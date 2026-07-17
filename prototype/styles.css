@@ -617,6 +617,18 @@ select {
   background: var(--signal-blue-soft);
 }
 
+.status-stack {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+}
+
+.status-stack small {
+  color: var(--machine-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
 .severity-critical {
   color: var(--safety-red);
   background: var(--safety-red-soft);
@@ -1254,6 +1266,23 @@ select {
     grid-column: 3;
     grid-row: 1 / 5;
     align-self: center;
+  }
+}
+
+@media (min-width: 681px) and (max-width: 880px) {
+  .group-exception-row {
+    grid-template-columns: 106px minmax(220px, 1fr) 86px 18px;
+    padding-left: 58px;
+  }
+
+  .group-exception-row .elapsed-time {
+    grid-column: auto;
+    justify-self: end;
+  }
+
+  .group-exception-row .row-arrow {
+    grid-column: auto;
+    grid-row: auto;
   }
 }
 

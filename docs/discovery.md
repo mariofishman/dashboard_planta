@@ -381,15 +381,16 @@ Catalog discovery identified the following likely data sources. Their precise Gr
 
 Do not assume that catalog field availability proves that a rule is implementable. Each rule still needs an exact GraphQL data mapping, timestamp semantics, join path, latency check, and representative live-record validation.
 
-## Severity hypothesis
+## Exception status model
 
-Severity remains unconfirmed. The rationale currently proposes:
+Version 1 will not distinguish critical from non-critical exceptions. Every violated rule represents an operational or data-recording error that should be corrected.
 
-- Informational: a required event is approaching its deadline.
-- Warning: a deadline or expected sequence has been violated without known downstream propagation.
-- Critical: the inconsistency is affecting another work order, material movement, inventory balance, machine process, or traceability chain.
+The interface should distinguish only between:
 
-Version 1 needs a minimal validated severity model before implementation. Thresholds should be configurable where operating times may change.
+- **Error detected:** the expected sequence, declaration, deadline, or balance rule has already been violated.
+- **Approaching deadline:** no error exists yet, but the system warns that a required action will become overdue soon.
+
+Thresholds for approaching deadlines should be configurable where operating times may change.
 
 ## Unresolved discovery questions
 
@@ -402,7 +403,7 @@ Highest-priority unresolved issues are:
 5. What signals can prove undeclared good production or undeclared waste?
 6. What formulas, units, tolerances, remnants, core weights, partial reels, and waste rules define a balanced closure?
 7. Which external notification channels are required in addition to the live dashboard?
-8. What minimal severity levels and escalation behavior are required for version 1?
+8. When should preventive warnings appear, and when should unresolved errors trigger external escalation?
 9. How quickly do relevant ERP events become available, and can sockets expose every required state change?
 10. Which GraphQL operations and relationships expose the evidence for each rule?
 

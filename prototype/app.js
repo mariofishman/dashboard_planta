@@ -208,46 +208,92 @@ const exceptions = [
   }
 ];
 
-const severityLabels = {
-  critical: "Crítica",
-  warning: "Advertencia",
-  info: "Por vencer"
+const statusLabels = {
+  error: "Error detectado",
+  upcoming: "Por vencer"
 };
 
 const list = document.querySelector("#exception-list");
 const emptyState = document.querySelector("#empty-state");
 const searchInput = document.querySelector("#search-input");
-const operationFilter = document.querySelector("#operation-filter");
-const severityButtons = [...document.querySelectorAll("[data-severity]")];
-const stageButtons = [...document.querySelectorAll("[data-stage]")];
+const queryPrefixButtons = [...document.querySelectorAll("[data-query-prefix]")];
 const drawer = document.querySelector("#detail-drawer");
 const scrim = document.querySelector("#drawer-scrim");
-let selectedSeverity = "all";
-let selectedStage = "all";
+const expandedOperations = new Set(exceptions.map((item) => item.operation));
+const expandedMachines = new Set();
+const expandedWorkOrders = new Set();
 let simulatedEventCount = 0;
 
-function traceMarkup(activeStage) {
-  return stages.map((stage, index) => {
-    let state = "is-future";
-    if (index < activeStage) state = "is-complete";
-    if (index === activeStage) state = "is-broken";
-    return `<span class="trace-step ${state}"><span class="trace-dot"></span><span>${stage}</span></span>`;
-  }).join("");
+function itemStatus(item) {
+  return item.severity === "info" ? "upcoming" : "error";
 }
 
-function rowMarkup(item) {
+function normalizeText(value) {
+  return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function searchableText(item) {
+  return normalizeText([
+    item.title,
+    item.description,
+    item.workOrder,
+    item.machine,
+    item.operation,
+    stages[item.stage],
+    ...item.evidence.flat()
+  ].join(" "));
+}
+
+function matchesSearch(item, rawQuery) {
+  const recognized = new Set(["operacion", "operation", "maquina", "machine", "ot", "workorder", "bobina", "reel", "codigo", "etapa", "stage"]);
+  const filters = [];
+  const remainder = rawQuery.replace(/([\p{L}_]+)\s*:\s*(?:"([^"]+)"|([^\s]+))/gu, (match, rawKey, quotedValue, plainValue) => {
+    const key = normalizeText(rawKey).replaceAll("_", "");
+    if (!recognized.has(key)) return match;
+    filters.push([key, normalizeText(quotedValue || plainValue)]);
+    return " ";
+  });
+
+  const sources = {
+    operacion: normalizeText(item.operation),
+    operation: normalizeText(item.operation),
+    maquina: normalizeText(item.machine),
+    machine: normalizeText(item.machine),
+    ot: normalizeText(item.workOrder),
+    workorder: normalizeText(item.workOrder),
+    bobina: searchableText(item),
+    reel: searchableText(item),
+    codigo: searchableText(item),
+    etapa: normalizeText(stages[item.stage]),
+    stage: normalizeText(stages[item.stage])
+  };
+
+  const scopedMatch = filters.every(([key, value]) => sources[key].includes(value));
+  const generalTerms = normalizeText(remainder).split(/\s+/).filter(Boolean);
+  return scopedMatch && generalTerms.every((term) => searchableText(item).includes(term));
+}
+
+function statusSummary(items) {
+  const errors = items.filter((item) => itemStatus(item) === "error").length;
+  const upcoming = items.length - errors;
   return `
-    <button class="exception-row ${item.isNew ? "is-new" : ""}" type="button" data-id="${item.id}" aria-label="Abrir excepción: ${item.title}">
-      <span class="severity-pill severity-${item.severity}">${severityLabels[item.severity]}</span>
+    ${errors ? `<span class="error-count-inline">${errors} ${errors === 1 ? "error" : "errores"}</span>` : ""}
+    ${upcoming ? `<span class="upcoming-count-inline">${upcoming} por vencer</span>` : ""}
+  `;
+}
+
+function exceptionRowMarkup(item) {
+  const status = itemStatus(item);
+  return `
+    <button class="group-exception-row ${item.isNew ? "is-new" : ""}" type="button" data-id="${item.id}" aria-label="Abrir excepción: ${item.title}">
+      <span class="status-stack">
+        <span class="status-pill status-${status}">${statusLabels[status]}</span>
+        <small>${stages[item.stage]}</small>
+      </span>
       <span class="exception-copy">
         <strong>${item.title}</strong>
         <span>${item.description}</span>
       </span>
-      <span class="work-order">
-        <strong>OT ${item.workOrder}</strong>
-        <span>${item.operation} · ${item.machine}</span>
-      </span>
-      <span class="flow-trace" aria-label="Excepción en ${stages[item.stage]}">${traceMarkup(item.stage)}</span>
       <span class="elapsed-time">
         <strong>${item.elapsed}</strong>
         <span>Detectada ${item.detected}</span>
@@ -258,50 +304,77 @@ function rowMarkup(item) {
 }
 
 function filteredExceptions() {
-  const query = searchInput.value.trim().toLowerCase();
-  const operation = operationFilter.value;
-  return exceptions.filter((item) => {
-    const matchesSeverity = selectedSeverity === "all" || item.severity === selectedSeverity;
-    const matchesStage = selectedStage === "all" || item.stage === Number(selectedStage);
-    const matchesOperation = operation === "all" || item.operation === operation;
-    const text = `${item.title} ${item.description} ${item.workOrder} ${item.machine} ${item.operation}`.toLowerCase();
-    return matchesSeverity && matchesStage && matchesOperation && text.includes(query);
-  });
+  const query = searchInput.value.trim();
+  return exceptions.filter((item) => matchesSearch(item, query));
 }
 
-function updateStageRail() {
-  const severityRank = { critical: 3, warning: 2, info: 1 };
-  stageButtons.forEach((button) => {
-    const stage = Number(button.dataset.stage);
-    const stageItems = exceptions.filter((item) => item.stage === stage);
-    const highestSeverity = stageItems.reduce((highest, item) => {
-      return severityRank[item.severity] > severityRank[highest] ? item.severity : highest;
-    }, "info");
-    button.classList.remove("has-critical", "has-warning", "has-info", "is-selected");
-    if (stageItems.length > 0) button.classList.add(`has-${highestSeverity}`);
-    if (selectedStage === button.dataset.stage) button.classList.add("is-selected");
-    button.setAttribute("aria-pressed", String(selectedStage === button.dataset.stage));
-    const countLabel = stageItems.length === 1 ? "1 excepción" : `${stageItems.length} excepciones`;
-    button.setAttribute("aria-label", `${stages[stage]}: ${countLabel}. Filtrar la lista.`);
-    button.querySelector("strong").textContent = stageItems.length;
-  });
+function groupBy(items, getKey) {
+  return items.reduce((groups, item) => {
+    const key = getKey(item);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+    return groups;
+  }, new Map());
+}
+
+function groupedMarkup(items) {
+  const searching = searchInput.value.trim().length > 0;
+  return [...groupBy(items, (item) => item.operation)].map(([operation, operationItems]) => {
+    const operationOpen = searching || expandedOperations.has(operation);
+    const machines = groupBy(operationItems, (item) => item.machine);
+    const machineMarkup = [...machines].map(([machine, machineItems]) => {
+      const machineKey = `${operation}|${machine}`;
+      const machineOpen = searching || expandedMachines.has(machineKey);
+      const workOrders = groupBy(machineItems, (item) => item.workOrder);
+      const workOrderMarkup = [...workOrders].map(([workOrder, workOrderItems]) => {
+        const workOrderKey = `${machineKey}|${workOrder}`;
+        const workOrderOpen = searching || expandedWorkOrders.has(workOrderKey);
+        return `
+          <div class="workorder-group">
+            <button class="workorder-header" type="button" data-workorder-group="${encodeURIComponent(workOrderKey)}" aria-expanded="${workOrderOpen}">
+              <span class="group-heading"><span class="group-caret" aria-hidden="true">›</span><strong>OT ${workOrder}</strong></span>
+              <span class="group-summary">${statusSummary(workOrderItems)}</span>
+            </button>
+            <div class="group-content" ${workOrderOpen ? "" : "hidden"}>${workOrderItems.map(exceptionRowMarkup).join("")}</div>
+          </div>
+        `;
+      }).join("");
+      return `
+        <div class="machine-group">
+          <button class="machine-header" type="button" data-machine-group="${encodeURIComponent(machineKey)}" aria-expanded="${machineOpen}">
+            <span class="group-heading"><span class="group-caret" aria-hidden="true">›</span><strong>Máquina ${machine}</strong></span>
+            <span class="group-summary"><span>${workOrders.size} ${workOrders.size === 1 ? "OT" : "OTs"}</span>${statusSummary(machineItems)}</span>
+          </button>
+          <div class="group-content" ${machineOpen ? "" : "hidden"}>${workOrderMarkup}</div>
+        </div>
+      `;
+    }).join("");
+    return `
+      <section class="operation-group">
+        <button class="operation-header" type="button" data-operation-group="${encodeURIComponent(operation)}" aria-expanded="${operationOpen}">
+          <span class="group-heading"><span class="group-caret" aria-hidden="true">›</span><strong>${operation}</strong></span>
+          <span class="group-summary"><span>${machines.size} ${machines.size === 1 ? "máquina" : "máquinas"}</span>${statusSummary(operationItems)}</span>
+        </button>
+        <div class="group-content" ${operationOpen ? "" : "hidden"}>${machineMarkup}</div>
+      </section>
+    `;
+  }).join("");
 }
 
 function render() {
   const items = filteredExceptions();
-  list.innerHTML = items.map(rowMarkup).join("");
+  list.innerHTML = groupedMarkup(items);
   emptyState.hidden = items.length !== 0;
-  document.querySelector("#active-count").textContent = exceptions.length;
-  document.querySelector("#critical-count").textContent = exceptions.filter((item) => item.severity === "critical").length;
-  document.querySelector("#warning-count").textContent = exceptions.filter((item) => item.severity === "warning").length;
-  document.querySelector("#info-count").textContent = exceptions.filter((item) => item.severity === "info").length;
-  updateStageRail();
+  document.querySelector("#result-count").textContent = items.length;
+  document.querySelector("#error-count").textContent = exceptions.filter((item) => itemStatus(item) === "error").length;
+  document.querySelector("#upcoming-count").textContent = exceptions.filter((item) => itemStatus(item) === "upcoming").length;
 }
 
 function openDrawer(item) {
-  const severity = document.querySelector("#drawer-severity");
-  severity.className = `severity-pill severity-${item.severity}`;
-  severity.textContent = severityLabels[item.severity];
+  const status = itemStatus(item);
+  const statusElement = document.querySelector("#drawer-status");
+  statusElement.className = `status-pill status-${status}`;
+  statusElement.textContent = statusLabels[status];
   document.querySelector("#drawer-title").textContent = item.title;
   document.querySelector("#drawer-context").innerHTML = `
     <div class="context-item"><span>Orden de trabajo</span><strong>${item.workOrder}</strong></div>
@@ -362,7 +435,7 @@ function simulateSocketEvent() {
     evidence: [
       [detectedTime, "Reserva parcial", "1 de 2 bobinas"],
       [detectedTime, "OT iniciada", "Usuario: José V."],
-      [detectedTime, "Excepción crítica", "Reserva incompleta"]
+      [detectedTime, "Error detectado", "Reserva incompleta"]
     ],
     audience: ["Gerente de planta", "Supervisor de impresión", "Líder de impresión", "Responsable de reservas"],
     isNew: true
@@ -375,23 +448,41 @@ function simulateSocketEvent() {
 
 list.addEventListener("click", (event) => {
   const row = event.target.closest("[data-id]");
-  if (!row) return;
-  openDrawer(exceptions.find((item) => item.id === Number(row.dataset.id)));
+  if (row) {
+    openDrawer(exceptions.find((item) => item.id === Number(row.dataset.id)));
+    return;
+  }
+
+  const operationButton = event.target.closest("[data-operation-group]");
+  if (operationButton) {
+    const key = decodeURIComponent(operationButton.dataset.operationGroup);
+    expandedOperations.has(key) ? expandedOperations.delete(key) : expandedOperations.add(key);
+    render();
+    return;
+  }
+
+  const machineButton = event.target.closest("[data-machine-group]");
+  if (machineButton) {
+    const key = decodeURIComponent(machineButton.dataset.machineGroup);
+    expandedMachines.has(key) ? expandedMachines.delete(key) : expandedMachines.add(key);
+    render();
+    return;
+  }
+
+  const workOrderButton = event.target.closest("[data-workorder-group]");
+  if (workOrderButton) {
+    const key = decodeURIComponent(workOrderButton.dataset.workorderGroup);
+    expandedWorkOrders.has(key) ? expandedWorkOrders.delete(key) : expandedWorkOrders.add(key);
+    render();
+  }
 });
 
 searchInput.addEventListener("input", render);
-operationFilter.addEventListener("change", render);
-severityButtons.forEach((button) => {
+queryPrefixButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    selectedSeverity = button.dataset.severity;
-    severityButtons.forEach((candidate) => candidate.classList.toggle("is-active", candidate === button));
-    render();
-  });
-});
-stageButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    selectedStage = selectedStage === button.dataset.stage ? "all" : button.dataset.stage;
-    render();
+    const spacer = searchInput.value && !searchInput.value.endsWith(" ") ? " " : "";
+    searchInput.value += `${spacer}${button.dataset.queryPrefix}`;
+    searchInput.focus();
   });
 });
 document.querySelector("#close-drawer").addEventListener("click", closeDrawer);

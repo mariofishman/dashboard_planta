@@ -15,7 +15,7 @@
 - The primary value is rapid detection, explanation, prioritization, and support for correcting factory errors through existing operational workflows.
 - Initial scope follows the live work-order and material-flow lifecycle, from reservation and pre-start movement through consumption, production, weighing, downstream movement, and closure.
 - The dashboard should preserve evidence and distinguish confirmed violations from suspected inconsistencies.
-- Severity should reflect elapsed time and downstream operational consequences.
+- Version 1 will treat every violated rule as an error rather than distinguishing critical and non-critical exceptions. Approaching-deadline warnings remain separate because the error has not happened yet.
 - Exceptions should link directly to the relevant EMUSA Soft work order, reel, material transfer, machine, or user record.
 - The first known candidate rules are:
   1. Work order started before required material transfer.
@@ -23,7 +23,7 @@
   3. Closed work order with incomplete or unbalanced declarations.
   4. Produced reel not weighed within 30 minutes.
   5. Downstream use of a reel with incomplete required information.
-- Visual design should wait until users, evidence, rules, severity, and resolution workflows are sufficiently understood.
+- Visual design should wait until users, evidence, rules, preventive-warning timing, and resolution workflows are sufficiently understood.
 - The primary dashboard users are the factory manager, operation supervisors, technical operation leaders, and the process team with its supervisors.
 - Known operations are extrusion, extrusion lamination (`Exlam`), printing, adhesive lamination, cutting, and bag making or sealing.
 - Each operation has three rotating 12-hour shifts, with two shifts working each day.
@@ -83,7 +83,7 @@
 - Separate deterministic violations from inferred or suspicious conditions.
 - Define balance calculations, units, tolerances, waste, remnants, partial reels, and setup losses.
 - Validate whether the 30-minute weighing threshold is universal.
-- Define severity, notification escalation, and operational responsibility rules.
+- Define preventive-warning timing, notification escalation, and operational responsibility rules.
 - Confirm socket event coverage, fallback refresh needs, and external notification channels.
 - Create the remaining foundational files after discovery provides enough detail:
   - `readme.md`
