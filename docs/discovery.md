@@ -1,0 +1,418 @@
+# EMUSA Soft Factory Operations Dashboard: Product Discovery
+
+## Purpose
+
+This is the canonical detailed record of product-discovery findings for the EMUSA Soft factory-operations dashboard. It captures confirmed operating knowledge, candidate exception rules, available evidence, unresolved decisions, and the first-release boundary.
+
+Use this document for detailed discovery. Keep `project_context.md` as the concise project handoff and `dashboard_rationale.md` as the stable product rationale.
+
+## Product direction
+
+The product is a live operational exception dashboard. It should compare the expected production and material flow with events recorded in EMUSA Soft, then inform the relevant factory personnel when required events are missing, late, contradictory, or unbalanced.
+
+The dashboard complements the ERP. It does not replace production, inventory, weighing, or work-order workflows.
+
+### First-release boundary
+
+Version 1 should:
+
+- be an online dashboard updated live through sockets;
+- detect and display operational exceptions;
+- show enough evidence to understand the affected work order, reel, machine, operation, timing, and responsible area;
+- make the factory manager aware of all exceptions;
+- make the affected operation's supervisors and technical leaders aware;
+- involve the process team when transport, weighing, or another process-team action is implicated; and
+- direct users back to existing operational workflows to correct the underlying record or process.
+
+Version 1 should not:
+
+- acknowledge, assign, resolve, dismiss, or override exceptions inside the dashboard;
+- edit ERP records;
+- replace the existing factory applications; or
+- implement the complete digital-twin direction.
+
+Operational personnel will try to correct an exception using existing processes. If they cannot, they will contact the project leader. In-dashboard resolution may be considered for version 2.
+
+## Users and operational organization
+
+### Primary users
+
+- Factory manager: should have access to and remain aware of all exceptions.
+- Operation supervisors: should monitor exceptions affecting their operation during their shift.
+- Technical operation leaders: should receive exceptions affecting the operation they lead.
+- Process-team supervisors and personnel: should receive exceptions involving movement, pickup, weighing, curing, or delivery between operations.
+
+All authorized users need dashboard access. Visibility should be broad, while operational relevance determines who must be notified first.
+
+### Factory operations
+
+The known operations are:
+
+1. Extrusion
+2. Extrusion lamination (`Exlam`)
+3. Printing presses
+4. Adhesive lamination
+5. Cutting
+6. Bag making, also called sealing
+
+Each operation has three rotating shifts. Shifts are 12 hours; two shifts work each day and the three shifts rotate so personnel rest on alternating days.
+
+Some important operations also have technical leaders. Printing has one or two leaders whose responsibilities include the presses, cliché preparation, and ink preparation.
+
+### Process team
+
+The process team moves material within the factory. Its work is distinct from warehouse dispatch. For a produced reel, the process team may:
+
+1. collect it from the machine;
+2. take it to the scale;
+3. weigh it; and
+4. move it to a curing or waiting warehouse, or directly to the next operation.
+
+The process team and its supervisors are important dashboard users whenever an exception depends on one of these actions.
+
+## Notification and responsibility model
+
+The dashboard is informative in version 1, so ownership means responsibility for operational attention rather than assignment inside the product.
+
+- The factory manager should always be aware of every exception.
+- Supervisors and technical leaders of the affected operation should be made aware immediately.
+- Process personnel and their supervisors should be made aware when their movement, pickup, weighing, or delivery action is involved.
+- All authorized users may see the dashboard simultaneously.
+- The dashboard should not automatically blame an individual when the evidence could indicate a process delay, missing record, device issue, configuration problem, or software defect.
+
+The exact external notification channels have not been selected.
+
+## Current operational flow and candidate exceptions
+
+The rules below are discovery findings, not yet implementation-ready specifications. Configurable thresholds and uncertain interpretations are identified explicitly.
+
+### 1. Work-order planning and raw-material reservation
+
+When a work order is planned, David Alba manually reserves the raw-material reels intended for it. Most raw materials are reels, and each reel has a unique code (`Código Único`).
+
+The reservation tells warehouse personnel exactly which reels to send. Warehouse personnel should fulfill the reservation rather than decide independently which reels belong to a work order.
+
+Candidate exception:
+
+- A work order is starting or has started without its required reels being reserved.
+
+Primary audience:
+
+- Factory manager
+- Affected operation's supervisor and technical leader
+- Planning or reservation owner
+
+Expected evidence:
+
+- Work-order identifier and operation
+- Planned and actual start times
+- Reserved reel unique codes
+- Reservation status and timestamp
+- Reservation creator
+
+### 2. Pre-start warehouse dispatch
+
+Reserved reels should be sent from the warehouse before the work order begins. The desired lead time may be 30, 60, or 90 minutes and must be configurable until validated.
+
+Candidate exception:
+
+- A work order is approaching its planned start and one or more reserved reels have not been sent.
+
+Primary audience:
+
+- Factory manager
+- Affected operation's supervisor and technical leader
+- Warehouse personnel or supervisor
+
+Expected evidence:
+
+- Planned work-order start
+- Configured dispatch lead time
+- Reserved reels
+- Dispatch status and timestamp for each reel
+- Origin and intended destination
+
+### 3. Material in transit and operator receipt
+
+After the warehouse sends a reel, the operator must receive it in the `Flujo de Materiales` workflow. Until receipt is recorded, the reel remains in transit.
+
+The warehouse is adjacent to the machines. A long transit state may mean the reel was delivered physically but the operator did not record digital receipt.
+
+Candidate exception:
+
+- A reel remains in transit for more than 30 minutes.
+
+The 30-minute transit threshold is the current proposal and should be configurable until validated.
+
+Primary audience:
+
+- Factory manager
+- Receiving operation's supervisor and technical leader
+- Warehouse personnel or supervisor
+- Process team when it performed the movement
+
+Expected evidence:
+
+- Reel unique code
+- Dispatch timestamp
+- Elapsed transit time
+- Origin and destination
+- Sender
+- Receipt status, receiver, and receipt timestamp
+- Related work order and machine
+
+### 4. Work-order sequence
+
+Operators should start work orders according to the active production plan. Supervisors may reorganize the planner's proposed sequence during the day, so the rule must compare against the latest approved operational sequence rather than only the original plan.
+
+Candidate exception:
+
+- An operator starts a work order that is not next in the current approved sequence.
+
+Primary audience:
+
+- Factory manager
+- Affected operation's supervisor and technical leader
+
+Expected evidence:
+
+- Machine or line
+- Work order started
+- Actual start time and starting user
+- Current approved sequence and its last change
+- Work order expected to start next
+
+### 5. Consumption after work-order start
+
+When a work order starts, the operator should begin consuming the correct reserved reels. A running work order cannot physically operate without raw material.
+
+Candidate exceptions:
+
+- A work order has been running beyond an allowed interval without any recorded consumption.
+- The reels recorded as consumed do not match the reels reserved for the work order.
+
+The allowed interval after work-order start has not been defined.
+
+Primary audience:
+
+- Factory manager
+- Affected operation's supervisor and technical leader
+
+Expected evidence:
+
+- Work-order actual start time
+- Reserved reel unique codes
+- Consumed reel unique codes
+- Consumption timestamps and users
+- Elapsed time without consumption
+- Reel locations and material compatibility
+
+The absence of a digital consumption event is deterministic. Whether physical consumption occurred is an inference unless another signal proves it.
+
+### 6. Work-order closure and material balance
+
+`Cierre de OTs` is the process of declaring a work order finished. During closure, the operator declares how many meters the machine ran.
+
+Expected reel length can be calculated approximately from:
+
+- reel weight;
+- reel width; and
+- basis weight in grams per square meter (`g/m²`).
+
+The declared run length can be compared with the approximate meters available in the consumed reels. For example, if three consumed reels represent approximately 30,000 meters but the operator declares 40,000 meters, another consumed reel or declaration may be missing.
+
+Candidate exceptions or notices:
+
+- Declared run meters materially exceed the estimated meters in consumed reels.
+- Reserved reels remain unconsumed when the work order closes.
+- Production and consumption declarations are incomplete or unbalanced at closure.
+- A work order is truncated before consuming all reserved material.
+
+A truncated work order is not inherently an error. It may be justified by a machine problem or another operating condition, but it should be surfaced for review.
+
+Primary audience:
+
+- Factory manager
+- Affected operation's supervisor and technical leader
+- Reconciliation personnel, if applicable
+
+Expected evidence:
+
+- Declared run meters
+- Reserved and consumed reel unique codes
+- Weight, width, basis weight, and estimated meters for each reel
+- Total planned, consumed, and declared meters
+- Configured tolerance
+- Closure time and closing user
+- Truncation status, reason, requester, and approval information
+
+The exact formula, units, core-weight treatment, tolerances, waste treatment, remnants, and partial-reel rules remain unresolved.
+
+### 7. Good-production declaration
+
+During a running work order, the operator should declare each produced reel when the machine's rewinder is full and the reel is unloaded to the floor.
+
+The declaration prints a label with a barcode and unique code. The new reel initially has an unweighed status because there is no scale at the machine.
+
+Candidate exception:
+
+- Evidence indicates that a reel was produced, but its production declaration or label was not created promptly.
+
+The available evidence and allowed delay for detecting an undeclared physical reel remain unresolved.
+
+Primary audience:
+
+- Factory manager
+- Affected operation's supervisor and technical leader
+- Process team when pickup should have occurred
+
+Expected evidence:
+
+- Source work order and machine
+- Production declaration time
+- Produced reel unique code and barcode
+- Declaring operator
+- Weighing status
+
+### 8. Produced-reel pickup and weighing
+
+After declaration, the process team should collect the reel, take it to the scale, weigh it, and move it to its next location.
+
+Candidate exceptions:
+
+- A declared reel has not been collected or moved away from the machine within the allowed time.
+- A declared reel has not been weighed within the allowed time.
+
+Thirty minutes is the current proposed threshold for pickup and weighing. Whether these are one combined deadline or separate deadlines remains unresolved.
+
+Primary audience:
+
+- Factory manager
+- Source operation's supervisor and technical leader
+- Process team and process supervisor
+
+Expected evidence:
+
+- Produced reel unique code
+- Source work order and machine
+- Production declaration timestamp
+- Current location or movement state
+- Pickup or movement timestamp
+- Scale record and weighing timestamp
+- Elapsed time
+- Destination operation or warehouse
+
+### 9. Waste declaration and weighing
+
+Bad production may accumulate in a waste bag. When the bag is full and closed, it should receive a printed barcode label and be weighed promptly.
+
+Candidate exceptions:
+
+- A closed waste bag was not declared and labeled promptly.
+- A declared waste bag was not weighed within the allowed time.
+
+Primary audience:
+
+- Factory manager
+- Affected operation's supervisor and technical leader
+- Process team and process supervisor when pickup or weighing is involved
+
+Expected evidence:
+
+- Source work order, operation, and machine
+- Waste declaration and label timestamps
+- Waste bag unique code or barcode
+- Scale record and weighing timestamp
+- Weight and waste category
+- Elapsed time
+
+The signal proving that a physical waste bag was closed but not declared remains unresolved.
+
+### 10. Downstream movement after weighing
+
+A weighed good-production reel may be moved to a warehouse to cure or wait for the next shift, or it may go directly to a downstream operation such as lamination.
+
+Candidate exceptions for this stage have not yet been elicited. Discovery should continue from this point.
+
+## Initial rule classification
+
+### Likely deterministic rules
+
+These conditions can likely be evaluated directly if the required timestamps and relationships are available:
+
+- Work order reaches its start without required reservations.
+- Reserved reel is not dispatched by the configured pre-start deadline.
+- Reel remains in transit beyond the configured threshold.
+- Work order starts out of the latest approved sequence.
+- Running work order has no recorded consumption after the configured interval.
+- Reserved and consumed reel codes differ.
+- Closed work order has missing or unbalanced declarations.
+- Declared produced reel or waste bag remains unweighed beyond the configured threshold.
+- Incomplete produced reel is moved to or used by a downstream work order.
+
+### Inferred or context-dependent conditions
+
+These conditions require corroborating evidence or human interpretation:
+
+- A physically produced reel was not digitally declared.
+- A physical waste bag was closed but not digitally declared.
+- Missing consumption inferred from declared run meters.
+- Unused reserved material caused by legitimate truncation rather than an error.
+- A long transit state reflects missing digital receipt rather than delayed physical movement.
+
+The interface must distinguish confirmed rule violations from suspected inconsistencies.
+
+## ERP evidence identified so far
+
+The EMUSA ERP catalog inspected on 2026-07-17 is schema version 2, generated on 2026-07-13, with 1,034 GraphQL operations, 345 entities, 345 SQL tables, and 1,034 examples.
+
+Catalog discovery identified the following likely data sources. Their precise GraphQL operations, relationships, and live values still require description and validation before implementation:
+
+- `pre_reserva_orden_trabajo`: work-order pre-reservation status and audit timestamps.
+- `ordenes_produccion`: planned and executed production dates and status.
+- `orden_produccion_borrador_trabajos`: planned work-order order within a production draft.
+- `ordenes_trabajo`: planned and executed dates, consumed and planned totals, closure, truncation, and reel tolerances.
+- `orden_trabajo_materiales`: reservation state, incoming and consumed quantities, linear meters, closure actions, and flow relationships.
+- `articulo_serial`: reel serial code, quantities, dimensions, basis weight, scans, operation, and audit timestamps.
+- `flujo_materiales` and `flujo_materiales_detalles`: origins, destinations, transit and received quantities, status, receiver, and receipt time.
+- `orden_trabajo_salidas` and `orden_trabajo_salida_detalles`: output quantities and weighed, unweighed, partial, or observed output state.
+- `balanza_cargas` and `balanza_carga_detalle_registros`: serial codes, weighing mode, weights, and weighing audit timestamps.
+- `operaciones`: operation configuration, reel tolerances, waste threshold, and minimum process duration.
+
+Do not assume that catalog field availability proves that a rule is implementable. Each rule still needs an exact GraphQL data mapping, timestamp semantics, join path, latency check, and representative live-record validation.
+
+## Severity hypothesis
+
+Severity remains unconfirmed. The rationale currently proposes:
+
+- Informational: a required event is approaching its deadline.
+- Warning: a deadline or expected sequence has been violated without known downstream propagation.
+- Critical: the inconsistency is affecting another work order, material movement, inventory balance, machine process, or traceability chain.
+
+Version 1 needs a minimal validated severity model before implementation. Thresholds should be configurable where operating times may change.
+
+## Unresolved discovery questions
+
+Highest-priority unresolved issues are:
+
+1. What happens to good reels and waste after weighing, and which failures occur in the downstream flow?
+2. What remaining exception scenarios should version 1 include?
+3. Which proposed time thresholds are universal, and which vary by operation, shift, machine, or material?
+4. What is the exact latest-approved production sequence and how is a supervisor's reordering recorded?
+5. What signals can prove undeclared good production or undeclared waste?
+6. What formulas, units, tolerances, remnants, core weights, partial reels, and waste rules define a balanced closure?
+7. Which external notification channels are required in addition to the live dashboard?
+8. What minimal severity levels and escalation behavior are required for version 1?
+9. How quickly do relevant ERP events become available, and can sockets expose every required state change?
+10. Which GraphQL operations and relationships expose the evidence for each rule?
+
+## Documentation organization
+
+The project does not need to move every Markdown file into `docs/`.
+
+- Keep `AGENTS.md` at the repository root because tooling expects project instructions there.
+- Keep `project_context.md` at the root as the main handoff entry point.
+- Keep `dashboard_rationale.md` at the root as the stable product rationale and prominent project reference.
+- Store detailed, growing documentation such as this discovery record under `docs/`.
+
+This separates root-level entry documents from detailed working documentation without breaking their established roles.

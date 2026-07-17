@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>EMUSA | Control de planta</title>
+    <link rel="stylesheet" href="styles.css?v=3" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <span class="brand-mark" aria-hidden="true">E</span>
+          <div>
+            <strong>EMUSA</strong>
+            <span>Control de planta</span>
+          </div>
+        </div>
+
+        <div class="topbar-status">
+          <div class="live-status" aria-label="Conexión en vivo activa">
+            <span class="live-dot" aria-hidden="true"></span>
+            En vivo
+          </div>
+          <time id="current-time" datetime=""></time>
+          <button class="ghost-button" id="simulate-event" type="button">Simular evento</button>
+          <button class="avatar-button" type="button" aria-label="Abrir perfil de usuario">FM</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="page-heading" aria-labelledby="page-title">
+          <div>
+            <p class="eyebrow">Viernes 17 de julio · Turno día</p>
+            <h1 id="page-title">Excepciones activas</h1>
+            <p>Eventos que requieren atención en el flujo de producción.</p>
+          </div>
+
+          <div class="attention-summary" aria-label="Resumen de excepciones">
+            <div class="summary-critical">
+              <span>Críticas</span>
+              <strong id="critical-count">3</strong>
+            </div>
+            <div>
+              <span>Advertencias</span>
+              <strong id="warning-count">5</strong>
+            </div>
+            <div>
+              <span>Por vencer</span>
+              <strong id="info-count">2</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="flow-rail" aria-label="Estado del flujo operativo">
+          <div class="rail-label">
+            <span>Flujo operativo</span>
+            <strong>12 OTs activas</strong>
+          </div>
+          <div class="rail-stages">
+            <button class="rail-stage" data-stage="0" type="button" aria-pressed="false">
+              <span>Reserva</span>
+              <strong>0</strong>
+            </button>
+            <button class="rail-stage" data-stage="1" type="button" aria-pressed="false">
+              <span>Envío</span>
+              <strong>0</strong>
+            </button>
+            <button class="rail-stage" data-stage="2" type="button" aria-pressed="false">
+              <span>Tránsito</span>
+              <strong>0</strong>
+            </button>
+            <button class="rail-stage" data-stage="3" type="button" aria-pressed="false">
+              <span>Consumo</span>
+              <strong>0</strong>
+            </button>
+            <button class="rail-stage" data-stage="4" type="button" aria-pressed="false">
+              <span>Producción</span>
+              <strong>0</strong>
+            </button>
+            <button class="rail-stage" data-stage="5" type="button" aria-pressed="false">
+              <span>Pesaje</span>
+              <strong>0</strong>
+            </button>
+            <button class="rail-stage" data-stage="6" type="button" aria-pressed="false">
+              <span>Cierre</span>
+              <strong>0</strong>
+            </button>
+          </div>
+        </section>
+
+        <section class="queue-panel" aria-labelledby="queue-title">
+          <div class="queue-toolbar">
+            <div class="view-tabs" role="tablist" aria-label="Vista de excepciones">
+              <button class="view-tab is-active" type="button" role="tab" aria-selected="true">Activas <span id="active-count">10</span></button>
+              <button class="view-tab" type="button" role="tab" aria-selected="false">Todas</button>
+            </div>
+
+            <div class="filters">
+              <label class="search-control">
+                <span class="sr-only">Buscar</span>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m21 21-4.35-4.35m2.35-5.65a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" /></svg>
+                <input id="search-input" type="search" placeholder="Buscar OT, máquina o código" />
+              </label>
+              <select id="operation-filter" aria-label="Filtrar por operación">
+                <option value="all">Todas las operaciones</option>
+                <option value="Impresión">Impresión</option>
+                <option value="Exlam">Exlam</option>
+                <option value="Laminación">Laminación</option>
+                <option value="Corte">Corte</option>
+                <option value="Sellado">Sellado</option>
+              </select>
+              <div class="severity-filter" role="group" aria-label="Filtrar por severidad">
+                <button class="filter-chip is-active" data-severity="all" type="button">Todas</button>
+                <button class="filter-chip" data-severity="critical" type="button">Críticas</button>
+                <button class="filter-chip" data-severity="warning" type="button">Advertencias</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="queue-header" aria-hidden="true">
+            <span>Prioridad</span>
+            <span>Excepción</span>
+            <span>OT / Máquina</span>
+            <span>Punto del flujo</span>
+            <span>Tiempo</span>
+            <span></span>
+          </div>
+
+          <div class="exception-list" id="exception-list" aria-live="polite"></div>
+          <div class="empty-state" id="empty-state" hidden>
+            <strong>No hay excepciones con estos filtros</strong>
+            <span>Prueba con otra operación o severidad.</span>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="drawer-scrim" id="drawer-scrim" hidden></div>
+    <aside class="detail-drawer" id="detail-drawer" aria-labelledby="drawer-title" aria-hidden="true">
+      <div class="drawer-header">
+        <div>
+          <span class="severity-pill" id="drawer-severity"></span>
+          <h2 id="drawer-title"></h2>
+        </div>
+        <button class="icon-button" id="close-drawer" type="button" aria-label="Cerrar detalle">×</button>
+      </div>
+      <div class="drawer-content">
+        <section class="drawer-section context-grid" id="drawer-context"></section>
+        <section class="drawer-section">
+          <p class="section-label">Qué ocurrió</p>
+          <div class="expectation-pair">
+            <div>
+              <span>Esperado</span>
+              <p id="drawer-expected"></p>
+            </div>
+            <div class="recorded-state">
+              <span>Registrado</span>
+              <p id="drawer-recorded"></p>
+            </div>
+          </div>
+        </section>
+        <section class="drawer-section">
+          <p class="section-label">Secuencia de evidencia</p>
+          <ol class="evidence-timeline" id="drawer-evidence"></ol>
+        </section>
+        <section class="drawer-section">
+          <p class="section-label">Personas informadas</p>
+          <div class="audience-list" id="drawer-audience"></div>
+        </section>
+      </div>
+      <div class="drawer-footer">
+        <p>La corrección se realiza en EMUSA Soft.</p>
+        <a class="primary-link" href="#" id="erp-link">Abrir registro en EMUSA Soft <span aria-hidden="true">↗</span></a>
+      </div>
+    </aside>
+
+    <div class="socket-toast" id="socket-toast" role="status" aria-live="polite" hidden>
+      <span class="toast-pulse" aria-hidden="true"></span>
+      Nueva excepción recibida
+    </div>
+
+    <script src="app.js?v=4"></script>
+  </body>
+</html>
