@@ -6,7 +6,7 @@ This is the canonical detailed record of product-discovery findings for the EMUS
 
 Use this document for detailed discovery. Keep `project_context.md` as the concise project handoff and `dashboard_rationale.md` as the stable product rationale.
 
-The editable alert-by-alert review artifact is `docs/alert_catalog.md`. Its current annotation-friendly browser mirror is `prototype/alert_catalog_v2.html`; `prototype/alert_catalog.html` preserves the first annotated iteration.
+The editable alert-by-alert review artifact is `docs/alert_catalog.md`. Its current annotation-friendly browser mirror is `prototype/alert-catalog/v2/index.html`; `prototype/alert-catalog/v1/index.html` preserves the first annotated iteration.
 
 ## Product direction
 

@@ -1,4 +1,4 @@
-@import url("alert_catalog.css?v=1");
+@import url("../v1/styles.css?v=1");
 
 .header-links { display: flex; align-items: center; gap: 18px; }
 .header-links a { color: var(--signal-blue); font-size: 12px; font-weight: 700; text-decoration: none; }
@@ -55,4 +55,3 @@
   .family-code { width: 42px; height: 42px; font-size: 18px; }
   .rule-note { margin-right: 18px; margin-left: 18px; }
 }
-
