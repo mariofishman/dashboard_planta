@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-18T00:00:00-05:00",
+  "title": "Design System: EMUSA Operations",
+  "extensions": {
+    "colorMeta": {
+      "emusa-navy": { "role": "primary", "displayName": "EMUSA Navy", "canonical": "#00246B", "tonalRamp": ["#000B20", "#00143B", "#001D57", "#00246B", "#284A86", "#5D75A0", "#A6B2CA", "#EEF1F6"] },
+      "action-cyan": { "role": "primary", "displayName": "Action Cyan", "canonical": "#007ACC", "tonalRamp": ["#001827", "#00324F", "#00527F", "#007ACC", "#3C9ADB", "#78BAE7", "#B7DCF3", "#EAF6FC"] },
+      "process-green": { "role": "secondary", "displayName": "Process Green", "canonical": "#008A49", "tonalRamp": ["#002016", "#003D25", "#006238", "#008A49", "#31A66B", "#70C498", "#B4E1C8", "#EDF8F1"] },
+      "canvas": { "role": "neutral", "displayName": "Operational Canvas", "canonical": "#F5F5F5", "tonalRamp": ["#18191C", "#313238", "#50525A", "#72747C", "#9A9CA3", "#C2C3C7", "#E3E4E6", "#F5F5F5"] },
+      "surface": { "role": "neutral", "displayName": "Clean Surface", "canonical": "#FFFFFF", "tonalRamp": ["#17181B", "#303137", "#505158", "#73757C", "#9B9DA3", "#C4C5C9", "#E7E7E9", "#FFFFFF"] },
+      "selected-soft": { "role": "neutral", "displayName": "Selected Soft Blue", "canonical": "#E2EBFD", "tonalRamp": ["#111A2F", "#243454", "#3F5680", "#647DA9", "#91A7CF", "#BBCBE8", "#DCE6F8", "#F4F7FE"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Corporate Display", "purpose": "Public-facing hero and executive overview only." },
+      "headline": { "displayName": "Page Headline", "purpose": "Page titles and major report headings." },
+      "title": { "displayName": "Panel Title", "purpose": "Panels, dialogs, and grouped regions." },
+      "body": { "displayName": "Operational Body", "purpose": "Explanations, values, forms, and standard content." },
+      "label": { "displayName": "Control Label", "purpose": "Buttons, filters, statuses, and navigation." }
+    },
+    "shadows": [
+      { "name": "surface-low", "value": "0 1px 3px rgba(0,0,0,.08)", "purpose": "Floating or clickable surface." },
+      { "name": "surface-hover", "value": "0 4px 12px rgba(0,0,0,.12)", "purpose": "Hover state for clickable tiles only." },
+      { "name": "navigation", "value": "0 2px 8px rgba(0,0,0,.06)", "purpose": "Sticky navigation separation." },
+      { "name": "dialog", "value": "0 16px 40px rgba(0,36,107,.16)", "purpose": "Dialogs and popovers." }
+    ],
+    "motion": [
+      { "name": "fast", "value": "150ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Hover and focus feedback." },
+      { "name": "standard", "value": "200ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "State transitions and panel changes." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action for an operational workflow.",
+      "html": "<button class=\"ds-btn-primary\">Confirm receipt</button>",
+      "css": ".ds-btn-primary { min-height: 40px; padding: 10px 18px; border: 0; border-radius: 10px; background: #007ACC; color: #FFFFFF; font: 600 13px/1.4 Montserrat, system-ui, sans-serif; letter-spacing: .02em; transition: background 150ms cubic-bezier(.22,1,.36,1), transform 150ms cubic-bezier(.22,1,.36,1); } .ds-btn-primary:hover { background: #006BA8; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid #3D7EFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary or cancel action.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { min-height: 40px; padding: 10px 18px; border: 1px solid #D8DDE8; border-radius: 10px; background: #FFFFFF; color: #00246B; font: 600 13px/1.4 Montserrat, system-ui, sans-serif; letter-spacing: .02em; transition: background 150ms cubic-bezier(.22,1,.36,1), border-color 150ms cubic-bezier(.22,1,.36,1); } .ds-btn-secondary:hover { background: #F5F5F5; border-color: #A9B4CA; } .ds-btn-secondary:focus-visible { outline: 2px solid #3D7EFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-default",
+      "description": "Standard operational text input.",
+      "html": "<label class=\"ds-field\"><span>Work order</span><input value=\"488560-01\" /></label>",
+      "css": ".ds-field { display: grid; gap: 8px; color: #00246B; font: 600 13px/1.4 Montserrat, system-ui, sans-serif; } .ds-field input { min-height: 40px; padding: 10px 12px; border: 1px solid #D8DDE8; border-radius: 10px; background: #FFFFFF; color: #00246B; font: 400 14px/20px Montserrat, system-ui, sans-serif; } .ds-field input:hover { border-color: #A9B4CA; } .ds-field input:focus-visible { outline: 2px solid #3D7EFF; outline-offset: 2px; border-color: #007ACC; }"
+    },
+    {
+      "name": "Selected Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "Active dashboard filter or selected state.",
+      "html": "<button class=\"ds-chip-selected\">In progress</button>",
+      "css": ".ds-chip-selected { min-height: 32px; padding: 6px 12px; border: 0; border-radius: 9999px; background: #E2EBFD; color: #00246B; font: 600 13px/1.4 Montserrat, system-ui, sans-serif; } .ds-chip-selected:hover { background: #D4E2FC; } .ds-chip-selected:focus-visible { outline: 2px solid #3D7EFF; outline-offset: 2px; }"
+    },
+    {
+      "name": "Operational Card",
+      "kind": "card",
+      "refersTo": "card-default",
+      "description": "A single grouped region; not a wrapper for more cards.",
+      "html": "<section class=\"ds-card\"><h3>Production today</h3><strong>18,420 kg</strong><p>Updated 4 minutes ago</p></section>",
+      "css": ".ds-card { padding: 24px; border: 1px solid #E0E0E0; border-radius: 16px; background: #FFFFFF; color: #00246B; font-family: Montserrat, system-ui, sans-serif; } .ds-card h3 { margin: 0 0 16px; font-size: 14px; line-height: 20px; font-weight: 600; } .ds-card strong { display: block; font-size: 30px; line-height: 1.15; font-weight: 700; font-variant-numeric: tabular-nums; } .ds-card p { margin: 8px 0 0; color: #4D608A; font-size: 13px; line-height: 18px; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "status-success",
+      "description": "Text-backed operational status indicator.",
+      "html": "<span class=\"ds-status-success\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M6.4 11.2 3.2 8l1.1-1.1 2.1 2.1 5.3-5.3L12.8 5z\"/></svg>Completed</span>",
+      "css": ".ds-status-success { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 9999px; background: #E6F5ED; color: #006637; font: 600 13px/1.4 Montserrat, system-ui, sans-serif; } .ds-status-success svg { width: 16px; height: 16px; fill: currentColor; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Connected Production Floor",
+    "overview": "EMUSA Operations combines EMUSA's corporate authority with Vescrow's quiet, soft-futuristic product grammar. Brand color structures the interface and communicates state without competing with operational data.",
+    "keyCharacteristics": ["EMUSA identity first", "Soft but compact product controls", "Restrained functional color", "Real manufacturing imagery", "Dense information with earned familiarity"],
+    "rules": [
+      { "name": "Brand Authority", "body": "EMUSA navy and cyan own structure; Vescrow expansion colors are limited to charts.", "section": "colors" },
+      { "name": "Operational Scale", "body": "Product screens use fixed type sizes and stable density.", "section": "typography" },
+      { "name": "Flat by Default", "body": "Static panels use either border or shadow, never both as decoration.", "section": "elevation" }
+    ],
+    "dos": ["Preserve EMUSA identity.", "Use color for action, state, and data meaning.", "Support all component states and three site languages.", "Use real manufacturing imagery."],
+    "donts": ["Do not use gradients or glass effects.", "Do not nest cards.", "Do not exceed 16px card radius.", "Do not use marketing claims in operational UI.", "Do not communicate status through color alone."]
+  }
+}
