@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EMUSA Alert Catalog Review · Iteration 2</title>
+    <link rel="stylesheet" href="alert_catalog_v2.css?v=1" />
+  </head>
+  <body>
+    <header class="review-header">
+      <div class="brand">EMUSA <span>Alert catalog · iteration 2</span></div>
+      <div class="header-links"><a href="/alert_catalog.html">Iteration 1</a><a href="/">Dashboard</a></div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <p class="eyebrow">Persistent product discovery · review pass 2</p>
+        <h1>Factory alert catalog</h1>
+        <p>Annotate a complete card or one statement. This iteration applies all 25 comments from the first review and maps directly to <code>docs/alert_catalog.md</code>.</p>
+        <div class="legend" aria-label="Alert states">
+          <span><i class="dot error"></i>Error</span>
+          <span><i class="dot upcoming"></i>Por vencer</span>
+          <span><i class="dot possible"></i>Possible error</span>
+        </div>
+      </section>
+
+      <section class="iteration-summary" aria-labelledby="iteration-title">
+        <div class="summary-heading"><span>Iteration 2</span><h2 id="iteration-title">What changed</h2></div>
+        <ul>
+          <li>Reservation and dispatch are now one incident with 60- and 30-minute checkpoints.</li>
+          <li>Sequence and machine-activity alerts moved into family B.</li>
+          <li>Truncation and downstream-incomplete alerts were removed.</li>
+          <li>Pickup and weighing were merged; waste declaration and weighing were merged.</li>
+          <li>Statistical plausibility and OT balance families were added.</li>
+          <li>Extrusion, Exlam, and sealing now have separate future families.</li>
+        </ul>
+      </section>
+
+      <nav class="stage-index" id="alert-index" aria-label="Alert index"></nav>
+      <div class="catalog" id="catalog"></div>
+
+      <section class="future-card" id="future" aria-labelledby="future-title">
+        <div class="card-heading"><div><span class="alert-id">FUTURE DISCOVERY</span><h2 id="future-title">Operation-specific families</h2></div></div>
+        <div class="future-grid" id="future-grid"></div>
+      </section>
+
+      <section class="excluded-card" id="excluded" aria-labelledby="excluded-title">
+        <div class="card-heading"><div><span class="alert-id">REFERENCE</span><h2 id="excluded-title">Excluded rules</h2></div></div>
+        <div class="excluded-list" id="excluded-list"></div>
+      </section>
+    </main>
+
+    <script src="alert_catalog_v2.js?v=1"></script>
+  </body>
+</html>
+

@@ -80,9 +80,9 @@ The dashboard should help answer questions such as:
 
 - Which work orders are currently inconsistent with the expected physical process?
 - Which required inventory movements were not recorded before production began?
-- Which raw-material reels appear to have been physically used but not digitally consumed?
+- Which active work orders have exceeded the allowed interval without a consumption declaration?
 - Which produced reels have not been weighed within the permitted time?
-- Which closed work orders have incomplete or unbalanced declarations?
+- Which closed work orders declare more run meters than their consumed reels support, or completed full production with delivered reserved reels still unconsumed?
 - Which exceptions are urgent because they can affect another active or upcoming work order?
 - Who needs to investigate or correct each exception?
 - How long has each exception remained unresolved?
@@ -148,21 +148,21 @@ The physical production process is therefore ahead of the recorded inventory pro
 - Whether any missing reel has already been scanned or consumed elsewhere
 - Recommended corrective action
 
-## Known error scenario 2: raw material physically used but not digitally consumed
+## Known error scenario 2: active work order without declared consumption
 
-### Physical reality
+### Operational state
 
-A raw-material reel is used during production.
+A work order is active beyond the allowed initial interval.
 
 ### Expected digital state
 
-The user scans the reel's barcode and records its consumption against the correct work order.
+The operator records consumption of a reserved reel shortly after the work order starts.
 
 ### Error condition
 
-The reel was used physically, but no corresponding consumption was recorded in the software.
+The work order remains active beyond the configured interval without any recorded consumption.
 
-This can become visible while the work order is running, when it closes, or during reconciliation of the declared inputs and outputs.
+If production is subsequently declared, that event may strengthen the evidence shown for this exception, but it must not generate a separate production-without-consumption alert.
 
 ### Why it matters
 
@@ -174,22 +174,22 @@ This can become visible while the work order is running, when it closes, or duri
 
 ### Candidate dashboard exception
 
-`Possible physical consumption without a recorded digital consumption event.`
+`Active work order without a consumption declaration.`
 
 ### Useful information for the supervisor
 
 - Work-order identifier
 - Machine
-- Suspected reel identifier
-- Last known scan and location
+- Reserved reel identifiers
+- Last known scans and locations
 - Expected material requirements
 - Declared consumption to date
 - Production output to date
 - Time since the reel was last seen or moved
 - User responsible for the work order
-- Evidence supporting the exception
+- Supporting production events, when available
 
-## Known error scenario 3: closed work order with incomplete or unbalanced declarations
+## Known error scenario 3: closure reconciliation errors
 
 ### Physical reality
 
@@ -201,12 +201,18 @@ Before closure, users should confirm that:
 
 - all production outputs have been declared;
 - all raw materials physically used have been declared as consumed;
-- the recorded information is sufficiently balanced and internally consistent; and
+- declared run meters are supported, within tolerance, by the estimated meters in consumed reels;
+- when the OT completed all planned production, every reserved reel delivered to the machine is declared as consumed; and
 - the digital work-order record accurately represents the completed physical run.
 
 ### Error condition
 
-The work order is closed even though production declarations, consumption declarations, or both are missing or inconsistent.
+The work order is closed with one or both of these conditions:
+
+- declared run meters materially exceed the estimated meters supported by consumed reels; or
+- the OT completed all planned production, but a reserved reel delivered to the machine remains unconsumed.
+
+The first condition is the primary closure rule. The second applies only to fully completed production, not automatically to a legitimately truncated or partially completed OT.
 
 ### Why it matters
 
@@ -218,7 +224,8 @@ The work order is closed even though production declarations, consumption declar
 
 ### Candidate dashboard exception
 
-`Closed work order has an unresolved input-output imbalance.`
+- `Declared run meters exceed the meters supported by consumed reels.`
+- `Fully completed OT has a delivered reserved reel that remains unconsumed.`
 
 ### Useful information for the supervisor
 
@@ -509,8 +516,8 @@ The system should communicate when an exception is based on a deterministic rule
 The following rules are the initial known candidates:
 
 1. **Missing pre-start material transfer:** A work order starts before all required reels are recorded in the correct factory or machine location.
-2. **Possible undeclared consumption:** Available evidence indicates that a reel was physically used, but no consumption was recorded against the work order.
-3. **Unbalanced closure:** A work order closes without complete or consistent production and consumption declarations.
+2. **Active work order without consumption:** A work order remains active beyond the configured interval without a consumption declaration. Production events may support this exception but do not create another alert.
+3. **Closure reconciliation error:** Declared run meters exceed the estimated meters supported by consumed reels, or a fully completed OT has a delivered reserved reel that remains unconsumed.
 4. **Late weighing:** A produced reel has no recorded weight 30 minutes after its production declaration.
 5. **Downstream use of incomplete reel:** A produced reel is transferred to or consumed by another work order while required information, such as weight, is missing.
 
@@ -550,8 +557,8 @@ This is the original discovery agenda. Current answers, first-release decisions,
 
 ### Evidence and detection
 
-- What signals indicate that a reel was physically used when no consumption event exists?
-- Are there machine signals, scale events, downstream scans, operator records, or reconciliation calculations?
+- Which ERP status and timestamp definitively establish that a work order is active?
+- What interval after work-order start should be allowed before the missing-consumption exception appears?
 - Which exceptions can be proven deterministically?
 - Which exceptions are only suspected?
 

@@ -16,13 +16,16 @@
 - Initial scope follows the live work-order and material-flow lifecycle, from reservation and pre-start movement through consumption, production, weighing, downstream movement, and closure.
 - The dashboard should preserve evidence and distinguish confirmed violations from suspected inconsistencies.
 - Version 1 will treat every violated rule as an error rather than distinguishing critical and non-critical exceptions. Approaching-deadline warnings remain separate because the error has not happened yet.
+- EMUSA Soft prevents a reel from being digitally consumed unless it was reserved for that specific work order. A consumed-versus-reserved reel mismatch is therefore not a valid dashboard exception; missing consumption declarations remain relevant.
+- Current machines do not provide a rewinder-completion signal; PLC-based detection is a possible future capability, not version 1 evidence.
+- A version 1 inferred warning may compare cumulative raw-material kilograms with the rewinder's maximum retained mass and declared output. If the input mass cannot physically remain on the rewinder, one or more produced reels may be undeclared. Capacity source, waste, losses, partial-reel treatment, and tolerances remain unresolved.
 - Exceptions should link directly to the relevant EMUSA Soft work order, reel, material transfer, machine, or user record.
 - The first known candidate rules are:
   1. Work order started before required material transfer.
-  2. Possible physical consumption without a digital consumption declaration.
-  3. Closed work order with incomplete or unbalanced declarations.
+  2. Active work order without a consumption declaration after the configured interval. A production declaration may support this exception but must not create a duplicate alert.
+  3. Closure errors: declared run meters exceed the estimated meters supported by consumed reels, or a fully completed OT has delivered reserved reels that remain unconsumed.
   4. Produced reel not weighed within 30 minutes.
-  5. Downstream use of a reel with incomplete required information.
+  5. Produced reel not moved from a finished OT's machine to the next OT or appropriate warehouse within 30 minutes; once movement begins, an unreceived transfer is covered by the transit rule.
 - Visual design should wait until users, evidence, rules, preventive-warning timing, and resolution workflows are sufficiently understood.
 - The primary dashboard users are the factory manager, operation supervisors, technical operation leaders, and the process team with its supervisors.
 - Known operations are extrusion, extrusion lamination (`Exlam`), printing, adhesive lamination, cutting, and bag making or sealing.
@@ -30,6 +33,7 @@
 - The factory manager should remain aware of all exceptions. Affected operation supervisors and leaders should be informed immediately, with the process team included when movement, pickup, weighing, or delivery is involved.
 - Version 1 is a live, socket-updated informational dashboard. It will not acknowledge, assign, resolve, dismiss, override, or correct exceptions inside the dashboard.
 - Detailed discovery findings are maintained in `docs/discovery.md`.
+- The reviewable alert catalog is maintained in `docs/alert_catalog.md`. The current annotation-friendly browser mirror is `prototype/alert_catalog_v2.html`; `prototype/alert_catalog.html` preserves the first annotated iteration.
 
 ## Current configuration
 
@@ -72,6 +76,7 @@
   - The API record lacked executed dates and actual production values at inspection time, despite being opened through a `/closed/` route. This requires clarification before defining closure rules.
 - Reviewed the rationale document; it is clear and suitable as persistent discovery context.
 - Documented the confirmed users, operating structure, first-release boundary, end-to-end flow discovered so far, candidate rules, evidence hypotheses, and unresolved questions in `docs/discovery.md`.
+- Created a persistent alert catalog and browser review surface for line-by-line annotations.
 
 ## Pending work
 
@@ -82,6 +87,7 @@
 - Map every exception to available ERP fields, events, timestamps, and relationships.
 - Separate deterministic violations from inferred or suspicious conditions.
 - Define balance calculations, units, tolerances, waste, remnants, partial reels, and setup losses.
+- Determine the source of each machine's maximum rewinder capacity and validate the inferred undeclared-production formula.
 - Validate whether the 30-minute weighing threshold is universal.
 - Define preventive-warning timing, notification escalation, and operational responsibility rules.
 - Confirm socket event coverage, fallback refresh needs, and external notification channels.
@@ -100,6 +106,9 @@
 
 - Project root: `/Users/mariofishman/projects/dashboard_planta`
 - Rationale: `/Users/mariofishman/projects/dashboard_planta/dashboard_rationale.md`
+- Alert catalog: `/Users/mariofishman/projects/dashboard_planta/docs/alert_catalog.md`
+- Current alert catalog browser review: `/Users/mariofishman/projects/dashboard_planta/prototype/alert_catalog_v2.html`
+- Previous annotated alert catalog: `/Users/mariofishman/projects/dashboard_planta/prototype/alert_catalog.html`
 - Agent instructions: `/Users/mariofishman/projects/dashboard_planta/AGENTS.md`
 - Credential file: `/Users/mariofishman/projects/dashboard_planta/.env`
 - Project handoff: `/Users/mariofishman/projects/dashboard_planta/project_context.md`

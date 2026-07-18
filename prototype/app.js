@@ -3,7 +3,7 @@ const stages = ["Reserva", "Envío", "Tránsito", "Consumo", "Producción", "Pes
 const exceptions = [
   {
     id: 1,
-    severity: "critical",
+    status: "error",
     title: "Bobina producida sin pesar",
     description: "La bobina CU-98421 continúa junto a la prensa.",
     operation: "Impresión",
@@ -18,13 +18,33 @@ const exceptions = [
       ["09:26", "Producción declarada", "CU-98421 · Operador Luis M."],
       ["09:27", "Etiqueta impresa", "Código de barras generado"],
       ["09:56", "Límite de pesaje vencido", "Sin registro en balanza"],
-      ["10:13", "Excepción crítica", "La bobina permanece en P15"]
+      ["10:13", "Error detectado", "La bobina permanece en P15"]
     ],
     audience: ["Gerente de planta", "Supervisor de impresión", "Líder de impresión", "Equipo de procesos"]
   },
   {
+    id: 11,
+    status: "error",
+    title: "Consumo de bobina sin declarar",
+    description: "La bobina CU-98408 fue cargada en P15, pero no aparece consumida.",
+    operation: "Impresión",
+    workOrder: "151056.1",
+    machine: "P15",
+    stage: 3,
+    elapsed: "19 min",
+    detected: "10:41",
+    expected: "La bobina CU-98408 debía declararse consumida al cargarla para continuar la OT.",
+    recorded: "La máquina continúa produciendo, pero el último consumo registrado corresponde a CU-98397.",
+    evidence: [
+      ["10:18", "Bobina recibida", "CU-98408 · Destino P15"],
+      ["10:22", "Cambio de bobina", "P15 continúa produciendo"],
+      ["10:41", "Error detectado", "Sin consumo digital de CU-98408"]
+    ],
+    audience: ["Gerente de planta", "Supervisor de impresión", "Líder de impresión"]
+  },
+  {
     id: 2,
-    severity: "critical",
+    status: "error",
     title: "Material en tránsito por más de 30 min",
     description: "Dos bobinas fueron enviadas pero no recibidas.",
     operation: "Exlam",
@@ -39,13 +59,13 @@ const exceptions = [
       ["09:30", "Salida de almacén", "2 bobinas hacia EL02"],
       ["09:31", "Estado en tránsito", "Destino: Exlam"],
       ["10:00", "Límite de recepción vencido", "Sin usuario receptor"],
-      ["10:08", "Excepción crítica", "38 minutos en tránsito"]
+      ["10:08", "Error detectado", "38 minutos en tránsito"]
     ],
     audience: ["Gerente de planta", "Supervisor de Exlam", "Supervisor de almacén", "Equipo de procesos"]
   },
   {
     id: 3,
-    severity: "critical",
+    status: "error",
     title: "OT iniciada fuera de secuencia",
     description: "La OT 151104.1 no era la siguiente en el plan vigente.",
     operation: "Impresión",
@@ -66,7 +86,7 @@ const exceptions = [
   },
   {
     id: 4,
-    severity: "warning",
+    status: "error",
     title: "OT próxima sin material enviado",
     description: "Faltan 42 minutos para el inicio planificado.",
     operation: "Laminación",
@@ -86,7 +106,7 @@ const exceptions = [
   },
   {
     id: 5,
-    severity: "warning",
+    status: "error",
     title: "OT activa sin consumo declarado",
     description: "La máquina opera sin consumo digital registrado.",
     operation: "Corte",
@@ -106,7 +126,7 @@ const exceptions = [
   },
   {
     id: 6,
-    severity: "warning",
+    status: "error",
     title: "Bobina reservada no consumida al cierre",
     description: "La OT fue truncada con una bobina pendiente.",
     operation: "Exlam",
@@ -127,7 +147,7 @@ const exceptions = [
   },
   {
     id: 7,
-    severity: "warning",
+    status: "error",
     title: "Diferencia en metros declarados",
     description: "La corrida supera los metros estimados de consumo.",
     operation: "Impresión",
@@ -148,7 +168,7 @@ const exceptions = [
   },
   {
     id: 8,
-    severity: "warning",
+    status: "error",
     title: "Bolsa de merma sin pesar",
     description: "La etiqueta fue creada hace 34 minutos.",
     operation: "Sellado",
@@ -163,13 +183,13 @@ const exceptions = [
       ["08:37", "Merma declarada", "MR-10982 · 1 bolsa"],
       ["08:38", "Etiqueta impresa", "Origen: SE12"],
       ["09:07", "Límite de pesaje vencido", "Sin registro en balanza"],
-      ["09:11", "Advertencia activa", "34 minutos sin peso"]
+      ["09:11", "Error detectado", "34 minutos sin peso"]
     ],
     audience: ["Gerente de planta", "Supervisor de sellado", "Equipo de procesos"]
   },
   {
     id: 9,
-    severity: "info",
+    status: "upcoming",
     title: "Envío de material próximo a vencer",
     description: "Quedan 12 minutos para el límite de despacho.",
     operation: "Corte",
@@ -188,7 +208,7 @@ const exceptions = [
   },
   {
     id: 10,
-    severity: "info",
+    status: "upcoming",
     title: "Pesaje próximo a vencer",
     description: "La bobina tiene 24 minutos sin peso.",
     operation: "Laminación",
@@ -223,10 +243,6 @@ const expandedOperations = new Set(exceptions.map((item) => item.operation));
 const expandedMachines = new Set();
 const expandedWorkOrders = new Set();
 let simulatedEventCount = 0;
-
-function itemStatus(item) {
-  return item.severity === "info" ? "upcoming" : "error";
-}
 
 function normalizeText(value) {
   return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -274,7 +290,7 @@ function matchesSearch(item, rawQuery) {
 }
 
 function statusSummary(items) {
-  const errors = items.filter((item) => itemStatus(item) === "error").length;
+  const errors = items.filter((item) => item.status === "error").length;
   const upcoming = items.length - errors;
   return `
     ${errors ? `<span class="error-count-inline">${errors} ${errors === 1 ? "error" : "errores"}</span>` : ""}
@@ -283,7 +299,7 @@ function statusSummary(items) {
 }
 
 function exceptionRowMarkup(item) {
-  const status = itemStatus(item);
+  const status = item.status;
   return `
     <button class="group-exception-row ${item.isNew ? "is-new" : ""}" type="button" data-id="${item.id}" aria-label="Abrir excepción: ${item.title}">
       <span class="status-stack">
@@ -366,12 +382,12 @@ function render() {
   list.innerHTML = groupedMarkup(items);
   emptyState.hidden = items.length !== 0;
   document.querySelector("#result-count").textContent = items.length;
-  document.querySelector("#error-count").textContent = exceptions.filter((item) => itemStatus(item) === "error").length;
-  document.querySelector("#upcoming-count").textContent = exceptions.filter((item) => itemStatus(item) === "upcoming").length;
+  document.querySelector("#error-count").textContent = exceptions.filter((item) => item.status === "error").length;
+  document.querySelector("#upcoming-count").textContent = exceptions.filter((item) => item.status === "upcoming").length;
 }
 
 function openDrawer(item) {
-  const status = itemStatus(item);
+  const status = item.status;
   const statusElement = document.querySelector("#drawer-status");
   statusElement.className = `status-pill status-${status}`;
   statusElement.textContent = statusLabels[status];
@@ -421,7 +437,7 @@ function simulateSocketEvent() {
   const detectedTime = now.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", hour12: false });
   exceptions.unshift({
     id: 100 + simulatedEventCount,
-    severity: "critical",
+    status: "error",
     title: "OT iniciada sin reservas completas",
     description: `Evento simulado ${simulatedEventCount}: falta reservar una bobina de sustrato.`,
     operation: "Impresión",

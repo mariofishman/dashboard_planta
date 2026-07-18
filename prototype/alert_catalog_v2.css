@@ -1,0 +1,58 @@
+@import url("alert_catalog.css?v=1");
+
+.header-links { display: flex; align-items: center; gap: 18px; }
+.header-links a { color: var(--signal-blue); font-size: 12px; font-weight: 700; text-decoration: none; }
+
+.iteration-summary {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  gap: 28px;
+  margin-top: 32px;
+  padding: 22px;
+  border-radius: 10px;
+  background: var(--machine-ink);
+  color: white;
+}
+
+.summary-heading span { display: block; margin-bottom: 6px; color: rgba(255,255,255,.55); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.summary-heading h2 { color: white; }
+.iteration-summary ul { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 26px; margin: 0; padding-left: 18px; color: rgba(255,255,255,.74); font-size: 12px; line-height: 1.45; }
+
+.family-section { display: grid; gap: 16px; }
+.family-section + .family-section { margin-top: 30px; }
+.family-heading { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 14px; padding: 0 4px; scroll-margin-top: 124px; }
+.family-code { display: grid; place-items: center; width: 52px; height: 52px; color: white; border-radius: 8px; background: var(--machine-ink); font-size: 22px; font-weight: 800; }
+.family-heading h2 { font-size: 21px; }
+.family-heading p { margin: 3px 0 0; color: var(--machine-muted); font-size: 11px; line-height: 1.45; }
+
+.alert-card { position: relative; }
+.alert-card::before { position: absolute; inset: 0 auto 0 0; width: 3px; content: ""; background: var(--family-accent, var(--machine-ink)); }
+.family-a { --family-accent: #2d6a55; }
+.family-b { --family-accent: #28628d; }
+.family-c { --family-accent: #9a6815; }
+.family-d { --family-accent: #7a4f83; }
+
+.rule-note { margin: 0 22px 18px; padding: 12px 14px; color: var(--machine-secondary); border-left: 3px solid var(--family-accent); background: var(--machine-inset); font-size: 11px; line-height: 1.5; }
+.detection-rule code { background: rgba(28,34,31,.08); }
+
+.future-card { margin-top: 30px; scroll-margin-top: 124px; overflow: hidden; background: var(--factory-panel); border-radius: 10px; box-shadow: var(--shadow-panel); }
+.future-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--machine-line); }
+.future-grid section { padding: 20px; }
+.future-grid section + section { border-left: 1px solid var(--machine-line); }
+.future-grid strong { display: block; margin-bottom: 7px; font-size: 13px; }
+.future-grid p { margin: 0; color: var(--machine-secondary); font-size: 11px; line-height: 1.55; }
+
+@media (max-width: 850px) {
+  .iteration-summary { grid-template-columns: 1fr; gap: 14px; }
+  .iteration-summary ul { grid-template-columns: 1fr; }
+  .future-grid { grid-template-columns: 1fr; }
+  .future-grid section + section { border-left: 0; border-top: 1px solid var(--machine-line); }
+}
+
+@media (max-width: 560px) {
+  .header-links a:first-child { display: none; }
+  .family-heading { grid-template-columns: 48px 1fr; }
+  .family-code { width: 42px; height: 42px; font-size: 18px; }
+  .rule-note { margin-right: 18px; margin-left: 18px; }
+}
+

@@ -1277,6 +1277,8 @@ select {
 
   .group-exception-row .elapsed-time {
     grid-column: auto;
+    grid-row: auto;
+    display: block;
     justify-self: end;
   }
 
@@ -1297,7 +1299,7 @@ select {
   }
 
   .attention-summary {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .queue-toolbar {

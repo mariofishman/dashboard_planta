@@ -6,6 +6,8 @@ This is the canonical detailed record of product-discovery findings for the EMUS
 
 Use this document for detailed discovery. Keep `project_context.md` as the concise project handoff and `dashboard_rationale.md` as the stable product rationale.
 
+The editable alert-by-alert review artifact is `docs/alert_catalog.md`. Its current annotation-friendly browser mirror is `prototype/alert_catalog_v2.html`; `prototype/alert_catalog.html` preserves the first annotated iteration.
+
 ## Product direction
 
 The product is a live operational exception dashboard. It should compare the expected production and material flow with events recorded in EMUSA Soft, then inform the relevant factory personnel when required events are missing, late, contradictory, or unbalanced.
@@ -94,7 +96,7 @@ The reservation tells warehouse personnel exactly which reels to send. Warehouse
 
 Candidate exception:
 
-- A work order is starting or has started without its required reels being reserved.
+- At 60 minutes before planned start, required material is unavailable in the warehouse or has not been reserved. Missing stock may reflect a pending supplier delivery, not only a late reservation.
 
 Primary audience:
 
@@ -112,11 +114,11 @@ Expected evidence:
 
 ### 2. Pre-start warehouse dispatch
 
-Reserved reels should be sent from the warehouse before the work order begins. The desired lead time may be 30, 60, or 90 minutes and must be configurable until validated.
+Reserved reels should be sent from the warehouse before the work order begins. The confirmed dispatch checkpoint is 30 minutes before planned start.
 
 Candidate exception:
 
-- A work order is approaching its planned start and one or more reserved reels have not been sent.
+- At 30 minutes before planned start, one or more required reels have not been sent. This updates the existing material-readiness incident rather than creating a duplicate; for example, `not dispatched because not reserved`.
 
 Primary audience:
 
@@ -127,7 +129,7 @@ Primary audience:
 Expected evidence:
 
 - Planned work-order start
-- Configured dispatch lead time
+- 30-minute dispatch checkpoint
 - Reserved reels
 - Dispatch status and timestamp for each reel
 - Origin and intended destination
@@ -142,7 +144,7 @@ Candidate exception:
 
 - A reel remains in transit for more than 30 minutes.
 
-The 30-minute transit threshold is the current proposal and should be configurable until validated.
+The confirmed transit threshold is 30 minutes.
 
 Primary audience:
 
@@ -184,12 +186,15 @@ Expected evidence:
 
 ### 5. Consumption after work-order start
 
-When a work order starts, the operator should begin consuming the correct reserved reels. A running work order cannot physically operate without raw material.
+When a work order starts, the operator should begin declaring consumption of its reserved reels. A running work order cannot physically operate without raw material.
+
+EMUSA Soft enforces the reservation relationship: the ERP does not allow a reel to be consumed by a work order unless that reel was previously reserved for that specific work order. Therefore, a digitally consumed reel differing from the work order's reserved reels is not a possible exception under the current ERP rules.
 
 Candidate exceptions:
 
 - A work order has been running beyond an allowed interval without any recorded consumption.
-- The reels recorded as consumed do not match the reels reserved for the work order.
+
+A production declaration without consumption must not create a second exception. If the work order is already active without recorded consumption, that existing exception covers the condition. Production declarations may be shown as supporting evidence on the same exception.
 
 The allowed interval after work-order start has not been defined.
 
@@ -205,9 +210,9 @@ Expected evidence:
 - Consumed reel unique codes
 - Consumption timestamps and users
 - Elapsed time without consumption
-- Reel locations and material compatibility
+- Reel locations
 
-The absence of a digital consumption event is deterministic. Whether physical consumption occurred is an inference unless another signal proves it.
+The exception is based on the deterministic absence of a required consumption declaration after the work order starts. It should not attempt to infer or separately alert that physical consumption occurred.
 
 ### 6. Work-order closure and material balance
 
@@ -219,16 +224,17 @@ Expected reel length can be calculated approximately from:
 - reel width; and
 - basis weight in grams per square meter (`g/m²`).
 
-The declared run length can be compared with the approximate meters available in the consumed reels. For example, if three consumed reels represent approximately 30,000 meters but the operator declares 40,000 meters, another consumed reel or declaration may be missing.
+The declared run length can be compared with the approximate meters available in the consumed reels. For example, if three consumed reels represent approximately 30,000 meters but the operator declares 40,000 meters, another consumption declaration is missing or the closure data is incorrect. This meter-balance comparison is the most important closure rule identified so far.
 
-Candidate exceptions or notices:
+A second closure rule applies only when the work order completed all planned production. If the reserved reels were delivered to the machine and full planned production was completed, all reserved reels should have been declared as consumed. Any delivered reserved reel that remains unconsumed indicates an error. This rule does not automatically apply to a legitimately truncated or partially completed work order.
 
-- Declared run meters materially exceed the estimated meters in consumed reels.
-- Reserved reels remain unconsumed when the work order closes.
-- Production and consumption declarations are incomplete or unbalanced at closure.
-- A work order is truncated before consuming all reserved material.
+Candidate exceptions:
 
-A truncated work order is not inherently an error. It may be justified by a machine problem or another operating condition, but it should be surfaced for review.
+- Declared run meters materially exceed, beyond the configured tolerance, the estimated meters supported by the consumed reels. This is the primary closure exception.
+- The work order completed all planned production, but one or more reserved reels delivered to the machine remain unconsumed.
+- Required production or consumption declarations are missing at closure.
+
+A truncated work order is not an alert. It is a normal production condition and does not by itself indicate a digital-versus-physical mismatch. Closure rules that require full planned production must not apply automatically to truncated OTs.
 
 Primary audience:
 
@@ -254,11 +260,15 @@ During a running work order, the operator should declare each produced reel when
 
 The declaration prints a label with a barcode and unique code. The new reel initially has an unweighed status because there is no scale at the machine.
 
-Candidate exception:
+Current machinery does not report rewinder completion to EMUSA Soft. A PLC could provide that signal in the future, but it is not available for version 1. The ERP also cannot prove that a physical label was printed unless it records a separate print-job acknowledgment or failure.
 
-- Evidence indicates that a reel was produced, but its production declaration or label was not created promptly.
+Candidate inferred warning:
 
-The available evidence and allowed delay for detecting an undeclared physical reel remain unresolved.
+- The cumulative kilograms of raw material loaded or declared consumed since the last produced-reel declaration exceed the mass that could still remain on the rewinder, after accounting for allowed waste and process variation. This suggests that one or more completed reels may not have been declared.
+
+Example: if the rewinder can hold at most 500 kg and 1,500 kg of raw material has been loaded, it is not physically possible for all 1,500 kg to remain on the rewinder. After applicable allowances, some finished output should already have been removed and declared.
+
+This is evidence of a possible error, not deterministic proof. The exact formula must account for the current partial reel, declared output, declared waste, setup loss, operation-specific material additions, and an agreed tolerance.
 
 Primary audience:
 
@@ -269,6 +279,10 @@ Primary audience:
 Expected evidence:
 
 - Source work order and machine
+- Maximum rewinder capacity for the machine
+- Raw-material kilograms loaded or declared consumed since the last output declaration
+- Declared output kilograms and reel count
+- Declared waste and allowed process loss
 - Production declaration time
 - Produced reel unique code and barcode
 - Declaring operator
@@ -345,18 +359,17 @@ These conditions can likely be evaluated directly if the required timestamps and
 - Reel remains in transit beyond the configured threshold.
 - Work order starts out of the latest approved sequence.
 - Running work order has no recorded consumption after the configured interval.
-- Reserved and consumed reel codes differ.
-- Closed work order has missing or unbalanced declarations.
+- Declared run meters exceed, beyond tolerance, the estimated meters supported by consumed reels at closure.
+- Fully completed work order has delivered reserved reels that remain unconsumed.
 - Declared produced reel or waste bag remains unweighed beyond the configured threshold.
-- Incomplete produced reel is moved to or used by a downstream work order.
+- A reel from a finished OT remains at the machine for more than 30 minutes without a recorded movement to the next OT or appropriate warehouse.
 
 ### Inferred or context-dependent conditions
 
 These conditions require corroborating evidence or human interpretation:
 
-- A physically produced reel was not digitally declared.
+- Raw-material mass exceeds what the rewinder could retain without enough produced-reel declarations, suggesting undeclared good production.
 - A physical waste bag was closed but not digitally declared.
-- Missing consumption inferred from declared run meters.
 - Unused reserved material caused by legitimate truncation rather than an error.
 - A long transit state reflects missing digital receipt rather than delayed physical movement.
 
@@ -399,8 +412,8 @@ Highest-priority unresolved issues are:
 1. What happens to good reels and waste after weighing, and which failures occur in the downstream flow?
 2. What remaining exception scenarios should version 1 include?
 3. Which proposed time thresholds are universal, and which vary by operation, shift, machine, or material?
-4. What is the exact latest-approved production sequence and how is a supervisor's reordering recorded?
-5. What signals can prove undeclared good production or undeclared waste?
+4. What is the exact latest-approved production sequence and how is a factory-floor update to the planner's plan recorded?
+5. Where should each machine's maximum rewinder capacity come from, and what waste, process-loss, partial-reel, and operation-specific allowances should the inferred warning use?
 6. What formulas, units, tolerances, remnants, core weights, partial reels, and waste rules define a balanced closure?
 7. Which external notification channels are required in addition to the live dashboard?
 8. When should preventive warnings appear, and when should unresolved errors trigger external escalation?

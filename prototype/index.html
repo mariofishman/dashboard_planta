@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
     <title>EMUSA | Control de planta</title>
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <link rel="stylesheet" href="styles.css?v=7" />
   </head>
   <body>
     <div class="app-shell">
@@ -40,7 +40,7 @@
           <div class="attention-summary" aria-label="Resumen de excepciones">
             <div class="summary-errors">
               <span>Errores activos</span>
-              <strong id="error-count">8</strong>
+              <strong id="error-count">9</strong>
             </div>
             <div>
               <span>Por vencer pronto</span>
@@ -54,7 +54,7 @@
             <div class="queue-title-row">
               <div>
                 <h2 id="queue-title">Problemas por operación</h2>
-                <p><span id="result-count">10</span> resultados activos</p>
+                <p><span id="result-count">11</span> resultados activos</p>
               </div>
               <span class="grouping-path">Operación → Máquina → OT</span>
             </div>
@@ -78,7 +78,7 @@
           <div class="exception-list" id="exception-list" aria-live="polite"></div>
           <div class="empty-state" id="empty-state" hidden>
             <strong>No hay excepciones con estos filtros</strong>
-            <span>Prueba con otra operación o severidad.</span>
+            <span>Prueba con otros términos o filtros.</span>
           </div>
         </section>
       </main>
@@ -128,6 +128,6 @@
       Nueva excepción recibida
     </div>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=7"></script>
   </body>
 </html>

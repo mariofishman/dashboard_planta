@@ -1,0 +1,133 @@
+:root {
+  --factory-paper: #f3f4f0;
+  --factory-panel: #ffffff;
+  --machine-ink: #1c221f;
+  --machine-secondary: #56615b;
+  --machine-muted: #838d87;
+  --machine-line: rgba(28, 34, 31, 0.12);
+  --machine-inset: #f1f3f0;
+  --safety-red: #c94035;
+  --safety-red-soft: #f8e7e4;
+  --signal-blue: #28628d;
+  --signal-blue-soft: #e8f1f7;
+  --signal-amber: #9a6815;
+  --signal-amber-soft: #f7eedb;
+  --review-gray: #68716c;
+  --review-gray-soft: #eceeec;
+  --shadow-panel: 0 0 0 1px rgba(28, 34, 31, 0.05), 0 4px 18px rgba(28, 34, 31, 0.05);
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  color: var(--machine-ink);
+  background: var(--factory-paper);
+  font-family: Avenir, "Avenir Next", "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.review-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 60px;
+  padding: 0 32px;
+  background: rgba(243, 244, 240, 0.94);
+  border-bottom: 1px solid var(--machine-line);
+  backdrop-filter: blur(12px);
+}
+
+.brand { font-size: 13px; font-weight: 800; letter-spacing: 0.08em; }
+.brand span { margin-left: 10px; color: var(--machine-muted); font-weight: 500; letter-spacing: 0; }
+.dashboard-link { color: var(--signal-blue); font-size: 12px; font-weight: 700; text-decoration: none; }
+
+main { width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 56px 0 96px; }
+
+.intro { max-width: 760px; }
+.eyebrow { margin: 0 0 8px; color: var(--machine-muted); font-size: 11px; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+h1 { margin: 0; font-size: clamp(34px, 5vw, 52px); line-height: 1; letter-spacing: -0.045em; text-wrap: balance; }
+.intro > p:not(.eyebrow) { max-width: 680px; margin: 18px 0 0; color: var(--machine-secondary); font-size: 14px; line-height: 1.6; }
+code { padding: 2px 5px; border-radius: 4px; background: var(--machine-inset); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.92em; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 24px; color: var(--machine-secondary); font-size: 11px; font-weight: 650; }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot.error { background: var(--safety-red); }
+.dot.upcoming { background: var(--signal-blue); }
+.dot.possible { background: var(--signal-amber); }
+.dot.notice { background: var(--review-gray); }
+
+.stage-index {
+  position: sticky;
+  top: 60px;
+  z-index: 9;
+  display: flex;
+  gap: 4px;
+  margin: 42px 0 20px;
+  padding: 8px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--machine-ink);
+}
+
+.stage-index a { flex: 0 0 auto; min-width: 42px; padding: 8px 10px; color: rgba(255,255,255,.7); border-radius: 5px; font-size: 10px; font-weight: 750; text-align: center; text-decoration: none; }
+.stage-index a:hover, .stage-index a:focus-visible { color: #fff; background: rgba(255,255,255,.1); outline: none; }
+
+.catalog { display: grid; gap: 16px; }
+
+.alert-card, .excluded-card {
+  scroll-margin-top: 124px;
+  overflow: hidden;
+  background: var(--factory-panel);
+  border-radius: 10px;
+  box-shadow: var(--shadow-panel);
+}
+
+.card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 20px 22px 18px; }
+.alert-id { display: block; margin-bottom: 5px; color: var(--machine-muted); font-size: 10px; font-weight: 750; letter-spacing: 0.07em; text-transform: uppercase; }
+h2 { margin: 0; font-size: 19px; line-height: 1.25; letter-spacing: -0.02em; text-wrap: balance; }
+.state-pill { flex: 0 0 auto; padding: 6px 9px; border-radius: 5px; font-size: 9px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+.state-error .state-pill { color: var(--safety-red); background: var(--safety-red-soft); }
+.state-upcoming .state-pill { color: var(--signal-blue); background: var(--signal-blue-soft); }
+.state-possible .state-pill { color: var(--signal-amber); background: var(--signal-amber-soft); }
+.state-notice .state-pill, .state-unsupported .state-pill { color: var(--review-gray); background: var(--review-gray-soft); }
+
+.definition-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--machine-line); }
+.definition-grid section { min-width: 0; padding: 18px 20px; }
+.definition-grid section + section { border-left: 1px solid var(--machine-line); }
+h3, .detection-rule > span { margin: 0 0 8px; color: var(--machine-muted); font-size: 9px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; }
+.definition-grid p, .detection-rule p, .excluded-list p { margin: 0; color: var(--machine-secondary); font-size: 12px; line-height: 1.55; text-wrap: pretty; }
+
+.detection-rule { display: grid; grid-template-columns: 200px 1fr; gap: 20px; padding: 17px 20px; background: var(--machine-inset); border-top: 1px solid var(--machine-line); }
+.detection-rule > span { margin: 2px 0 0; color: var(--machine-ink); }
+
+.excluded-card { margin-top: 16px; }
+.excluded-list { display: grid; grid-template-columns: repeat(2, 1fr); border-top: 1px solid var(--machine-line); }
+.excluded-list section { padding: 18px 20px; border-bottom: 1px solid var(--machine-line); }
+.excluded-list section:nth-child(even) { border-left: 1px solid var(--machine-line); }
+.excluded-list strong { display: block; margin-bottom: 6px; font-size: 12px; }
+
+@media (max-width: 850px) {
+  .definition-grid { grid-template-columns: repeat(2, 1fr); }
+  .definition-grid section:nth-child(3) { border-left: 0; border-top: 1px solid var(--machine-line); }
+  .definition-grid section:nth-child(4) { border-top: 1px solid var(--machine-line); }
+}
+
+@media (max-width: 560px) {
+  .review-header { padding: 0 18px; }
+  .brand span { display: none; }
+  main { width: min(100% - 24px, 1180px); padding-top: 36px; }
+  .stage-index { margin-top: 30px; }
+  .card-heading { display: grid; gap: 12px; padding: 18px; }
+  .state-pill { justify-self: start; }
+  .definition-grid, .excluded-list { grid-template-columns: 1fr; }
+  .definition-grid section + section, .definition-grid section:nth-child(3), .definition-grid section:nth-child(4), .excluded-list section:nth-child(even) { border-left: 0; border-top: 1px solid var(--machine-line); }
+  .detection-rule { grid-template-columns: 1fr; gap: 4px; padding: 17px 18px; }
+}
+

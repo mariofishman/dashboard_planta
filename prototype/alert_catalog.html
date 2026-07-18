@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EMUSA Alert Catalog Review</title>
+    <link rel="stylesheet" href="alert_catalog.css?v=1" />
+  </head>
+  <body>
+    <header class="review-header">
+      <div class="brand">EMUSA <span>Alert catalog review</span></div>
+      <a href="/" class="dashboard-link">Dashboard</a>
+    </header>
+
+    <main>
+      <section class="intro">
+        <p class="eyebrow">Persistent product discovery</p>
+        <h1>Factory alert catalog</h1>
+        <p>Annotate a complete card or select one statement. Each alert has a stable identifier that maps back to <code>docs/alert_catalog.md</code>.</p>
+        <div class="legend" aria-label="Alert states">
+          <span><i class="dot error"></i>Error</span>
+          <span><i class="dot upcoming"></i>Por vencer</span>
+          <span><i class="dot possible"></i>Possible error</span>
+          <span><i class="dot notice"></i>Notice</span>
+        </div>
+      </section>
+
+      <nav class="stage-index" aria-label="Alert index">
+        <a href="#a01">A01</a><a href="#a02">A02</a><a href="#a03">A03</a><a href="#a04">A04</a>
+        <a href="#a05">A05</a><a href="#a06">A06</a><a href="#a07">A07</a><a href="#a08">A08</a>
+        <a href="#a09">A09</a><a href="#a10">A10</a><a href="#a11">A11</a><a href="#a12">A12</a>
+        <a href="#a13">A13</a><a href="#a14">A14</a><a href="#excluded">Excluded</a>
+      </nav>
+
+      <div class="catalog" id="catalog"></div>
+
+      <section class="excluded-card" id="excluded" aria-labelledby="excluded-title">
+        <div class="card-heading">
+          <div><span class="alert-id">REFERENCE</span><h2 id="excluded-title">Excluded or non-primary rules</h2></div>
+        </div>
+        <div class="excluded-list" id="excluded-list"></div>
+      </section>
+    </main>
+
+    <script src="alert_catalog.js?v=1"></script>
+  </body>
+</html>
+
