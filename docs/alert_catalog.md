@@ -201,6 +201,8 @@ The names used below are concrete examples from the current configuration, not p
 
 **Detection indicators and algorithm:** At actual OT start, compare the started OT with the first pending OT in the latest recorded plan for that machine. Do not alert if an authorized floor update changed the sequence before start.
 
+**Alert distribution:** Notify the person who started the OT, the named operator for that machine and shift, and the operation supervisor. For a P15 example, Jesus Lara receives it only when the shift or start event identifies him, and Jackeline Pastor receives the supervisory view. Notify David Alba only when a linked A01 readiness incident shows that reservation caused the sequence change; do not include him for an unrelated sequencing error.
+
 ### B02 — Planned OT has not started on time
 
 **Status:** Error
@@ -216,6 +218,8 @@ The names used below are concrete examples from the current configuration, not p
 
 **Resolution:** If the preceding OT is still running, the planner supplies the expected delay and selects `Update All Plan`; the system shifts every subsequent OT on that machine by that delay. This can use the existing planned-date operations `updateWorkOrderPlannedDates` and `recalculatePlannedDates`. If nothing is running, the user must record a categorized equipment pause—such as maintenance, intentional hold, or waiting for material—with an explanation when required, then update the plan by the expected delay. The ERP already exposes `equipo_pausa` with pause type, other reason, pause time, and resume time.
 
+**Alert distribution:** Notify the named operator scheduled on the OT shift, the person who owns the current plan update, and the operation supervisor. For a P15 example, Jesus Lara is included only if the shift roster identifies him, while Jackeline Pastor receives the supervisory view. Add David Alba only when the delay is explained by a linked missing-reservation incident.
+
 ### B03 — Machine has no active OT for more than 30 minutes
 
 **Status:** Error
@@ -230,6 +234,8 @@ The names used below are concrete examples from the current configuration, not p
 **Detection indicators and algorithm:** Require that the machine is scheduled or expected to operate, has no active OT, and has remained in that state for more than 30 minutes. Exclude recorded maintenance, planned shutdown, approved pause, or no-production schedule periods.
 
 **Resolution:** Record the machine’s real state using the equipment-pause workflow, including category, explanation when required, and expected duration. Then shift the remaining plan using the same `Update All Plan` behavior described in `B02`. Close `B03` when an OT starts, a valid pause is recorded, or the plan is updated so the machine is no longer expected to be running during that interval.
+
+**Alert distribution:** Notify the operator assigned to the machine and shift, the person recorded on any pause event, and the operation supervisor. For a P15 example, route to Jesus Lara only when the roster identifies him and to Jackeline Pastor for oversight. If a linked A01 or A02 incident explains the idle machine, keep that alert's named warehouse recipients and do not create a second broad warehouse notification.
 
 ## C — Statistical and physical plausibility
 
@@ -248,6 +254,8 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Read the actual net weight from `balanza_carga_detalle_registros.peso_neto`, joined through `id_articulo_serial`. Obtain OT, output, substrate/article, width, grammage, operation, and timestamps from `articulo_serial`, `orden_trabajo_salidas`, and `ordenes_trabajo`. When linear meters exist, calculate `expected kg = grammage_g_m2 × width_m × length_m ÷ 1000`. Build historical ranges from previously weighed serials using the same substrate and grammage, segmented by operation and machine, then normalize or filter by width. Prefer the previous 12 months when sample size is sufficient. A derived statistics table or materialized view may cache sample count, median, percentiles, and model version; raw serial and scale records remain authoritative. Hard physical-limit violations are errors; statistical outliers are possible errors.
 
+**Alert distribution:** Notify the named person who created the scale record, the OT-shift operator, and the operation supervisor. For a P15/Balanza PP example, this can resolve to J. Cubas as the weighing actor, Jesus Lara as the on-shift operator, and Jackeline Pastor for oversight. Make the scale actor primary for a hard recording error and the supervisor primary for a statistical-only review.
+
 ### C02 — Waste amount outside the plausible range
 
 **Status:** Possible error
@@ -260,6 +268,8 @@ These rules detect values that are possible to enter but inconsistent with physi
 | Example | Comparable 20,000-meter printing OTs normally produce 60–100 kg of waste, but the OT declares 5 kg or 450 kg. |
 
 **Detection indicators and algorithm:** Use two sources. The theoretical source is the quotation matrix: `cotizacion_config_waste`, `cotizacion_config_valores`, kilogram bands in `cotizacion_config_rangos`, band values in `cotizacion_config_rango_valores`, and substrate/taxon adjustments in `cotizacion_config_waste_gap` and `cotizacion_config_waste_gap_detalle`. The empirical source is historical waste serials and their scale records grouped by operation, substrate/taxon, machine, and OT-size band. Store only derived aggregates—sample count, expected value, percentiles, source period, and model version—in a dedicated statistics table or materialized view. Compare current waste with both baselines and show which one triggered the warning.
+
+**Alert distribution:** Notify the named OT-shift operator, the person who weighed or declared the waste, and the operation supervisor. For a P15 example, the resolved names can be Jesus Lara, J. Cubas, and Jackeline Pastor. A statistical-only outlier goes first to Jackeline; a concrete wrong or missing record goes first to the named event actor.
 
 ### Removed after ERP review: C03, C04, and C05
 
@@ -280,6 +290,8 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Use `ordenes_trabajo.fecha_inicio_ejecucion` and `fecha_fin_ejecucion`, which come from opening and closing the OT rather than typed timestamps. Subtract recorded equipment pauses from `equipo_pausa`. Divide declared meters and kilograms by effective runtime. Compare against `equipos.velocidad_maquina` and historical rates for the same machine, operation, substrate/product, width, and setup. Detect both implausibly high and implausibly low rates. The alert should state whether the likely issue is production quantity or OT open/close timing.
 
+**Alert distribution:** Notify the named OT opener or closer implicated by the calculation, the operator assigned to the shift, and the operation supervisor. For a P15 example, route to Jesus Lara only when the event or roster identifies him and to Jackeline Pastor for oversight. Do not add warehouse personnel because the machine warehouse is only the zone proxy for finding the correct production users.
+
 ## D — Work-order closure and material balance
 
 ### D01 — Declared meters exceed consumed-reel meters
@@ -296,6 +308,8 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Estimate meters in every consumed reel from weight, width, and basis weight. Sum them and compare them with declared run meters. Alert when the difference exceeds the configured tolerance. This is the primary closure rule.
 
+**Alert distribution:** Notify the named person who closed the OT, the operator assigned to the closing shift, and the operation supervisor. For a P15 example, use `closingUserId` and the shift roster to decide whether Jesus Lara is included, and include Jackeline Pastor for oversight. Add J. Cubas only when an incorrect or missing scale weight contributes to the discrepancy.
+
 ### D02 — Completed OT has delivered reserved reels unconsumed
 
 **Status:** Error  
@@ -310,6 +324,8 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Require all three conditions: full planned production completed, reserved reels delivered to the machine, and `delivered reserved reels - consumed reels` is not empty. Do not apply automatically to truncated OTs.
 
+**Alert distribution:** Notify the named closing user, the operator on the closing shift, the operation supervisor, and David Alba because the incident may involve reservation quantity. For a P15 example, this can include Jesus Lara when identified by the shift and Jackeline Pastor for oversight. Notify AMP-001 personnel such as Alexander Chujandama Cahuaza only when the evidence shows a delivery or return action assigned to that source warehouse.
+
 ### D03 — OT input, good production, and waste do not balance
 
 **Status:** Possible error or Error
@@ -322,6 +338,8 @@ These rules detect values that are possible to enter but inconsistent with physi
 | Example | Consumed input is 1,500 kg, good production is 1,300 kg, and waste is 90 kg. The 110 kg gap exceeds the current tolerance of 65 kg, which is 5% of good production. |
 
 **Detection indicators and algorithm:** Calculate `balance gap = consumed input mass - good-output mass - waste mass` and `allowed gap = 0.05 × total good-production mass`. Alert when `absolute balance gap > allowed gap`. Store `0.05` as a configurable parameter so it can change later. Do not subtract an undefined generic process-loss value. Use actual scale weights from `balanza_carga_detalle_registros` when available. For declared but unweighed output, estimate from `articulo_serial`, `orden_trabajo_salidas`, width, grammage, declared linear meters when present, and comparable weighed serials. For missing or unweighed waste, use both the quotation waste matrix (`cotizacion_config_waste`, kilogram ranges and substrate/taxon gaps) and historical waste distributions. Recalculate whenever actual weights arrive. Statistical gaps are possible errors; gaps that remain beyond tolerance after actual weights are available are errors. If evidence identifies a specific `A03`, `A04`, `A05`, `A06`, `D01`, or `D02` cause, enrich that incident and suppress a duplicate `D03` alert.
+
+**Alert distribution:** Notify the named closing user, the OT-shift operator, and the operation supervisor. Add only the people implicated by the reason that explains the gap: J. Cubas for weighing, David Alba for reservation, or the named source-warehouse person for material movement. For a P15 example, Jesus Lara and Jackeline Pastor are included only when the OT and current configuration resolve to them; deduplicate recipients already notified by the specific A or D incident.
 
 ## E — Extrusion-specific alerts
 
