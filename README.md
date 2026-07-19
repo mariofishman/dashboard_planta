@@ -7,6 +7,7 @@ Supervisory dashboard discovery and prototypes for detecting operational recordi
 - `project_context.md` — concise project handoff, current decisions, and pending work.
 - `dashboard_rationale.md` — stable product rationale and operational context.
 - `docs/` — detailed discovery and the canonical alert catalog.
+- `docs/ux_ui_decisions.md` — canonical UX/UI decisions for the dashboard, chat list, and chat detail prototypes.
 - `prototype/dashboard/` — current dashboard prototype.
 - `prototype/alert-catalog/v6/` — final alert-catalog review prototype.
 - `prototype/alert-catalog/v1/` — archived first alert-catalog iteration.

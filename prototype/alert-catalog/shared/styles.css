@@ -259,6 +259,12 @@ h3, .detection-rule > span { margin: 0 0 8px; color: var(--machine-muted); font-
 .resolution-rule h3 { margin: 0; color: var(--machine-ink); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .resolution-rule p { margin: 0; color: var(--machine-secondary); font-size: 11px; line-height: 1.55; }
 
+.owner-rule { position: relative; display: grid; grid-template-columns: 210px 1fr; gap: 22px; padding: 18px 22px; border-top: 1px solid var(--machine-line); }
+.owner-rule h3 { margin: 0; color: var(--machine-ink); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.owner-rule p { margin: 0; color: var(--machine-secondary); font-size: 11px; line-height: 1.55; }
+.owner-rule code { padding: 1px 4px; border-radius: 3px; background: rgba(31, 38, 35, .06); font-size: 10px; }
+.owner-rule.review-change { padding-top: 54px; }
+
 .distribution-rule { position: relative; display: grid; grid-template-columns: 210px 1fr; gap: 22px; padding: 18px 22px; border-top: 1px solid var(--machine-line); }
 .distribution-rule h3 { margin: 0; color: var(--machine-ink); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .distribution-rule p { margin: 0; color: var(--machine-secondary); font-size: 11px; line-height: 1.55; }
@@ -289,6 +295,9 @@ h3, .detection-rule > span { margin: 0 0 8px; color: var(--machine-muted); font-
 .role-review-item { min-height: 138px; padding: 58px 18px 18px; border-radius: 8px; box-shadow: var(--shadow-panel); }
 .role-review-item h3 { margin: 0 0 7px; padding-right: 90px; font-size: 15px; }
 .role-review-item p { margin: 0; color: var(--machine-secondary); font-size: 11px; line-height: 1.55; }
+.role-removal-note { position: relative; margin-top: 16px; padding: 54px 18px 18px; border-radius: 8px; box-shadow: var(--shadow-panel); }
+.role-removal-note h3 { margin: 0 0 7px; padding-right: 90px; font-size: 15px; }
+.role-removal-note p { margin: 0; color: var(--machine-secondary); font-size: 11px; line-height: 1.65; }
 
 .family-review-note { position: relative; margin: 18px 0 20px; padding: 22px; padding-top: 54px; border-radius: 8px; }
 .family-review-note h3 { margin: 0 0 6px; font-size: 14px; }
@@ -296,7 +305,8 @@ h3, .detection-rule > span { margin: 0 0 8px; color: var(--machine-muted); font-
 
 @media (max-width: 850px) {
   .resolution-rule,
-  .distribution-rule { grid-template-columns: 1fr; gap: 5px; }
+  .distribution-rule,
+  .owner-rule { grid-template-columns: 1fr; gap: 5px; }
   .distribution-row { grid-template-columns: 58px 1fr; }
   .role-review-grid { grid-template-columns: 1fr; }
   .closure-example { grid-template-columns: 1fr; gap: 6px; }

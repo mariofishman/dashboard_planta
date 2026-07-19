@@ -6,7 +6,7 @@ This is the canonical detailed record of product-discovery findings for the EMUS
 
 Use this document for detailed discovery. Keep `project_context.md` as the concise project handoff and `dashboard_rationale.md` as the stable product rationale.
 
-The editable alert-by-alert review artifact is `docs/alert_catalog.md`. Its current focused-review browser mirror is `prototype/alert-catalog/v9/index.html`; prior annotated iterations remain in `prototype/alert-catalog/v1/` through `prototype/alert-catalog/v8/`.
+The canonical alert catalog is `docs/alert_catalog.md`. Its final browser publication is `prototype/alert-catalog/final/index.html`; annotated review iterations remain in `prototype/alert-catalog/v1/` through `prototype/alert-catalog/v10/`.
 
 ## Product direction
 
@@ -90,7 +90,7 @@ The rules below are discovery findings, not yet implementation-ready specificati
 
 ### 1. Work-order planning and raw-material reservation
 
-When a work order is planned, David Alba manually reserves the raw-material reels intended for it. Most raw materials are reels, and each reel has a unique code (`Código Único`).
+When a work order is planned, the material planner manually reserves the raw-material reels intended for it. Most raw materials are reels, and each reel has a unique code (`Código Único`).
 
 The reservation tells warehouse personnel exactly which reels to send. Warehouse personnel should fulfill the reservation rather than decide independently which reels belong to a work order.
 
@@ -102,7 +102,7 @@ Primary audience:
 
 - Factory manager
 - Affected operation's supervisor and technical leader
-- Planning or reservation owner
+- Material planner
 
 Expected evidence:
 
