@@ -8,7 +8,7 @@ Supervisory dashboard discovery and prototypes for detecting operational recordi
 - `dashboard_rationale.md` — stable product rationale and operational context.
 - `docs/` — detailed discovery and the canonical alert catalog.
 - `prototype/dashboard/` — current dashboard prototype.
-- `prototype/alert-catalog/v2/` — current alert-catalog review prototype.
+- `prototype/alert-catalog/v6/` — final alert-catalog review prototype.
 - `prototype/alert-catalog/v1/` — archived first alert-catalog iteration.
 - `AGENTS.md` — project-specific agent instructions.
 
@@ -23,7 +23,7 @@ python3 -m http.server 8000
 Open:
 
 - Dashboard: `http://localhost:8000/prototype/dashboard/`
-- Current alert catalog: `http://localhost:8000/prototype/alert-catalog/v2/`
+- Current alert catalog: `http://localhost:8000/prototype/alert-catalog/v6/`
 - Archived alert catalog: `http://localhost:8000/prototype/alert-catalog/v1/`
 
 ## EMUSA Soft MCP configuration

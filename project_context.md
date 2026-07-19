@@ -33,7 +33,7 @@
 - The factory manager should remain aware of all exceptions. Affected operation supervisors and leaders should be informed immediately, with the process team included when movement, pickup, weighing, or delivery is involved.
 - Version 1 is a live, socket-updated informational dashboard. It will not acknowledge, assign, resolve, dismiss, override, or correct exceptions inside the dashboard.
 - Detailed discovery findings are maintained in `docs/discovery.md`.
-- The reviewable alert catalog is maintained in `docs/alert_catalog.md`. The current annotation-friendly browser mirror is `prototype/alert-catalog/v2/index.html`; `prototype/alert-catalog/v1/index.html` preserves the first annotated iteration.
+- The reviewable alert catalog is maintained in `docs/alert_catalog.md`. The final focused-review browser mirror is `prototype/alert-catalog/v6/index.html`; iterations 1–5 remain available for comparison.
 
 ## Current configuration
 
@@ -108,8 +108,8 @@
 - Rationale: `/Users/mariofishman/projects/dashboard_planta/dashboard_rationale.md`
 - Alert catalog: `/Users/mariofishman/projects/dashboard_planta/docs/alert_catalog.md`
 - Dashboard prototype: `/Users/mariofishman/projects/dashboard_planta/prototype/dashboard/index.html`
-- Current alert catalog browser review: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v2/index.html`
-- Previous annotated alert catalog: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v1/index.html`
+- Current alert catalog browser review: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v6/index.html`
+- Previous annotated alert catalogs: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v1/index.html`, `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v2/index.html`, and `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v3/index.html`
 - Agent instructions: `/Users/mariofishman/projects/dashboard_planta/AGENTS.md`
 - Credential file: `/Users/mariofishman/projects/dashboard_planta/.env`
 - Project handoff: `/Users/mariofishman/projects/dashboard_planta/project_context.md`
@@ -139,6 +139,6 @@ rg --files -g '!.git' -g '!.env'
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000/prototype/dashboard/` or `http://localhost:8000/prototype/alert-catalog/v2/`.
+Then open `http://localhost:8000/prototype/dashboard/` or `http://localhost:8000/prototype/alert-catalog/v6/`.
 
 Do not display `.env` contents or run commands that print `EMUSASOFT_MCP_TOKEN`.

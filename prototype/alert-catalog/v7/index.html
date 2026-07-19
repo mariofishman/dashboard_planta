@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EMUSA Alert Catalog Review · Iteration 6</title>
+    <link rel="stylesheet" href="styles.css?v=6" />
+  </head>
+  <body>
+    <header class="review-header">
+      <div class="brand">EMUSA <span>Alert catalog · iteration 6 · final</span></div>
+      <div class="header-links"><a href="../v5/">Iteration 5</a><a href="../v4/">Iteration 4</a><a href="../../dashboard/">Dashboard</a></div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <p class="eyebrow">Final review · iteration 6</p>
+        <h1>Review only what changed</h1>
+        <p>Only red-outlined sections changed after the fifth review. Use each status button to cycle through <strong>Pending</strong>, <strong>Approved</strong>, and <strong>Commented</strong>. Your choices remain saved in this browser.</p>
+        <div class="review-legend" aria-label="Review instructions">
+          <span><i></i>Changed section</span>
+          <span id="review-progress">0 of 0 reviewed</span>
+        </div>
+      </section>
+
+      <nav class="stage-index" id="alert-index" aria-label="Alert index"></nav>
+      <div class="catalog" id="catalog"></div>
+
+      <section class="removed-card" id="removed-alerts">
+        <div class="card-heading"><div><span class="alert-id">REMOVED AFTER ERP REVIEW</span><h2>C03, C04, and C05</h2></div></div>
+        <div class="removed-list" id="removed-list"></div>
+      </section>
+    </main>
+
+    <script src="app.js?v=6"></script>
+  </body>
+</html>
