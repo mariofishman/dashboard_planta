@@ -1,35 +1,39 @@
 # Monitor: arquitectura de integración con EmusaSoft y roadmap de producción
 
-**Sistema:** Monitor — Dashboard, Mensajes, Errores y Alertas  
-**Estado:** arquitectura de referencia previa a implementación  
-**Fecha de análisis:** 2026-07-18  
-**Fuentes principales:** catálogo MCP de EmusaSoft, esquema MySQL de producción extraído el 2026-07-16, documentación y prototipos del workspace  
+**Sistema:** Monitor — Dashboard, Mensajes, Errores y Alertas
+**Versión:** 1.0
+**Estado:** arquitectura aprobada para iniciar la Fase 0
+**Fecha de análisis:** 2026-07-19
+**Fuentes principales:** catálogo MCP de EmusaSoft, esquema MySQL de producción extraído el 2026-07-16, documentación y prototipos del workspace, respuestas del arquitecto de EmusaSoft del 2026-07-19
 **No incluye:** scaffold, código de aplicación, migraciones ejecutables ni cambios en EmusaSoft
 
 ## 1. Resumen de la decisión arquitectónica
 
 Monitor debe construirse como una aplicación y servicio separados que se integran con EmusaSoft, no como lógica incrustada directamente en la base de datos productiva del ERP.
 
-La arquitectura compatible con lo observado en EmusaSoft es:
+La arquitectura objetivo confirmada es:
 
-1. Autenticación y contexto de usuario derivados de EmusaSoft.
-2. GraphQL como contrato principal de lectura e integración.
-3. MySQL 8 e IDs enteros como kit de persistencia compatible.
-4. Prisma como opción preferente de acceso a la base de datos de Monitor, porque el esquema productivo contiene `_prisma_migrations`.
-5. Modelo de autorización compatible con usuarios, grupos, roles, permisos, recursos, plantas y almacenes de EmusaSoft.
-6. Motor de detección idempotente que transforma evidencia ERP en incidentes de Monitor.
-7. Base propia de Monitor para incidentes, evidencia, conversaciones, mensajes, lecturas, entregas y auditoría; Monitor no debe escribir sus datos operativos en las tablas de EmusaSoft.
-8. Gateway de tiempo real de Monitor para entregar cambios al navegador. Debe quedar detrás de un adaptador hasta confirmar el transporte de sockets que usa EmusaSoft.
-9. Canal de notificación desacoplado que pueda usar los flujos existentes de EmusaSoft cuando exista un contrato soportado y proveedores propios de Monitor cuando no exista.
-10. Enlaces profundos hacia los registros originales del ERP; EmusaSoft sigue siendo la fuente de verdad operacional.
+1. Monitor es un sistema nuevo, con repositorio, despliegue y base de datos de control propios.
+2. La base de datos de EmusaSoft es una fuente operacional externa de solo lectura. Monitor no escribe en ella.
+3. Monitor consume directamente el stream SSE de EmusaSoft. EmusaSoft utiliza Redis como infraestructura realtime.
+4. El contrato de eventos SSE se define desde los requerimientos funcionales de Monitor y se implementa como un contrato versionado entre ambos sistemas.
+5. Un adaptador SSE normaliza los eventos de EmusaSoft; un lector SQL read-only reconcilia, completa contexto y recupera gaps.
+6. Un motor de detección idempotente transforma evidencia de EmusaSoft en incidentes de Monitor.
+7. La base propia de Monitor conserva reglas, eventos normalizados, cursores, incidentes, evidencia, conversaciones, mensajes, lecturas, entregas y auditoría.
+8. Monitor utiliza WebSockets para la comunicación bidireccional con sus clientes: mensajes, recibos de lectura, presencia, escritura y actualizaciones del dashboard.
+9. Redis de Monitor coordina fan-out, presencia y escalamiento horizontal de WebSockets. La base de datos, no Redis, es la fuente de verdad de mensajes e incidentes.
+10. Una API de Monitor atiende consultas, recuperación de historial y comandos persistentes; el WebSocket distribuye cambios confirmados y señales efímeras.
+11. Los registros operacionales se corrigen en EmusaSoft. Monitor conserva enlaces profundos y observa posteriormente la corrección.
+12. Monitor ofrece una vista de todas las alertas `CLOSED_WITHOUT_RESOLUTION`, con evidencia, motivo, administrador y referencias operacionales suficientes para que el equipo de EmusaSoft evalúe ajustes posteriores.
+13. Las regularizaciones de inventario, kardex valorizado o contabilidad quedan fuera del alcance de Monitor. Monitor no agenda, solicita ni ejecuta ajustes y nunca obtiene permisos de escritura sobre EmusaSoft.
 
 ### Estrategia técnica: diagnóstico, políticas y acciones
 
-**Diagnóstico:** EmusaSoft ya contiene el registro operacional, identidad, permisos, documentos, comentarios, lecturas y notificaciones. La brecha es una capa confiable que detecte divergencias, conserve evidencia, evite duplicados, dirija la información y sostenga las conversaciones diseñadas. El riesgo principal es acoplar Monitor a contratos internos no confirmados o interpretar timestamps de persistencia como eventos físicos.
+**Diagnóstico:** EmusaSoft ya contiene el registro operacional y emite realtime mediante SSE/Redis, pero Monitor es un sistema independiente y comunicacional. La brecha es una capa confiable que consuma eventos, reconcilie contra datos read-only, detecte divergencias, conserve evidencia y sostenga conversaciones bidireccionales. El riesgo principal es confundir el SSE de entrada con el canal WebSocket de clientes, depender de Redis como persistencia o interpretar timestamps de base de datos como eventos físicos.
 
-**Políticas guía:** reutilizar el kit observable de EmusaSoft; mantener una sola fuente de verdad por dominio; integrar mediante contratos soportados; no escribir directamente en producción; hacer cada detector idempotente, versionado y explicable; entregar primero reglas deterministas; aislar estadísticas y capacidades no confirmadas detrás de feature flags.
+**Políticas guía:** una sola fuente de verdad por dominio; escritura exclusivamente en la base de Monitor; lectura exclusivamente en EmusaSoft; ninguna integración de regularización; SSE para entrada desde EmusaSoft; WebSockets para interacción bidireccional con clientes; persistir antes de publicar; reconciliar todo stream; hacer detectores y comandos idempotentes, versionados y explicables; entregar primero reglas deterministas.
 
-**Acciones:** cerrar brechas de codebase e infraestructura, formalizar contratos de datos, construir ingestión recuperable, entregar un vertical slice con A02/A03/A05, validar routing, añadir mensajes y después incorporar balances y modelos estadísticos. El kit estándar propuesto es GraphQL, MySQL 8, Prisma, TypeScript y los componentes de Emusa UI, sujeto a confirmar el runtime real en la Fase 0.
+**Acciones:** formalizar los contratos SSE, SQL read-only y WebSocket; crear el repositorio y la base de Monitor; construir ingestión y reconciliación recuperables; entregar un vertical slice con A02/A03/A05; habilitar conversaciones bidireccionales; añadir la vista de cierres sin resolución; y después incorporar balances y modelos estadísticos. El kit mínimo propuesto es TypeScript, una API de Monitor, una base relacional, Redis y WebSockets; las librerías concretas se fijan en ADRs antes del scaffold.
 
 ## 2. Nivel de certeza
 
@@ -39,7 +43,9 @@ Las afirmaciones se clasifican así:
 - **Inferido:** conclusión técnica razonable basada en evidencia directa, pero sin acceso al archivo fuente que la implementa.
 - **Pendiente:** no puede confirmarse con las fuentes disponibles.
 
-El MCP disponible no expone archivos del repositorio ni dependencias, módulos, controladores, resolvers o infraestructura de despliegue. Expone un catálogo generado de GraphQL, entidades, tablas SQL, ejemplos y el sistema de UI. Por ello, este documento describe exhaustivamente la arquitectura observable y separa los puntos que requieren acceso real a los repositorios o a la infraestructura. No se afirma como exacto ningún framework backend, broker, proveedor de identidad o implementación de sockets que no aparezca en las fuentes.
+El MCP disponible no expone archivos del repositorio ni dependencias, módulos, controladores, resolvers o infraestructura de despliegue. Expone un catálogo generado de GraphQL, entidades, tablas SQL, ejemplos y el sistema de UI. Las respuestas del arquitecto añaden cinco decisiones: EmusaSoft usa SSE y Redis; Monitor consumirá ese SSE directamente; el contrato se definirá según los requerimientos funcionales; Monitor tendrá repositorio y base propios; y su acceso a la base de EmusaSoft será de solo lectura. Siguen pendientes los detalles de endpoints, autenticación, payloads, garantías y topología, que se convierten en contratos de implementación de la Fase 0 y no cambian la arquitectura objetivo.
+
+**Precedencia vigente:** la decisión de producto del 2026-07-19 elimina la cola y cualquier API de regularización. Si `docs/alert_catalog.md` todavía menciona una cola de ajustes durante su edición paralela, esa parte queda reemplazada por la vista read-only de cierres sin resolución definida aquí. Las reglas de detección y su evidencia continúan viniendo del catálogo vigente.
 
 ## 3. Fuentes inspeccionadas
 
@@ -126,7 +132,7 @@ El dump tiene 18 tablas más que el catálogo MCP. La explicación más probable
 - `docs/design/brand_guidelines.md`
 - `docs/design/design-system/tokens.json`
 - `prototype/dashboard/`
-- `prototype/alert-catalog/v1` a `v7`
+- `prototype/alert-catalog/v1` a `v8`
 - `prototype/chat-list-review/chat-list-final.html`
 - `prototype/chat-list-review/chat-detail.html`
 - `prototype/chat-list-review/dashboard.html`
@@ -153,16 +159,16 @@ El dump tiene 18 tablas más que el catálogo MCP. La explicación más probable
 - Framework backend exacto.
 - Estructura de monorepo o repositorios.
 - Límites reales entre servicios.
-- Broker o bus de eventos.
-- Uso de outbox/CDC.
+- Topología exacta de Redis y ownership de sus canales.
+- Garantías del SSE: orden, duplicados, retención, replay y backpressure.
 - Proveedor de identidad y protocolo exacto de login.
-- Transporte de tiempo real: WebSocket, Socket.IO, SSE u otro.
 - Topología de despliegue, contenedores, ingress, balanceadores y autoscaling.
 - Cache, colas, jobs y scheduler.
 - Observabilidad y proveedor de logs/trazas.
-- Contrato soportado para publicar eventos desde EmusaSoft hacia sistemas externos.
+- Endpoint, autenticación y payloads del SSE de EmusaSoft.
+- Tecnología concreta del gateway WebSocket de Monitor.
 
-No se encontró ninguna operación GraphQL de `subscription` ni resultados para `websocket`, `socket`, `realtime` o `subscription` en el catálogo. Esto no prueba que no existan sockets; sólo prueba que no están documentados en el catálogo MCP inspeccionado.
+No se encontró ninguna operación GraphQL de `subscription` ni resultados para `websocket`, `socket`, `realtime` o `subscription` en el catálogo. El arquitecto confirmó que el realtime de EmusaSoft es SSE con Redis; por tanto, no se debe buscar ni asumir un socket bidireccional de EmusaSoft para Monitor.
 
 ## 5. Núcleo transversal de documentos
 
@@ -275,16 +281,17 @@ Operaciones GraphQL relevantes:
 
 ### 6.3 Política de autorización para Monitor
 
-1. El login debe reutilizar la identidad de EmusaSoft; Monitor no crea contraseñas.
-2. El backend de Monitor resuelve `sysUserId` en cada sesión.
-3. La autorización se calcula en servidor; el navegador no decide acceso.
-4. El usuario debe pertenecer a una planta autorizada.
-5. La visibilidad de incidentes se deriva de planta, operación, máquina, almacén, grupo, rol y participación específica.
-6. El gerente de planta ve todos los incidentes de su planta.
-7. Supervisores y líderes ven las operaciones bajo su responsabilidad.
-8. Operadores y personal de proceso ven conversaciones o incidentes donde son participantes resueltos.
-9. La misma persona encontrada por varios caminos se deduplica por `sysUserId`.
-10. Los ejemplos de personas incluidos en `docs/alert_catalog.md` no se codifican como destinatarios.
+1. Monitor no duplica la identidad operacional: cada usuario autenticado se mapea a un `sysUserId` de EmusaSoft.
+2. El mecanismo de autenticación —SSO, token exchange u otro— se decide mediante ADR antes del scaffold; Monitor no crea contraseñas mientras exista una integración corporativa soportada.
+3. El backend de Monitor resuelve y verifica `sysUserId` en cada sesión.
+4. La autorización se calcula en servidor; el navegador no decide acceso.
+5. El usuario debe pertenecer a una planta autorizada.
+6. La visibilidad de incidentes se deriva de planta, operación, máquina, almacén, grupo, rol y participación específica.
+7. El gerente de planta ve todos los incidentes de su planta.
+8. Supervisores y líderes ven las operaciones bajo su responsabilidad.
+9. Operadores y personal de proceso ven conversaciones o incidentes donde son participantes resueltos.
+10. La misma persona encontrada por varios caminos se deduplica por `sysUserId`.
+11. Los ejemplos de personas incluidos en `docs/alert_catalog.md` no se codifican como destinatarios.
 
 La “zona de influencia” usada en el catálogo de alertas no aparece como tabla ni operación explícita en el catálogo MCP actual. Antes de producción se debe confirmar si se representa mediante grupos, recursos de almacén, configuración externa o código no catalogado.
 
@@ -510,42 +517,66 @@ Esta tabla es la fuente principal para A02 y parte de A01/A05.
 | Componente | Responsabilidad |
 |---|---|
 | Monitor Web | Dashboard, lista de conversaciones, detalle, evidencia y enlaces ERP. |
-| Monitor API GraphQL | Contrato de UI, autorización, consultas y mutaciones de mensajes/administración. |
-| Identity Adapter | Resuelve sesión EmusaSoft, `getUserContext`, roles, grupos, permisos y planta. |
-| ERP GraphQL Adapter | Lee operaciones soportadas sin exponer credenciales al navegador. |
-| ERP Event Adapter | Recibe eventos confirmados o aplica polling incremental con cursores. |
+| Monitor API | Contrato de UI, autorización, consultas, historial y comandos persistentes. GraphQL o REST se decide por ADR. |
+| Identity Adapter | Autentica al usuario según el contrato que se defina y lo mapea al usuario y scopes operacionales de EmusaSoft. |
+| Emusa Read Model Adapter | Consulta la base de EmusaSoft con credenciales estrictamente read-only para snapshots, reconciliación y contexto. |
+| Emusa SSE Adapter | Mantiene la conexión SSE directa, valida el contrato, registra cursores y normaliza eventos. |
 | Normalizer | Convierte payloads ERP en eventos canónicos de Monitor. |
 | Detection Engine | Evalúa reglas deterministas, de deadline y estadísticas. |
 | Incident Service | Deduplica, actualiza, correlaciona, resuelve y audita incidentes. |
 | Routing Service | Resuelve destinatarios por planta, OT, turno, actor, operación, máquina y almacén. |
 | Conversation Service | Conversaciones, mensajes, adjuntos, lecturas, reacciones y mensajes del sistema. |
-| Notification Worker | Entrega in-app y, cuando corresponda, email, WhatsApp o SMS. |
-| Realtime Gateway | Distribuye cambios autorizados a clientes conectados. |
+| Notification Worker | Entrega in-app y, cuando corresponda, email, WhatsApp o SMS mediante proveedores propios de Monitor. |
+| Unresolved Closure Read Model | Proyecta y filtra alertas cerradas sin resolución para revisión del equipo de EmusaSoft. |
+| WebSocket Gateway | Recibe señales bidireccionales y distribuye cambios autorizados a clientes conectados. |
+| Redis de Monitor | Coordina fan-out, presencia y escalamiento del gateway; no conserva el historial canónico. |
 | Scheduler | Checkpoints de tiempo, reevaluaciones, escalación y reconciliación. |
 | Monitor DB | Estado propio, auditoría, cursores, reglas, incidentes y mensajes. |
-| Observability | Métricas, logs estructurados, trazas, healthchecks y dead-letter queue. |
+| Observability | Métricas, logs estructurados, trazas, healthchecks y registro de jobs fallidos. |
 
-### 10.2 Flujo de datos
+### 10.2 Diagrama de contexto
 
-1. Un cambio ocurre en EmusaSoft.
-2. El adaptador lo recibe por evento confirmado o lo descubre con lectura incremental.
+```mermaid
+flowchart LR
+    ESSE["EmusaSoft SSE"] --> SA["SSE Adapter"]
+    EDB[("EmusaSoft DB read-only")] --> RA["Read Model Adapter"]
+    SA --> N["Normalizer"]
+    RA --> N
+    N --> DE["Detection Engine"]
+    DE --> MDB[("Monitor DB")]
+    MDB --> API["Monitor API"]
+    MDB --> WS["WebSocket Gateway"]
+    WS <--> MR["Monitor Redis"]
+    API <--> WEB["Monitor Web"]
+    WS <--> WEB
+```
+
+### 10.3 Flujo de datos
+
+1. Un cambio ocurre en EmusaSoft y se publica por SSE mediante su infraestructura Redis.
+2. Emusa SSE Adapter consume directamente el stream, valida la versión y registra el cursor recibido.
 3. El normalizador crea un evento canónico con `source`, `source_id`, `occurred_at`, `observed_at`, `version` y payload mínimo.
-4. Se guarda el evento de entrada con clave idempotente.
-5. El motor selecciona reglas por tipo de evento y checkpoints activos.
-6. Cada regla produce `pass`, `warning`, `possible_error`, `error` o `insufficient_evidence`.
-7. Incident Service busca la clave de incidente y crea o actualiza una sola cadena.
-8. Se persiste evidencia inmutable y snapshot de versión de regla.
-9. Routing Service resuelve participantes nominales y deduplica usuarios.
-10. Se escribe un mensaje de sistema en la conversación correspondiente.
-11. Se encolan notificaciones externas permitidas.
-12. El gateway publica el cambio sólo a sesiones autorizadas.
-13. Cuando nueva evidencia hace pasar la regla, el incidente se marca resuelto automáticamente.
+4. Monitor persiste el evento de entrada con una clave idempotente antes de procesarlo.
+5. Si el payload está incompleto o existe un gap, Emusa Read Model Adapter consulta la base read-only y reconcilia una ventana acotada.
+6. El motor selecciona reglas por tipo de evento y checkpoints activos.
+7. Cada regla produce `pass`, `warning`, `possible_error`, `error` o `insufficient_evidence`.
+8. Incident Service busca la clave de incidente y crea o actualiza una sola cadena.
+9. Se persiste evidencia inmutable y snapshot de versión de regla.
+10. Routing Service resuelve participantes nominales y deduplica usuarios.
+11. Se escribe un mensaje de sistema en la conversación correspondiente y se programan las notificaciones permitidas.
+12. Después del commit, el gateway WebSocket publica el cambio sólo a sesiones autorizadas mediante Redis de Monitor.
+13. Los comandos del cliente entran por API o WebSocket, se validan y persisten antes de emitir su confirmación.
+14. Cuando nueva evidencia hace pasar la regla, el incidente se marca resuelto automáticamente.
+15. Las alertas cerradas sin resolución quedan disponibles inmediatamente en una vista read-only para que el equipo de EmusaSoft determine cualquier acción fuera de Monitor.
 
-### 10.3 Regla de frontera de datos
+### 10.4 Regla de frontera de datos
 
-- **EmusaSoft:** fuente de verdad de OT, movimientos, consumos, producción, seriales, pesajes, usuarios y permisos.
+- **EmusaSoft:** fuente de verdad de OT, movimientos, consumos, producción, seriales, pesajes y demás datos operacionales.
 - **Monitor:** fuente de verdad de definiciones de regla, evaluaciones, incidentes, evidencia congelada, conversaciones, mensajes, lecturas, entregas y cierre administrativo.
 - **No permitido:** escritura directa desde Monitor en tablas productivas de EmusaSoft.
+- **Acceso permitido:** SSE de EmusaSoft y consultas SQL con un usuario read-only; nunca desde el navegador.
+- **Regularización:** fuera del alcance de Monitor; el equipo de EmusaSoft decide y ejecuta cualquier ajuste usando sus propios procesos.
+- **Redis:** transporte y coordinación efímera; nunca fuente de verdad operacional ni comunicacional.
 - **Corrección:** se realiza en EmusaSoft y Monitor observa el cambio.
 - **Cierre sin resolución:** sólo cambia el estado administrativo en Monitor y conserva que la regla ERP continuó fallando.
 
@@ -555,7 +586,7 @@ Esta tabla es la fuente principal para A02 y parte de A01/A05.
 
 | Entidad | Propósito |
 |---|---|
-| `monitor_rule_definition` | Código A01–E04, versión, categoría, certeza, parámetros y estado. |
+| `monitor_rule_definition` | Código vigente del catálogo, versión, categoría, certeza, parámetros y estado. |
 | `monitor_rule_parameter` | Parámetro por planta, operación, máquina o regla con vigencia. |
 | `monitor_source_event` | Evento canónico idempotente recibido del ERP. |
 | `monitor_evaluation` | Resultado de evaluar regla, entradas, fórmula, salida y duración. |
@@ -580,8 +611,8 @@ La clave debe ser determinista y versionada:
 Reglas de correlación:
 
 - A01 cambia de razón en los checkpoints de 60 y 30 minutos; no crea un segundo incidente.
-- Una declaración de producción sin consumo enriquece A03; no crea otro incidente.
-- D03 se suprime cuando A03, A04, A05, A06, D01 o D02 explica el mismo balance.
+- A03 se cierra con el primer consumo válido y se suprime cuando A07 aporta evidencia más fuerte.
+- D03 se suprime cuando A03, A04, A05, A06, A07, D01 o D02 explica el mismo balance.
 - Una regla determinista reemplaza o enriquece una advertencia estadística genérica.
 - Un evento histórico ya cerrado sin resolución no reabre; un evento nuevo crea otra generación.
 
@@ -599,7 +630,21 @@ Estados técnicos recomendados:
 
 `RESOLVED` sólo ocurre cuando la condición vuelve a pasar. `CLOSED_WITHOUT_RESOLUTION` requiere autorización, razón estandarizada, comentario, actor, timestamp y evidencia. Ninguno modifica registros ERP.
 
-### 11.4 Evidencia explicable
+### 11.4 Vista de cierres sin resolución
+
+La vista debe mostrar, como mínimo:
+
+- ID, regla, estado, motivo, comentario, administrador y fecha de cierre;
+- planta, OT, documento, material, reel, máquina, almacén y ubicación relacionados;
+- condición detectada, valores observados, diferencia y unidades;
+- evidencia congelada y enlaces profundos hacia EmusaSoft;
+- incidentes correlacionados y cadena de cierre;
+- filtros por fecha, planta, regla, OT, material, máquina y administrador;
+- búsqueda, ordenamiento, paginación y exportación controlada.
+
+La vista es informativa y read-only. No contiene botones para ajustar, aprobar, enviar, reintentar ni marcar una regularización como ejecutada. Cualquier proceso posterior pertenece a EmusaSoft.
+
+### 11.5 Evidencia explicable
 
 Cada evaluación debe guardar:
 
@@ -609,7 +654,7 @@ Cada evaluación debe guardar:
 - timestamps `occurred_at`, `observed_at` y `evaluated_at`;
 - fórmula legible;
 - valores, unidades y tolerancias;
-- consultas u operaciones GraphQL usadas, sin credenciales;
+- eventos SSE y consultas read-only usados, sin credenciales;
 - hash del snapshot;
 - resultado y nivel de confianza;
 - razón de evidencia insuficiente, si aplica.
@@ -624,6 +669,7 @@ Cada evaluación debe guardar:
 | A04 | consumos, salidas, seriales, pesajes, merma, capacidad rebobinador | Inferida | Fuente de capacidad y tolerancia estadística. |
 | A05 | `articulo_serial`, salidas, pesaje, flujo y ubicación | Deadline/determinista | Definir si pesaje y movimiento son deadlines independientes y timestamp de pickup. |
 | A06 | salidas tipo merma, `solicitudes_merma`, seriales y pesaje | Mixta | Señal de bolsa cerrada no declarada. |
+| A07 | consumos, producción buena, merma y pesajes | Mixta | Tolerancia, pesos verificados y tratamiento de estimaciones. |
 | B01 | OT, plan aprobado y versiones/secuencia | Determinista | Fuente exacta de “último plan aprobado”. |
 | B02 | fechas planificadas/ejecutadas, pausa, plan | Deadline | Política de reprogramación y tolerancia. |
 | B03 | equipo, OT activa, pausas y plan | Deadline | Definir intervalo esperado y estados que excluyen alerta. |
@@ -640,33 +686,41 @@ Cada evaluación debe guardar:
 
 ## 13. Estrategia de ingestión y tiempo real
 
-### 13.1 Orden de preferencia
+### 13.1 Entrada desde EmusaSoft: SSE
 
-1. Eventos de dominio soportados oficialmente por EmusaSoft.
-2. Outbox transaccional de EmusaSoft publicada a un broker.
-3. CDC sobre réplica/read replica, autorizado y operado por plataforma.
-4. Polling GraphQL incremental con cursores y reconciliación.
+Monitor consumirá directamente el SSE de EmusaSoft. El contrato mínimo que debe definirse antes de implementar contiene:
 
-No se debe implementar scraping del frontend ni polling de tablas productivas desde el navegador.
+- endpoint y autenticación de servicio;
+- `event_id` globalmente único o clave equivalente;
+- tipo y versión del evento;
+- `occurred_at` en origen y `published_at`;
+- entidad, ID y planta afectada;
+- payload mínimo o referencia suficiente para consultar contexto;
+- semántica de `Last-Event-ID`, retención y replay;
+- política explícita de orden y duplicados;
+- heartbeats, timeout, reconexión y backoff;
+- ambientes, ownership y procedimiento de cambio de versión.
 
-### 13.2 Fallback inicial seguro
+El adaptador debe asumir entrega al menos una vez: deduplicar por `event_id`, tolerar reordenamiento y persistir antes de cualquier procesamiento o publicación downstream. SSE no ofrece confirmación por mensaje. Si EmusaSoft no ofrece replay suficiente, Monitor recupera el gap mediante reconciliación read-only.
 
-Mientras no exista un contrato de eventos confirmado:
+### 13.2 Reconciliación contra la base read-only
 
-- lectura GraphQL desde backend;
-- polling incremental por dominios con intervalos adaptados;
-- cursores persistentes;
-- reevaluación programada de deadlines;
-- reconciliación periódica de ventanas recientes;
-- backoff y jitter;
-- límites de concurrencia;
-- métricas de edad de fuente y retraso de detección.
+El SSE reduce latencia, pero no demuestra por sí solo completitud. Monitor debe:
 
-El polling no debe descargar `getWorkOrder` completo para todas las OTs en cada ciclo. Se requiere una consulta incremental o endpoint específico antes de escalar.
+- consultar desde backend con un usuario SQL sin permisos de escritura;
+- preferir una réplica read-only cuando EmusaSoft la tenga disponible;
+- persistir cursores y checkpoints por dominio;
+- reconciliar ventanas recientes y periodos posteriores a downtime;
+- reevaluar deadlines mediante scheduler aunque no llegue un evento;
+- usar índices y consultas incrementales acotadas;
+- aplicar backoff, jitter, límites de concurrencia y query timeouts;
+- medir retraso, gaps, duplicados y divergencias entre SSE y base.
 
-### 13.3 Realtime al navegador
+No se permite scraping, acceso SQL desde el navegador ni polling completo de tablas. GraphQL puede usarse como herramienta complementaria de validación, pero no es la frontera runtime confirmada para la ingestión.
 
-El contrato de UI debe ser independiente del transporte:
+### 13.3 Salida e interacción con clientes: WebSockets
+
+El contrato de clientes es propio de Monitor y distinto del SSE de EmusaSoft:
 
 - `incident.created`
 - `incident.updated`
@@ -677,11 +731,13 @@ El contrato de UI debe ser independiente del transporte:
 - `presence.updated`
 - `source.freshness.changed`
 
-El cliente se suscribe por usuario y scopes autorizados. Tras reconectar envía su último cursor, recupera el gap por HTTP/GraphQL y luego reanuda tiempo real. Nunca se confía sólo en sockets para consistencia.
+El cliente se suscribe por usuario y scopes autorizados. Los mensajes y recibos se aceptan sólo después de autenticación y autorización server-side. Cada comando persistente lleva `client_message_id` o clave idempotente. Tras reconectar, el cliente envía su último cursor, recupera el gap por API y reanuda el stream. Nunca se confía sólo en WebSockets para consistencia.
+
+Redis de Monitor distribuye eventos entre instancias y mantiene presencia efímera. El historial y los estados confirmados viven en Monitor DB. El Redis usado internamente por EmusaSoft no se considera compartido con Monitor salvo contrato operativo explícito.
 
 ## 14. API recomendada de Monitor
 
-GraphQL mantiene compatibilidad conceptual con EmusaSoft.
+GraphQL es una opción coherente con EmusaSoft, pero no es una restricción impuesta al nuevo sistema. La Fase 0 decidirá GraphQL o REST con un criterio simple: escoger el contrato que el equipo pueda operar y probar con menor complejidad. Las capacidades mínimas son las mismas en ambos casos.
 
 Queries mínimas:
 
@@ -710,10 +766,10 @@ Las operaciones de corrección de OT, material, consumo, producción o pesaje no
 
 ## 15. Seguridad y privacidad
 
-- El token de EmusaSoft sólo vive en backend o secret manager.
+- Las credenciales SSE y SQL de EmusaSoft sólo viven en backend o secret manager.
 - El navegador nunca recibe credenciales de servicio.
 - Acceso de base de datos productiva: ninguno desde la UI; read-only desde adaptadores autorizados.
-- Least privilege para GraphQL y base de datos.
+- Least privilege para SSE, API y bases de datos.
 - TLS en tránsito y cifrado en reposo.
 - Separación de ambientes y secretos.
 - Logs sin tokens, cuerpos sensibles ni PII innecesaria.
@@ -722,6 +778,7 @@ Las operaciones de corrección de OT, material, consumo, producción o pesaje no
 - Rate limits para mensajes, búsquedas y mutaciones.
 - Auditoría inmutable para cierre administrativo, cambios de regla y destinatarios.
 - Retención definida para mensajes, evidencia y entregas.
+- Exportación de cierres sin resolución restringida por rol, auditada y sin credenciales ni PII innecesaria.
 - Backups y pruebas periódicas de restauración.
 - El dump de producción se mantiene fuera de Git y fuera de artefactos de CI.
 
@@ -739,7 +796,7 @@ Métricas mínimas:
 - conexiones realtime y reconexiones;
 - mensajes enviados, entregados y leídos;
 - errores GraphQL por operación;
-- cola y dead letters;
+- jobs pendientes y fallidos;
 - tiempo de respuesta p50/p95/p99;
 - discrepancias detectadas en reconciliación.
 
@@ -795,45 +852,50 @@ SLOs propuestos para el piloto, pendientes de aprobación:
 - Expansión de español, inglés y portugués.
 - Carga, vacío, error, offline, stale y reconexión.
 - Volúmenes altos de incidentes y conversaciones.
+- Filtros, paginación, permisos y exportación de la vista de cierres sin resolución.
+- Verificación de que la vista no expone acciones de ajuste ni estados ficticios de regularización.
 
 ## 18. Roadmap de producción
 
 Las duraciones son rangos de esfuerzo de un equipo pequeño multidisciplinario y no fechas comprometidas. Deben recalibrarse cuando se conozcan tamaño del equipo, ambientes y disponibilidad de EmusaSoft.
 
-### Fase 0 — Cierre de evidencia arquitectónica
+### Fase 0 — Contratos y decisiones de implementación
 
-**Esfuerzo:** 1–2 semanas  
-**Objetivo:** eliminar los bloqueadores que el MCP y el dump no pueden responder.
+**Esfuerzo:** 1 semana
+**Objetivo:** convertir la arquitectura confirmada en contratos implementables sin escribir todavía lógica de producto.
 
 Entregables:
 
-- acceso read-only a repositorios backend, frontend e infraestructura de EmusaSoft;
-- mapa de módulos, dependencias, resolvers, servicios, jobs y despliegue;
-- contrato de autenticación y renovación de sesión;
-- confirmación de sockets, broker, outbox, CDC y scheduler;
-- catálogo MCP regenerado contra el esquema vigente;
-- inventario de ambientes y secretos;
-- ADR del límite Monitor/EmusaSoft;
-- decisión de si la zona de influencia y turnos tienen fuente canónica.
+- ADR de frontera: EmusaSoft read-only y Monitor con repositorio y base propios;
+- especificación versionada del SSE: endpoint, autenticación, eventos, payloads, cursores, replay y errores;
+- contrato del acceso SQL read-only, preferentemente contra réplica;
+- ADR de autenticación de usuarios y mapeo con `sysUserId`;
+- ADR del kit técnico: runtime, framework API, motor de base, ORM, WebSocket y Redis;
+- protocolo WebSocket de Monitor: autenticación, comandos, eventos, cursores e idempotencia;
+- esquema del evento canónico y política de reconciliación;
+- inventario de ambientes, secretos, ownership y límites operativos;
+- threat model inicial y prueba de que las credenciales de EmusaSoft no llegan al navegador.
 
 Gate de salida:
 
-- no quedan componentes críticos clasificados como “pendiente” para autenticación, eventos o autorización.
+- un evento SSE de prueba puede mapearse en papel hasta un evento WebSocket y recuperarse por API;
+- están aprobados los contratos de autenticación, SSE, SQL read-only y WebSocket;
+- ninguna decisión crítica de transporte o persistencia queda implícita.
 
 ### Fase 1 — Contratos de datos y reglas
 
 **Esfuerzo:** 2–3 semanas  
-**Objetivo:** convertir el catálogo A01–E04 en especificaciones ejecutables.
+**Objetivo:** convertir las reglas vigentes de las familias A–E en especificaciones ejecutables.
 
 Entregables:
 
 - contrato de evento canónico;
-- mapping de cada regla a operación GraphQL, campo, join, unidad y timestamp;
+- mapping de cada regla a evento SSE, tabla/campo read-only, join, unidad y timestamp;
 - definición de clave de deduplicación por regla;
 - parámetros versionados;
 - fixtures anonimizados;
 - matriz de evidencia suficiente/insuficiente;
-- resolución formal de bloqueadores A04, A06, B01, D01, E02–E04;
+- resolución formal de bloqueadores A04, A06, A07, B01, D01, E02–E04;
 - clasificación final: determinista, deadline, física o estadística.
 
 Gate de salida:
@@ -849,36 +911,37 @@ Entregables:
 
 - repositorio y pipeline CI;
 - environments local, test y staging;
-- API GraphQL de Monitor;
-- MySQL 8 y migraciones Prisma;
+- API de Monitor según ADR;
+- base relacional de Monitor y migraciones según ADR;
 - identity adapter;
 - autorización server-side;
 - logging estructurado, métricas, tracing y healthchecks;
 - secret management;
-- realtime gateway con reconexión por cursor;
+- Redis y gateway WebSocket con reconexión por cursor;
 - feature flags.
 
 Gate de salida:
 
-- un usuario de staging entra con identidad EmusaSoft, recibe scopes correctos y abre una sesión realtime sin exposición de credenciales.
+- un usuario de staging se autentica, recibe scopes correctos y abre una sesión WebSocket sin exposición de credenciales;
+- una prueba de permisos demuestra que Monitor no puede escribir en la base de EmusaSoft.
 
-### Fase 3 — Ingestión y reconciliación
+### Fase 3 — SSE, lectura y reconciliación
 
 **Esfuerzo:** 2–4 semanas  
 **Objetivo:** obtener evidencia confiable y repetible.
 
 Entregables:
 
-- adaptadores GraphQL para OT, materiales, flujos, seriales, pesajes, pausas y usuarios;
-- evento o polling incremental según decisión de Fase 0;
+- consumidor SSE de EmusaSoft con validación de contrato y reconexión;
+- adaptadores SQL read-only para OT, materiales, flujos, seriales, pesajes, pausas y usuarios;
 - source event store idempotente;
-- cursores, retries, backoff, DLQ y reconciliación;
+- cursores, `Last-Event-ID`, retries, backoff, DLQ y reconciliación SQL;
 - dashboard de frescura de fuentes;
-- pruebas de drift del schema.
+- pruebas de drift del esquema y del contrato SSE.
 
 Gate de salida:
 
-- staging puede parar y reanudar la ingestión sin perder ni duplicar eventos canónicos.
+- staging puede cortar SSE, omitir, duplicar y reordenar eventos y luego recuperar el estado correcto mediante idempotencia y reconciliación.
 
 ### Fase 4 — Vertical slice de incidentes
 
@@ -898,7 +961,7 @@ Entregables:
 - resolución automática;
 - correlación básica;
 - API de incidentes;
-- eventos realtime;
+- eventos WebSocket posteriores al commit;
 - vista dashboard y drawer conectados a datos reales de staging.
 
 Gate de salida:
@@ -918,7 +981,7 @@ Entregables:
 - razones de routing auditadas;
 - deduplicación de destinatarios;
 - notificación in-app;
-- integración con flujo EmusaSoft soportado o proveedor externo por canal;
+- proveedor propio de Monitor para cada canal externo aprobado;
 - retry, delivery state y dead letters.
 
 Gate de salida:
@@ -940,9 +1003,18 @@ Orden recomendado:
 6. reenvío y respuesta privada;
 7. herramientas de moderación y auditoría.
 
+Entregables técnicos:
+
+- comandos WebSocket o API idempotentes para enviar y marcar lectura;
+- eventos WebSocket para mensajes, recibos, presencia y escritura;
+- persistencia transaccional antes del fan-out por Redis;
+- recuperación paginada por API y cursor de sincronización;
+- autorización por conversación en cada conexión y comando;
+- soporte de reconexión y múltiples dispositivos sin duplicar mensajes.
+
 Gate de salida:
 
-- desktop y móvil pasan pruebas de permisos, reconexión, idempotencia, accesibilidad y recuperación de mensajes.
+- desktop y móvil pasan pruebas de permisos, reconexión, idempotencia, orden, accesibilidad y recuperación de mensajes por API.
 
 ### Fase 7 — Reglas de cierre y balance
 
@@ -956,11 +1028,13 @@ Entregables:
 - D01, D02 y D03;
 - correlación y supresión de causas específicas;
 - evidencia de peso real versus estimado;
-- cierre administrativo si se aprueba su inclusión.
+- cierre administrativo si se aprueba su inclusión;
+- vista read-only de cierres sin resolución con filtros, búsqueda, evidencia, referencias ERP y exportación controlada.
 
 Gate de salida:
 
-- expertos de proceso reproducen cada cálculo con datos de origen y aprueban tolerancias y explicaciones.
+- expertos de proceso reproducen cada cálculo con datos de origen y aprueban tolerancias y explicaciones;
+- el equipo de EmusaSoft puede localizar y comprender un cierre sin resolución sin acceso administrativo a Monitor.
 
 ### Fase 8 — Reglas estadísticas y específicas de operación
 
@@ -1018,7 +1092,7 @@ Entregables:
 
 ### Release 0 — Shadow monitor
 
-- Ingestión.
+- Consumo SSE y reconciliación SQL read-only.
 - Evaluación sin notificar usuarios.
 - A02, A03 y A05.
 - Comparación con hechos históricos.
@@ -1027,7 +1101,7 @@ Entregables:
 
 - Dashboard real.
 - Incidentes y evidencia.
-- Realtime.
+- Actualizaciones WebSocket del dashboard.
 - Routing y notificación in-app.
 - Enlaces a EmusaSoft.
 - Sin correcciones de ERP desde Monitor.
@@ -1043,6 +1117,7 @@ Entregables:
 
 - D01–D03.
 - Cierre administrativo si se aprueba.
+- Vista read-only de alertas cerradas sin resolución.
 - Correlación avanzada.
 
 ### Release 2 — Estadística y operación específica
@@ -1053,34 +1128,35 @@ Entregables:
 
 ## 20. Decisiones pendientes antes de escribir código
 
-1. Repositorios exactos de EmusaSoft a inspeccionar y commit/tag de referencia.
-2. Framework, runtime y versión estándar del backend y frontend.
-3. Proveedor de identidad y mecanismo de SSO/token exchange.
-4. Transporte de sockets existente.
-5. Fuente oficial de eventos y garantías de entrega.
-6. Fuente canónica de turnos, operador activo y zonas de influencia.
-7. Permiso exacto que habilita Monitor y administración.
-8. Si Monitor tendrá base separada en el mismo cluster o un cluster independiente.
-9. Política de retención de incidentes, mensajes, adjuntos y evidencia.
-10. Canales externos del primer release.
-11. Si `CLOSED_WITHOUT_RESOLUTION` entra en Release 1 o 1.2.
-12. Qué funciones del prototipo de chat son imprescindibles en el primer release.
-13. Reglas exactas que entran al piloto.
-14. Tolerancias, unidades y fuentes que aún están abiertas en el catálogo.
-15. Equipo, ambientes y proceso de despliegue.
+Estas decisiones pertenecen al equipo de Monitor o a Product; ya no requieren descubrir la arquitectura interna de EmusaSoft:
+
+1. Endpoint, autenticación, payloads, cursores, replay y límites concretos del SSE.
+2. Proveedor de identidad y mecanismo de sesión para usuarios de Monitor.
+3. Runtime, framework API, motor de base, ORM y librería WebSocket del nuevo repositorio.
+4. Fuente funcional de turnos, operador activo y zonas de influencia.
+5. Permiso exacto que habilita acceso y administración en Monitor.
+6. Política de retención de incidentes, mensajes, adjuntos y evidencia.
+7. Canales externos del primer release.
+8. Si `CLOSED_WITHOUT_RESOLUTION` entra en Release 1 o 1.2.
+9. Funciones imprescindibles del chat en el primer release.
+10. Reglas exactas del piloto y tolerancias todavía abiertas.
+11. Equipo, ambientes y proceso de despliegue.
 
 ## 21. Definition of Done del primer release productivo
 
-- Identidad y permisos reutilizan EmusaSoft y se verifican en backend.
+- Cada identidad autenticada se mapea a `sysUserId` y sus permisos se verifican en backend.
 - No existe escritura directa a la base productiva de EmusaSoft.
-- Todas las operaciones GraphQL usadas tienen contract tests.
+- El contrato SSE y cada consulta SQL read-only usada tienen contract tests.
 - La ingestión es idempotente, recuperable y reconciliable.
 - Cada incidente tiene regla, versión, evidencia, timestamps, sujetos y destinatarios explicables.
 - La regla de un incidente evita duplicados confirmados.
 - La UI muestra error, por vencer, posible error, stale y offline sin depender sólo del color.
-- La reconexión recupera eventos y mensajes faltantes.
+- La reconexión SSE recupera o reconcilia gaps y la reconexión WebSocket recupera eventos y mensajes faltantes por API.
 - Las correcciones realizadas en EmusaSoft resuelven automáticamente el incidente cuando la regla vuelve a pasar.
 - Los cierres administrativos, si están habilitados, son auditados y no alteran evidencia ERP.
+- Monitor nunca tiene credenciales SQL de escritura sobre EmusaSoft.
+- La vista de cierres sin resolución muestra evidencia, motivo, administrador y referencias ERP, con filtros y acceso read-only.
+- Monitor no agenda, solicita ni registra como ejecutados ajustes de inventario, kardex o contabilidad.
 - Las notificaciones registran intentos, entrega y error.
 - Logs y trazas no exponen tokens ni datos sensibles innecesarios.
 - Backups y restore test están aprobados.
@@ -1089,6 +1165,6 @@ Entregables:
 
 ## 22. Conclusión técnica
 
-EmusaSoft presenta una arquitectura observable basada en GraphQL, MySQL, Prisma, un núcleo documental transversal, autorización por usuarios/grupos/roles/recursos, primitivas de comentarios/lecturas, presencia de usuario y notificaciones multicanal. Monitor debe reutilizar esos contratos e identidades, pero mantener su propio modelo de incidentes y conversación para evitar contaminar el ERP y para cubrir las capacidades diseñadas que las tablas existentes no representan.
+Monitor será un sistema completamente independiente con repositorio, servicio y base de control propios. Consume el SSE de EmusaSoft respaldado por Redis y utiliza acceso SQL read-only para contexto y reconciliación. Hacia sus clientes, Monitor expone una API recuperable y WebSockets bidireccionales respaldados por su propio Redis. EmusaSoft conserva la verdad operacional; Monitor conserva incidentes, comunicaciones y cierres administrativos.
 
-La principal dependencia antes de implementación no es el diseño visual: es confirmar el codebase real, la autenticación, el transporte de eventos/sockets, la fuente de turnos y zonas, y los timestamps operacionales de cada regla. El roadmap empieza cerrando esas brechas y luego entrega un vertical slice pequeño, idempotente y auditable antes de incorporar balances, estadísticas y reglas específicas de extrusión.
+Monitor sólo ofrece una vista read-only de alertas cerradas sin resolución. Cualquier ajuste posterior pertenece al equipo de EmusaSoft y queda fuera del alcance del proyecto. Antes del scaffold deben cerrarse autenticación, especificación SSE, consultas read-only, kit técnico y protocolo WebSocket.

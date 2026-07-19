@@ -1,4 +1,5 @@
 .env
+.DS_Store
 
 # Local database backups and extracted dumps
 /local-data/database/

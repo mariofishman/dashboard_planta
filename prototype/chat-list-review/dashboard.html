@@ -4,23 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <title>EMUSA Operations · Dashboard de alertas</title>
-    <link rel="stylesheet" href="dashboard.css?v=1" />
+    <title>Dashboard de alertas</title>
+    <link rel="stylesheet" href="dashboard.css?v=2" />
   </head>
   <body>
     <header class="app-topbar">
-      <a class="brand" href="dashboard.html" aria-label="EMUSA Operations, dashboard">
-        <span class="brand-mark" aria-hidden="true">E</span>
-        <span><strong>EMUSA</strong><small>Operations</small></span>
-      </a>
-      <nav class="top-navigation" aria-label="Navegación principal">
-        <a class="active" href="dashboard.html" aria-current="page">Dashboard</a>
-        <a href="chat-list-final.html">Chats</a>
-      </nav>
-      <div class="topbar-user">
-        <span>Luis V.</span>
-        <button type="button" aria-label="Abrir perfil de Luis V.">LV</button>
+      <div class="ecosystem-control">
+        <button class="ecosystem-button" type="button" data-ecosystem-toggle aria-expanded="false" aria-controls="ecosystem-menu" aria-label="Abrir aplicaciones de producción">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+        </button>
+        <div class="ecosystem-menu" id="ecosystem-menu" data-ecosystem-menu hidden>
+          <strong>Aplicaciones de producción</strong>
+          <a href="dashboard.html" aria-current="page">Control de alertas</a>
+          <button type="button" data-ecosystem-app="Planificación">Planificación</button>
+          <button type="button" data-ecosystem-app="Inventario">Inventario</button>
+          <button type="button" data-ecosystem-app="Calidad">Calidad</button>
+          <button type="button" data-ecosystem-app="Mantenimiento">Mantenimiento</button>
+        </div>
       </div>
+      <span class="topbar-title">Control de alertas</span>
+      <button class="report-button header-report" type="button" data-export-report>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"></path></svg>
+        Exportar reporte
+      </button>
     </header>
 
     <main class="dashboard-shell">
@@ -29,58 +35,55 @@
           <h1>Resumen de alertas</h1>
           <p>Histórico, recurrencia y estado actual de los errores de planta.</p>
         </div>
-        <button class="report-button" type="button" data-export-report>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"></path></svg>
-          Exportar reporte
-        </button>
       </header>
 
-      <section class="filter-bar" aria-label="Filtros del dashboard">
-        <label class="search-field">
-          <span>Buscar</span>
-          <div>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
-            <input data-dashboard-search type="search" placeholder="Persona, OT, máquina o error" autocomplete="off" />
-          </div>
-        </label>
-        <label>
-          <span>Fechas</span>
-          <select data-range-filter>
-            <option value="7">Últimos 7 días</option>
-            <option value="30" selected>Últimos 30 días</option>
-            <option value="90">Últimos 90 días</option>
-          </select>
-        </label>
-        <label>
-          <span>Operación</span>
-          <select data-operation-filter>
-            <option value="all">Todas</option>
-            <option value="Impresión">Impresión</option>
-            <option value="Exlam">Exlam</option>
-            <option value="Corte">Corte</option>
-            <option value="Sellado">Sellado</option>
-          </select>
-        </label>
-        <label>
-          <span>Estado</span>
-          <select data-status-filter>
-            <option value="all">Resueltas y abiertas</option>
-            <option value="open">Solo abiertas</option>
-            <option value="resolved">Solo resueltas</option>
-          </select>
-        </label>
-        <button class="clear-filters" type="button" data-clear-filters>Limpiar</button>
-      </section>
-
-      <section class="status-band" aria-label="Indicadores del periodo">
-        <div class="period-total">
-          <span>Alertas en el periodo</span>
-          <div><strong data-total-alerts>184</strong><small data-period-label>Últimos 30 días</small></div>
-          <div class="resolution-track" aria-label="82 por ciento resueltas"><span data-resolution-track></span></div>
+      <section class="filter-panel" aria-label="Filtros del dashboard">
+        <header class="filter-panel-header">
+          <button class="filter-toggle" type="button" data-filter-toggle aria-expanded="true" aria-controls="dashboard-filters">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>
+            <span>Filtros</span>
+            <small data-filter-summary>Últimos 30 días · Todos los estados</small>
+            <svg class="filter-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
+          </button>
+          <button class="reset-filters" type="button" data-reset-filters>Restablecer</button>
+        </header>
+        <div class="filter-bar" id="dashboard-filters" data-filter-content>
+          <label class="search-field">
+            <span>Buscar</span>
+            <div>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+              <input data-dashboard-search type="search" placeholder="Persona, OT, máquina o error" autocomplete="off" />
+            </div>
+          </label>
+          <label>
+            <span>Fechas</span>
+            <select data-range-filter>
+              <option value="7">Últimos 7 días</option>
+              <option value="30" selected>Últimos 30 días</option>
+              <option value="90">Últimos 90 días</option>
+            </select>
+          </label>
+          <label>
+            <span>Operación</span>
+            <select data-operation-filter>
+              <option value="all">Todas</option>
+              <option value="Impresión">Impresión</option>
+              <option value="Extrusión">Extrusión</option>
+              <option value="Exlam">Exlam</option>
+              <option value="Corte">Corte</option>
+              <option value="Sellado">Sellado</option>
+            </select>
+          </label>
+          <label>
+            <span>Estado</span>
+            <select data-status-filter>
+              <option value="all">Todos los estados</option>
+              <option value="open">Abiertas</option>
+              <option value="resolved">Resueltas</option>
+              <option value="adminClosed">Cerradas sin resolución</option>
+            </select>
+          </label>
         </div>
-        <div><span>Resueltas</span><strong class="resolved-value" data-resolved-alerts>151</strong><small data-resolution-rate>82%</small></div>
-        <div><span>Abiertas ahora</span><strong class="open-value" data-open-alerts>33</strong><small>requieren seguimiento</small></div>
-        <div><span>Tiempo medio</span><strong data-average-time>46 min</strong><small>hasta resolver</small></div>
       </section>
 
       <section class="primary-insights">
@@ -93,8 +96,16 @@
             <div class="chart-legend" aria-label="Leyenda">
               <span><i class="legend-resolved"></i>Resueltas</span>
               <span><i class="legend-open"></i>Abiertas</span>
+              <span><i class="legend-admin-closed"></i>Cerradas sin resolución</span>
             </div>
           </header>
+          <section class="trend-summary-strip" aria-label="Resumen del periodo filtrado">
+            <div><span>Alertas</span><strong data-total-alerts>184</strong><small data-period-label>Últimos 30 días</small></div>
+            <div><span>Resueltas</span><strong class="resolved-value" data-resolved-alerts>142</strong><small data-resolution-rate>77%</small></div>
+            <div><span>Abiertas</span><strong class="open-value" data-open-alerts>33</strong><small>requieren seguimiento</small></div>
+            <div><span>Cerradas sin resolución</span><strong class="admin-closed-value" data-admin-closed-alerts>9</strong><small>por administración</small></div>
+            <div><span>Tiempo medio</span><strong data-average-time>46 min</strong><small>hasta resolver</small></div>
+          </section>
           <div class="trend-chart" data-trend-chart role="img" aria-labelledby="trend-title trend-description"></div>
           <p class="sr-only" id="trend-description">Gráfico de barras apiladas que compara alertas resueltas y abiertas por fecha.</p>
         </article>
@@ -175,7 +186,7 @@
       </section>
     </main>
 
-    <nav class="mobile-navigation" aria-label="Navegación principal móvil">
+    <nav class="mobile-navigation" aria-label="Navegación principal">
       <a class="active" href="dashboard.html" aria-current="page">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"></path></svg>
         <span>Dashboard</span>
@@ -187,6 +198,6 @@
     </nav>
 
     <div class="dashboard-toast" data-dashboard-toast role="status" aria-live="polite"></div>
-    <script src="dashboard.js?v=1"></script>
+    <script src="dashboard.js?v=2"></script>
   </body>
 </html>

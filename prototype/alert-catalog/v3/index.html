@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EMUSA Alert Catalog Review · Iteration 3</title>
-    <link rel="stylesheet" href="styles.css?v=1" />
+    <link rel="stylesheet" href="../shared/styles.css" />
   </head>
-  <body>
+  <body data-review-document="emusa-alert-catalog" data-review-iteration="3" data-review-legacy-storage-key="emusa-alert-catalog-v3-review">
     <header class="review-header">
       <div class="brand">EMUSA <span>Alert catalog · iteration 3</span></div>
       <div class="header-links"><a href="../v4/">Iteration 4</a><a href="../v2/">Iteration 2</a><a href="../v1/">Iteration 1</a><a href="../../dashboard/">Dashboard</a></div>
@@ -23,16 +23,987 @@
         </div>
       </section>
 
-      <nav class="stage-index" id="alert-index" aria-label="Alert index"></nav>
-      <div class="catalog" id="catalog"></div>
+      <nav class="stage-index" id="alert-index" aria-label="Alert index"><a href="#family-a">A</a><a href="#a01">A01</a><a href="#a02">A02</a><a href="#a03">A03</a><a href="#a04">A04</a><a href="#a05">A05</a><a href="#a06">A06</a><a href="#family-b">B</a><a href="#b01">B01</a><a href="#b02">B02</a><a href="#b03">B03</a><a href="#family-c">C</a><a href="#c01">C01</a><a href="#c02">C02</a><a href="#c06">C06</a><a href="#family-d">D</a><a href="#d01">D01</a><a href="#d02">D02</a><a href="#d03">D03</a><a href="#family-e">E</a><a href="#e01">E01</a><a href="#e02">E02</a><a href="#e03">E03</a><a href="#e04">E04</a><a href="#e05">E05</a><a href="#e06">E06</a><a href="#e07">E07</a><a href="#family-f">F</a><a href="#f01">F01</a><a href="#f02">F02</a><a href="#f03">F03</a><a href="#f04">F04</a><a href="#f05">F05</a><a href="#f06">F06</a><a href="#family-g">G</a><a href="#g01">G01</a><a href="#g02">G02</a><a href="#g03">G03</a><a href="#g04">G04</a><a href="#g05">G05</a><a href="#g06">G06</a><a href="#g07">G07</a><a href="#g08">G08</a><a href="#g09">G09</a><a href="#removed-alerts">Removed</a></nav>
+      <div class="catalog" id="catalog"><section class="family-section"><div class="family-heading" id="family-a"><span class="family-code">A</span><div><h2>Material, inventory, and production-data registration</h2><p>Printing, lamination, adhesive lamination, and cutting.</p></div></div><article class="alert-card family-a state-upcoming" id="a01">
+
+    <div class="card-heading"><div><span class="alert-id">A01 · Readiness and dispatch</span><h2>Required material not ready before OT start</h2></div><span class="state-pill">Por vencer, then Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>At 60 minutes before planned OT start, required material is unavailable or unreserved. At 30 minutes before start, the same incident is updated if material has not been dispatched.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>The OT is at risk of starting without required material at the machine.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Reservation negligence, unavailable stock, pending supplier delivery, or warehouse dispatch delay.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>OT 151200.1 starts at 10:00. At 09:00 one substrate is unavailable; at 09:30 the same incident adds its dispatch state.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Evaluate material, reservation, warehouse availability, purchase/supplier status, and dispatch at the two checkpoints. Keep one incident per OT and required material.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="a01-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Close when the material becomes available, is reserved, or is dispatched. Also close when an authorized user reschedules the OT: the updated planned start creates new 60- and 30-minute checkpoints. Use updateWorkOrderPlannedDates and recalculatePlannedDates.</p>
+  </section>
+  </article><article class="alert-card family-a state-error" id="a02">
+
+    <div class="card-heading"><div><span class="alert-id">A02 · Transit and receipt</span><h2>Material flow not received within 30 minutes</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>A sent material flow remains in transit without digital receipt for more than 30 minutes.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Material may have arrived physically while the receiver failed to reproduce the receipt in EMUSA Soft.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Physical delivery occurred without digital receipt, or physical movement is delayed.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>A reel sent to P15 at 09:00 remains En tránsito at 09:31.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Find sent or in-transit flow details with no receivedAt and elapsed time over 30 minutes. Distinguish OT-linked movement from non-OT relocation.</p>
+  </section>
+
+  </article><article class="alert-card family-a state-error" id="a03">
+
+    <div class="card-heading"><div><span class="alert-id">A03 · Consumption</span><h2>Active OT without consumption after 15 minutes</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>An OT has been active for 15 minutes without a first consumption declaration.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>The first raw-material reel being used should already be represented digitally.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>The operator completed initial setup but did not declare the first reel.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>OT 151087.3 starts at 09:00 and still has zero consumption at 09:15.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Require OT active, elapsed execution time at least 15 minutes, and consumption count zero. Do not duplicate this when production exists.</p>
+  </section>
+
+  </article><article class="alert-card family-a state-possible" id="a04">
+
+    <div class="card-heading"><div><span class="alert-id">A04 · Production declaration</span><h2>Possible undeclared produced reel</h2></div><span class="state-pill">Possible error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Estimated mass remaining on the rewinder exceeds its physical capacity.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Enough material has been consumed that another finished reel should already have been declared.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Delayed output declaration or an inaccurate statistical estimate.</p>
+  </section>
+      <section class=" review-change" data-review-key="a04-example">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Example</h3><p>Input is 1,500 kg, declared output is 900 kg, and waste is 100 kg. The 500 kg remainder equals rewinder capacity; consuming more without another output declaration creates a warning.</p>
+  </section>
+    </div>
+    <section class="detection-rule review-change" data-review-key="a04-detection">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Detection indicators and algorithm</h3><p>Remaining mass = consumed input − actual or estimated declared output − actual or estimated waste. Do not subtract generic process loss. Use scale net weight when available; otherwise join article_serial, orden_trabajo_salidas, width, grammage, linear meters when present, and comparable weighed reels. Theoretical kg ≈ grammage × width × length ÷ 1000. If length is absent, use a width-adjusted historical model and lower confidence.</p>
+  </section>
+
+  </article><article class="alert-card family-a state-upcoming" id="a05">
+
+    <div class="card-heading"><div><span class="alert-id">A05 · Post-production handling</span><h2>Produced reel not weighed or not moved</h2></div><span class="state-pill">Por vencer, then Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>A produced reel is unweighed after 30 minutes, or remains at a finished OT’s machine for more than 30 minutes.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Weight is required for cost and inventory quantity; finished output must also enter its next workflow.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missed weighing, process-team delay, or unrecorded movement.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>CU-98421 is unweighed and still at P15 after 30 minutes; one incident can show one or both reasons.</p>
+  </section>
+    </div>
+    <section class="detection-rule review-change" data-review-key="a05-detection">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Detection indicators and algorithm</h3><p>These are OR conditions. Add not_weighed after 30 minutes without a scale record. Independently add still_at_machine after OT finish plus 30 minutes without movement. The incident may contain either reason or both. Once movement begins, an unreceived flow uses A02.</p>
+  </section>
+
+  </article><article class="alert-card family-a state-possible" id="a06">
+
+    <div class="card-heading"><div><span class="alert-id">A06 · Waste registration and weighing</span><h2>Waste missing or not weighed</h2></div><span class="state-pill">Possible error or Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Declared waste remains unweighed, or OT balance and expected waste indicate missing waste.</p>
+  </section>
+      <section class=" review-change" data-review-key="a06-why">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Why the alert exists</h3><p>Waste weight supports OT balance and waste-control analysis. It does not allocate raw-material cost, which is divided across good production, but it is essential for later waste reduction.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Undeclared waste, missed weighing, wrong waste category, or an atypical run.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Comparable OTs expect 70–100 kg of waste; this OT closes with 5 kg and an unexplained balance gap.</p>
+  </section>
+    </div>
+    <section class="detection-rule review-change" data-review-key="a06-detection">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Detection indicators and algorithm</h3><p>Use scale records for declared waste. Source theoretical waste from operaciones → cotizacion_config_waste → cotizacion_config_valores, lot-size bands from cotizacion_config_rangos and cotizacion_config_rango_valores, and substrate adjustments from cotizacion_config_waste_gap and its taxon detail. Compare with historical OT waste; a derived statistics table may cache aggregates but raw OT, serial, and scale data remain authoritative.</p>
+  </section>
+
+  </article></section><section class="family-section"><div class="family-heading" id="family-b"><span class="family-code">B</span><div><h2>Production-plan adherence and machine activity</h2><p>Protects the planner’s current recorded schedule.</p></div></div><article class="alert-card family-b state-error" id="b01">
+
+    <div class="card-heading"><div><span class="alert-id">B01 · Sequence</span><h2>OT started outside the latest approved plan sequence</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>An operator starts an OT that is not next in the latest recorded sequence.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Actual execution no longer matches the planner’s plan or a recorded floor update.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Wrong OT, disorganization, late material, or an unrecorded sequence change.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>The operator skips 151099.1 and starts 151104.1 without updating the plan.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Compare the started OT with the first pending OT on the machine’s latest plan.</p>
+  </section>
+
+  </article><article class="alert-card family-b state-error" id="b02">
+
+    <div class="card-heading"><div><span class="alert-id">B02 · Planned start</span><h2>Planned OT has not started on time</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>The planned start arrives but the expected OT has not started and the plan was not updated.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Recorded plan and factory execution have diverged.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Previous OT delay, setup, material, operator, machine problem, or unrecorded change.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>OT 151230.1 should start at 16:00 but has not started.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Find the first pending OT whose planned start is in the past and which has no execution start or rescheduling event.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="b02-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>If the previous OT is still running, the planner enters the expected delay and selects Update All Plan to shift every later OT. If nothing is running, record a categorized equipment pause—maintenance, intentional hold, waiting for material, or another explained reason—then shift the remaining plan. Existing ERP operations updateWorkOrderPlannedDates and recalculatePlannedDates support the date change.</p>
+  </section>
+  </article><article class="alert-card family-b state-error" id="b03">
+
+    <div class="card-heading"><div><span class="alert-id">B03 · Machine activity</span><h2>Machine has no active OT for more than 30 minutes</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>A machine expected to produce has no active OT for more than 30 minutes.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Planned time is being lost without an active work order.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Unrecorded stoppage, maintenance, waiting, operator delay, or stale plan.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>P09 is scheduled but has no active OT from 14:00 to 14:31.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Exclude recorded maintenance, shutdown, approved pause, and no-production periods.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="b03-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Record the real state using equipo_pausa with category, explanation when required, and expected duration; then run Update All Plan. Close when an OT starts, a valid pause is recorded, or the plan no longer expects production in that interval.</p>
+  </section>
+  </article></section><section class="family-section"><div class="family-heading" id="family-c"><span class="family-code">C</span><div><h2>Statistical and physical plausibility</h2><p>Only conditions that the ERP can actually represent remain.</p></div></div><article class="alert-card family-c state-possible" id="c01">
+
+    <div class="card-heading"><div><span class="alert-id">C01 · Weight plausibility</span><h2>Produced reel weight outside the plausible range</h2></div><span class="state-pill">Possible error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Recorded net weight is outside physical or reliable historical limits.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>An implausible weight corrupts inventory, yield, and cost.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Scale, unit, barcode, or exceptional-production issue.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>A reel is weighed at 3,000 kg when comparable reels are 250–600 kg.</p>
+  </section>
+    </div>
+    <section class="detection-rule review-change" data-review-key="c01-detection">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Detection indicators and algorithm</h3><p>Read peso_neto from balanza_carga_detalle_registros and join article_serial, orden_trabajo_salidas, and ordenes_trabajo. When meters exist, expected kg = grammage × width × length ÷ 1000. Build ranges from the previous 12 months of weighed reels with the same substrate and grammage, segmented by operation/machine and adjusted for width. A derived table may cache sample count, median, percentiles, and model version.</p>
+  </section>
+
+  </article><article class="alert-card family-c state-possible" id="c02">
+
+    <div class="card-heading"><div><span class="alert-id">C02 · Waste plausibility</span><h2>Waste amount outside the plausible range</h2></div><span class="state-pill">Possible error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Waste weight or percentage is outside the expected range for comparable OTs.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Low waste may mean missing declarations; high waste may be wrong or operationally important.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing bag, wrong weight/category, setup loss, or atypical conditions.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Comparable 20,000-meter OTs produce 60–100 kg, but this OT declares 5 kg or 450 kg.</p>
+  </section>
+    </div>
+    <section class="detection-rule review-change" data-review-key="c02-detection">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Detection indicators and algorithm</h3><p>Combine the quotation waste matrix—operation, kilogram lot-size range, approved value, and substrate/taxon gap—with historical waste serial and scale data grouped by operation, substrate, machine, and OT-size band. Store only derived statistics in a cache table or materialized view and show which baseline triggered the warning.</p>
+  </section>
+
+  </article><article class="alert-card family-c state-possible" id="c06">
+
+    <div class="card-heading"><div><span class="alert-id">C06 · Rate plausibility</span><h2>Production rate outside the machine’s plausible range</h2></div><span class="state-pill">Possible error</span></div>
+    <div class="definition-grid">
+      <section class=" review-change" data-review-key="c06-when">
+    <button class="review-status" type="button">Pending</button>
+    <h3>When it happens</h3><p>Produced meters or kilograms divided by the OT execution interval imply a rate materially above or below the machine range.</p>
+  </section>
+      <section class=" review-change" data-review-key="c06-why">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Why the alert exists</h3><p>Production quantity may be wrong, or the OT may have been opened too early or closed too late.</p>
+  </section>
+      <section class=" review-change" data-review-key="c06-causes">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Possible causes</h3><p>Incorrect production, OT left open, late close, unrecorded pause, or exceptional production.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>A Comexi expected near 250 m/min or another press expected near 350 m/min implies 1,200 m/min or an abnormally low rate.</p>
+  </section>
+    </div>
+    <section class="detection-rule review-change" data-review-key="c06-detection">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Detection indicators and algorithm</h3><p>Use fecha_inicio_ejecucion and fecha_fin_ejecucion created by Open/Close Work Order. Subtract equipo_pausa intervals. Divide meters and kilograms by effective runtime; compare with equipos.velocidad_maquina and historical rates by machine, product, width, and setup. State whether quantity or open/close timing is the likely cause.</p>
+  </section>
+
+  </article></section><section class="family-section"><div class="family-heading" id="family-d"><span class="family-code">D</span><div><h2>Work-order closure and material balance</h2><p>Reconciles declared meters, consumed material, good output, and waste.</p></div></div><article class="alert-card family-d state-error" id="d01">
+
+    <div class="card-heading"><div><span class="alert-id">D01 · Closure meters</span><h2>Declared meters exceed consumed-reel meters</h2></div><span class="state-pill">Error · Confirmed</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>At closure, run meters exceed meters supported by consumed reels.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Production cannot be explained by recorded consumption.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing consumption, wrong run meters, reel data, or closure.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Consumed reels support 30,000 m but closure declares 40,000 m.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Estimate meters from consumed-reel weight, width, and grammage; compare with declared run meters using tolerance.</p>
+  </section>
+
+  </article><article class="alert-card family-d state-error" id="d02">
+
+    <div class="card-heading"><div><span class="alert-id">D02 · Closure material</span><h2>Completed OT has delivered reserved reels unconsumed</h2></div><span class="state-pill">Error · Confirmed</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Full planned production completes while a delivered reserved reel remains unconsumed.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>A fully completed OT should have used and declared delivered planned material.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing consumption, wrong completion, or wrong reservation quantity.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Four reels were delivered, full production completed, but only three were consumed.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Require full production, delivered reservations, and an unconsumed delivered reel. Do not apply automatically to truncation.</p>
+  </section>
+
+  </article><article class="alert-card family-d state-possible" id="d03">
+
+    <div class="card-heading"><div><span class="alert-id">D03 · Closure mass balance</span><h2>OT input, good production, and waste do not balance</h2></div><span class="state-pill">Possible error or Error</span></div>
+    <div class="definition-grid">
+      <section class=" review-change" data-review-key="d03-when">
+    <button class="review-status" type="button">Pending</button>
+    <h3>When it happens</h3><p>Consumed input cannot be reconciled with good production and waste within an explicit measurement tolerance.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>A production, waste, consumption, or weighing record may be missing or wrong.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Undeclared output/waste, unweighed output, wrong weight, or missing consumption.</p>
+  </section>
+      <section class=" review-change" data-review-key="d03-example">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Example</h3><p>Input is 1,500 kg, output is 1,300 kg, and waste is 90 kg. The unexplained 110 kg exceeds measurement tolerance.</p>
+  </section>
+    </div>
+    <section class="detection-rule review-change" data-review-key="d03-detection">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Detection indicators and algorithm</h3><p>Balance gap = consumed input − good output − waste. Do not subtract undefined process loss. Use scale weights; estimate unweighed output from article_serial, outputs, width, grammage, meters when available, and comparable weighed reels. Estimate waste from quotation ranges/substrate gaps plus historical waste. Recalculate as actual weights arrive and suppress D03 when a specific A or D incident explains the gap.</p>
+  </section>
+
+  </article></section><section class="family-section"><div class="family-heading" id="family-e"><span class="family-code">E</span><div><h2>Extrusion candidates</h2><p>Shared OT/output flow plus extrusion recipes and material containers. All items are new and require review.</p></div></div><article class="alert-card family-e state-possible review-change new-alert" id="e01" data-review-key="e01-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">E01 · Readiness</span><h2>Required resin, additive, or container not ready</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Apply A01 to planned extrusion materials and assigned containers.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use material stock, container assignment, extrusion-container locations, reservations, and dispatch state.</p>
+  </section>
+
+  </article><article class="alert-card family-e state-possible review-change new-alert" id="e02" data-review-key="e02-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">E02 · Consumption</span><h2>Active extrusion OT without material consumption</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>No resin, additive, or container consumption exists after the initial interval.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use work-order materials, container link, consumed quantity, and consumed-by-flow. Present as A03 without duplicating it.</p>
+  </section>
+
+  </article><article class="alert-card family-e state-possible review-change new-alert" id="e03" data-review-key="e03-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">E03 · Recipe</span><h2>Consumed formulation differs from OT recipe</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Actual ingredient or screw proportions differ materially from the recipe snapshot.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Compare container/material consumption with orden_trabajo_receta_snapshot by ingredient, screw, position, percentage, and configured tolerance.</p>
+  </section>
+
+  </article><article class="alert-card family-e state-possible review-change new-alert" id="e04" data-review-key="e04-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">E04 · Container state</span><h2>Extrusion container state contradicts consumption</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>A container remains in use when empty, is empty without audit data, or real versus ideal closure quantities diverge.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use en_uso, esta_vacio, fecha_vaciado, user, and real/ideal consumed and returned quantities.</p>
+  </section>
+
+  </article><article class="alert-card family-e state-possible review-change new-alert" id="e05" data-review-key="e05-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">E05 · Output handling</span><h2>Extrusion output missing, unweighed, or not moved</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Produced extrusion output is not represented, weighed, or moved on time.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Apply A04/A05 using produced serial, output, scale, target-operation, and location data; keep one incident per serial.</p>
+  </section>
+
+  </article><article class="alert-card family-e state-possible review-change new-alert" id="e06" data-review-key="e06-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">E06 · Closure</span><h2>Extrusion closure does not balance</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Resin/additive input, returns, good output, and waste do not reconcile.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use container closure quantities, OT material consumption, produced-serial weights, and waste weights; estimate only while unweighed.</p>
+  </section>
+
+  </article><article class="alert-card family-e state-possible review-change new-alert" id="e07" data-review-key="e07-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">E07 · Rate</span><h2>Extrusion production rate is implausible</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Output divided by effective OT runtime is too high or low.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Apply C06 using open/close timestamps, pauses, declared meters/kilograms, and extrusion equipment speed.</p>
+  </section>
+
+  </article></section><section class="family-section"><div class="family-heading" id="family-f"><span class="family-code">F</span><div><h2>Extrusion-lamination (Exlam) candidates</h2><p>Multiple substrate layers and bonding material require layer-aware checks. All items are new.</p></div></div><article class="alert-card family-f state-possible review-change new-alert" id="f01" data-review-key="f01-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">F01 · Readiness</span><h2>Required Exlam layers or bonding materials not ready</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>A required layer, adhesive, or coating is unavailable, unreserved, or undispatched.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Apply A01 to every required input and show the blocking layer/material in one incident.</p>
+  </section>
+
+  </article><article class="alert-card family-f state-possible review-change new-alert" id="f02" data-review-key="f02-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">F02 · Consumption</span><h2>Active Exlam OT without required layer consumption</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>One or more required layers or bonding materials have no consumption after the initial interval.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use raw-material type, quantity, reel width, grammage, and OT layer schema.</p>
+  </section>
+
+  </article><article class="alert-card family-f state-possible review-change new-alert" id="f03" data-review-key="f03-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">F03 · Layer balance</span><h2>Exlam layer consumption is out of proportion</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Paired layer meters or adhesive/coating quantities disagree beyond tolerance.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Compare substrate linear meters plus laminating-sheet, adhesive-mixture, and curtain grammage; treat as possible until weights support it.</p>
+  </section>
+
+  </article><article class="alert-card family-f state-possible review-change new-alert" id="f04" data-review-key="f04-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">F04 · Output handling</span><h2>Exlam output missing, unweighed, or not moved</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Laminate output is not declared, weighed, or moved on time.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Apply A04/A05 to Exlam serial, output, scale, target-operation, and location records.</p>
+  </section>
+
+  </article><article class="alert-card family-f state-possible review-change new-alert" id="f05" data-review-key="f05-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">F05 · Closure</span><h2>Exlam closure meter or mass balance fails</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Consumed layers and adhesive/coating do not reconcile with laminate output and waste.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Show every layer separately; use D01 for meters and D03 for combined mass.</p>
+  </section>
+
+  </article><article class="alert-card family-f state-possible review-change new-alert" id="f06" data-review-key="f06-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">F06 · Rate</span><h2>Exlam production rate is implausible</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Output per effective runtime is too high or low.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Apply C06 with execution timestamps, pauses, equipment speed, and comparable Exlam OTs.</p>
+  </section>
+
+  </article></section><section class="family-section"><div class="family-heading" id="family-g"><span class="family-code">G</span><div><h2>Sealing / bag-making candidates</h2><p>Reel-to-bag conversion uses bag specifications, packages, bundles, partial bundles, counts, and weights. All items are new.</p></div></div><article class="alert-card family-g state-possible review-change new-alert" id="g01" data-review-key="g01-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G01 · Readiness</span><h2>Required input reel not ready</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>The sealing input reel is unavailable, unreserved, or undispatched.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Apply A01 reservation, availability, and dispatch checkpoints.</p>
+  </section>
+
+  </article><article class="alert-card family-g state-possible review-change new-alert" id="g02" data-review-key="g02-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G02 · Consumption</span><h2>Active sealing OT without reel consumption</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>The OT has no input-reel consumption after the initial interval.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Apply A03 to the sealing input reel.</p>
+  </section>
+
+  </article><article class="alert-card family-g state-possible review-change new-alert" id="g03" data-review-key="g03-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G03 · Output declaration</span><h2>Produced bags or bundles were not declared</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Consumed reel meters and bag specification imply more output than declared.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Estimate units from useful print length, bag dimensions, planned millares, useful bag weight, and declared output.</p>
+  </section>
+
+  </article><article class="alert-card family-g state-possible review-change new-alert" id="g04" data-review-key="g04-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G04 · Weighing</span><h2>Produced bundle remains unweighed</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>A full or partial bundle remains in an unweighed state beyond the threshold.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use observed, unweighed, and weighed full/partial bundle counters plus scale records.</p>
+  </section>
+
+  </article><article class="alert-card family-g state-possible review-change new-alert" id="g05" data-review-key="g05-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G05 · Package count</span><h2>Package or bundle count does not reconcile</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Full bundles, partial bundles, units, and quantity per package disagree.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Expected units = full bundles × quantity per package + partial units. Keep observed/unweighed/weighed states mutually exclusive.</p>
+  </section>
+
+  </article><article class="alert-card family-g state-possible review-change new-alert" id="g06" data-review-key="g06-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G06 · Yield</span><h2>Bag count and consumed-reel balance is implausible</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Declared bags are inconsistent with consumed reel meters and bag geometry.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use useful print length, repetitions, bag dimensions, millares, and declared sealing waste.</p>
+  </section>
+
+  </article><article class="alert-card family-g state-possible review-change new-alert" id="g07" data-review-key="g07-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G07 · Waste</span><h2>Sealing waste is missing, unweighed, or implausible</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Sealing waste is absent, overdue for weighing, or outside expected range.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Apply A06/C02 using sealing quotation waste and historical OTs by bag format, substrate, machine, and lot size.</p>
+  </section>
+
+  </article><article class="alert-card family-g state-possible review-change new-alert" id="g08" data-review-key="g08-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G08 · Rate</span><h2>Sealing production rate is implausible</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Declared bags or millares per effective runtime are too high or low.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use OT open/close timestamps minus pauses and compare with technical-spec/equipment speed and historical sealing OTs.</p>
+  </section>
+
+  </article><article class="alert-card family-g state-possible review-change new-alert" id="g09" data-review-key="g09-new">
+    <button class="review-status" type="button">Pending</button>
+    <div class="card-heading"><div><span class="alert-id">G09 · Closure</span><h2>Sealing closure does not balance</h2></div><span class="state-pill candidate-pill">Candidate</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Input reel, good bags, partial packages, and waste do not reconcile.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>This condition could expose a physical-versus-digital mismatch in this operation.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing declaration, delayed workflow action, incorrect quantity, or an operation-specific exception requiring review.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Review this candidate against representative live OTs before implementation.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use actual weights when available and technical estimates otherwise; suppress when G03–G08 already explain the gap.</p>
+  </section>
+
+  </article></section></div>
 
       <section class="removed-card review-change" id="removed-alerts" data-review-key="removed-c03-c05">
         <button class="review-status" type="button">Pending</button>
         <div class="card-heading"><div><span class="alert-id">REMOVED AFTER ERP REVIEW</span><h2>C03, C04, and C05</h2></div></div>
-        <div class="removed-list" id="removed-list"></div>
+        <div class="removed-list" id="removed-list"><section><strong>C03 · Specification mismatch</strong><p>Removed: output specifications are inherited from the OT and software; operators do not declare them independently.</p></section><section><strong>C04 · Impossible chronology/value</strong><p>Removed: the current workflow prevents production-dependent records before production, and specifications are system-derived.</p></section><section><strong>C05 · Duplicate serial/event</strong><p>Removed: production serial codes are system-generated. The catalog confirms produceArticleSerial and production-series configuration; backend constraint source is not exposed by MCP.</p></section></div>
       </section>
     </main>
 
-    <script src="app.js?v=1"></script>
+    <script src="../shared/app.js"></script>
   </body>
 </html>

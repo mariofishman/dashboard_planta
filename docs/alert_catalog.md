@@ -20,6 +20,7 @@ Statuses describe timing or certainty, not severity:
 
 - `Error`: a defined rule has already been violated.
 - `Por vencer`: a deadline is approaching but has not yet been violated.
+- `Warning`: a monitoring threshold has passed, but the condition may still be legitimate and should close automatically when the expected action occurs.
 - `Possible error`: available evidence suggests a problem but does not prove it.
 
 ## One-incident rule
@@ -36,20 +37,23 @@ The dashboard must not create duplicate alerts for the same underlying problem.
 Every incident has two distinct terminal outcomes:
 
 - `Resolved`: the underlying ERP or physical condition was corrected and the detection rule now passes.
-- `Closed without resolution`: an authorized administrator confirms that a historical condition can no longer be corrected safely. This outcome must never create invented reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT records.
+- `Closed without resolution`: an authorized administrator confirms that the historical operational record can no longer be reconstructed safely. Closure never invents reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT events. When the unreconstructed history leaves inventory quantity, location, cost, valuation, or OT reconciliation incorrect, closure creates an explicit EmusaSoft adjustment-queue item instead.
 
 Administrative closure requires a standardized reason, mandatory comment, administrator identity, timestamp, and preserved evidence. It stops reminders and escalations but does not state that the business condition was fixed. Before confirmation, show incidents correlated by OT, material or reel, machine, and time window. The administrator may close the root incident and selected consequences as one audited cascade with a shared closure reference. The same historical evidence must not reopen that chain automatically; genuinely new events may create a new incident.
 
-For the A01 exception described during review, material may have been physically sent and consumed without reservation or EMUSA Soft movements. Close A01 and only the selected downstream missing-dispatch, missing-consumption, and balance incidents for the same OT and material under reason `physical_operation_outside_erp`. Do not backfill transactions that cannot be proven.
+Closure itself does not alter EmusaSoft. It creates one or more auditable adjustment-queue items for the corrections that EmusaSoft must perform. Each item records the affected inventory item or reel, warehouse/location, OT when applicable, current quantity and cost, proposed quantity and cost, reason, evidence, originating incident, requester, and status. Queue statuses are `Pending review`, `Approved`, `Applied`, or `Rejected`. An authorized EmusaSoft role reviews and applies the adjustment as an explicit present-time inventory, location, valuation, cost, or OT-reconciliation transaction. Monitor stores the resulting EmusaSoft transaction identifier and recalculates any still-open consequential incidents. Rejection requires a reason and leaves the historical closure unchanged.
+
+For the A01 exception described during review, material may have been physically sent and consumed without reservation or EmusaSoft movements. Close A01 and only the selected downstream missing-dispatch, missing-consumption, and balance incidents for the same OT and material under reason `physical_operation_outside_erp`. Do not backfill transactions that cannot be proven. Create adjustment-queue items for any resulting raw-material inventory reduction, location correction, finished-output inventory increase, cost allocation, valuation correction, or OT reconciliation that EmusaSoft must post.
 
 | Code | Recommended resolution |
 |---|---|
 | A01 | Reserve, confirm availability, and dispatch; otherwise reschedule. If the material was already used outside the ERP and the history cannot be reconstructed safely, close the correlated chain without resolution. |
 | A02 | Record the real receipt, or correct/cancel the movement. If the old handoff and physical location cannot be proven, close without resolution with the last known location. |
-| A03 | Declare traceable actual consumption. If the exact reel or quantity cannot be reconstructed, close without resolution and link D01/D03 rather than inventing consumption. |
+| A03 | Close automatically when the first valid consumption is declared. Consumption remains editable while `WorkOrder.readOnlyInput = false`; after input lock, preserve an unreconstructable condition without inventing consumption. |
 | A04 | Declare missing output or correct input, output, waste, or weight. Close a verified false positive without resolution with physical evidence. |
 | A05 | Weigh and move the reel or correct the scale/barcode/movement record. If the reel is no longer traceable, close without resolution with its last known location. |
 | A06 | Declare or weigh waste and correct its category. If the missing quantity cannot be recovered, close without resolution and link the resulting D03 gap. |
+| A07 | Declare missing consumption while OT input remains editable, or correct the output/waste evidence. If input is locked and cannot be reconstructed, close without resolution and link D03. |
 | B01 | Update the current plan and record the reason for the sequence change. An already-started historical deviation is closed as explained or closed without resolution when it cannot be reconstructed. |
 | B02 | Start, record the real pause, or reschedule and update the full plan. Close a historical unreconstructable delay without resolution with its affected plan version. |
 | B03 | Start the next OT, record the pause, or update the expected production interval. Preserve unexplained historical downtime when closing without resolution. |
@@ -59,16 +63,11 @@ For the A01 exception described during review, material may have been physically
 | D01 | Add missing consumption or correct meters/reel data. If the locked history cannot be recovered, close without resolution with the remaining meter difference. |
 | D02 | Declare consumed material, return/reassign unused material, or correct completion/reservation. Preserve an unproven reel disposition as an inventory exception. |
 | D03 | Resolve the specific upstream cause and recalculate. Close an unreconstructable or accepted residual gap without resolution with final gap, tolerance, evidence, and linked incidents. |
+| D04 | Declare, weigh, label, and return the remnant reel or correct run-meter and reel data. If locked history cannot be reconstructed, create inventory and cost adjustment-queue items. |
 | E01 | Replenish safety stock, use an approved substitute, or reschedule/cancel. Close a passed historical readiness window without resolution and record whether production continued. |
 | E02 | Capture starting quantities or reconstruct them only from traceable records. Otherwise close without resolution and link E03/E04/D03. |
 | E03 | Correct closing/opening quantity or the missing intervening movement. If neither side is provable, close without resolution for the OT pair and preserve the difference. |
 | E04 | Correct inventory quantities, screw association, or recipe snapshot. Close an approved formulation exception without resolution with the authorizer and reason. |
-
-## Alert distribution model
-
-Every alert in this catalog is associated with a work order. At the incident timestamp, resolve `OT → machine → operation → shift → named operator`. Then resolve `machine → associated warehouse → zone of influence → named users`. Alerts involving material movement may add the source warehouse, destination warehouse, weighing point, or next-machine warehouse. The current shift record decides which operator receives the alert; zone membership alone must not notify every person assigned to that warehouse.
-
-The names used below are concrete examples from the current configuration, not permanent hard-coded recipients. David Alba is the confirmed reservation owner. For P15 examples, Jesus Lara is configured in both Impresión and the P15 zone, while Jackeline Pastor is configured as an administrator of Gerencia de Producción and Impresión and is also in the P15 zone. Alexander Chujandama Cahuaza is configured in AMP-001. J. Cubas is configured at Balanza PP. For KF1 extrusion examples, Claudio Yahuarcani Huayamba and Danitza Silvestre are configured in the KF1 zone, and Danitza is also configured in Extrusion. At runtime, use the actual OT, shift roster, event actor, and live zone assignments; if one person is reached through multiple paths, notify that person once.
 
 ## Changes from iteration 1
 
@@ -126,6 +125,21 @@ The names used below are concrete examples from the current configuration, not p
 - Required runtime resolution of named people from the OT, shift roster, event actor, and live zone assignments instead of notifying every user in a zone.
 - Added concrete named examples from current P15, AMP-001, Balanza PP, and KF1 configuration for review; these examples are not hard-coded recipients.
 
+## Changes for iteration 8
+
+- Consolidated alert distribution into seven general rules and a table containing only code-specific exceptions.
+- Replaced personal-name examples with positions and runtime role resolution.
+- Reclassified A03 as a warning that closes when first consumption is declared, and documented `WorkOrder.readOnlyInput` as the runtime editability check.
+- Added A07 for possible raw material consumed but not declared when output and waste exceed recorded input consumption.
+- Corrected administrative closure so it creates an auditable EmusaSoft adjustment queue for inventory, location, cost, valuation, and OT reconciliation without fabricating historical operational events.
+
+## Changes for iteration 9
+
+- Clarified that A04 and A05 also cover partially consumed remnant, leftover, or remaining raw-material reels without changing their core logic.
+- Added D04 for consumed-reel meters exceeding declared run meters after accounting for declared remnant reels.
+- Applied E01–E04 to both Extrusion and Exlam.
+- Added a separately reviewable glossary for every role and job description used in alert distribution.
+
 ## A — Material, inventory, and production-data registration
 
 ### A01 — Required material not ready before OT start
@@ -144,11 +158,10 @@ The names used below are concrete examples from the current configuration, not p
 
 **Resolution:** Keep one incident open until every condition required at the current checkpoint is satisfied. At the 60-minute checkpoint, the material must be available and reserved; at the 30-minute checkpoint it must also be sent. Rescheduling closes the current deadlines and creates new checkpoints. If the material was already physically sent and consumed outside EMUSA Soft and the missing historical transactions cannot be proven, an administrator closes A01 and selected correlated consequences without resolution; the system must not fabricate reservations, movements, receipts, or consumption.
 
-**Alert distribution:** Notify David Alba when the reason is missing reservation. For an AMP-001 → P15 example, notify the named AMP-001 person on the source-warehouse shift, such as Alexander Chujandama Cahuaza when the roster selects him, and the named P15 operator on the OT shift, such as Jesus Lara when selected. Include Jackeline Pastor for P15/printing oversight. Change the primary recipient with the reason: David for reservation, AMP-001 for stock or dispatch, and the P15 operator when machine readiness is affected.
 
 ### A02 — Reserved OT material not received within 30 minutes
 
-**Status:** Error  
+**Status:** Warning
 **Scope:** Reserved material moving toward a work order
 
 | Field | Definition |
@@ -160,28 +173,30 @@ The names used below are concrete examples from the current configuration, not p
 
 **Detection indicators and algorithm:** Require a material flow linked to a work-order reservation, a sent or in-transit status, no `receivedAt`, and `current time - sent time > 30 minutes`. Exclude relocations between warehouses or storage locations when the material is not moving toward a work order. Once reserved material is received, close the incident.
 
-**Alert distribution:** Resolve both ends of the reserved OT movement. For an AMP-001 → P15 example, notify Alexander Chujandama Cahuaza only when he is the named source-shift sender, Jesus Lara only when he is the named P15 receiver for the OT shift, and Jackeline Pastor for printing oversight. The unresolved action determines the primary person: sender while dispatch or transport is pending, receiver after physical arrival requires digital receipt.
 
 ### A03 — Active OT without consumption after 15 minutes
 
-**Status:** Error  
+**Status:** Warning
 **Scope:** Printing, lamination, adhesive lamination, and cutting
 
 | Field | Definition |
 |---|---|
-| When it happens | An OT has been active for 15 minutes without a first consumption declaration. |
-| Why the alert exists | After 15 minutes of setup or operation, the first raw-material reel being used should already be represented digitally. |
-| Possible causes | The operator started the OT, spent the initial setup period preparing the machine, and then failed to declare the first reel being used. |
-| Example | OT 151087.3 starts at 09:00. At 09:15 it remains active with zero consumed reels. |
+| When it happens | An OT has been active for 15 minutes without a first consumption declaration. This is a warning, not proof of an error, because setup may legitimately take longer. |
+| Why the alert exists | The first raw-material reel may already be in use but not yet represented digitally. |
+| Possible causes | Machine setup took longer than expected, or the operator has not yet declared the first reel. |
+| Example | OT 151087.3 starts at 09:00 and still has zero consumption at 09:15. Its first valid consumption is declared at 09:27, so the warning closes automatically. |
 
-**Detection indicators and algorithm:** Require `OT active`, `current time - actual start >= 15 minutes`, and `consumption count = 0`. Production declarations may support the same incident but must not create a duplicate alert.
+**Detection indicators and algorithm:** Open the warning when `OT active`, `current time - actual start >= 15 minutes`, and `consumption count = 0`. Close it immediately when the first valid consumption is recorded, even after 20 or 30 minutes. Do not open or retain A03 when stronger A07 evidence shows that produced output requires more input than has been declared.
 
-**Alert distribution:** Notify the exact operator assigned to the OT and shift and the affected operation supervisor. For a P15 example, Jesus Lara receives it only if the shift record identifies him as the operator; Jackeline Pastor receives the supervisory view. Do not notify AMP-001 personnel unless A01 or A02 is also open for the same material.
+**Resolution:** Close automatically when the first valid consumption is declared. A consumption correction is permitted while `WorkOrder.readOnlyInput = false`. Once `readOnlyInput = true`—normally after OT closure or finalization—the input is locked. The ERP catalog exposes this flag but does not identify the exact backend transition that sets it. If locked history cannot be reconstructed, close without resolution and link A07, D01, or D03 rather than inventing consumption.
+
 
 ### A04 — Possible undeclared produced reel
 
 **Status:** Possible error  
 **Scope:** Rewinder-based operations without PLC signals
+
+**Remnant-reel scope:** A04 also covers an undeclared remnant, leftover, or remaining raw-material reel removed from the unwinder when an OT stops before consuming it completely. The existing missing-reel logic is unchanged: the remnant must be represented digitally so its remaining mass is accounted for.
 
 | Field | Definition |
 |---|---|
@@ -192,23 +207,23 @@ The names used below are concrete examples from the current configuration, not p
 
 **Detection indicators and algorithm:** Calculate `estimated remaining mass = consumed input mass - actual or estimated declared-output mass - actual or estimated declared-waste mass`. Do not subtract a generic process loss. Use actual scale weight from `balanza_carga_detalle_registros.peso_neto` when available. For unweighed output, use `articulo_serial`, `orden_trabajo_salidas`, width, grammage, declared linear meters when present, and comparable weighed reels. The theoretical check is `kg ≈ grammage_g_m2 × width_m × length_m ÷ 1000`. If length is unavailable, use a historical model adjusted for width and mark the result as lower-confidence. Warn when the remaining mass exceeds configured rewinder capacity plus statistical tolerance. Bags are excluded from A04.
 
-**Alert distribution:** Notify the exact operator on the OT shift because the missing declaration belongs to that machine run, plus the operation supervisor. For a P15 example, route to Jesus Lara only when the roster identifies him for that shift and to Jackeline Pastor for oversight. Add J. Cubas only when weighing evidence is part of the incident; do not notify the full P15 zone.
 
-### A05 — Produced reel not weighed or not moved from the machine
+### A05 — Produced or remnant reel not weighed or not moved from the machine
 
 **Status:** Por vencer, then Error  
-**Scope:** Produced-reel handling
+**Scope:** Produced- and remnant-reel handling
+
+**Remnant-reel scope:** A05 uses the same declaration, weighing, labeling, and movement logic for produced reels and remnant raw-material reels. A partially consumed input reel must be declared with its remaining kilograms, weighed, labeled or ticketed, and returned to the raw-material warehouse. The 30-minute weighing and movement checks do not change.
 
 | Field | Definition |
 |---|---|
-| When it happens | A declared produced reel has no recorded weight within 30 minutes, or a reel from a finished OT remains at the machine for more than 30 minutes instead of being sent to its next OT or appropriate warehouse. |
+| When it happens | A declared produced or remnant reel has no recorded weight within 30 minutes, or remains at the machine for more than 30 minutes instead of being sent to its next OT or appropriate warehouse. |
 | Why the alert exists | Without weight, EMUSA Soft cannot calculate the reel's cost or add the correct quantity to inventory. After an OT finishes, the reel must also leave the machine and enter the correct next workflow. |
 | Possible causes | Process-team delay, missed weighing, missing scale record, failure to initiate the next movement, or failure to record that movement. |
 | Example | CU-98421 was declared at 10:00. At 10:31 it has no weight and remains at P15. The dashboard shows one incident with reasons `not_weighed` and `still_at_machine`. |
 
-**Detection indicators and algorithm:** Maintain one incident per produced reel. These are **OR conditions**, not AND conditions. Add `not_weighed` when `current time - production declaration >= 30 minutes` and no scale record exists. Independently add `still_at_machine` when the source OT is finished, 30 minutes have elapsed, and no movement to the required warehouse or next OT exists. The incident may contain either reason or both. If movement has begun but is not received within 30 minutes, use `A02` rather than creating another incident.
+**Detection indicators and algorithm:** Maintain one incident per produced or remnant reel. These are **OR conditions**, not AND conditions. Add `not_weighed` when 30 minutes have elapsed since the reel declaration and no scale record exists. Independently add `still_at_machine` when the source OT is finished, 30 minutes have elapsed, and no movement to the required warehouse or next OT exists. The incident may contain either reason or both. If movement has begun but is not received within 30 minutes, use `A02` rather than creating another incident.
 
-**Alert distribution:** Use the reason to name recipients. For a P15 example, notify the OT-shift operator such as Jesus Lara when the roster selects him; notify J. Cubas at Balanza PP for `not_weighed`; notify the named process or movement actor for `still_at_machine`; and include Jackeline Pastor for printing oversight. If both reasons exist, merge the recipient lists and notify each person once.
 
 ### A06 — Waste missing or not weighed
 
@@ -224,7 +239,22 @@ The names used below are concrete examples from the current configuration, not p
 
 **Detection indicators and algorithm:** Use two evidence paths in one incident. First, for declared waste, alert when no scale record exists after the configured weighing interval. Second, at closure, compare actual or estimated good-output mass, declared waste, and expected waste against consumed input mass. Source theoretical waste from the quotation configuration chain: `operaciones` → `cotizacion_config_waste` → `cotizacion_config_valores`; use `cotizacion_config_rangos.valor_kg` and `cotizacion_config_rango_valores.valor` for lot-size bands, and `cotizacion_config_waste_gap` plus `cotizacion_config_waste_gap_detalle.id_taxon` for operation/substrate adjustments. Compare that baseline with historical actual waste by operation, substrate/taxon, machine, and OT-size band. A separate aggregate statistics table or materialized view may cache those historical distributions, but it must be derived from OT, waste-serial, and scale records rather than become a second source of truth. When balance evidence points to missing waste, add reason `possible_waste_not_declared`. If the same imbalance already exists as `D03`, attach the waste reason to that incident instead of duplicating it.
 
-**Alert distribution:** Notify the named OT-shift operator, the operation supervisor, and the named weighing or waste actor when their evidence is implicated. For a P15 example, this can resolve to Jesus Lara, Jackeline Pastor, and J. Cubas respectively. If the warning is only statistical, make Jackeline the primary reviewer; if a specific unweighed bag identifies an event actor, make that named actor primary.
+### A07 — Possible raw material consumed but not declared
+
+**Status:** Possible error; Error when verified weights confirm the gap
+**Scope:** Operations that produce weighed or statistically estimable output
+
+| Field | Definition |
+|---|---|
+| When it happens | Actual or statistically estimated good output and waste require more raw-material mass than the OT records as consumed, beyond the configured tolerance. |
+| Why the alert exists | Physical output cannot exceed its material input. The digital record probably omits consumption, although an output weight or estimate may also be wrong. |
+| Possible causes | Missing consumption declaration, incorrect output weight or estimate, incorrect waste amount, or output associated with the wrong OT. |
+| Example | Two produced reels are estimated at 350 kg each, or about 700 kg total, while the OT records only 500 kg of raw-material consumption. The unexplained 200 kg indicates possible undeclared consumption. |
+
+**Detection indicators and algorithm:** Calculate `required input evidence = actual or estimated good-output mass + actual or estimated waste mass` and `consumption gap = required input evidence - declared input consumption`. Open A07 when the gap exceeds the configured tolerance. Prefer actual scale weights. For unweighed reels, estimate mass from meters, width, basis weight, and comparable weighed reels. Statistical evidence creates a possible error; actual verified weights can confirm an error. Suppress A03 when A07 supplies the stronger explanation. At OT closure, link or merge A07 with D03 instead of creating duplicate incidents.
+
+**Resolution:** Declare the missing consumed reel while `WorkOrder.readOnlyInput = false`, or correct the output, waste, or estimate that created the gap. Close when declared consumption covers output and waste within tolerance. If `readOnlyInput = true` and the exact input cannot be reconstructed, close without resolution, preserve the quantified gap, and link D03.
+
 
 ## B — Production-plan adherence and machine activity
 
@@ -241,7 +271,6 @@ The names used below are concrete examples from the current configuration, not p
 
 **Detection indicators and algorithm:** At actual OT start, compare the started OT with the first pending OT in the latest recorded plan for that machine. Do not alert if an authorized floor update changed the sequence before start.
 
-**Alert distribution:** Notify the person who started the OT, the named operator for that machine and shift, and the operation supervisor. For a P15 example, Jesus Lara receives it only when the shift or start event identifies him, and Jackeline Pastor receives the supervisory view. Notify David Alba only when a linked A01 readiness incident shows that reservation caused the sequence change; do not include him for an unrelated sequencing error.
 
 ### B02 — Planned OT has not started on time
 
@@ -258,7 +287,6 @@ The names used below are concrete examples from the current configuration, not p
 
 **Resolution:** If the preceding OT is still running, the planner supplies the expected delay and selects `Update All Plan`; the system shifts every subsequent OT on that machine. If nothing is running, record a categorized equipment pause and then update the plan. If the historical delay can no longer be reconstructed, an administrator closes without resolution and preserves the observed delay and affected plan version.
 
-**Alert distribution:** Notify the named operator scheduled on the OT shift, the person who owns the current plan update, and the operation supervisor. For a P15 example, Jesus Lara is included only if the shift roster identifies him, while Jackeline Pastor receives the supervisory view. Add David Alba only when the delay is explained by a linked missing-reservation incident.
 
 ### B03 — Machine has no active OT for more than 30 minutes
 
@@ -275,7 +303,6 @@ The names used below are concrete examples from the current configuration, not p
 
 **Resolution:** Record the machine’s real state using the equipment-pause workflow, including category, explanation when required, and expected duration. Then shift the remaining plan using the same `Update All Plan` behavior described in `B02`. Close normally when an OT starts, a valid pause is recorded, or the plan no longer expects production. If the interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration.
 
-**Alert distribution:** Notify the operator assigned to the machine and shift, the person recorded on any pause event, and the operation supervisor. For a P15 example, route to Jesus Lara only when the roster identifies him and to Jackeline Pastor for oversight. If a linked A01 or A02 incident explains the idle machine, keep that alert's named warehouse recipients and do not create a second broad warehouse notification.
 
 ## C — Statistical and physical plausibility
 
@@ -294,7 +321,6 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Read the actual net weight from `balanza_carga_detalle_registros.peso_neto`, joined through `id_articulo_serial`. Obtain OT, output, substrate/article, width, grammage, operation, and timestamps from `articulo_serial`, `orden_trabajo_salidas`, and `ordenes_trabajo`. When linear meters exist, calculate `expected kg = grammage_g_m2 × width_m × length_m ÷ 1000`. Build historical ranges from previously weighed serials using the same substrate and grammage, segmented by operation and machine, then normalize or filter by width. Prefer the previous 12 months when sample size is sufficient. A derived statistics table or materialized view may cache sample count, median, percentiles, and model version; raw serial and scale records remain authoritative. Hard physical-limit violations are errors; statistical outliers are possible errors.
 
-**Alert distribution:** Notify the named person who created the scale record, the OT-shift operator, and the operation supervisor. For a P15/Balanza PP example, this can resolve to J. Cubas as the weighing actor, Jesus Lara as the on-shift operator, and Jackeline Pastor for oversight. Make the scale actor primary for a hard recording error and the supervisor primary for a statistical-only review.
 
 ### C02 — Waste amount outside the plausible range
 
@@ -309,7 +335,6 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Use two sources. The theoretical source is the quotation matrix: `cotizacion_config_waste`, `cotizacion_config_valores`, kilogram bands in `cotizacion_config_rangos`, band values in `cotizacion_config_rango_valores`, and substrate/taxon adjustments in `cotizacion_config_waste_gap` and `cotizacion_config_waste_gap_detalle`. The empirical source is historical waste serials and their scale records grouped by operation, substrate/taxon, machine, and OT-size band. Store only derived aggregates—sample count, expected value, percentiles, source period, and model version—in a dedicated statistics table or materialized view. Compare current waste with both baselines and show which one triggered the warning.
 
-**Alert distribution:** Notify the named OT-shift operator, the person who weighed or declared the waste, and the operation supervisor. For a P15 example, the resolved names can be Jesus Lara, J. Cubas, and Jackeline Pastor. A statistical-only outlier goes first to Jackeline; a concrete wrong or missing record goes first to the named event actor.
 
 ### Removed after ERP review: C03, C04, and C05
 
@@ -330,7 +355,6 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Use `ordenes_trabajo.fecha_inicio_ejecucion` and `fecha_fin_ejecucion`, which come from opening and closing the OT rather than typed timestamps. Subtract recorded equipment pauses from `equipo_pausa`. Divide declared meters and kilograms by effective runtime. Compare against `equipos.velocidad_maquina` and historical rates for the same machine, operation, substrate/product, width, and setup. Detect both implausibly high and implausibly low rates. The alert should state whether the likely issue is production quantity or OT open/close timing.
 
-**Alert distribution:** Notify the named OT opener or closer implicated by the calculation, the operator assigned to the shift, and the operation supervisor. For a P15 example, route to Jesus Lara only when the event or roster identifies him and to Jackeline Pastor for oversight. Do not add warehouse personnel because the machine warehouse is only the zone proxy for finding the correct production users.
 
 ## D — Work-order closure and material balance
 
@@ -348,7 +372,6 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Estimate meters in every consumed reel from weight, width, and basis weight. Sum them and compare them with declared run meters. Alert when the difference exceeds the configured tolerance. This is the primary closure rule.
 
-**Alert distribution:** Notify the named person who closed the OT, the operator assigned to the closing shift, and the operation supervisor. For a P15 example, use `closingUserId` and the shift roster to decide whether Jesus Lara is included, and include Jackeline Pastor for oversight. Add J. Cubas only when an incorrect or missing scale weight contributes to the discrepancy.
 
 ### D02 — Completed OT has delivered reserved reels unconsumed
 
@@ -364,7 +387,6 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Detection indicators and algorithm:** Require all three conditions: full planned production completed, reserved reels delivered to the machine, and `delivered reserved reels - consumed reels` is not empty. Do not apply automatically to truncated OTs.
 
-**Alert distribution:** Notify the named closing user, the operator on the closing shift, the operation supervisor, and David Alba because the incident may involve reservation quantity. For a P15 example, this can include Jesus Lara when identified by the shift and Jackeline Pastor for oversight. Notify AMP-001 personnel such as Alexander Chujandama Cahuaza only when the evidence shows a delivery or return action assigned to that source warehouse.
 
 ### D03 — OT input, good production, and waste do not balance
 
@@ -377,13 +399,27 @@ These rules detect values that are possible to enter but inconsistent with physi
 | Possible causes | Undeclared produced reel, undeclared waste, unweighed output, wrong weight, missing consumption, or statistical assumptions that do not fit this OT. |
 | Example | Consumed input is 1,500 kg, good production is 1,300 kg, and waste is 90 kg. The 110 kg gap exceeds the current tolerance of 65 kg, which is 5% of good production. |
 
-**Detection indicators and algorithm:** Calculate `balance gap = consumed input mass - good-output mass - waste mass` and `allowed gap = 0.05 × total good-production mass`. Alert when `absolute balance gap > allowed gap`. Store `0.05` as a configurable parameter so it can change later. Do not subtract an undefined generic process-loss value. Use actual scale weights from `balanza_carga_detalle_registros` when available. For declared but unweighed output, estimate from `articulo_serial`, `orden_trabajo_salidas`, width, grammage, declared linear meters when present, and comparable weighed serials. For missing or unweighed waste, use both the quotation waste matrix (`cotizacion_config_waste`, kilogram ranges and substrate/taxon gaps) and historical waste distributions. Recalculate whenever actual weights arrive. Statistical gaps are possible errors; gaps that remain beyond tolerance after actual weights are available are errors. If evidence identifies a specific `A03`, `A04`, `A05`, `A06`, `D01`, or `D02` cause, enrich that incident and suppress a duplicate `D03` alert.
+**Detection indicators and algorithm:** Calculate `balance gap = consumed input mass - good-output mass - waste mass` and `allowed gap = 0.05 × total good-production mass`. Alert when `absolute balance gap > allowed gap`. Store `0.05` as a configurable parameter so it can change later. Do not subtract an undefined generic process-loss value. Use actual scale weights from `balanza_carga_detalle_registros` when available. For declared but unweighed output, estimate from `articulo_serial`, `orden_trabajo_salidas`, width, grammage, declared linear meters when present, and comparable weighed serials. For missing or unweighed waste, use both the quotation waste matrix (`cotizacion_config_waste`, kilogram ranges and substrate/taxon gaps) and historical waste distributions. Recalculate whenever actual weights arrive. Statistical gaps are possible errors; gaps that remain beyond tolerance after actual weights are available are errors. If evidence identifies a specific `A03`, `A04`, `A05`, `A06`, `D01`, `D02`, or `D04` cause, enrich that incident and suppress a duplicate `D03` alert.
 
-**Alert distribution:** Notify the named closing user, the OT-shift operator, and the operation supervisor. Add only the people implicated by the reason that explains the gap: J. Cubas for weighing, David Alba for reservation, or the named source-warehouse person for material movement. For a P15 example, Jesus Lara and Jackeline Pastor are included only when the OT and current configuration resolve to them; deduplicate recipients already notified by the specific A or D incident.
+### D04 — Consumed-reel meters exceed declared meters
 
-## E — Extrusion-specific alerts
+**Status:** Error
 
-Extrusion containers each hold one specific resin used by the current OT. Separately, every extrusion machine has a machine-specific safety warehouse holding resin for current and near-term orders. General output handling, weighing, movement, rate, and aggregate closure still use A04/A05, C06, and D03. E04 is separate because resin proportions can be wrong even when total mass balances.
+| Field | Definition |
+|---|---|
+| When it happens | At OT closure, consumed-reel meters exceed declared run meters plus the meters represented by any declared remnant reels beyond the configured tolerance. |
+| Why the alert exists | The excess material must be explained. It may still exist physically as a partially consumed remnant reel that must return to inventory. |
+| Possible causes | Undeclared remnant reel, incorrect run meters, incorrect consumed-reel weight, width, or grammage, or an unrecorded warehouse return. |
+| Example | A consumed reel supports 10,000 m, but the OT declares 5,000 run meters and no remnant. The remaining equivalent of 5,000 m should exist as a declared, weighed, labeled, and returned remnant reel. |
+
+**Detection indicators and algorithm:** Calculate `unexplained meters = consumed-reel meters - declared run meters - declared remnant-reel meters`. Alert when unexplained meters exceed the configured tolerance. Estimate remnant meters from its measured kilograms, width, and grammage. Link A04 when the remnant declaration is missing and A05 when the declared remnant is not weighed or moved; do not create duplicate incidents.
+
+**Resolution:** Declare the remnant reel, record its remaining kilograms, weigh it, print or attach its identifying label, and return it to the raw-material warehouse. Otherwise correct run meters or reel data. If the OT is locked and the history cannot be reconstructed, close without resolution and create the required EmusaSoft inventory and cost adjustment-queue items.
+
+
+## E — Extrusion and Exlam resin-container alerts
+
+Every E01–E04 rule applies to both Extrusion and Exlam. Both operations use resin recipes and material containers. Operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients. Each container holds one specific resin used by the current OT. Separately, every applicable machine has a machine-specific safety warehouse holding resin for current and near-term orders. General output handling, weighing, movement, rate, and aggregate closure still use A04/A05, C06, D03, and D04. E04 is separate because resin proportions can be wrong even when total mass balances.
 
 ### E01 — Required extrusion safety inventory is incomplete
 
@@ -399,7 +435,6 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 
 **Detection indicators and algorithm:** Read recipe demand from `orden_trabajo_receta_snapshot` and planned production from the affected and following extrusion OTs. Calculate demand for every recipe material across the next 4 hours. Compare it with resin stock in the warehouse assigned to that machine, using `Warehouse` and `ArticleWarehouseStock` or the equivalent stock query after confirming the machine-to-warehouse mapping. Do not use `getExtrusionContainersInventory` as the safety-stock source: those containers represent the resins loaded for the current OT. Do not use A01 reservation or dispatch logic.
 
-**Alert distribution:** Notify the named extrusion operator scheduled for the affected OT and shift, the named users of the machine-specific safety warehouse, and the extrusion supervisor. For a KF1 example, this can resolve to Claudio Yahuarcani Huayamba as the shift/zone recipient and Danitza Silvestre as the configured KF1 and Extrusion oversight recipient. Do not notify David Alba because extrusion safety stock is not reserved per OT.
 
 ### E02 — Extrusion OT opened without complete starting-container inventory
 
@@ -414,7 +449,6 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 
 **Detection indicators and algorithm:** At OT opening, compare required recipe materials from `orden_trabajo_receta_snapshot` with the containers associated through `quickStartWorkOrder`. Require one actual opening quantity for every `locationId + articleId`. The ERP catalog confirms container association and current inventory but does not expose an explicitly named persisted opening-quantity field. Before implementation, verify whether the opening snapshot is stored through `WorkOrderMaterial.quantityIncoming`, the linked `locationItem.quantity`, or another backend field. If no immutable opening snapshot exists, add one; current mutable inventory alone is insufficient evidence.
 
-**Alert distribution:** Notify the named person who opened the extrusion OT, the operator assigned to that shift, and the extrusion supervisor. For a KF1 example, route to Claudio Yahuarcani Huayamba only when the opening event or shift roster identifies him and to Danitza Silvestre for KF1/Extrusion oversight. The KF1 warehouse zone is the proxy used to find these named production users.
 
 ### E03 — Previous closing stock does not match the next opening stock
 
@@ -429,7 +463,6 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 
 **Detection indicators and algorithm:** Identify consecutive OTs for the same machine and compare the same `locationId + articleId`. Use `WorkOrderMaterialStockContainer.closeQuantityReturnedReal` from the previous OT and the immutable opening quantity captured for the current OT. Alert when `absolute(previous closing kg - current opening kg)` exceeds the configured container-measurement tolerance. Show both OT codes, both declarations, the container, resin, elapsed interval, and any intervening material movements.
 
-**Alert distribution:** Notify the named closing user of the previous OT, the named opening user and shift operator of the current OT, and the extrusion supervisor. For a KF1 example, Claudio Yahuarcani Huayamba is included only when one of those records identifies him, and Danitza Silvestre receives the oversight view. If an intervening material movement identifies another actor, include that named person instead of all KF1-zone users.
 
 ### E04 — Consumed resin proportions do not match the recipe
 
@@ -444,4 +477,55 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 
 **Detection indicators and algorithm:** For every resin and screw, calculate `actual consumed kg = opening kg + added kg - ending kg`. Divide each resin amount by total actual resin consumption to obtain its percentage. Compare it with the corresponding percentage in `orden_trabajo_receta_snapshot` using a separately configurable ingredient tolerance. Apply the same E04 code to extrusion and Exlam. Run D03 independently for total input-versus-output-plus-waste balance; E04 and D03 may pass or fail independently and must not become duplicate incidents.
 
-**Alert distribution:** Notify the named OT-shift operator, the people who recorded opening, additions, and ending inventory when their values are implicated, and the extrusion or Exlam supervisor. For a KF1 extrusion example, this can resolve to Claudio Yahuarcani Huayamba and Danitza Silvestre. If D03 is also open, merge the named recipient lists and send one notification per person.
+## General alert distribution
+
+Apply these rules to every alert:
+
+1. Always inform the factory manager.
+2. Always inform the affected operation's shift supervisor and its configured technical leader.
+3. Inform the operator assigned to the OT, machine, and shift when the exception concerns machine execution or production.
+4. Make the position responsible for the unresolved action or data the primary recipient.
+5. Add only implicated supporting roles: reservation owner, purchasing owner, planner, raw-material warehouse, processed-material or work-in-process warehouse, process or movement team, scale operator, or pause owner. Include their supervisor or leader when applicable.
+6. Resolve actual people dynamically from the OT, shift roster, event actor, and current role assignments. Positions define routing; personal names are runtime results, never hard-coded rules.
+7. Deduplicate recipients and correlated incidents so each person receives one notification for the same incident chain.
+
+### Distribution exceptions and overrides
+
+Codes not listed use the seven general rules without modification.
+
+| Code | Override or exception |
+|---|---|
+| A01 | Do not notify the OT operator. Route the primary action by reason to the reservation owner, purchasing owner or planner, or raw-material warehouse dispatcher. The operation shift supervisor and technical leader still receive the alert. |
+| A02 | The material has already been sent. Notify both the sending-role owner and the receiving operator, plus their applicable shift supervisors; do not assign the pending action only to the sender. |
+| A05 | For `not_weighed`, add the scale operator. For `still_at_machine`, add the process or movement actor. A produced reel also routes to the processed-material or work-in-process warehouse and its supervisor or leader. A remnant raw-material reel instead routes to the raw-material warehouse and its supervisor or leader. |
+| A06 | The waste declarer is the OT machine operator. When weighing is implicated, also notify the scale operator and the processed-material or work-in-process warehouse supervisor. |
+| B03 | When no active OT exists, use the planned shift operator if known; otherwise the machine shift supervisor and technical leader are the actionable production recipients. |
+| D02 | Add the reservation owner only when reservation quantity or reel selection is implicated. Add raw-material warehouse roles only when delivery or return evidence implicates them. |
+| E01 | Do not use OT reservation routing. Notify the planner or supervisor responsible for requesting replenishment and the specific machine-safety-warehouse role responsible for stock, not every user in that warehouse zone. |
+| E03 | This incident spans two OTs: notify the previous OT closing role, the current OT opening role, and any identified intervening material-movement actor. |
+
+## Distribution role glossary
+
+These are positions, not personal names. Actual people are resolved dynamically from the OT, machine, shift roster, event actor, and current role assignments.
+
+| Position | Working definition |
+|---|---|
+| Factory manager | Plant-wide operational authority who receives every alert for awareness, regardless of the action owner. |
+| Operation shift supervisor | Supervisor responsible for the affected operation during the incident's shift. |
+| Technical leader | Configured leader responsible for technical oversight of the entire affected operation, when that operation has this position. |
+| OT machine operator | Operator assigned to the affected work order, machine, and shift; also the waste declarer for that OT. |
+| Primary action owner | Routing designation for the position that can perform the currently unresolved action or correct the affected data. |
+| Reservation owner | Position responsible for selecting and reserving raw-material reels for planned work orders. |
+| Purchasing owner | Position responsible for supplier purchasing and follow-up when required material is not available in-house. |
+| Planner | Position responsible for the production plan, OT sequence, planned dates, and plan-wide delay updates. |
+| Raw-material warehouse dispatcher or sender | Shift position responsible for dispatching reserved input material or receiving returned remnant raw-material reels. |
+| Raw-material warehouse supervisor or leader | Supervisor responsible for the raw-material warehouse shift and its dispatch, receipt, and inventory actions. |
+| Receiving operator | OT operator responsible for digitally receiving reserved material sent to the work-order machine. |
+| Process or movement actor | Process-team position that physically collects, weighs, and moves produced or remnant reels between machines and warehouses. |
+| Scale operator | Position responsible for weighing produced reels, remnant reels, and waste and recording the corresponding scale result. |
+| Processed-material or work-in-process warehouse role | Warehouse position responsible for receiving and storing produced reels awaiting curing, another operation, or later movement. |
+| Processed-material or work-in-process warehouse supervisor | Supervisor or leader responsible for the scale and processed-material warehouse team. |
+| Pause owner | Position or recorded actor responsible for documenting and maintaining the explanation for an equipment pause. |
+| Machine-safety-warehouse stock role | Position responsible for resin availability and replenishment in the safety warehouse assigned to an Extrusion or Exlam machine. |
+| OT opening role | Recorded person who opens the current OT and declares its required starting inventory. |
+| OT closing role | Recorded person who closes the previous or current OT and declares its ending inventory and production information. |

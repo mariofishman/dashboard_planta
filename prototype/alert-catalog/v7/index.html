@@ -4,12 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>EMUSA Alert Catalog Review · Iteration 7</title>
-    <link rel="stylesheet" href="styles.css?v=7.1" />
+    <link rel="stylesheet" href="../shared/styles.css" />
   </head>
-  <body>
+  <body data-review-document="emusa-alert-catalog" data-review-iteration="7" data-review-legacy-storage-key="emusa-alert-catalog-v7-review">
     <header class="review-header">
       <div class="brand">EMUSA <span>Alert catalog · iteration 7</span></div>
-      <div class="header-links"><a href="../v6/">Iteration 6</a><a href="../v5/">Iteration 5</a><a href="../../dashboard/">Dashboard</a></div>
+      <div class="header-links"><a href="../v8/">Iteration 8</a><a href="../v6/">Iteration 6</a><a href="../../dashboard/">Dashboard</a></div>
     </header>
 
     <main>
@@ -32,10 +32,640 @@
         <div class="closure-example"><strong>A01 example</strong><span>Material was never reserved, but the warehouse physically sent it to the machine and the operator consumed it outside EMUSA Soft. Close A01 and the selected downstream missing-dispatch, missing-consumption, and balance incidents for that OT and material under reason <em>Physical operation outside ERP</em>. Do not create fake reservations, movements, receipts, or consumption records.</span></div>
       </section>
 
-      <nav class="stage-index" id="alert-index" aria-label="Alert index"></nav>
-      <div class="catalog" id="catalog"></div>
+      <nav class="stage-index" id="alert-index" aria-label="Alert index"><a href="#family-a">A</a><a href="#a01">A01</a><a href="#a02">A02</a><a href="#a03">A03</a><a href="#a04">A04</a><a href="#a05">A05</a><a href="#a06">A06</a><a href="#family-b">B</a><a href="#b01">B01</a><a href="#b02">B02</a><a href="#b03">B03</a><a href="#family-c">C</a><a href="#c01">C01</a><a href="#c02">C02</a><a href="#c06">C06</a><a href="#family-d">D</a><a href="#d01">D01</a><a href="#d02">D02</a><a href="#d03">D03</a><a href="#family-e">E</a><a href="#e01">E01</a><a href="#e02">E02</a><a href="#e03">E03</a><a href="#e04">E04</a></nav>
+      <div class="catalog" id="catalog"><section class="family-section"><div class="family-heading" id="family-a"><span class="family-code">A</span><div><h2>Material, inventory, and production-data registration</h2><p>General material and output-registration controls.</p></div></div><article class="alert-card family-a state-upcoming" id="a01">
+
+    <div class="card-heading"><div><span class="alert-id">A01 · Readiness and dispatch</span><h2>Required material not ready before OT start</h2></div><span class="state-pill">Por vencer, then Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>At 60 minutes before planned OT start, required material is unavailable or unreserved. At 30 minutes, only material that is available and reserved is checked for dispatch; the same incident is updated if it has not been sent.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>The OT is at risk of starting without required material at the machine.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Reservation negligence, unavailable stock, pending supplier delivery, or warehouse dispatch delay.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>OT 151200.1 starts at 10:00. At 09:00 one substrate is unavailable or unreserved; at 09:30 a ready material that has not been sent adds the dispatch reason to the same incident.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>At T−60, require both warehouse availability and reservation. At T−30, require dispatch only after both readiness conditions pass. Keep one incident per OT and material, updating its reason instead of creating a second alert.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="a01-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Reserve the material, confirm warehouse availability, and dispatch it before the applicable checkpoint; reschedule the OT when readiness cannot be restored in time. If the material was physically sent and consumed outside EMUSA Soft and the missing historical steps can no longer be entered safely, do not invent reservations, movements, receipts, or consumption. An administrator closes A01 without resolution and closes the linked consequences for the same OT and material as one audited exception.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="a01-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify David Alba when the reason is missing reservation. For an AMP-001 → P15 example, notify the named AMP-001 person on the source-warehouse shift, such as Alexander Chujandama Cahuaza when the roster selects him, and the named P15 operator on the OT shift, such as Jesus Lara when selected. Include Jackeline Pastor for P15/printing oversight. Change the primary recipient with the reason: David for reservation, AMP-001 for stock or dispatch, and the P15 operator when machine readiness is affected.</p>
+  </section>
+  </article><article class="alert-card family-a state-error" id="a02">
+
+    <div class="card-heading"><div><span class="alert-id">A02 · Transit and receipt</span><h2>Reserved OT material not received within 30 minutes</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Material reserved for a work order remains in transit to that OT without digital receipt for more than 30 minutes.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Reserved material may have arrived physically at the machine while the operator failed to record its receipt in EMUSA Soft.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Physical delivery occurred without digital receipt, or movement to the work-order machine is delayed.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>A reel reserved for OT 151087.3 is sent to P15 at 09:00 and remains En tránsito at 09:31.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Require a material flow linked to a work-order reservation, sent or in transit, with no receivedAt and elapsed time over 30 minutes. Exclude relocations between warehouses or storage locations when the material is not moving toward a work order.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="a02-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Record the receipt when the reserved material physically reached the OT destination. If it did not arrive, correct or cancel the movement and create the proper dispatch. When the old physical location and handoff can no longer be proven, an administrator closes the incident without resolution, records the last known location and reason, and includes only linked incidents from the same OT movement.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="a02-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Resolve both ends of the reserved OT movement. For an AMP-001 → P15 example, notify Alexander Chujandama Cahuaza only when he is the named source-shift sender, Jesus Lara only when he is the named P15 receiver for the OT shift, and Jackeline Pastor for printing oversight. The unresolved action determines the primary person: sender while dispatch or transport is pending, receiver after physical arrival requires digital receipt.</p>
+  </section>
+  </article><article class="alert-card family-a state-error" id="a03">
+
+    <div class="card-heading"><div><span class="alert-id">A03 · Consumption</span><h2>Active OT without consumption after 15 minutes</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>An OT has been active for 15 minutes without a first consumption declaration.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>The first raw-material reel being used should already be represented digitally.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>The operator completed initial setup but did not declare the first reel.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>OT 151087.3 starts at 09:00 and still has zero consumption at 09:15.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Require OT active, elapsed execution time at least 15 minutes, and consumption count zero. Do not duplicate this when production exists.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="a03-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Declare the actual consumed reel when it is traceable and EMUSA Soft still permits a valid declaration. Correct an incorrectly opened OT when that is the cause. If production already occurred and the exact reel or quantity cannot be reconstructed, close without resolution; preserve the missing-consumption fact and link any D01 or D03 consequence instead of fabricating consumption.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="a03-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the exact operator assigned to the OT and shift and the affected operation supervisor. For a P15 example, Jesus Lara receives it only if the shift record identifies him as the operator; Jackeline Pastor receives the supervisory view. Do not notify AMP-001 personnel unless A01 or A02 is also open for the same material.</p>
+  </section>
+  </article><article class="alert-card family-a state-possible" id="a04">
+
+    <div class="card-heading"><div><span class="alert-id">A04 · Production declaration</span><h2>Possible undeclared produced reel</h2></div><span class="state-pill">Possible error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Estimated mass remaining on the rewinder exceeds its physical capacity.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Enough material has been consumed that another finished reel should already have been declared.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Delayed output declaration or an inaccurate statistical estimate.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Input is 1,500 kg, declared output is 900 kg, and waste is 100 kg. The 500 kg remainder equals rewinder capacity; consuming more without another output declaration creates a warning.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Remaining mass = consumed input − actual or estimated declared output − actual or estimated waste. Do not subtract generic process loss. Use scale net weight when available; otherwise join article_serial, orden_trabajo_salidas, width, grammage, linear meters when present, and comparable weighed reels. Theoretical kg ≈ grammage × width × length ÷ 1000. If length is absent, use a width-adjusted historical model and lower confidence.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="a04-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Declare the missing produced reel or correct the input, output, waste, or weight record that created the excess remainder. If physical verification shows no undeclared reel and the estimate was a false positive, an administrator closes without resolution using reason Verified physical exception and attaches the supporting observation.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="a04-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the exact operator on the OT shift because the missing declaration belongs to that machine run, plus the operation supervisor. For a P15 example, route to Jesus Lara only when the roster identifies him for that shift and to Jackeline Pastor for oversight. Add J. Cubas only when weighing evidence is part of the incident; do not notify the full P15 zone.</p>
+  </section>
+  </article><article class="alert-card family-a state-upcoming" id="a05">
+
+    <div class="card-heading"><div><span class="alert-id">A05 · Post-production handling</span><h2>Produced reel not weighed or not moved</h2></div><span class="state-pill">Por vencer, then Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>A produced reel is unweighed after 30 minutes, or remains at a finished OT’s machine for more than 30 minutes.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Weight is required for cost and inventory quantity; finished output must also enter its next workflow.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missed weighing, process-team delay, or unrecorded movement.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>CU-98421 is unweighed and still at P15 after 30 minutes; one incident can show one or both reasons.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>These are OR conditions. Add not_weighed after 30 minutes without a scale record. Independently add still_at_machine after OT finish plus 30 minutes without movement. The incident may contain either reason or both. Once movement begins, an unreceived flow uses A02.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="a05-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Weigh the reel and record its movement to the required warehouse or next OT. Correct the scale, barcode, or movement record when the action occurred but was recorded incorrectly. If the reel is no longer traceable, close without resolution with its last known location and keep any related inventory discrepancy linked to the same incident chain.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="a05-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Use the reason to name recipients. For a P15 example, notify the OT-shift operator such as Jesus Lara when the roster selects him; notify J. Cubas at Balanza PP for not_weighed; notify the named process or movement actor for still_at_machine; and include Jackeline Pastor for printing oversight. If both reasons exist, merge the recipient lists and notify each person once.</p>
+  </section>
+  </article><article class="alert-card family-a state-possible" id="a06">
+
+    <div class="card-heading"><div><span class="alert-id">A06 · Waste registration and weighing</span><h2>Waste missing or not weighed</h2></div><span class="state-pill">Possible error or Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Declared waste remains unweighed, or OT balance and expected waste indicate missing waste.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Waste weight supports OT balance and waste-control analysis. It does not allocate raw-material cost, which is divided across good production, but it is essential for later waste reduction.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Undeclared waste, missed weighing, wrong waste category, or an atypical run.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Comparable OTs expect 70–100 kg of waste; this OT closes with 5 kg and an unexplained balance gap.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use scale records for declared waste. Source theoretical waste from operaciones → cotizacion_config_waste → cotizacion_config_valores, lot-size bands from cotizacion_config_rangos and cotizacion_config_rango_valores, and substrate adjustments from cotizacion_config_waste_gap and its taxon detail. Compare with historical OT waste; a derived statistics table may cache aggregates but raw OT, serial, and scale data remain authoritative.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="a06-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Declare missing waste, weigh the waste, or correct its weight and category. For a statistical warning, verify the run against physical and historical evidence. If the missing bag or exact quantity can no longer be recovered, close without resolution with the known estimate and link the resulting D03 balance gap.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="a06-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named OT-shift operator, the operation supervisor, and the named weighing or waste actor when their evidence is implicated. For a P15 example, this can resolve to Jesus Lara, Jackeline Pastor, and J. Cubas respectively. If the warning is only statistical, make Jackeline the primary reviewer; if a specific unweighed bag identifies an event actor, make that named actor primary.</p>
+  </section>
+  </article></section><section class="family-section"><div class="family-heading" id="family-b"><span class="family-code">B</span><div><h2>Production-plan adherence and machine activity</h2><p>Protects the planner’s current recorded schedule.</p></div></div><article class="alert-card family-b state-error" id="b01">
+
+    <div class="card-heading"><div><span class="alert-id">B01 · Sequence</span><h2>OT started outside the latest approved plan sequence</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>An operator starts an OT that is not next in the latest recorded sequence.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Actual execution no longer matches the planner’s plan or a recorded floor update.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Wrong OT, disorganization, late material, or an unrecorded sequence change.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>The operator skips 151099.1 and starts 151104.1 without updating the plan.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Compare the started OT with the first pending OT on the machine’s latest plan.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="b01-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Do not attempt to undo an OT that already started. Update the current production plan, record why the sequence changed, and reschedule affected later OTs. Then close the incident as an explained deviation; use administrative closure without resolution when the historical sequence change was never recorded and cannot be reconstructed.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="b01-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the person who started the OT, the named operator for that machine and shift, and the operation supervisor. For a P15 example, Jesus Lara receives it only when the shift or start event identifies him, and Jackeline Pastor receives the supervisory view. Notify David Alba only when a linked A01 readiness incident shows that reservation caused the sequence change; do not include him for an unrelated sequencing error.</p>
+  </section>
+  </article><article class="alert-card family-b state-error" id="b02">
+
+    <div class="card-heading"><div><span class="alert-id">B02 · Planned start</span><h2>Planned OT has not started on time</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>The planned start arrives but the expected OT has not started and the plan was not updated.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Recorded plan and factory execution have diverged.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Previous OT delay, setup, material, operator, machine problem, or unrecorded change.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>OT 151230.1 should start at 16:00 but has not started.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Find the first pending OT whose planned start is in the past and which has no execution start or rescheduling event.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="b02-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Start the planned OT, record the real pause or cause of delay, or reschedule it and run Update All Plan so later OTs move consistently. If the time window has passed and no reliable cause can be reconstructed, an administrator closes without resolution with the observed delay and affected plan version.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="b02-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named operator scheduled on the OT shift, the person who owns the current plan update, and the operation supervisor. For a P15 example, Jesus Lara is included only if the shift roster identifies him, while Jackeline Pastor receives the supervisory view. Add David Alba only when the delay is explained by a linked missing-reservation incident.</p>
+  </section>
+  </article><article class="alert-card family-b state-error" id="b03">
+
+    <div class="card-heading"><div><span class="alert-id">B03 · Machine activity</span><h2>Machine has no active OT for more than 30 minutes</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>A machine expected to produce has no active OT for more than 30 minutes.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Planned time is being lost without an active work order.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Unrecorded stoppage, maintenance, waiting, operator delay, or stale plan.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>P09 is scheduled but has no active OT from 14:00 to 14:31.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Exclude recorded maintenance, shutdown, approved pause, and no-production periods.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="b03-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Start the next OT, record the real equipment pause with category and expected duration, or update the plan so the interval is no longer expected production time. If the idle interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration for analysis.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="b03-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the operator assigned to the machine and shift, the person recorded on any pause event, and the operation supervisor. For a P15 example, route to Jesus Lara only when the roster identifies him and to Jackeline Pastor for oversight. If a linked A01 or A02 incident explains the idle machine, keep that alert's named warehouse recipients and do not create a second broad warehouse notification.</p>
+  </section>
+  </article></section><section class="family-section"><div class="family-heading" id="family-c"><span class="family-code">C</span><div><h2>Statistical and physical plausibility</h2><p>Only conditions that the ERP can actually represent remain.</p></div></div><article class="alert-card family-c state-possible" id="c01">
+
+    <div class="card-heading"><div><span class="alert-id">C01 · Weight plausibility</span><h2>Produced reel weight outside the plausible range</h2></div><span class="state-pill">Possible error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Recorded net weight is outside physical or reliable historical limits.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>An implausible weight corrupts inventory, yield, and cost.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Scale, unit, barcode, or exceptional-production issue.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>A reel is weighed at 3,000 kg when comparable reels are 250–600 kg.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Read peso_neto from balanza_carga_detalle_registros and join article_serial, orden_trabajo_salidas, and ordenes_trabajo. When meters exist, expected kg = grammage × width × length ÷ 1000. Build ranges from the previous 12 months of weighed reels with the same substrate and grammage, segmented by operation/machine and adjusted for width. A derived table may cache sample count, median, percentiles, and model version.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="c01-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Reweigh the reel and correct the unit, barcode, or scale association when wrong. If a second verified measurement confirms an exceptional but valid reel, close without resolution as Verified physical exception; preserve both the original and verification evidence.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="c01-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named person who created the scale record, the OT-shift operator, and the operation supervisor. For a P15/Balanza PP example, this can resolve to J. Cubas as the weighing actor, Jesus Lara as the on-shift operator, and Jackeline Pastor for oversight. Make the scale actor primary for a hard recording error and the supervisor primary for a statistical-only review.</p>
+  </section>
+  </article><article class="alert-card family-c state-possible" id="c02">
+
+    <div class="card-heading"><div><span class="alert-id">C02 · Waste plausibility</span><h2>Waste amount outside the plausible range</h2></div><span class="state-pill">Possible error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Waste weight or percentage is outside the expected range for comparable OTs.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Low waste may mean missing declarations; high waste may be wrong or operationally important.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing bag, wrong weight/category, setup loss, or atypical conditions.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Comparable 20,000-meter OTs produce 60–100 kg, but this OT declares 5 kg or 450 kg.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Combine the quotation waste matrix—operation, kilogram lot-size range, approved value, and substrate/taxon gap—with historical waste serial and scale data grouped by operation, substrate, machine, and OT-size band. Store only derived statistics in a cache table or materialized view and show which baseline triggered the warning.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="c02-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Reweigh the waste, correct its category or unit, or add a missing bag declaration. If the value is physically verified as an exceptional run, close without resolution as Verified physical exception rather than changing a correct weight to fit the expected range.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="c02-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named OT-shift operator, the person who weighed or declared the waste, and the operation supervisor. For a P15 example, the resolved names can be Jesus Lara, J. Cubas, and Jackeline Pastor. A statistical-only outlier goes first to Jackeline; a concrete wrong or missing record goes first to the named event actor.</p>
+  </section>
+  </article><article class="alert-card family-c state-possible" id="c06">
+
+    <div class="card-heading"><div><span class="alert-id">C06 · Rate plausibility</span><h2>Production rate outside the machine’s plausible range</h2></div><span class="state-pill">Possible error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Produced meters or kilograms divided by the OT execution interval imply a rate materially above or below the machine range.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Production quantity may be wrong, or the OT may have been opened too early or closed too late.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Incorrect production, OT left open, late close, unrecorded pause, or exceptional production.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>A Comexi expected near 250 m/min or a faster Miraflex expected near 350 m/min implies 1,200 m/min or an abnormally low rate.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use fecha_inicio_ejecucion and fecha_fin_ejecucion created by Open/Close Work Order. Subtract equipo_pausa intervals. Divide meters and kilograms by effective runtime; compare with equipos.velocidad_maquina and historical rates by machine, product, width, and setup. State whether quantity or open/close timing is the likely cause.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="c06-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Correct the production quantity, OT opening or closing event, or missing pause that distorted effective runtime. If the rate is verified as a legitimate exceptional run, close without resolution with the evidence and model version that produced the warning.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="c06-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named OT opener or closer implicated by the calculation, the operator assigned to the shift, and the operation supervisor. For a P15 example, route to Jesus Lara only when the event or roster identifies him and to Jackeline Pastor for oversight. Do not add warehouse personnel because the machine warehouse is only the zone proxy for finding the correct production users.</p>
+  </section>
+  </article></section><section class="family-section"><div class="family-heading" id="family-d"><span class="family-code">D</span><div><h2>Work-order closure and material balance</h2><p>Reconciles declared meters, consumed material, good output, and waste.</p></div></div><article class="alert-card family-d state-error" id="d01">
+
+    <div class="card-heading"><div><span class="alert-id">D01 · Closure meters</span><h2>Declared meters exceed consumed-reel meters</h2></div><span class="state-pill">Error · Confirmed</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>At closure, run meters exceed meters supported by consumed reels.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Production cannot be explained by recorded consumption.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing consumption, wrong run meters, reel data, or closure.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Consumed reels support 30,000 m but closure declares 40,000 m.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Estimate meters from consumed-reel weight, width, and grammage; compare with declared run meters using tolerance.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="d01-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Declare the missing consumed reel or correct run meters, reel weight, width, grammage, or closure data. If the OT is historically locked and the source record cannot be recovered, close without resolution with the remaining meter difference and link D03 rather than entering invented consumption.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="d01-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named person who closed the OT, the operator assigned to the closing shift, and the operation supervisor. For a P15 example, use closingUserId and the shift roster to decide whether Jesus Lara is included, and include Jackeline Pastor for oversight. Add J. Cubas only when an incorrect or missing scale weight contributes to the discrepancy.</p>
+  </section>
+  </article><article class="alert-card family-d state-error" id="d02">
+
+    <div class="card-heading"><div><span class="alert-id">D02 · Closure material</span><h2>Completed OT has delivered reserved reels unconsumed</h2></div><span class="state-pill">Error · Confirmed</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Full planned production completes while a delivered reserved reel remains unconsumed.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>A fully completed OT should have used and declared delivered planned material.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Missing consumption, wrong completion, or wrong reservation quantity.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Four reels were delivered, full production completed, but only three were consumed.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Require full production, delivered reservations, and an unconsumed delivered reel. Do not apply automatically to truncation.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="d02-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Declare a delivered reel that was actually consumed, return or reassign an unused reel through the valid inventory flow, or correct completion or reservation quantity. If the completed OT is locked and the reel disposition cannot be proven, close without resolution and preserve the unreconciled reel as an inventory exception.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="d02-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named closing user, the operator on the closing shift, the operation supervisor, and David Alba because the incident may involve reservation quantity. For a P15 example, this can include Jesus Lara when identified by the shift and Jackeline Pastor for oversight. Notify AMP-001 personnel such as Alexander Chujandama Cahuaza only when the evidence shows a delivery or return action assigned to that source warehouse.</p>
+  </section>
+  </article><article class="alert-card family-d state-possible" id="d03">
+
+    <div class="card-heading"><div><span class="alert-id">D03 · Closure mass balance</span><h2>OT input, good production, and waste do not balance</h2></div><span class="state-pill">Possible error or Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>At closure, the absolute balance gap exceeds 5% of total good-production mass. The percentage is initially configurable.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>A production, waste, consumption, or weighing record may be missing or wrong.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Undeclared output/waste, unweighed output, wrong weight, or missing consumption.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>Input is 1,500 kg, output is 1,300 kg, and waste is 90 kg. The 110 kg gap exceeds the current 65 kg tolerance: 5% of good production.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Balance gap = consumed input − good output − waste. Allowed gap = 0.05 × total good-production mass; keep 0.05 configurable. Alert when the absolute gap exceeds the allowed gap. Do not subtract undefined process loss. Use scale weights and documented estimates, recalculate as actual weights arrive, and suppress D03 when a specific A or D incident explains the gap.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="d03-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Resolve the most specific underlying incident first: missing consumption, output, waste, or weight. Recalculate the balance after corrected or actual weights arrive. If the residual gap cannot be reconstructed or is accepted as a documented physical exception, close without resolution with the final gap, tolerance, evidence, and linked cause incidents.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="d03-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named closing user, the OT-shift operator, and the operation supervisor. Add only the people implicated by the reason that explains the gap: J. Cubas for weighing, David Alba for reservation, or the named source-warehouse person for material movement. For a P15 example, Jesus Lara and Jackeline Pastor are included only when the OT and current configuration resolve to them; deduplicate recipients already notified by the specific A or D incident.</p>
+  </section>
+  </article></section><section class="family-section"><div class="family-heading" id="family-e"><span class="family-code">E</span><div><h2>Extrusion-specific alerts</h2><p>Resin inventory and formulation controls unique to extrusion and Exlam.</p></div></div><section class="family-review-note">
+
+    <h3>Aggregate balance and resin proportions are separate checks</h3><p>D03 checks whether total input equals good output plus waste. E04 checks whether the resin mix matches the recipe and can fail even when D03 passes. Extrusion and Exlam share E04; reel declaration, handling, rate, and aggregate balance continue to use A04/A05, C06, and D03.</p>
+  </section><article class="alert-card family-e state-upcoming" id="e01">
+
+    <div class="card-heading"><div><span class="alert-id">E01 · Safety inventory</span><h2>Required extrusion safety inventory is incomplete</h2></div><span class="state-pill">Por vencer, then Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>Three hours before an extrusion OT starts, a required resin or additive is missing from the machine-specific safety warehouse or its stock is insufficient for the next 4 hours of scheduled demand.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>The affected or following extrusion OT may stop because required formulation material is not available near the machine.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>The planner or supervisor did not request replenishment of the machine-specific safety warehouse on time.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>At 11:00, an OT planned for 14:00 requires R-17, but the safety warehouse assigned to that machine has insufficient R-17 for scheduled demand through the next 4 hours.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Use orden_trabajo_receta_snapshot and planned extrusion OTs to calculate 4-hour demand. Compare it with resin stock in the warehouse assigned to that machine, using Warehouse and ArticleWarehouseStock or the equivalent stock query after confirming the machine-to-warehouse mapping. Do not use current OT containers for this readiness rule: each container holds one resin for the current OT, while the safety warehouse protects current and near-term orders.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="e01-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Replenish the machine safety warehouse, use an approved substitute, or reschedule or cancel the affected OT. Close normally when the configured four-hour coverage is restored or the demand window changes. Close without resolution only for a historical readiness warning whose window has passed, recording whether production continued or stopped.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="e01-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named extrusion operator scheduled for the affected OT and shift, the named users of the machine-specific safety warehouse, and the extrusion supervisor. For a KF1 example, this can resolve to Claudio Yahuarcani Huayamba as the shift/zone recipient and Danitza Silvestre as the configured KF1 and Extrusion oversight recipient. Do not notify David Alba because extrusion safety stock is not reserved per OT.</p>
+  </section>
+  </article><article class="alert-card family-e state-error" id="e02">
+
+    <div class="card-heading"><div><span class="alert-id">E02 · Opening inventory</span><h2>Extrusion OT opened without complete starting-container inventory</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>quickStartWorkOrder opens an extrusion OT without operator-declared starting kilograms for every required recipe container.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Actual resin consumption cannot be calculated without complete opening inventory.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>The operator omitted a container, its starting quantity, or completion of the opening declaration.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>The recipe uses three resins, but starting kilograms exist for only two associated containers.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Match recipe materials to quickStartWorkOrder container associations and require one immutable opening quantity per locationId + articleId. MCP confirms the association but not the exact stored opening field; verify WorkOrderMaterial.quantityIncoming, locationItem.quantity, or add a dedicated snapshot.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="e02-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Capture complete starting kilograms before production. If the OT already ran, reconstruct opening quantities only from traceable closing stock, additions, and movements. Otherwise close without resolution and link the resulting E03, E04, or D03 incidents instead of inventing opening inventory.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="e02-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named person who opened the extrusion OT, the operator assigned to that shift, and the extrusion supervisor. For a KF1 example, route to Claudio Yahuarcani Huayamba only when the opening event or shift roster identifies him and to Danitza Silvestre for KF1/Extrusion oversight. The KF1 warehouse zone is the proxy used to find these named production users.</p>
+  </section>
+  </article><article class="alert-card family-e state-error" id="e03">
+
+    <div class="card-heading"><div><span class="alert-id">E03 · Inventory continuity</span><h2>Previous closing stock does not match the next opening stock</h2></div><span class="state-pill">Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>For the same container and resin, the previous OT closing kilograms differ from the next OT opening kilograms beyond container-measurement tolerance.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Inventory continuity between consecutive work orders is broken.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Wrong previous ending stock, wrong current starting stock, or an unrecorded addition/removal between OTs.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>OT 151300 closes C-04 with 420 kg of R-17; the next OT opens the same container and resin with 365 kg and no intervening movement.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>Compare previous WorkOrderMaterialStockContainer.closeQuantityReturnedReal with the current immutable opening quantity using locationId + articleId. Show both OTs and any intervening material movements.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="e03-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Correct the previous closing quantity, current opening quantity, or missing intervening resin movement. If neither side can be proven, close without resolution for the OT pair and preserve the unexplained container-and-resin difference for inventory follow-up.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="e03-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named closing user of the previous OT, the named opening user and shift operator of the current OT, and the extrusion supervisor. For a KF1 example, Claudio Yahuarcani Huayamba is included only when one of those records identifies him, and Danitza Silvestre receives the oversight view. If an intervening material movement identifies another actor, include that named person instead of all KF1-zone users.</p>
+  </section>
+  </article><article class="alert-card family-e state-possible" id="e04">
+
+    <div class="card-heading"><div><span class="alert-id">E04 · Formulation proportions</span><h2>Consumed resin proportions do not match the recipe</h2></div><span class="state-pill">Possible error or Error</span></div>
+    <div class="definition-grid">
+      <section class="">
+
+    <h3>When it happens</h3><p>The total resin mass can balance production plus waste, but one or more actual resin or screw percentages differ from the recipe beyond a configurable ingredient tolerance.</p>
+  </section>
+      <section class="">
+
+    <h3>Why the alert exists</h3><p>Aggregate balance cannot detect a wrong formulation: excess of one resin can offset a shortage of another while total kilograms remain correct.</p>
+  </section>
+      <section class="">
+
+    <h3>Possible causes</h3><p>Incorrect starting or ending container inventory, undeclared sack addition, resin associated with the wrong screw, or the wrong recipe snapshot.</p>
+  </section>
+      <section class="">
+
+    <h3>Example</h3><p>The recipe requires 5% resin A and 95% resin B. Actual calculated consumption is 10% and 90%. Total resin kilograms still balance output plus waste, so D03 passes but E04 alerts.</p>
+  </section>
+    </div>
+    <section class="detection-rule">
+
+    <h3>Detection indicators and algorithm</h3><p>For every resin and screw, actual consumed kg = opening kg + added kg − ending kg. Divide each actual resin amount by total actual resin to obtain its percentage. Compare it with orden_trabajo_receta_snapshot percentages using a separately configurable ingredient tolerance. Use the same E04 code for extrusion and Exlam. Run D03 independently for aggregate mass balance; do not merge or duplicate the incidents.</p>
+  </section>
+    <section class="resolution-rule review-change" data-review-key="e04-resolution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Recommended resolution</h3><p>Correct the opening, added, or ending resin quantities, screw association, or recipe snapshot that caused the wrong proportions. If records are verified and production intentionally used a different approved mix, close without resolution as Approved formulation exception with the authorizing person and reason.</p>
+  </section>
+    <section class="distribution-rule review-change" data-review-key="e04-distribution">
+    <button class="review-status" type="button">Pending</button>
+    <h3>Alert distribution</h3><p>Notify the named OT-shift operator, the people who recorded opening, additions, and ending inventory when their values are implicated, and the extrusion or Exlam supervisor. For a KF1 extrusion example, this can resolve to Claudio Yahuarcani Huayamba and Danitza Silvestre. If D03 is also open, merge the named recipient lists and send one notification per person.</p>
+  </section>
+  </article></section></div>
     </main>
 
-    <script src="app.js?v=7.1"></script>
+    <script src="../shared/app.js"></script>
   </body>
 </html>

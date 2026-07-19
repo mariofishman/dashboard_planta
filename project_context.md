@@ -23,23 +23,31 @@
 - The first known candidate rules are:
   1. Work order started before required material transfer.
   2. Active work order without a consumption declaration after the configured interval. A production declaration may support this exception but must not create a duplicate alert.
-  3. Closure errors: declared run meters exceed the estimated meters supported by consumed reels, or a fully completed OT has delivered reserved reels that remain unconsumed.
-  4. Produced reel not weighed within 30 minutes.
-  5. Produced reel not moved from a finished OT's machine to the next OT or appropriate warehouse within 30 minutes; once movement begins, an unreceived transfer is covered by the transit rule.
+  3. Closure errors: declared run meters exceed the estimated meters supported by consumed reels; consumed-reel meters exceed declared run meters plus declared remnant-reel meters; or a fully completed OT has delivered reserved reels that remain unconsumed.
+  4. Produced or remnant reel not weighed within 30 minutes.
+  5. Produced reel not moved from a finished OT's machine to the next OT or appropriate warehouse within 30 minutes, or remnant reel not returned to the raw-material warehouse within 30 minutes; once movement begins, an unreceived transfer is covered by the transit rule.
 - Visual design should wait until users, evidence, rules, preventive-warning timing, and resolution workflows are sufficiently understood.
 - The primary dashboard users are the factory manager, operation supervisors, technical operation leaders, and the process team with its supervisors.
 - Known operations are extrusion, extrusion lamination (`Exlam`), printing, adhesive lamination, cutting, and bag making or sealing.
 - Each operation has three rotating 12-hour shifts, with two shifts working each day.
 - The factory manager should remain aware of all exceptions. Affected operation supervisors and leaders should be informed immediately, with the process team included when movement, pickup, weighing, or delivery is involved.
 - Version 1 is a live, socket-updated informational dashboard. It will not acknowledge, assign, resolve, dismiss, override, or correct exceptions inside the dashboard.
+- Monitor is a new system with its own repository and control database.
+- Monitor owns its service, deployment, migrations, and database independently from EmusaSoft.
+- Monitor consumes EmusaSoft events directly through SSE backed by Redis and reads the EmusaSoft database with read-only access.
+- Monitor uses its own WebSockets for bidirectional client communication; SSE is only the inbound EmusaSoft channel.
+- EmusaSoft remains the operational source of truth; Monitor owns incidents, evidence, conversations, messages, cursors, and audit history.
+- Monitor provides a read-only view of incidents closed without resolution. Any later inventory, valued-kardex, or accounting adjustment belongs entirely to the EmusaSoft team.
+- Monitor never receives SQL write access to EmusaSoft.
 - Detailed discovery findings are maintained in `docs/discovery.md`.
-- The reviewable alert catalog is maintained in `docs/alert_catalog.md`. The final focused-review browser mirror is `prototype/alert-catalog/v6/index.html`; iterations 1–5 remain available for comparison.
+- The reviewable alert catalog is maintained in `docs/alert_catalog.md`. The current focused-review browser mirror is `prototype/alert-catalog/v9/index.html`; iterations 1–8 remain available for comparison.
 
 ## Current configuration
 
 - Project directory: `/Users/mariofishman/projects/dashboard_planta`
 - Git repository: initialized locally.
-- Application scaffold and technical stack: not selected or created.
+- Application scaffold: not created.
+- Architecture: selected at system level; implementation ADRs for authentication, API, database/ORM and WebSocket library remain pending.
 - EMUSA Soft MCP credential source: project-root `.env` using `EMUSASOFT_MCP_TOKEN`.
 - Never print, log, quote, commit, or expose the MCP token.
 - Verify only that the token exists and is non-empty before connecting.
@@ -79,6 +87,8 @@
 - Created a persistent alert catalog and browser review surface for line-by-line annotations.
 - Organized the dashboard and versioned alert-catalog prototypes into separate directories.
 - Added a GitHub-facing `README.md` and a credential-safe `.env.example`.
+- Finalized architecture v1.0: independent Monitor repository/service/database, SSE plus read-only EmusaSoft access, Monitor WebSockets, and no adjustment queue or write integration.
+- Defined a read-only closed-without-resolution view as the handoff surface for the EmusaSoft team.
 
 ## Pending work
 
@@ -92,13 +102,14 @@
 - Determine the source of each machine's maximum rewinder capacity and validate the inferred undeclared-production formula.
 - Validate whether the 30-minute weighing threshold is universal.
 - Define preventive-warning timing, notification escalation, and operational responsibility rules.
-- Confirm socket event coverage, fallback refresh needs, and external notification channels.
+- Define the SSE event contract, read-only reconciliation queries, WebSocket protocol, and external notification channels.
+- Define the filters, evidence fields, permissions, and controlled export for the closed-without-resolution view.
 - Create the remaining foundational files after discovery provides enough detail:
   - expanded `AGENTS.md`
   - `project.md`, if still useful alongside this file
   - `todo.md`
   - `decisions.md`
-- Select the technical architecture and scaffold the application only after requirements are sufficiently defined.
+- Complete Phase 0 contracts in `docs/monitor_architecture_and_production_roadmap.md` before scaffolding the application.
 
 ## Important paths and commands
 
@@ -108,8 +119,8 @@
 - Rationale: `/Users/mariofishman/projects/dashboard_planta/dashboard_rationale.md`
 - Alert catalog: `/Users/mariofishman/projects/dashboard_planta/docs/alert_catalog.md`
 - Dashboard prototype: `/Users/mariofishman/projects/dashboard_planta/prototype/dashboard/index.html`
-- Current alert catalog browser review: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v6/index.html`
-- Previous annotated alert catalogs: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v1/index.html`, `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v2/index.html`, and `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v3/index.html`
+- Current alert catalog browser review: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v9/index.html`
+- Previous annotated alert catalogs: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v1/` through `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v8/`
 - Agent instructions: `/Users/mariofishman/projects/dashboard_planta/AGENTS.md`
 - Credential file: `/Users/mariofishman/projects/dashboard_planta/.env`
 - Project handoff: `/Users/mariofishman/projects/dashboard_planta/project_context.md`
@@ -139,6 +150,6 @@ rg --files -g '!.git' -g '!.env'
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000/prototype/dashboard/` or `http://localhost:8000/prototype/alert-catalog/v6/`.
+Then open `http://localhost:8000/prototype/dashboard/` or `http://localhost:8000/prototype/alert-catalog/v9/`.
 
 Do not display `.env` contents or run commands that print `EMUSASOFT_MCP_TOKEN`.
