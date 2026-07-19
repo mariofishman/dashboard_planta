@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>EMUSA Operations · Dashboard de alertas</title>
+    <link rel="stylesheet" href="dashboard.css?v=1" />
+  </head>
+  <body>
+    <header class="app-topbar">
+      <a class="brand" href="dashboard.html" aria-label="EMUSA Operations, dashboard">
+        <span class="brand-mark" aria-hidden="true">E</span>
+        <span><strong>EMUSA</strong><small>Operations</small></span>
+      </a>
+      <nav class="top-navigation" aria-label="Navegación principal">
+        <a class="active" href="dashboard.html" aria-current="page">Dashboard</a>
+        <a href="chat-list-final.html">Chats</a>
+      </nav>
+      <div class="topbar-user">
+        <span>Luis V.</span>
+        <button type="button" aria-label="Abrir perfil de Luis V.">LV</button>
+      </div>
+    </header>
+
+    <main class="dashboard-shell">
+      <header class="dashboard-heading">
+        <div>
+          <h1>Resumen de alertas</h1>
+          <p>Histórico, recurrencia y estado actual de los errores de planta.</p>
+        </div>
+        <button class="report-button" type="button" data-export-report>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 19h14"></path></svg>
+          Exportar reporte
+        </button>
+      </header>
+
+      <section class="filter-bar" aria-label="Filtros del dashboard">
+        <label class="search-field">
+          <span>Buscar</span>
+          <div>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+            <input data-dashboard-search type="search" placeholder="Persona, OT, máquina o error" autocomplete="off" />
+          </div>
+        </label>
+        <label>
+          <span>Fechas</span>
+          <select data-range-filter>
+            <option value="7">Últimos 7 días</option>
+            <option value="30" selected>Últimos 30 días</option>
+            <option value="90">Últimos 90 días</option>
+          </select>
+        </label>
+        <label>
+          <span>Operación</span>
+          <select data-operation-filter>
+            <option value="all">Todas</option>
+            <option value="Impresión">Impresión</option>
+            <option value="Exlam">Exlam</option>
+            <option value="Corte">Corte</option>
+            <option value="Sellado">Sellado</option>
+          </select>
+        </label>
+        <label>
+          <span>Estado</span>
+          <select data-status-filter>
+            <option value="all">Resueltas y abiertas</option>
+            <option value="open">Solo abiertas</option>
+            <option value="resolved">Solo resueltas</option>
+          </select>
+        </label>
+        <button class="clear-filters" type="button" data-clear-filters>Limpiar</button>
+      </section>
+
+      <section class="status-band" aria-label="Indicadores del periodo">
+        <div class="period-total">
+          <span>Alertas en el periodo</span>
+          <div><strong data-total-alerts>184</strong><small data-period-label>Últimos 30 días</small></div>
+          <div class="resolution-track" aria-label="82 por ciento resueltas"><span data-resolution-track></span></div>
+        </div>
+        <div><span>Resueltas</span><strong class="resolved-value" data-resolved-alerts>151</strong><small data-resolution-rate>82%</small></div>
+        <div><span>Abiertas ahora</span><strong class="open-value" data-open-alerts>33</strong><small>requieren seguimiento</small></div>
+        <div><span>Tiempo medio</span><strong data-average-time>46 min</strong><small>hasta resolver</small></div>
+      </section>
+
+      <section class="primary-insights">
+        <article class="trend-panel panel" aria-labelledby="trend-title">
+          <header class="panel-heading">
+            <div>
+              <h2 id="trend-title">Alertas por fecha</h2>
+              <p data-trend-summary>La resolución acompaña el volumen diario; quedan 33 alertas abiertas.</p>
+            </div>
+            <div class="chart-legend" aria-label="Leyenda">
+              <span><i class="legend-resolved"></i>Resueltas</span>
+              <span><i class="legend-open"></i>Abiertas</span>
+            </div>
+          </header>
+          <div class="trend-chart" data-trend-chart role="img" aria-labelledby="trend-title trend-description"></div>
+          <p class="sr-only" id="trend-description">Gráfico de barras apiladas que compara alertas resueltas y abiertas por fecha.</p>
+        </article>
+
+        <article class="breakdown-panel panel" aria-labelledby="breakdown-title">
+          <header class="panel-heading compact-heading">
+            <div>
+              <h2 id="breakdown-title">Dónde se concentran</h2>
+              <p>Comparación por dimensión.</p>
+            </div>
+          </header>
+          <div class="dimension-tabs" role="tablist" aria-label="Agrupar alertas por">
+            <button role="tab" aria-selected="true" data-dimension="worker">Trabajador</button>
+            <button role="tab" aria-selected="false" data-dimension="workOrder">OT</button>
+            <button role="tab" aria-selected="false" data-dimension="machine">Máquina</button>
+            <button role="tab" aria-selected="false" data-dimension="operation">Operación</button>
+            <button role="tab" aria-selected="false" data-dimension="shift">Turno</button>
+            <button role="tab" aria-selected="false" data-dimension="errorType">Tipo de error</button>
+          </div>
+          <div class="ranking-list" data-ranking-list role="tabpanel"></div>
+        </article>
+      </section>
+
+      <section class="secondary-insights">
+        <article class="aging-panel panel" aria-labelledby="aging-title">
+          <header class="panel-heading compact-heading">
+            <div>
+              <h2 id="aging-title">Antigüedad de alertas abiertas</h2>
+              <p>Tiempo transcurrido sin resolución.</p>
+            </div>
+            <strong class="inline-total">33 abiertas</strong>
+          </header>
+          <div class="aging-buckets" data-aging-buckets></div>
+        </article>
+
+        <article class="error-panel panel" aria-labelledby="error-title">
+          <header class="panel-heading compact-heading">
+            <div>
+              <h2 id="error-title">Tipos de error más frecuentes</h2>
+              <p>Incidencias históricas y pendientes.</p>
+            </div>
+          </header>
+          <div class="error-type-list" data-error-type-list></div>
+        </article>
+      </section>
+
+      <section class="open-errors panel" aria-labelledby="open-errors-title">
+        <header class="panel-heading table-heading">
+          <div>
+            <h2 id="open-errors-title">Detalle de alertas</h2>
+            <p><span data-table-count>8</span> resultados con los filtros actuales.</p>
+          </div>
+          <a href="chat-list-final.html">Ver conversaciones</a>
+        </header>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Detectada</th>
+                <th>Error</th>
+                <th>Responsable</th>
+                <th>OT</th>
+                <th>Máquina</th>
+                <th>Operación</th>
+                <th>Turno</th>
+                <th>Antigüedad</th>
+                <th>Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody data-open-errors-table></tbody>
+          </table>
+        </div>
+        <div class="dashboard-empty" data-dashboard-empty hidden>
+          <strong>No hay errores con estos filtros</strong>
+          <span>Prueba otra fecha, operación, estado o término.</span>
+        </div>
+      </section>
+    </main>
+
+    <nav class="mobile-navigation" aria-label="Navegación principal móvil">
+      <a class="active" href="dashboard.html" aria-current="page">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"></path></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="chat-list-final.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4V5Z"></path></svg>
+        <span>Chats</span>
+      </a>
+    </nav>
+
+    <div class="dashboard-toast" data-dashboard-toast role="status" aria-live="polite"></div>
+    <script src="dashboard.js?v=1"></script>
+  </body>
+</html>

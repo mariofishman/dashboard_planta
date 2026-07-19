@@ -1,1 +1,4 @@
 .env
+
+# Local database backups and extracted dumps
+/local-data/database/
