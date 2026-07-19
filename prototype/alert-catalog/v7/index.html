@@ -3,35 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EMUSA Alert Catalog Review · Iteration 6</title>
-    <link rel="stylesheet" href="styles.css?v=6" />
+    <title>EMUSA Alert Catalog Review · Iteration 7</title>
+    <link rel="stylesheet" href="styles.css?v=7.1" />
   </head>
   <body>
     <header class="review-header">
-      <div class="brand">EMUSA <span>Alert catalog · iteration 6 · final</span></div>
-      <div class="header-links"><a href="../v5/">Iteration 5</a><a href="../v4/">Iteration 4</a><a href="../../dashboard/">Dashboard</a></div>
+      <div class="brand">EMUSA <span>Alert catalog · iteration 7</span></div>
+      <div class="header-links"><a href="../v6/">Iteration 6</a><a href="../v5/">Iteration 5</a><a href="../../dashboard/">Dashboard</a></div>
     </header>
 
     <main>
       <section class="intro">
-        <p class="eyebrow">Final review · iteration 6</p>
+        <p class="eyebrow">Resolution and distribution review · iteration 7</p>
         <h1>Review only what changed</h1>
-        <p>Only red-outlined sections changed after the fifth review. Use each status button to cycle through <strong>Pending</strong>, <strong>Approved</strong>, and <strong>Commented</strong>. Your choices remain saved in this browser.</p>
+        <p>Review the red-outlined <strong>Recommended resolution</strong> and <strong>Alert distribution</strong> sections for every alert, plus the general administrative-closure rule. Use each status button to cycle through <strong>Pending</strong>, <strong>Approved</strong>, and <strong>Commented</strong>. Your choices remain saved in this browser.</p>
         <div class="review-legend" aria-label="Review instructions">
           <span><i></i>Changed section</span>
           <span id="review-progress">0 of 0 reviewed</span>
         </div>
       </section>
 
+      <section class="admin-closure review-change" data-review-key="admin-close-without-resolution">
+        <button class="review-status" type="button">Pending</button>
+        <p class="eyebrow">General incident rule</p>
+        <h2>Administrative closure without resolution</h2>
+        <p>An authorized administrator may close an alert that can no longer be corrected without inventing historical ERP transactions. The action sets <strong>Closed without resolution</strong>, requires a standardized reason and comment, records the administrator and timestamp, and preserves the original evidence. It stops reminders and escalations but does not mark the underlying business condition as fixed or alter inventory, OT, movement, consumption, production, waste, or scale records.</p>
+        <p>Before confirming, the administrator sees the incidents correlated by OT, material or reel, machine, and time window. They may close the root incident and selected consequences as one cascade, with one shared closure reference and no duplicate notifications. Later evidence may create a new incident only when it represents a new event; the same historical evidence must not reopen the closed chain automatically.</p>
+        <div class="closure-example"><strong>A01 example</strong><span>Material was never reserved, but the warehouse physically sent it to the machine and the operator consumed it outside EMUSA Soft. Close A01 and the selected downstream missing-dispatch, missing-consumption, and balance incidents for that OT and material under reason <em>Physical operation outside ERP</em>. Do not create fake reservations, movements, receipts, or consumption records.</span></div>
+      </section>
+
       <nav class="stage-index" id="alert-index" aria-label="Alert index"></nav>
       <div class="catalog" id="catalog"></div>
-
-      <section class="removed-card" id="removed-alerts">
-        <div class="card-heading"><div><span class="alert-id">REMOVED AFTER ERP REVIEW</span><h2>C03, C04, and C05</h2></div></div>
-        <div class="removed-list" id="removed-list"></div>
-      </section>
     </main>
 
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7.1"></script>
   </body>
 </html>

@@ -6,6 +6,18 @@ const replyContext = document.querySelector('[data-reply-context]');
 const replyAuthor = document.querySelector('[data-reply-author]');
 const forwardPanel = document.querySelector('[data-forward-panel]');
 const interactionToast = document.querySelector('[data-interaction-toast]');
+const photoPreview = document.querySelector('[data-photo-preview]');
+const photoPreviewImage = document.querySelector('[data-photo-preview-image]');
+const photoPreviewName = document.querySelector('[data-photo-preview-name]');
+const galleryInput = document.querySelector('[data-gallery-input]');
+const cameraInput = document.querySelector('[data-camera-input]');
+const mobileActions = document.querySelector('[data-mobile-actions]');
+const mobileReactions = document.querySelector('[data-mobile-reactions]');
+const mobileActionMenu = document.querySelector('[data-mobile-action-menu]');
+let photoDraftUrl = '';
+let activeMobileMessage = null;
+let longPressTimer = null;
+let pressOrigin = null;
 let toastTimer;
 
 function showToast(message) {
@@ -40,7 +52,8 @@ const menuIcons = {
   copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="11" height="13" rx="1"></rect><path d="M15 7V4H4v13h3"></path></svg>',
   private: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8-5 4 5 4v-3h4c4 0 6 2 7 5 0-6-3-9-7-9H9V8Z"></path><path d="M4 5h6"></path></svg>',
   info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7.5h.01"></path></svg>',
-  select: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path></svg>'
+  select: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path></svg>',
+  more: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12h.01M12 12h.01M16 12h.01"></path></svg>'
 };
 
 function menuButton(label, icon, attributes) {
@@ -67,6 +80,76 @@ function populateMessageMenu(menu, message) {
     ${contextualItem}
     <hr class="message-menu-separator" />
     ${menuButton('Seleccionar mensajes', 'select', 'data-message-action="select" aria-pressed="false"')}`;
+}
+
+mobileReactions.innerHTML = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+  .map((emoji) => `<button type="button" data-reaction="${emoji}" aria-label="Reaccionar con ${emoji}">${emoji}</button>`)
+  .join('') + '<button class="more-reactions" type="button" data-reaction="more" aria-label="Más reacciones">+</button>';
+
+mobileActionMenu.innerHTML = `
+  ${menuButton('Responder', 'reply', 'data-mobile-action="reply"')}
+  ${menuButton('Reenviar', 'forward', 'data-mobile-action="forward"')}
+  ${menuButton('Copiar', 'copy', 'data-mobile-action="copy"')}
+  ${menuButton('Información', 'info', 'data-mobile-action="info"')}
+  ${menuButton('Destacar', 'star', 'data-mobile-action="star"')}
+  ${menuButton('Fijar', 'pin', 'data-mobile-action="pin"')}
+  ${menuButton('Más…', 'more', 'data-mobile-action="more"')}`;
+
+function isMobileLayout() {
+  return window.matchMedia('(max-width: 760px)').matches;
+}
+
+function closeMobileActions() {
+  mobileActions.hidden = true;
+  document.body.classList.remove('mobile-actions-open');
+  activeMobileMessage?.classList.remove('is-mobile-active');
+  activeMobileMessage = null;
+}
+
+function openMobileActions(message) {
+  if (!isMobileLayout()) return;
+  closeMessageMenus();
+  activeMobileMessage = message;
+  message.classList.add('is-mobile-active');
+  mobileActions.hidden = false;
+  document.body.classList.add('mobile-actions-open');
+  mobileReactions.querySelector('button').focus();
+}
+
+function clearLongPress() {
+  window.clearTimeout(longPressTimer);
+  longPressTimer = null;
+  pressOrigin = null;
+}
+
+function mobileMessageText(message) {
+  return message.querySelector(':scope > .message-bubble > p')?.textContent || message.querySelector('.alert-attachment h2')?.textContent || 'Mensaje';
+}
+
+function handleMobileAction(action) {
+  const message = activeMobileMessage;
+  if (!message) return;
+  const sender = message.querySelector('.message-sender')?.textContent || 'tu mensaje';
+
+  if (action === 'reply') {
+    replyAuthor.textContent = sender;
+    replyContext.hidden = false;
+    messageInput.focus();
+  }
+  if (action === 'forward') forwardPanel.hidden = false;
+  if (action === 'copy') {
+    navigator.clipboard?.writeText(mobileMessageText(message));
+    showToast('Mensaje copiado');
+  }
+  if (action === 'info') {
+    const summaryButton = message.querySelector('[data-summary-toggle]');
+    if (summaryButton && summaryButton.getAttribute('aria-expanded') !== 'true') toggleSummary(summaryButton);
+    else showToast('Información del mensaje');
+  }
+  if (action === 'star') showToast('Mensaje destacado');
+  if (action === 'pin') showToast('Mensaje fijado en esta conversación');
+  if (action === 'more') showToast('Más opciones de mensaje');
+  closeMobileActions();
 }
 
 function positionMessageMenu(toggle, menu) {
@@ -192,6 +275,15 @@ document.querySelectorAll('[data-alert-jump]').forEach((button) => {
   });
 });
 
+document.querySelectorAll('[data-message-jump]').forEach((button) => {
+  button.addEventListener('click', () => {
+    const message = document.getElementById(button.dataset.messageJump);
+    message.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+    message.classList.add('is-selected');
+    window.setTimeout(() => message.classList.remove('is-selected'), 1200);
+  });
+});
+
 document.querySelectorAll('.message-menu').forEach((menu) => populateMessageMenu(menu, menu.closest('[data-message]')));
 wireMessageMenu(document);
 
@@ -210,11 +302,54 @@ document.addEventListener('click', (event) => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') closeMessageMenus();
+  if (event.key === 'Escape') {
+    closeMessageMenus();
+    closeMobileActions();
+  }
 });
 
 detailScroll.addEventListener('scroll', () => closeMessageMenus(), { passive: true });
-window.addEventListener('resize', () => closeMessageMenus());
+window.addEventListener('resize', () => {
+  closeMessageMenus();
+  if (!isMobileLayout()) closeMobileActions();
+});
+
+messageHistory.addEventListener('pointerdown', (event) => {
+  if (!isMobileLayout() || event.pointerType === 'mouse' || event.target.closest('a, button, input')) return;
+  const message = event.target.closest('[data-message]');
+  if (!message) return;
+  pressOrigin = { x: event.clientX, y: event.clientY };
+  longPressTimer = window.setTimeout(() => openMobileActions(message), 520);
+});
+
+messageHistory.addEventListener('pointermove', (event) => {
+  if (!pressOrigin) return;
+  if (Math.hypot(event.clientX - pressOrigin.x, event.clientY - pressOrigin.y) > 10) clearLongPress();
+});
+
+['pointerup', 'pointercancel', 'pointerleave'].forEach((eventName) => {
+  messageHistory.addEventListener(eventName, clearLongPress);
+});
+
+messageHistory.addEventListener('contextmenu', (event) => {
+  if (!isMobileLayout() || event.target.closest('a, button, input')) return;
+  const message = event.target.closest('[data-message]');
+  if (!message) return;
+  event.preventDefault();
+  openMobileActions(message);
+});
+
+document.querySelector('[data-mobile-actions-close]').addEventListener('click', closeMobileActions);
+mobileReactions.addEventListener('click', (event) => {
+  const reaction = event.target.closest('[data-reaction]')?.dataset.reaction;
+  if (!reaction) return;
+  showToast(reaction === 'more' ? 'Más reacciones' : `Reacción ${reaction} añadida`);
+  closeMobileActions();
+});
+mobileActionMenu.addEventListener('click', (event) => {
+  const action = event.target.closest('[data-mobile-action]')?.dataset.mobileAction;
+  if (action) handleMobileAction(action);
+});
 
 document.querySelector('[data-reply-cancel]').addEventListener('click', () => {
   replyContext.hidden = true;
@@ -236,13 +371,38 @@ document.querySelector('.header-menu').addEventListener('click', () => {
   showToast('Opciones: fijar chat, marcar no leído o buscar en la conversación');
 });
 
+function selectPhoto(file) {
+  if (!file) return;
+  if (photoDraftUrl) URL.revokeObjectURL(photoDraftUrl);
+  photoDraftUrl = URL.createObjectURL(file);
+  photoPreviewImage.src = photoDraftUrl;
+  photoPreviewName.textContent = file.name || 'Foto nueva';
+  photoPreview.hidden = false;
+  messageInput.focus();
+  showToast('Foto lista para enviar; el mensaje es opcional');
+}
+
+document.querySelector('[data-photo-action="gallery"]').addEventListener('click', () => galleryInput.click());
+document.querySelector('[data-photo-action="camera"]').addEventListener('click', () => cameraInput.click());
+galleryInput.addEventListener('change', () => selectPhoto(galleryInput.files[0]));
+cameraInput.addEventListener('change', () => selectPhoto(cameraInput.files[0]));
+
+document.querySelector('[data-photo-cancel]').addEventListener('click', () => {
+  if (photoDraftUrl) URL.revokeObjectURL(photoDraftUrl);
+  photoDraftUrl = '';
+  photoPreview.hidden = true;
+  photoPreviewImage.src = 'assets/photo-message-sample.png';
+  galleryInput.value = '';
+  cameraInput.value = '';
+});
+
 messageForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const text = messageInput.value.trim();
-  if (!text) return;
+  if (!text && !photoDraftUrl) return;
 
   const message = document.createElement('article');
-  message.className = 'message outgoing-message';
+  message.className = `message outgoing-message${photoDraftUrl ? ' photo-message' : ''}`;
   message.setAttribute('data-message', '');
 
   const bubble = document.createElement('div');
@@ -256,11 +416,27 @@ messageForm.addEventListener('submit', (event) => {
   time.dateTime = now.toISOString();
   time.textContent = now.toLocaleTimeString('es-PE', { hour: 'numeric', minute: '2-digit' });
 
-  bubble.append(createMessageMenu(message), paragraph, time);
+  bubble.append(createMessageMenu(message));
+  if (photoDraftUrl) {
+    const figure = document.createElement('figure');
+    figure.className = 'message-photo';
+    const image = document.createElement('img');
+    image.src = photoDraftUrl;
+    image.alt = 'Foto enviada';
+    figure.append(image);
+    bubble.append(figure);
+  }
+  if (text) bubble.append(paragraph);
+  bubble.append(time);
   message.append(bubble);
   messageHistory.append(message);
   wireMessageMenu(message);
   messageInput.value = '';
+  photoDraftUrl = '';
+  photoPreview.hidden = true;
+  photoPreviewImage.src = 'assets/photo-message-sample.png';
+  galleryInput.value = '';
+  cameraInput.value = '';
   replyContext.hidden = true;
   replyAuthor.textContent = '';
   detailScroll.scrollTo({ top: detailScroll.scrollHeight, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });

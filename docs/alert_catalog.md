@@ -31,6 +31,39 @@ The dashboard must not create duplicate alerts for the same underlying problem.
 - A specific deterministic rule replaces or enriches a generic statistical warning.
 - An OT-level balance warning must not appear separately when its imbalance has already been explained by a specific missing-consumption, missing-output, missing-waste, or weighing incident.
 
+## Resolution and administrative closure model
+
+Every incident has two distinct terminal outcomes:
+
+- `Resolved`: the underlying ERP or physical condition was corrected and the detection rule now passes.
+- `Closed without resolution`: an authorized administrator confirms that a historical condition can no longer be corrected safely. This outcome must never create invented reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT records.
+
+Administrative closure requires a standardized reason, mandatory comment, administrator identity, timestamp, and preserved evidence. It stops reminders and escalations but does not state that the business condition was fixed. Before confirmation, show incidents correlated by OT, material or reel, machine, and time window. The administrator may close the root incident and selected consequences as one audited cascade with a shared closure reference. The same historical evidence must not reopen that chain automatically; genuinely new events may create a new incident.
+
+For the A01 exception described during review, material may have been physically sent and consumed without reservation or EMUSA Soft movements. Close A01 and only the selected downstream missing-dispatch, missing-consumption, and balance incidents for the same OT and material under reason `physical_operation_outside_erp`. Do not backfill transactions that cannot be proven.
+
+| Code | Recommended resolution |
+|---|---|
+| A01 | Reserve, confirm availability, and dispatch; otherwise reschedule. If the material was already used outside the ERP and the history cannot be reconstructed safely, close the correlated chain without resolution. |
+| A02 | Record the real receipt, or correct/cancel the movement. If the old handoff and physical location cannot be proven, close without resolution with the last known location. |
+| A03 | Declare traceable actual consumption. If the exact reel or quantity cannot be reconstructed, close without resolution and link D01/D03 rather than inventing consumption. |
+| A04 | Declare missing output or correct input, output, waste, or weight. Close a verified false positive without resolution with physical evidence. |
+| A05 | Weigh and move the reel or correct the scale/barcode/movement record. If the reel is no longer traceable, close without resolution with its last known location. |
+| A06 | Declare or weigh waste and correct its category. If the missing quantity cannot be recovered, close without resolution and link the resulting D03 gap. |
+| B01 | Update the current plan and record the reason for the sequence change. An already-started historical deviation is closed as explained or closed without resolution when it cannot be reconstructed. |
+| B02 | Start, record the real pause, or reschedule and update the full plan. Close a historical unreconstructable delay without resolution with its affected plan version. |
+| B03 | Start the next OT, record the pause, or update the expected production interval. Preserve unexplained historical downtime when closing without resolution. |
+| C01 | Reweigh and correct unit, barcode, or scale association. Close a verified exceptional reel without resolution while preserving both measurements. |
+| C02 | Reweigh or correct the waste category/unit. Close verified exceptional waste without resolution rather than changing a correct value to fit the model. |
+| C06 | Correct production quantity, OT timing, or missing pauses. Close a verified exceptional rate without resolution with its evidence and model version. |
+| D01 | Add missing consumption or correct meters/reel data. If the locked history cannot be recovered, close without resolution with the remaining meter difference. |
+| D02 | Declare consumed material, return/reassign unused material, or correct completion/reservation. Preserve an unproven reel disposition as an inventory exception. |
+| D03 | Resolve the specific upstream cause and recalculate. Close an unreconstructable or accepted residual gap without resolution with final gap, tolerance, evidence, and linked incidents. |
+| E01 | Replenish safety stock, use an approved substitute, or reschedule/cancel. Close a passed historical readiness window without resolution and record whether production continued. |
+| E02 | Capture starting quantities or reconstruct them only from traceable records. Otherwise close without resolution and link E03/E04/D03. |
+| E03 | Correct closing/opening quantity or the missing intervening movement. If neither side is provable, close without resolution for the OT pair and preserve the difference. |
+| E04 | Correct inventory quantities, screw association, or recipe snapshot. Close an approved formulation exception without resolution with the authorizer and reason. |
+
 ## Alert distribution model
 
 Every alert in this catalog is associated with a work order. At the incident timestamp, resolve `OT → machine → operation → shift → named operator`. Then resolve `machine → associated warehouse → zone of influence → named users`. Alerts involving material movement may add the source warehouse, destination warehouse, weighing point, or next-machine warehouse. The current shift record decides which operator receives the alert; zone membership alone must not notify every person assigned to that warehouse.
@@ -109,7 +142,7 @@ The names used below are concrete examples from the current configuration, not p
 
 **Detection indicators and algorithm:** At `planned start - 60 minutes`, evaluate required materials, reservation records, warehouse availability, and open purchase or supplier-delivery status. At `planned start - 30 minutes`, add dispatch status. Maintain one incident per OT and required material. Use reason codes such as `not_reserved_stock_available`, `material_not_in_warehouse`, `purchase_or_supplier_pending`, and `reserved_not_dispatched`.
 
-**Resolution:** Keep one incident open until every condition required at the current checkpoint is satisfied. At the 60-minute checkpoint, readiness is resolved only when the required material is both available in the warehouse and reserved for the OT; availability alone does not resolve a missing reservation, and reservation alone does not resolve missing stock. At the 30-minute checkpoint, the remaining dispatch condition is resolved only when the ready material is sent to the machine. Rescheduling the OT also closes the current incident because it removes the current deadlines and creates new 60-minute and 30-minute checkpoints. EMUSA Soft exposes `updateWorkOrderPlannedDates` and `recalculatePlannedDates`; the latter returns the affected work orders after recalculation.
+**Resolution:** Keep one incident open until every condition required at the current checkpoint is satisfied. At the 60-minute checkpoint, the material must be available and reserved; at the 30-minute checkpoint it must also be sent. Rescheduling closes the current deadlines and creates new checkpoints. If the material was already physically sent and consumed outside EMUSA Soft and the missing historical transactions cannot be proven, an administrator closes A01 and selected correlated consequences without resolution; the system must not fabricate reservations, movements, receipts, or consumption.
 
 **Alert distribution:** Notify David Alba when the reason is missing reservation. For an AMP-001 → P15 example, notify the named AMP-001 person on the source-warehouse shift, such as Alexander Chujandama Cahuaza when the roster selects him, and the named P15 operator on the OT shift, such as Jesus Lara when selected. Include Jackeline Pastor for P15/printing oversight. Change the primary recipient with the reason: David for reservation, AMP-001 for stock or dispatch, and the P15 operator when machine readiness is affected.
 
@@ -223,7 +256,7 @@ The names used below are concrete examples from the current configuration, not p
 
 **Detection indicators and algorithm:** For each machine plan, find the first pending OT whose planned start is in the past. Alert when it has no actual start and no approved rescheduling event. If another specific incident explains the delay, link it as the reason rather than duplicating the operational problem.
 
-**Resolution:** If the preceding OT is still running, the planner supplies the expected delay and selects `Update All Plan`; the system shifts every subsequent OT on that machine by that delay. This can use the existing planned-date operations `updateWorkOrderPlannedDates` and `recalculatePlannedDates`. If nothing is running, the user must record a categorized equipment pause—such as maintenance, intentional hold, or waiting for material—with an explanation when required, then update the plan by the expected delay. The ERP already exposes `equipo_pausa` with pause type, other reason, pause time, and resume time.
+**Resolution:** If the preceding OT is still running, the planner supplies the expected delay and selects `Update All Plan`; the system shifts every subsequent OT on that machine. If nothing is running, record a categorized equipment pause and then update the plan. If the historical delay can no longer be reconstructed, an administrator closes without resolution and preserves the observed delay and affected plan version.
 
 **Alert distribution:** Notify the named operator scheduled on the OT shift, the person who owns the current plan update, and the operation supervisor. For a P15 example, Jesus Lara is included only if the shift roster identifies him, while Jackeline Pastor receives the supervisory view. Add David Alba only when the delay is explained by a linked missing-reservation incident.
 
@@ -240,7 +273,7 @@ The names used below are concrete examples from the current configuration, not p
 
 **Detection indicators and algorithm:** Require that the machine is scheduled or expected to operate, has no active OT, and has remained in that state for more than 30 minutes. Exclude recorded maintenance, planned shutdown, approved pause, or no-production schedule periods.
 
-**Resolution:** Record the machine’s real state using the equipment-pause workflow, including category, explanation when required, and expected duration. Then shift the remaining plan using the same `Update All Plan` behavior described in `B02`. Close `B03` when an OT starts, a valid pause is recorded, or the plan is updated so the machine is no longer expected to be running during that interval.
+**Resolution:** Record the machine’s real state using the equipment-pause workflow, including category, explanation when required, and expected duration. Then shift the remaining plan using the same `Update All Plan` behavior described in `B02`. Close normally when an OT starts, a valid pause is recorded, or the plan no longer expects production. If the interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration.
 
 **Alert distribution:** Notify the operator assigned to the machine and shift, the person recorded on any pause event, and the operation supervisor. For a P15 example, route to Jesus Lara only when the roster identifies him and to Jackeline Pastor for oversight. If a linked A01 or A02 incident explains the idle machine, keep that alert's named warehouse recipients and do not create a second broad warehouse notification.
 
@@ -412,26 +445,3 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 **Detection indicators and algorithm:** For every resin and screw, calculate `actual consumed kg = opening kg + added kg - ending kg`. Divide each resin amount by total actual resin consumption to obtain its percentage. Compare it with the corresponding percentage in `orden_trabajo_receta_snapshot` using a separately configurable ingredient tolerance. Apply the same E04 code to extrusion and Exlam. Run D03 independently for total input-versus-output-plus-waste balance; E04 and D03 may pass or fail independently and must not become duplicate incidents.
 
 **Alert distribution:** Notify the named OT-shift operator, the people who recorded opening, additions, and ending inventory when their values are implicated, and the extrusion or Exlam supervisor. For a KF1 extrusion example, this can resolve to Claudio Yahuarcani Huayamba and Danitza Silvestre. If D03 is also open, merge the named recipient lists and send one notification per person.
-
-## F — Extrusion-lamination (`Exlam`)
-
-Exlam consumes one or two substrate reels and uses resins instead of adhesive. Reuse A01/A02/A03 for substrate flow, A04/A05 for output, C06 for rate, D01/D03 for closure, and E01–E04 for resin inventory and formulation. Former F01 is removed because wrong resin proportions are the same E04 condition in extrusion and Exlam.
-
-## G — Sealing or bag making
-
-Sealing consumes reels and produces bags measured in units or thousands. Reuse A01/A02/A03 for input reels, A05 for output handling where applicable, A06/C02 for waste, C06 for rate, and D01/D03 for closure. A04 remains specific to rewinder-capacity evidence for produced reels and does not apply to bags handled by workers and placed into boxes. No bag-production declaration alert is included until a separate rule is defined and supported by ERP evidence.
-
-Former G02 is removed. ERP catalog review confirms that `WorkOrderOutput` stores `quantityResult`, full/partial bundle counters, and `quantityPerPackage`, but no independently declared bundle-total operation was found. Therefore the proposed 9,250-versus-10,250 mismatch is not established as a possible user error. Revisit only if the actual sealing UI proves those values are entered independently.
-
-## Excluded rules
-
-| Rule | Reason |
-|---|---|
-| Consumed reel was not reserved for the OT | Impossible: EMUSA Soft prevents this consumption. |
-| Reserved OT material sent to an arbitrary destination | The current workflow derives the OT/material relationship and destination; relocation without a reservation is a separate non-OT flow. |
-| Production declared while an active OT has no consumption | Duplicate: `A03` already covers the active OT without consumption. |
-| Rewinder completion detected directly | No PLC or machine-completion signal currently exists. |
-| Physical label was not printed | Not observable without printer acknowledgment or print-job failure data. |
-| Scale discovers an undeclared reel | Useful as late reconciliation evidence, but too late to be the primary warning. |
-| Truncated OT | Normal production condition; not inherently a digital-versus-physical mismatch. |
-| Incomplete reel used downstream | Removed as a separate alert. Correct upstream registration, weighing, movement, and balance controls should prevent it. |

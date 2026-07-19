@@ -37,14 +37,30 @@ const families = [
       newAlert("E03","Inventory continuity","Previous closing stock does not match the next opening stock","error","Error","For the same container and resin, the previous OT closing kilograms differ from the next OT opening kilograms beyond container-measurement tolerance.","Inventory continuity between consecutive work orders is broken.","Wrong previous ending stock, wrong current starting stock, or an unrecorded addition/removal between OTs.","OT 151300 closes C-04 with 420 kg of R-17; the next OT opens the same container and resin with 365 kg and no intervening movement.","Compare previous WorkOrderMaterialStockContainer.closeQuantityReturnedReal with the current immutable opening quantity using locationId + articleId. Show both OTs and any intervening material movements."),
       changedAlert("E04","Formulation proportions","Consumed resin proportions do not match the recipe","possible","Possible error or Error","The total resin mass can balance production plus waste, but one or more actual resin or screw percentages differ from the recipe beyond a configurable ingredient tolerance.","Aggregate balance cannot detect a wrong formulation: excess of one resin can offset a shortage of another while total kilograms remain correct.","Incorrect starting or ending container inventory, undeclared sack addition, resin associated with the wrong screw, or the wrong recipe snapshot.","The recipe requires 5% resin A and 95% resin B. Actual calculated consumption is 10% and 90%. Total resin kilograms still balance output plus waste, so D03 passes but E04 alerts.","For every resin and screw, actual consumed kg = opening kg + added kg − ending kg. Divide each actual resin amount by total actual resin to obtain its percentage. Compare it with orden_trabajo_receta_snapshot percentages using a separately configurable ingredient tolerance. Use the same E04 code for extrusion and Exlam. Run D03 independently for aggregate mass balance; do not merge or duplicate the incidents.")
     ]
-  },
-  {
-    code:"F", title:"Extrusion-lamination (Exlam)", description:"Exlam reuses shared reel, resin, rate, and balance alerts.", familyNote:{key:"f-shared-rules-v5", title:"F01 is consolidated into E04", body:"Exlam consumes one or two substrate reels and uses resins instead of adhesive. Use A01/A02/A03 for substrate flow, A04/A05 for output, C06 for rate, D01/D03 for closure, and E01–E04 for resin inventory and formulation. The former F01 is removed: wrong resin proportions are the same E04 condition in extrusion and Exlam."}, alerts:[]
-  },
-  {
-    code:"G", title:"Sealing / bag making", description:"Sealing reuses shared material, waste, rate, and closure alerts.", familyNote:{key:"g-shared-rules-v6", changed:true, title:"Bag production is not part of A04", body:"Use A01/A02/A03 for input reels, A05 for output handling where applicable, A06/C02 for waste, C06 for rate, and D01/D03 for closure. A04 remains specific to rewinder-capacity evidence for produced reels. No bag-production declaration alert is included until a separate worker-and-box handling rule is defined and supported by ERP evidence. G02 remains removed as unverified."}, alerts:[]
   }
 ];
+
+const alertDistribution = {
+  A01: "Notify David Alba when the reason is missing reservation. For an AMP-001 → P15 example, notify the named AMP-001 person on the source-warehouse shift, such as Alexander Chujandama Cahuaza when the roster selects him, and the named P15 operator on the OT shift, such as Jesus Lara when selected. Include Jackeline Pastor for P15/printing oversight. Change the primary recipient with the reason: David for reservation, AMP-001 for stock or dispatch, and the P15 operator when machine readiness is affected.",
+  A02: "Resolve both ends of the reserved OT movement. For an AMP-001 → P15 example, notify Alexander Chujandama Cahuaza only when he is the named source-shift sender, Jesus Lara only when he is the named P15 receiver for the OT shift, and Jackeline Pastor for printing oversight. The unresolved action determines the primary person: sender while dispatch or transport is pending, receiver after physical arrival requires digital receipt.",
+  A03: "Notify the exact operator assigned to the OT and shift and the affected operation supervisor. For a P15 example, Jesus Lara receives it only if the shift record identifies him as the operator; Jackeline Pastor receives the supervisory view. Do not notify AMP-001 personnel unless A01 or A02 is also open for the same material.",
+  A04: "Notify the exact operator on the OT shift because the missing declaration belongs to that machine run, plus the operation supervisor. For a P15 example, route to Jesus Lara only when the roster identifies him for that shift and to Jackeline Pastor for oversight. Add J. Cubas only when weighing evidence is part of the incident; do not notify the full P15 zone.",
+  A05: "Use the reason to name recipients. For a P15 example, notify the OT-shift operator such as Jesus Lara when the roster selects him; notify J. Cubas at Balanza PP for not_weighed; notify the named process or movement actor for still_at_machine; and include Jackeline Pastor for printing oversight. If both reasons exist, merge the recipient lists and notify each person once.",
+  A06: "Notify the named OT-shift operator, the operation supervisor, and the named weighing or waste actor when their evidence is implicated. For a P15 example, this can resolve to Jesus Lara, Jackeline Pastor, and J. Cubas respectively. If the warning is only statistical, make Jackeline the primary reviewer; if a specific unweighed bag identifies an event actor, make that named actor primary.",
+  B01: "Notify the person who started the OT, the named operator for that machine and shift, and the operation supervisor. For a P15 example, Jesus Lara receives it only when the shift or start event identifies him, and Jackeline Pastor receives the supervisory view. Notify David Alba only when a linked A01 readiness incident shows that reservation caused the sequence change; do not include him for an unrelated sequencing error.",
+  B02: "Notify the named operator scheduled on the OT shift, the person who owns the current plan update, and the operation supervisor. For a P15 example, Jesus Lara is included only if the shift roster identifies him, while Jackeline Pastor receives the supervisory view. Add David Alba only when the delay is explained by a linked missing-reservation incident.",
+  B03: "Notify the operator assigned to the machine and shift, the person recorded on any pause event, and the operation supervisor. For a P15 example, route to Jesus Lara only when the roster identifies him and to Jackeline Pastor for oversight. If a linked A01 or A02 incident explains the idle machine, keep that alert's named warehouse recipients and do not create a second broad warehouse notification.",
+  C01: "Notify the named person who created the scale record, the OT-shift operator, and the operation supervisor. For a P15/Balanza PP example, this can resolve to J. Cubas as the weighing actor, Jesus Lara as the on-shift operator, and Jackeline Pastor for oversight. Make the scale actor primary for a hard recording error and the supervisor primary for a statistical-only review.",
+  C02: "Notify the named OT-shift operator, the person who weighed or declared the waste, and the operation supervisor. For a P15 example, the resolved names can be Jesus Lara, J. Cubas, and Jackeline Pastor. A statistical-only outlier goes first to Jackeline; a concrete wrong or missing record goes first to the named event actor.",
+  C06: "Notify the named OT opener or closer implicated by the calculation, the operator assigned to the shift, and the operation supervisor. For a P15 example, route to Jesus Lara only when the event or roster identifies him and to Jackeline Pastor for oversight. Do not add warehouse personnel because the machine warehouse is only the zone proxy for finding the correct production users.",
+  D01: "Notify the named person who closed the OT, the operator assigned to the closing shift, and the operation supervisor. For a P15 example, use closingUserId and the shift roster to decide whether Jesus Lara is included, and include Jackeline Pastor for oversight. Add J. Cubas only when an incorrect or missing scale weight contributes to the discrepancy.",
+  D02: "Notify the named closing user, the operator on the closing shift, the operation supervisor, and David Alba because the incident may involve reservation quantity. For a P15 example, this can include Jesus Lara when identified by the shift and Jackeline Pastor for oversight. Notify AMP-001 personnel such as Alexander Chujandama Cahuaza only when the evidence shows a delivery or return action assigned to that source warehouse.",
+  D03: "Notify the named closing user, the OT-shift operator, and the operation supervisor. Add only the people implicated by the reason that explains the gap: J. Cubas for weighing, David Alba for reservation, or the named source-warehouse person for material movement. For a P15 example, Jesus Lara and Jackeline Pastor are included only when the OT and current configuration resolve to them; deduplicate recipients already notified by the specific A or D incident.",
+  E01: "Notify the named extrusion operator scheduled for the affected OT and shift, the named users of the machine-specific safety warehouse, and the extrusion supervisor. For a KF1 example, this can resolve to Claudio Yahuarcani Huayamba as the shift/zone recipient and Danitza Silvestre as the configured KF1 and Extrusion oversight recipient. Do not notify David Alba because extrusion safety stock is not reserved per OT.",
+  E02: "Notify the named person who opened the extrusion OT, the operator assigned to that shift, and the extrusion supervisor. For a KF1 example, route to Claudio Yahuarcani Huayamba only when the opening event or shift roster identifies him and to Danitza Silvestre for KF1/Extrusion oversight. The KF1 warehouse zone is the proxy used to find these named production users.",
+  E03: "Notify the named closing user of the previous OT, the named opening user and shift operator of the current OT, and the extrusion supervisor. For a KF1 example, Claudio Yahuarcani Huayamba is included only when one of those records identifies him, and Danitza Silvestre receives the oversight view. If an intervening material movement identifies another actor, include that named person instead of all KF1-zone users.",
+  E04: "Notify the named OT-shift operator, the people who recorded opening, additions, and ending inventory when their values are implicated, and the extrusion or Exlam supervisor. For a KF1 extrusion example, this can resolve to Claudio Yahuarcani Huayamba and Danitza Silvestre. If D03 is also open, merge the named recipient lists and send one notification per person."
+};
 
 function newAlert(id, stage, title, state, status, when, why, causes, example, detection) {
   return { id, stage, title, state, status, when, why, causes, example, detection };
@@ -54,17 +70,37 @@ function changedAlert(id, stage, title, state, status, when, why, causes, exampl
   return { id, stage, title, state, status, when, why, causes, example, detection };
 }
 
-const removed = [
-  ["C03 · Specification mismatch", "Removed: output specifications are inherited from the OT and software; operators do not declare them independently."],
-  ["C04 · Impossible chronology/value", "Removed: the current workflow prevents production-dependent records before production, and specifications are system-derived."],
-  ["C05 · Duplicate serial/event", "Removed: production serial codes are system-generated. The catalog confirms produceArticleSerial and production-series configuration; backend constraint source is not exposed by MCP."]
-];
+const recommendedResolutions = {
+  A01: "Reserve the material, confirm warehouse availability, and dispatch it before the applicable checkpoint; reschedule the OT when readiness cannot be restored in time. If the material was physically sent and consumed outside EMUSA Soft and the missing historical steps can no longer be entered safely, do not invent reservations, movements, receipts, or consumption. An administrator closes A01 without resolution and closes the linked consequences for the same OT and material as one audited exception.",
+  A02: "Record the receipt when the reserved material physically reached the OT destination. If it did not arrive, correct or cancel the movement and create the proper dispatch. When the old physical location and handoff can no longer be proven, an administrator closes the incident without resolution, records the last known location and reason, and includes only linked incidents from the same OT movement.",
+  A03: "Declare the actual consumed reel when it is traceable and EMUSA Soft still permits a valid declaration. Correct an incorrectly opened OT when that is the cause. If production already occurred and the exact reel or quantity cannot be reconstructed, close without resolution; preserve the missing-consumption fact and link any D01 or D03 consequence instead of fabricating consumption.",
+  A04: "Declare the missing produced reel or correct the input, output, waste, or weight record that created the excess remainder. If physical verification shows no undeclared reel and the estimate was a false positive, an administrator closes without resolution using reason Verified physical exception and attaches the supporting observation.",
+  A05: "Weigh the reel and record its movement to the required warehouse or next OT. Correct the scale, barcode, or movement record when the action occurred but was recorded incorrectly. If the reel is no longer traceable, close without resolution with its last known location and keep any related inventory discrepancy linked to the same incident chain.",
+  A06: "Declare missing waste, weigh the waste, or correct its weight and category. For a statistical warning, verify the run against physical and historical evidence. If the missing bag or exact quantity can no longer be recovered, close without resolution with the known estimate and link the resulting D03 balance gap.",
+  B01: "Do not attempt to undo an OT that already started. Update the current production plan, record why the sequence changed, and reschedule affected later OTs. Then close the incident as an explained deviation; use administrative closure without resolution when the historical sequence change was never recorded and cannot be reconstructed.",
+  B02: "Start the planned OT, record the real pause or cause of delay, or reschedule it and run Update All Plan so later OTs move consistently. If the time window has passed and no reliable cause can be reconstructed, an administrator closes without resolution with the observed delay and affected plan version.",
+  B03: "Start the next OT, record the real equipment pause with category and expected duration, or update the plan so the interval is no longer expected production time. If the idle interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration for analysis.",
+  C01: "Reweigh the reel and correct the unit, barcode, or scale association when wrong. If a second verified measurement confirms an exceptional but valid reel, close without resolution as Verified physical exception; preserve both the original and verification evidence.",
+  C02: "Reweigh the waste, correct its category or unit, or add a missing bag declaration. If the value is physically verified as an exceptional run, close without resolution as Verified physical exception rather than changing a correct weight to fit the expected range.",
+  C06: "Correct the production quantity, OT opening or closing event, or missing pause that distorted effective runtime. If the rate is verified as a legitimate exceptional run, close without resolution with the evidence and model version that produced the warning.",
+  D01: "Declare the missing consumed reel or correct run meters, reel weight, width, grammage, or closure data. If the OT is historically locked and the source record cannot be recovered, close without resolution with the remaining meter difference and link D03 rather than entering invented consumption.",
+  D02: "Declare a delivered reel that was actually consumed, return or reassign an unused reel through the valid inventory flow, or correct completion or reservation quantity. If the completed OT is locked and the reel disposition cannot be proven, close without resolution and preserve the unreconciled reel as an inventory exception.",
+  D03: "Resolve the most specific underlying incident first: missing consumption, output, waste, or weight. Recalculate the balance after corrected or actual weights arrive. If the residual gap cannot be reconstructed or is accepted as a documented physical exception, close without resolution with the final gap, tolerance, evidence, and linked cause incidents.",
+  E01: "Replenish the machine safety warehouse, use an approved substitute, or reschedule or cancel the affected OT. Close normally when the configured four-hour coverage is restored or the demand window changes. Close without resolution only for a historical readiness warning whose window has passed, recording whether production continued or stopped.",
+  E02: "Capture complete starting kilograms before production. If the OT already ran, reconstruct opening quantities only from traceable closing stock, additions, and movements. Otherwise close without resolution and link the resulting E03, E04, or D03 incidents instead of inventing opening inventory.",
+  E03: "Correct the previous closing quantity, current opening quantity, or missing intervening resin movement. If neither side can be proven, close without resolution for the OT pair and preserve the unexplained container-and-resin difference for inventory follow-up.",
+  E04: "Correct the opening, added, or ending resin quantities, screw association, or recipe snapshot that caused the wrong proportions. If records are verified and production intentionally used a different approved mix, close without resolution as Approved formulation exception with the authorizing person and reason."
+};
 
-const reviewStorageKey = "emusa-alert-catalog-v6-review";
+families.flatMap(family => family.alerts).forEach(alert => {
+  alert.resolution = recommendedResolutions[alert.id];
+});
+
+const reviewStorageKey = "emusa-alert-catalog-v7-review";
 const reviewStates = ["pending", "approved", "commented"];
 
 function changedSection(alert, key, label, body, className = "") {
-  const changed = !alert.cardChanged && alert.changedV6?.includes(key);
+  const changed = key === "resolution" || key === "distribution";
   return `<section class="${className}${changed ? " review-change" : ""}"${changed ? ` data-review-key="${alert.id.toLowerCase()}-${key}"` : ""}>
     ${changed ? `<button class="review-status" type="button">Pending</button>` : ""}
     <h3>${label}</h3><p>${body}</p>
@@ -72,7 +108,7 @@ function changedSection(alert, key, label, body, className = "") {
 }
 
 function alertMarkup(alert, familyCode) {
-  const cardChanged = alert.cardChanged;
+  const cardChanged = false;
   return `<article class="alert-card family-${familyCode.toLowerCase()} state-${alert.state}${cardChanged ? " review-change new-alert" : ""}" id="${alert.id.toLowerCase()}"${cardChanged ? ` data-review-key="${alert.id.toLowerCase()}-new"` : ""}>
     ${cardChanged ? `<button class="review-status" type="button">Pending</button>` : ""}
     <div class="card-heading"><div><span class="alert-id">${alert.id} · ${alert.stage}</span><h2>${alert.title}</h2></div><span class="state-pill${alert.status === "Candidate" ? " candidate-pill" : ""}">${alert.status}</span></div>
@@ -84,21 +120,21 @@ function alertMarkup(alert, familyCode) {
     </div>
     ${changedSection(alert,"detection","Detection indicators and algorithm",alert.detection,"detection-rule")}
     ${alert.resolution ? changedSection(alert,"resolution","Recommended resolution",alert.resolution,"resolution-rule") : ""}
+    ${changedSection(alert,"distribution","Alert distribution",alertDistribution[alert.id],"distribution-rule")}
   </article>`;
 }
 
 function familyNoteMarkup(note) {
   if (!note) return "";
-  const changed = note.changed === true;
+  const changed = false;
   return `<section class="family-review-note${changed ? " review-change" : ""}"${changed ? ` data-review-key="${note.key}"` : ""}>
     ${changed ? `<button class="review-status" type="button">Pending</button>` : ""}
     <h3>${note.title}</h3><p>${note.body}</p>
   </section>`;
 }
 
-document.querySelector("#alert-index").innerHTML = families.map(f => `<a href="#family-${f.code.toLowerCase()}">${f.code}</a>${f.alerts.map(a => `<a href="#${a.id.toLowerCase()}">${a.id}</a>`).join("")}`).join("") + `<a href="#removed-alerts">Removed</a>`;
+document.querySelector("#alert-index").innerHTML = families.map(f => `<a href="#family-${f.code.toLowerCase()}">${f.code}</a>${f.alerts.map(a => `<a href="#${a.id.toLowerCase()}">${a.id}</a>`).join("")}`).join("");
 document.querySelector("#catalog").innerHTML = families.map(f => `<section class="family-section"><div class="family-heading" id="family-${f.code.toLowerCase()}"><span class="family-code">${f.code}</span><div><h2>${f.title}</h2><p>${f.description}</p></div></div>${familyNoteMarkup(f.familyNote)}${f.alerts.map(a => alertMarkup(a,f.code)).join("")}</section>`).join("");
-document.querySelector("#removed-list").innerHTML = removed.map(([title,body]) => `<section><strong>${title}</strong><p>${body}</p></section>`).join("");
 
 function loadReviewState() {
   try { return JSON.parse(localStorage.getItem(reviewStorageKey) || "{}"); } catch { return {}; }

@@ -13,6 +13,13 @@
 .review-legend span { display: inline-flex; align-items: center; gap: 8px; }
 .review-legend i { width: 15px; height: 15px; border: 2px solid var(--review-red); border-radius: 3px; background: var(--review-red-soft); }
 
+.admin-closure { max-width: 1180px; margin: 0 auto 34px; padding: 58px 24px 24px; background: var(--factory-panel); border-radius: 10px; box-shadow: var(--shadow-panel); }
+.admin-closure h2 { margin: 4px 0 12px; font-size: 22px; }
+.admin-closure > p:not(.eyebrow) { max-width: 940px; margin: 0 0 12px; color: var(--machine-secondary); font-size: 12px; line-height: 1.65; }
+.closure-example { display: grid; grid-template-columns: 150px 1fr; gap: 18px; margin-top: 18px; padding: 16px 18px; border-left: 3px solid var(--review-red); background: rgba(200, 55, 45, .04); font-size: 11px; line-height: 1.6; }
+.closure-example strong { color: var(--machine-ink); text-transform: uppercase; letter-spacing: .04em; }
+.closure-example span { color: var(--machine-secondary); }
+
 .review-change {
   position: relative;
   outline: 2px solid var(--review-red);
@@ -59,7 +66,7 @@
 .rule-note.review-change .review-status { top: 10px; right: 10px; }
 
 .resolution-rule { position: relative; display: grid; grid-template-columns: 210px 1fr; gap: 22px; padding: 18px 22px; border-top: 1px solid var(--machine-line); }
-.resolution-rule span { color: var(--machine-ink); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.resolution-rule h3 { margin: 0; color: var(--machine-ink); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
 .resolution-rule p { margin: 0; color: var(--machine-secondary); font-size: 11px; line-height: 1.55; }
 
 .new-alert { outline-offset: 0; }
@@ -81,6 +88,7 @@
 
 @media (max-width: 850px) {
   .resolution-rule { grid-template-columns: 1fr; gap: 5px; }
+  .closure-example { grid-template-columns: 1fr; gap: 6px; }
   .removed-list { grid-template-columns: 1fr; }
   .removed-list section + section { border-left: 0; border-top: 1px solid var(--machine-line); }
 }
