@@ -86,6 +86,13 @@ The names used below are concrete examples from the current configuration, not p
 - Changed the E01 safety-inventory horizon from 24 hours to 4 hours while retaining the 3-hour pre-start checkpoint.
 - Removed bag-production declaration from A04. No replacement bag-specific alert is included without a separate supported rule.
 
+## Changes for iteration 7
+
+- Added an alert-distribution model based on `OT → machine → operation → shift → named operator` and the machine warehouse as a proxy into zones of influence.
+- Added a distribution rule under every active alert card.
+- Required runtime resolution of named people from the OT, shift roster, event actor, and live zone assignments instead of notifying every user in a zone.
+- Added concrete named examples from current P15, AMP-001, Balanza PP, and KF1 configuration for review; these examples are not hard-coded recipients.
+
 ## A — Material, inventory, and production-data registration
 
 ### A01 — Required material not ready before OT start
@@ -359,6 +366,8 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 
 **Detection indicators and algorithm:** Read recipe demand from `orden_trabajo_receta_snapshot` and planned production from the affected and following extrusion OTs. Calculate demand for every recipe material across the next 4 hours. Compare it with resin stock in the warehouse assigned to that machine, using `Warehouse` and `ArticleWarehouseStock` or the equivalent stock query after confirming the machine-to-warehouse mapping. Do not use `getExtrusionContainersInventory` as the safety-stock source: those containers represent the resins loaded for the current OT. Do not use A01 reservation or dispatch logic.
 
+**Alert distribution:** Notify the named extrusion operator scheduled for the affected OT and shift, the named users of the machine-specific safety warehouse, and the extrusion supervisor. For a KF1 example, this can resolve to Claudio Yahuarcani Huayamba as the shift/zone recipient and Danitza Silvestre as the configured KF1 and Extrusion oversight recipient. Do not notify David Alba because extrusion safety stock is not reserved per OT.
+
 ### E02 — Extrusion OT opened without complete starting-container inventory
 
 **Status:** Error
@@ -371,6 +380,8 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 | Example | The recipe uses three resins, but the OT opens with starting kilograms recorded for only two associated containers. |
 
 **Detection indicators and algorithm:** At OT opening, compare required recipe materials from `orden_trabajo_receta_snapshot` with the containers associated through `quickStartWorkOrder`. Require one actual opening quantity for every `locationId + articleId`. The ERP catalog confirms container association and current inventory but does not expose an explicitly named persisted opening-quantity field. Before implementation, verify whether the opening snapshot is stored through `WorkOrderMaterial.quantityIncoming`, the linked `locationItem.quantity`, or another backend field. If no immutable opening snapshot exists, add one; current mutable inventory alone is insufficient evidence.
+
+**Alert distribution:** Notify the named person who opened the extrusion OT, the operator assigned to that shift, and the extrusion supervisor. For a KF1 example, route to Claudio Yahuarcani Huayamba only when the opening event or shift roster identifies him and to Danitza Silvestre for KF1/Extrusion oversight. The KF1 warehouse zone is the proxy used to find these named production users.
 
 ### E03 — Previous closing stock does not match the next opening stock
 
@@ -385,6 +396,8 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 
 **Detection indicators and algorithm:** Identify consecutive OTs for the same machine and compare the same `locationId + articleId`. Use `WorkOrderMaterialStockContainer.closeQuantityReturnedReal` from the previous OT and the immutable opening quantity captured for the current OT. Alert when `absolute(previous closing kg - current opening kg)` exceeds the configured container-measurement tolerance. Show both OT codes, both declarations, the container, resin, elapsed interval, and any intervening material movements.
 
+**Alert distribution:** Notify the named closing user of the previous OT, the named opening user and shift operator of the current OT, and the extrusion supervisor. For a KF1 example, Claudio Yahuarcani Huayamba is included only when one of those records identifies him, and Danitza Silvestre receives the oversight view. If an intervening material movement identifies another actor, include that named person instead of all KF1-zone users.
+
 ### E04 — Consumed resin proportions do not match the recipe
 
 **Status:** Possible error or Error
@@ -397,6 +410,8 @@ Extrusion containers each hold one specific resin used by the current OT. Separa
 | Example | The recipe requires 5% resin A and 95% resin B. Actual calculated consumption is 10% and 90%. Total resin kilograms still balance output plus waste, so D03 passes but E04 alerts. |
 
 **Detection indicators and algorithm:** For every resin and screw, calculate `actual consumed kg = opening kg + added kg - ending kg`. Divide each resin amount by total actual resin consumption to obtain its percentage. Compare it with the corresponding percentage in `orden_trabajo_receta_snapshot` using a separately configurable ingredient tolerance. Apply the same E04 code to extrusion and Exlam. Run D03 independently for total input-versus-output-plus-waste balance; E04 and D03 may pass or fail independently and must not become duplicate incidents.
+
+**Alert distribution:** Notify the named OT-shift operator, the people who recorded opening, additions, and ending inventory when their values are implicated, and the extrusion or Exlam supervisor. For a KF1 extrusion example, this can resolve to Claudio Yahuarcani Huayamba and Danitza Silvestre. If D03 is also open, merge the named recipient lists and send one notification per person.
 
 ## F — Extrusion-lamination (`Exlam`)
 
