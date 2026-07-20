@@ -1,69 +1,69 @@
 # Monitor–EmusaSoft Integration Architecture
 
 **Date:** 2026-07-20
-**Status:** agreed with the EmusaSoft architect; supersedes the SSE transport decision recorded on 2026-07-19
+**Status:** approved integration architecture; supersedes the SSE transport decision recorded on 2026-07-19
 **Owner:** Monitor project lead
 **Counterpart:** EmusaSoft architecture
 
-## 1. Recommended integration architecture
+## 1. Integration model
 
-Monitor runs a **condition-based detection engine** against a read-only EmusaSoft database endpoint:
+Monitor runs a condition-based detection engine against an approved read-only EmusaSoft Aurora MySQL replica:
 
-1. Each alert type in the alert catalog is backed by one approved **SQL detection query** (a predicate over current ERP state).
-2. A Monitor-owned scheduler executes the query set every N minutes (N is configurable in Monitor).
-3. Each detection is upserted into Monitor's incident table using the alert's declared natural key.
-4. On every cycle the predicate is re-evaluated:
-   - condition still holds → the incident stays open (no duplicate is created);
-   - condition no longer holds → the incident is auto-resolved.
-5. Human workflow (chats, assignments, administrative closures) is layered on top of the incident record inside Monitor's own database.
-6. Corrective actions in the ERP are performed by users in EmusaSoft, never by Monitor. Monitor resolves the create/modify URL for the required ERP document through the MCP and links it from the incident.
+1. Each alert type has one approved SQL detection-query contract: a bounded predicate over current ERP state.
+2. A Monitor-owned scheduler runs each query at its configured interval.
+3. Phase 0 assigns the initial interval from alert urgency, measured query performance, and EmusaSoft's approved replica load budget. The interval remains versioned Monitor configuration, not an alert-catalog rule or user-facing setting.
+4. Each returned row identifies one active condition through its alert type, query ID, and declared natural-key values.
+5. A continuing condition retains the same open incident occurrence. A condition that clears resolves that occurrence. If it later returns, Monitor creates a new occurrence.
+6. Chats, assignments, evidence, administrative closures, and audit history live only in Monitor.
+7. Monitor provides context-specific links to relevant EmusaSoft screens, such as a work order or material-reservation page. Users perform every operational correction in EmusaSoft.
 
 Monitor never writes to the EmusaSoft database.
 
-## 2. Transport choice and rejected alternatives
+## 2. Transport decision
 
 **Chosen: scheduled condition-based SQL polling.**
 
-State is re-derived from the current database on every cycle, which makes the pipeline idempotent and self-healing: a missed cycle loses nothing because the next cycle observes the full current truth.
+Every successful cycle re-derives the alert's current state. A missed cycle does not lose a durable event because the next successful cycle evaluates current ERP truth again.
 
-Rejected alternatives:
-
-| Alternative | Reason for rejection |
+| Rejected alternative | Reason |
 | --- | --- |
-| SSE event stream (former ES-01) | The service does not exist. Alerts are a Monitor-owned concept; EmusaSoft would have to build and operate new infrastructure that provides no value to EmusaSoft itself. |
-| Row-stream polling with a cursor (new-rows query) | Misses updates to existing rows, can skip rows committed late by long transactions, and couples Monitor to the physical schema evolution. |
-| Direct access to EmusaSoft's internal Redis | Internal infrastructure; access was never assumed and is not offered. |
+| SSE event stream | No EmusaSoft SSE service exists. Building one only for Monitor would add infrastructure that EmusaSoft does not otherwise need. |
+| Row-stream polling with a cursor | New-row queries miss updates to existing rows and can skip late commits. |
+| EmusaSoft internal Redis | It is private EmusaSoft infrastructure and is not an integration boundary. |
 
-Monitor-owned WebSockets remain the client-facing real-time channel for Monitor's own UI. That decision is unchanged.
+Monitor-owned WebSockets remain the bidirectional real-time channel between Monitor's backend and its clients.
 
-## 3. Authentication method
+## 3. Authentication and access
 
-- **Database access:** environment-specific read-only credentials provisioned by EmusaSoft, with a documented rotation procedure (ES-02). Write operations must be impossible at the privilege level, proven by automated tests.
-- **MCP access:** authenticated MCP service credentials (`EMUSASOFT_MCP_TOKEN`, kept in `.env`, never committed).
-- **User identity:** SSO or token exchange mapping each user to exactly one enabled `sysUserId` with server-calculated plant scope (ES-03).
+- **Database:** EmusaSoft provisions environment-specific no-write credentials and a documented rotation procedure. Automated tests must prove that write operations are impossible.
+- **MCP:** authenticated with `EMUSASOFT_MCP_TOKEN`, loaded from the repository-root `.env` and never committed or logged.
+- **Users:** SSO or token exchange maps each person to exactly one enabled `sysUserId`; the Monitor backend calculates plant and operational scope.
 
-## 4. Event contract, payload examples, and versioning
+## 4. Detection-query contract
 
-There are no push events. The contract is the **detection query set**. Each entry declares:
+There are no inbound push events. Each versioned detection-query contract declares:
 
-- `alertTypeCode` — catalog code (e.g. `A05`);
-- `queryId` — stable identifier of the detection query;
-- `naturalKey` — the columns that uniquely identify one emergency instance. The incident identity is `alertTypeCode + queryId + naturalKey values`. Every query MUST declare its unique key explicitly;
-- `sourceTimestampColumn` — optional; the ERP-side timestamp of the underlying fact when one exists;
-- `timestampPolicy` — `source` or `registration`; chosen by whoever configures the alert (see below);
-- output schema — named, typed columns;
-- `queryVersion` — semantic version, bumped on any change to predicate, key, or output schema;
-- catalog/schema version the query was validated against.
+- `alertTypeCode` — the catalog code, such as `A05`;
+- `queryId` — a stable identifier;
+- `queryVersion` — changed whenever the predicate, key, joins, or output schema changes;
+- `keySchemaVersion` — changed only when the meaning or structure of the natural key changes;
+- `naturalKey` — named columns that identify one condition independently of its recurrence;
+- output schema — named and typed evidence and routing fields;
+- `sourceTimestamp` — optional authoritative ERP timestamp for when the condition began;
+- required indexes and representative query plan;
+- schema/catalog revision against which the query was validated; and
+- configured polling interval and measured load.
 
-Detection queries should be authored using the EmusaSoft MCP, whose ERP catalog exposes the full database schema (MCP-01, MCP-03, MCP-04): discover tables, columns, types, and relationships through catalog search and description tools instead of guessing schema shapes.
+The EmusaSoft MCP is a discovery aid for tables, fields, types, relationships, examples, and deep-link contracts. It is not sufficient proof of the current database schema while catalog drift remains unresolved. Every production query must also be validated against the approved current schema and staging replica.
 
-Detection record example (as materialized by Monitor):
+Example materialized detection:
 
 ```json
 {
   "alertTypeCode": "A05",
   "queryId": "a05-coil-without-weighing",
   "queryVersion": "1.0.0",
+  "keySchemaVersion": 1,
   "naturalKey": { "workOrderId": 88231, "articleSerialId": 51002 },
   "detectionCycleAt": "2026-07-20T14:05:00Z",
   "firstSeenAt": "2026-07-20T13:35:00Z",
@@ -72,96 +72,106 @@ Detection record example (as materialized by Monitor):
 }
 ```
 
-`firstSeenAt` is assigned by Monitor when the incident row is first registered in Monitor's database. The incident start time used for metrics is governed by the alert's `timestampPolicy`, a per-alert configuration rule: `source` takes the date returned by the detection query (the ERP-side fact timestamp); `registration` takes Monitor's registration date. The person configuring the alert selects the policy; `sourceTimestamp` is always attached as evidence when the query can provide it.
+The incident's effective start time follows one universal rule: use an authoritative `sourceTimestamp` when the query can supply one; otherwise use Monitor's `firstSeenAt`. There is no user-configurable timestamp policy and no timestamp setting in `docs/alert_catalog.md`.
 
-## 5. Ordering, duplication, retention, replay, and recovery guarantees
+## 5. Condition identity, occurrences, and lifecycle
 
-- **Ordering:** not required. Every cycle evaluates full current state; there is no event sequence to preserve.
-- **Duplication:** prevented by upsert on the incident natural key. A condition persisting across cycles maps to the same open incident. A condition that reappears after resolution creates a new incident.
-- **Retention and replay:** not applicable at the transport level. Incident history is retained in Monitor's database under Monitor's own retention policy.
-- **Recovery:** after any outage (Monitor, network, or replica), the next successful cycle fully reconstructs the open-alert state. No cursor, no replay window, no backfill procedure.
-- **Flapping and human-closure conflicts:** when an administrator closes an incident without resolution while the condition still holds in the ERP, the recurrence is handled by one of three mechanisms, selectable per alert type:
-  1. **Exclusion rules (configurable):** the closed condition's key or criteria is recorded as an exclusion rule in Monitor; matching detections are filtered on subsequent cycles and do not reopen the incident.
-  2. **Detection-query amendment:** when an exclusion is systematic rather than case-by-case, the detection query itself is modified to exclude the whole class (published as a new `queryVersion`), cleaning every matching detection at the source.
-  3. **Document-request flow:** Monitor opens a linked follow-up ticket requesting the ERP document associated with the original incident. The original ticket closes only when that document is produced in EmusaSoft (verified by a detection query or MCP lookup).
+The **condition key** is `alertTypeCode + queryId + keySchemaVersion + normalized naturalKey values`. A predicate or evidence-only `queryVersion` change does not split a continuing condition. A changed key meaning requires a new `keySchemaVersion`. The condition key identifies the ERP condition evaluated across polling cycles; it is not the incident primary key.
 
-## 6. Read-only reconciliation approach
+Every activation creates a distinct **incident occurrence** with its own immutable ID:
 
-Detection and reconciliation now share the same channel: bounded, approved read-only queries (ES-02). EmusaSoft provides:
+- first successful detection creates an `OPEN` occurrence;
+- continued detection updates `lastSeenAt` without creating a duplicate;
+- disappearance from a complete, healthy cycle changes the occurrence to `RESOLVED`;
+- reappearance after resolution creates a new occurrence for the same condition key; and
+- occurrence history remains available for reporting and audit.
 
-- an approved replica or endpoint with environment-specific no-write credentials;
-- the permitted schemas, tables, and views;
-- indexed fields required by the detection predicates, with representative query plans;
-- connection limits, time zone, soft-delete semantics, and maintenance windows.
+The user-visible lifecycle remains exactly `OPEN`, `RESOLVED`, and `CLOSED_WITHOUT_RESOLUTION`.
 
-The polling interval N and the per-cycle query cost must fit inside the connection and load budget EmusaSoft defines for the endpoint.
+## 6. Close without resolution
 
-The endpoint is an **Aurora MySQL read replica**. There is no fixed lag SLA; replica lag is observable through Aurora's replica statistics — in-band via `information_schema.replica_host_status` (`REPLICA_LAG_IN_MILLISECONDS`), which Monitor can query over the same read-only connection, or through the `AuroraReplicaLag` CloudWatch metric. Monitor records the observed lag on each detection cycle and defers auto-resolution while lag exceeds a configured threshold, so incidents are never resolved against stale data.
+When an authorized administrator closes an incident without resolution while its ERP condition still exists:
 
-## 7. Identity integration
+1. Monitor records the reason, comment, actor, timestamp, condition key, occurrence ID, and frozen evidence.
+2. Monitor suppresses reopening only for that same uninterrupted condition.
+3. A healthy cycle that proves the condition has cleared automatically expires the suppression.
+4. A later recurrence creates a new incident occurrence.
 
-Unchanged from ES-03: SSO or token exchange, stable mapping to `sysUserId`, plant membership and scope calculated server-side, disabled-user behavior and revocation timing documented, non-production test identities available.
+Suppression is internal detection state, not a fourth incident lifecycle state. It is not permanent, it is not a user-maintained exclusion list, and it does not create a follow-up ticket. Systematic changes to what qualifies as an alert must be made through an approved, versioned detection-query change.
 
-## 8. Infrastructure ownership
+## 7. Cycle health and safe resolution
+
+A polling cycle may resolve an incident only when all of the following are true:
+
+- the approved query completed successfully within its limits;
+- its result schema and required fields validated;
+- the result set was complete rather than truncated or partially processed;
+- the replica-freshness signal was available and below the approved threshold; and
+- the cycle transaction committed successfully in Monitor.
+
+Timeouts, connection failures, invalid results, partial result sets, excessive or unknown replica lag, and Monitor persistence failures preserve the current incident state. They create source-freshness telemetry and operational alerts; they never count as evidence that a condition cleared.
+
+After an outage, each query performs a complete bounded evaluation of current state. No EmusaSoft cursor, replay window, or failed-event queue exists.
+
+## 8. Read-only endpoint and replica lag
+
+EmusaSoft provides:
+
+- an approved Aurora MySQL replica or endpoint and environment-specific no-write credentials;
+- permitted schemas, tables, and views;
+- connection and concurrency limits;
+- time-zone, soft-delete, and maintenance semantics;
+- required indexes and representative query plans; and
+- an approved load budget.
+
+Monitor records replica lag for every cycle and defers resolution when freshness is unknown or unacceptable. Phase 0 must confirm whether the read-only user may query `information_schema.replica_host_status`; otherwise EmusaSoft must provide access to the `AuroraReplicaLag` CloudWatch metric or another testable freshness signal.
+
+## 9. Ownership
 
 | Component | Owner |
 | --- | --- |
-| Monitor repository, service, deployment, database, scheduler, Redis, WebSockets | Monitor |
-| Incident store, rejected-criteria table, audit history, chats, roster | Monitor |
-| Detection query definitions and natural-key declarations | Monitor authors; EmusaSoft approves indexes and load |
-| Read-only replica/endpoint, credentials, indexes | EmusaSoft |
-| MCP server, ERP catalog, deep-link and document-creation URL patterns | EmusaSoft MCP team |
-| ERP corrective actions (creating/fixing documents) | EmusaSoft users, in EmusaSoft |
+| Monitor repository, service, deployment, database, scheduler, Redis, and WebSockets | Monitor |
+| Detection-query definitions, condition state, incident occurrences, temporary suppressions, evidence, chats, roster, and audit history | Monitor |
+| Query review, replica, credentials, indexes, freshness signal, and load budget | EmusaSoft |
+| MCP server, ERP catalog, and versioned deep-link patterns | EmusaSoft MCP team |
+| Work orders, reservations, documents, and all operational corrections | EmusaSoft users in EmusaSoft |
 
-## 9. Security and operational constraints
+## 10. Security and operational constraints
 
-- Monitor never writes to the EmusaSoft database; enforced by credential privileges and proven by automated tests (ES-02 acceptance).
-- No secrets in the repository: `.env` stays local, `EMUSASOFT_MCP_TOKEN` is never committed or logged.
-- Detection queries are read-only, bounded, and reviewed before deployment; ad-hoc unapproved queries against the replica are prohibited.
-- The polling interval is configurable but bounded below by the replica load budget agreed with EmusaSoft.
-- Incident records minimize personal data; evidence links point into EmusaSoft rather than copying documents.
-- All state transitions (detection, auto-resolution, administrative closure, rejected-criteria entries) are audit-logged in Monitor.
+- Detection queries are bounded, indexed, read-only, versioned, reviewed, and deployed from an allowlist; runtime ad-hoc SQL is prohibited.
+- The browser never receives database or MCP service credentials.
+- Polling concurrency and minimum intervals must remain within EmusaSoft's approved load budget.
+- Incident evidence minimizes copied personal and operational data and retains ERP references and authorized deep links.
+- Detection, resolution, administrative closure, suppression creation/expiry, and recurrence are audit-logged.
+- Monitor has no queue, outbox, broker, adjustment API, document-request workflow, or EmusaSoft write path.
 
-## 10. Required EmusaSoft changes
+## 11. Required external deliveries
 
-- **ES-01 (SSE contract) is withdrawn.** Replaced by: review and approve the detection query set — predicates, natural keys, required indexes, and load budget. Acceptance: each catalog alert type has an approved query whose plan runs within the agreed budget on the replica.
-- **ES-02 becomes the critical-path dependency** for live data. Same content as registered, plus the indexes required by the detection predicates.
-- ES-03 (identity), ES-04 (operational actors), ES-05 (immutable extrusion opening inventory), ES-06 (deep links), ES-07 (`emusa-ui`) remain unchanged.
+- **ES-01:** EmusaSoft reviews the detection-query set, natural keys, indexes, plans, and load budget.
+- **ES-02:** EmusaSoft provisions the read-only replica access and a testable freshness signal.
+- **ES-03 through ES-07:** identity, routing evidence, immutable extrusion evidence, deep links, and `emusa-ui` remain required as recorded in `docs/emusasoft_preimplementation_requests.md`.
+- **MCP-01 through MCP-06:** the MCP team resolves catalog drift, validation, type/search coverage, versioned integration resources, and representative examples.
 
-## 11. MCP changes needed
+## 12. Confirmed decisions and Phase 0 validation
 
-- MCP-01 through MCP-06 remain as registered (catalog regeneration, GraphQL validation, type description, search coverage, versioned integration resources, sanitized examples).
-- **Extension to ES-06/MCP-05:** expose the URL patterns that open the ERP screen to **create or modify the document** required to fix an incident, so Monitor can link the corrective action directly from the ticket. Patterns must be versioned and testable; verbal confirmation does not close the item.
+Confirmed on 2026-07-20:
 
-## 12. Confirmed decisions, assumptions, and unresolved questions
+1. No EmusaSoft SSE service exists.
+2. Monitor uses scheduled condition-based SQL polling against an Aurora MySQL read replica.
+3. Polling intervals are configurable per alert and are selected during Phase 0 from urgency, measured performance, and the replica load budget.
+4. The condition key and incident occurrence ID are separate so a later recurrence creates new history.
+5. A healthy cycle automatically resolves a condition that has cleared.
+6. Closing without resolution suppresses only the same uninterrupted condition until a healthy cycle proves it cleared.
+7. Monitor does not create a document-request follow-up ticket.
+8. The incident start time uses authoritative ERP time when available and otherwise Monitor's first-detection time.
+9. Monitor links to the relevant EmusaSoft screen; users perform all corrections there.
+10. Monitor remains fully independent and has no EmusaSoft write access.
 
-**Confirmed (2026-07-20, with the EmusaSoft architect):**
+Phase 0 must validate:
 
-1. No SSE service exists; the 2026-07-19 register entry naming SSE as the transport is superseded.
-2. Detection is condition-based SQL polling owned by Monitor; the interval N is configurable in Monitor.
-3. Incident identity is resolved in Monitor: alert type + query ID + the unique key each query declares.
-4. Auto-resolution: if the condition no longer holds on a cycle, the incident is resolved; if it persists, nothing changes.
-5. Administrative closures against persisting conditions are handled via the rejected-criteria table or the document-request follow-up ticket.
-6. The incident start timestamp is assigned by Monitor's database at first registration, unless the alert's `timestampPolicy` selects the query's source date (decision 12).
-7. Monitor has no write access; corrective actions happen in EmusaSoft via MCP-resolved URLs.
-
-**Confirmed (2026-07-20, second round):**
-
-8. The read endpoint is an **Aurora MySQL** replica. No fixed lag SLA; Monitor observes Aurora replica statistics and adapts its cycle behavior to the measured lag.
-9. The polling interval N is configured **per alert type**, not globally.
-10. Recurrence suppression uses configurable exclusion rules per alert; systematic exclusions are instead folded into the detection query as a new `queryVersion`.
-11. Incident history, statistics, and exclusion rules live in **Monitor's database**, retained for history and statistics — not for operational management in EmusaSoft.
-12. Timestamp policy is a per-alert rule: the alert configurator chooses between the query's source date (`source`) and Monitor's registration date (`registration`).
-
-**Assumptions (to validate):**
-
-- Aurora replica lag stays within minute-level bounds compatible with per-alert detection latency targets.
-- Every catalog alert type can be expressed as a bounded SQL predicate with a stable natural key.
-- The replica can absorb the full query set at the chosen intervals.
-
-**Unresolved questions:**
-
-- Confirm that the read-only credentials can query `information_schema.replica_host_status` for in-band lag; otherwise agree on CloudWatch metric access.
-- Expiry and scoping rules for exclusion rules — an exclusion without expiry silences that condition permanently; per-OT scoping or a review date should be considered.
-- Default N per alert type — to be recorded alert by alert in the catalog.
-- The load budget for the replica, still owed by EmusaSoft under ES-02.
+- representative detection queries and stable natural keys, starting with A05 and A02;
+- query plans, indexes, result bounds, timeouts, and failure behavior;
+- replica-freshness access and the threshold that blocks resolution;
+- the load budget and initial polling interval for each implemented query;
+- current-schema validation despite MCP catalog drift; and
+- versioned deep-link patterns for each supported incident destination.

@@ -4,13 +4,13 @@
 
 **System:** Monitor — Dashboard, Chats, Errors, and Alerts
 
-**Version:** 1.0
+**Version:** 1.1
 
 **Status:** architecture approved to begin Phase 0
 
-**Analysis date:** 2026-07-19
+**Analysis date:** 2026-07-20
 
-**Primary sources:** EmusaSoft MCP catalog, production MySQL schema extracted on 2026-07-16, workspace documentation and prototypes, and EmusaSoft architect answers dated 2026-07-19
+**Primary sources:** EmusaSoft MCP catalog, production MySQL schema extracted on 2026-07-16, workspace documentation and prototypes, and EmusaSoft architect answers through 2026-07-20
 **Not included:** application scaffold, application code, executable migrations, or EmusaSoft changes
 
 ## 1. Architecture decision summary
@@ -21,11 +21,11 @@ The confirmed target architecture is:
 
 1. Monitor is a new system with its own repository, deployment, and control database.
 2. The EmusaSoft database is an external, read-only operational source. Monitor never writes to it.
-3. Monitor consumes the EmusaSoft SSE stream directly. EmusaSoft uses Redis for its real-time infrastructure.
-4. The SSE event contract is derived from Monitor's functional requirements and versioned between both systems.
-5. An SSE adapter normalizes EmusaSoft events; a read-only SQL adapter reconciles data, adds context, and recovers gaps.
-6. An idempotent detection engine transforms EmusaSoft evidence into Monitor incidents.
-7. Monitor's database stores rules, normalized events, cursors, incidents, evidence, conversations, messages, receipts, deliveries, and audit history.
+3. EmusaSoft provides no SSE service to Monitor. EmusaSoft's internal Redis is not an integration boundary.
+4. Monitor runs approved condition-based SQL detection queries against an Aurora MySQL read replica.
+5. A Monitor-owned scheduler runs each query at a versioned per-alert interval selected during Phase 0 from urgency, measured performance, and the approved replica load budget.
+6. A source-freshness guard prevents failed, partial, invalid, or stale cycles from resolving incidents.
+7. Monitor's database stores query definitions, condition state, incident occurrences, temporary suppressions, evidence, conversations, messages, receipts, deliveries, client synchronization state, and audit history.
 8. Monitor uses WebSockets for bidirectional client communication, including messages, read receipts, presence, typing, and dashboard updates.
 9. Monitor's Redis coordinates fan-out, presence, and horizontal WebSocket scaling. The database—not Redis—is the source of truth for messages and incidents.
 10. A Monitor API serves queries, history recovery, and persistent commands. WebSockets distribute committed changes and ephemeral signals.
@@ -35,11 +35,11 @@ The confirmed target architecture is:
 
 ### Technical strategy
 
-**Diagnosis:** EmusaSoft already owns the operational record and emits real-time changes through SSE and Redis. Monitor is an independent communication and control system. The missing layer must consume events reliably, reconcile them against read-only data, detect divergence, preserve evidence, and support bidirectional conversations. The primary architectural risks are confusing inbound SSE with client WebSockets, treating Redis as persistence, or interpreting database timestamps as physical events.
+**Diagnosis:** EmusaSoft owns the operational record but provides no Monitor-specific event stream. Monitor must derive alert conditions safely from approved read-only queries without overloading the ERP replica, resolving incidents from incomplete data, or confusing source timestamps with first detection. It must preserve evidence and support bidirectional conversations as an independent system.
 
-**Guiding policies:** one source of truth per domain; writes only to Monitor's database; read-only access to EmusaSoft; no adjustment integration; SSE for EmusaSoft input; WebSockets for client interaction; persist before publishing; reconcile every stream; keep detectors and commands idempotent, versioned, and explainable; deliver deterministic rules first.
+**Guiding policies:** one source of truth per domain; writes only to Monitor's database; approved bounded reads from EmusaSoft; no adjustment or document-request integration; condition polling for ERP input; WebSockets for client interaction; healthy-cycle proof before automatic resolution; persist before publishing; keep queries, detectors, and commands idempotent, versioned, and explainable; deliver deterministic rules first.
 
-**Actions:** formalize SSE, read-only SQL, and WebSocket contracts; create the Monitor repository and database; build recoverable ingestion and reconciliation; deliver a vertical slice using A02, A03, and A05; enable bidirectional conversations; add the unresolved-closure view; then add balance and statistical models. The minimum proposed kit is TypeScript, a Monitor API, a relational database, Redis, and WebSockets. Concrete libraries must be selected through ADRs before scaffolding.
+**Actions:** formalize detection-query, replica-freshness, read-only access, deep-link, and WebSocket contracts; create the Monitor repository and database; build safe polling and occurrence management; deliver a vertical slice using A02, A03, and A05; enable bidirectional conversations; add the unresolved-closure view; then add balance and statistical models. The minimum proposed kit is TypeScript, a Monitor API, a relational database, Redis, a scheduler/query runner, and WebSockets. Concrete libraries must be selected through ADRs before scaffolding.
 
 ## 2. Confidence levels
 
@@ -47,7 +47,7 @@ The confirmed target architecture is:
 - **Inferred:** a reasonable technical conclusion based on direct evidence without access to the implementing source file.
 - **Pending:** cannot be confirmed from the available sources.
 
-The MCP does not expose repository files, dependencies, modules, controllers, resolvers, or deployment infrastructure. It exposes a generated GraphQL catalog, entities, SQL tables, examples, and the UI system. Architect answers add five decisions: EmusaSoft uses SSE and Redis; Monitor consumes SSE directly; the contract follows functional requirements; Monitor owns its repository and database; and EmusaSoft database access is read-only. Endpoint, authentication, payload, delivery guarantee, and topology details remain Phase 0 contracts and do not change the target architecture.
+The MCP does not expose repository files, dependencies, modules, controllers, resolvers, or deployment infrastructure. It exposes a generated GraphQL catalog, entities, SQL tables, examples, and the UI system. Its catalog is useful for discovery but is currently behind the extracted database and cannot alone prove a production query. The architect confirmed an Aurora MySQL read replica, condition-based SQL polling, independent Monitor ownership, and read-only access. Query contracts, replica credentials, freshness access, load limits, identity, deep links, and runtime details remain Phase 0 contracts.
 
 **Current precedence:** the product decision dated 2026-07-19 removes the adjustment queue and every regularization API. Detection rules and evidence remain governed by the active alert catalog; unresolved closures remain a read-only Monitor view.
 
@@ -114,6 +114,7 @@ Active sources:
 - `docs/design/design.md`
 - `docs/design/brand_guidelines.md`
 - `docs/design/design-system/tokens.json`
+- `docs/emusasoft_integration_architecture.md`
 - `docs/emusasoft_preimplementation_requests.md`
 - `prototype/alert-catalog/final/index.html`
 - `prototype/chat-list-review/chat-list-final.html`
@@ -125,6 +126,7 @@ Deprecated historical sources:
 - `docs/archive/project_context.md`
 - `docs/archive/dashboard_rationale.md`
 - `docs/archive/discovery.md`
+- `docs/archive/emusasoft_architecture_decisions.md`
 - `prototype/dashboard/`
 - `prototype/alert-catalog/v1/` through `v10/`
 
@@ -150,15 +152,15 @@ Deprecated historical sources:
 - exact backend framework or repository topology;
 - actual service boundaries;
 - exact Redis topology and channel ownership;
-- SSE ordering, duplicates, retention, replay, and backpressure guarantees;
+- approved detection queries, query plans, natural keys, result bounds, and polling intervals;
 - identity provider and login protocol;
 - deployment, container, ingress, load-balancer, and autoscaling topology;
 - caches, queues, jobs, and scheduler;
 - observability providers;
-- concrete EmusaSoft SSE endpoint, authentication, and payloads; and
+- concrete replica credentials, freshness signal, load budget, and permitted schemas; and
 - Monitor WebSocket gateway technology.
 
-No GraphQL `subscription` operation or catalog result for `websocket`, `socket`, `realtime`, or `subscription` was found. The architect confirmed that EmusaSoft real-time transport is SSE backed by Redis; Monitor must not assume an EmusaSoft bidirectional socket.
+No GraphQL `subscription` operation or catalog result for `websocket`, `socket`, `realtime`, or `subscription` was found. The EmusaSoft architect subsequently confirmed that no SSE service exists. Monitor must not assume any EmusaSoft push channel or access to EmusaSoft's internal Redis.
 
 ## 5. Cross-cutting document core
 
@@ -362,30 +364,30 @@ Consumption can be traced to serial, location, stock, container, pre-reservation
 | Monitor Web | Dashboard, chat list, chat detail, roster, evidence, and ERP links. |
 | Monitor API | UI contract, authorization, queries, history, and persistent commands; GraphQL or REST selected by ADR. |
 | Identity Adapter | Authenticates users and maps them to EmusaSoft users and operational scopes. |
-| Emusa Read Model Adapter | Uses strict read-only credentials for snapshots, reconciliation, and context. |
-| Emusa SSE Adapter | Maintains SSE, validates contracts, records cursors, and normalizes events. |
-| Normalizer | Converts ERP payloads into canonical Monitor events. |
+| Detection Query Registry | Stores approved query versions, natural-key schemas, result contracts, intervals, and load limits. |
+| Emusa Read Adapter | Runs only allowlisted bounded queries through strict read-only credentials. |
+| Detection Scheduler | Executes each query at its configured interval with bounded concurrency, timeouts, and retries. |
+| Source Freshness Guard | Validates cycle completion, result integrity, and replica lag before allowing resolution. |
 | Detection Engine | Evaluates deterministic, deadline, physical, and statistical rules. |
-| Incident Service | Deduplicates, updates, correlates, resolves, and audits incidents. |
+| Incident Service | Maintains condition state, creates distinct occurrences, correlates, resolves, suppresses uninterrupted closed conditions, and audits transitions. |
 | Routing Service | Resolves recipients by plant, work order, shift, actor, operation, machine, warehouse, and roster. |
 | Conversation Service | Owns conversations, messages, attachments, reads, reactions, and system messages. |
 | Notification Worker | Delivers in-app and approved external channels through Monitor-owned providers. |
 | Unresolved Closure Read Model | Filters closed-without-resolution incidents for EmusaSoft review. |
 | WebSocket Gateway | Receives bidirectional signals and distributes authorized changes. |
 | Monitor Redis | Coordinates fan-out, presence, and scaling; never stores canonical history. |
-| Scheduler | Runs deadlines, reevaluations, escalation, and reconciliation. |
-| Monitor DB | Owns Monitor state, audit, cursors, rules, incidents, messages, and roster assignments. |
+| Workflow Scheduler | Runs deadlines, reevaluations, and escalation outside the detection-query schedule. |
+| Monitor DB | Owns Monitor state, audit, queries, conditions, occurrences, client synchronization, messages, and roster assignments. |
 | Observability | Metrics, structured logs, traces, health checks, and failed-job records. |
 
 ### 10.2 Context diagram
 
 ```mermaid
 flowchart LR
-    ESSE["EmusaSoft SSE"] --> SA["SSE Adapter"]
-    EDB[("EmusaSoft DB read-only")] --> RA["Read Model Adapter"]
-    SA --> N["Normalizer"]
-    RA --> N
-    N --> DE["Detection Engine"]
+    SCH["Detection Scheduler"] --> RA["Read-only Query Adapter"]
+    EDB[("EmusaSoft Aurora read replica")] --> RA
+    RA --> FG["Freshness and Completeness Guard"]
+    FG --> DE["Detection Engine"]
     DE --> MDB[("Monitor DB")]
     MDB --> API["Monitor API"]
     MDB --> WS["WebSocket Gateway"]
@@ -396,28 +398,28 @@ flowchart LR
 
 ### 10.3 Data flow
 
-1. EmusaSoft changes and publishes an SSE event through its Redis-backed infrastructure.
-2. The SSE adapter consumes the stream, validates the version, and records the cursor.
-3. The normalizer creates a canonical event with `source`, `source_id`, `occurred_at`, `observed_at`, `version`, and a minimum payload.
-4. Monitor persists the input event with an idempotency key before processing.
-5. If context is incomplete or a gap exists, the read-model adapter reconciles a bounded window.
-6. The engine selects rules by event type and active checkpoints.
-7. Each rule produces a reproducible result and attaches its configured descriptive label. User-visible labels such as `Por vencer`, `Error posible`, or `Error` are explanatory text, not lifecycle states.
-8. The incident service creates or updates one incident chain using its deterministic key.
-9. Monitor persists immutable evidence and a rule-version snapshot.
+1. The scheduler selects due, approved query versions within the replica concurrency budget.
+2. The read adapter runs each bounded query through no-write credentials.
+3. The freshness guard validates the result contract, completeness, replica lag, and Monitor transaction health.
+4. A failed, partial, invalid, or stale cycle preserves current incident state and emits freshness telemetry.
+5. A healthy result row maps to a condition key built from alert code, query ID, key-schema version, and normalized natural-key values.
+6. The engine produces reproducible evidence and attaches the code's configured Spanish descriptive label. Labels such as `Error`, `Por vencer`, `Alerta`, and `Error posible` are explanatory text, not lifecycle states.
+7. The incident service updates the current occurrence or creates a new occurrence after a prior condition cleared.
+8. A condition absent from a complete healthy cycle is resolved unless its occurrence was already closed without resolution; either way, any temporary suppression expires when the condition clears.
+9. Monitor persists immutable evidence and query/rule-version snapshots.
 10. The routing service resolves named participants and deduplicates users.
 11. Monitor writes a system message and schedules allowed notifications.
 12. After commit, WebSockets publish only to authorized sessions through Monitor Redis.
 13. Client commands arrive by API or WebSocket and are validated and persisted before confirmation.
-14. When new evidence makes the rule pass, Monitor resolves the incident automatically.
-15. Closed-without-resolution incidents immediately enter the read-only view for EmusaSoft follow-up outside Monitor.
+14. Incidents expose authorized deep links to relevant EmusaSoft screens; Monitor performs no correction.
+15. Closed-without-resolution incidents immediately enter the read-only evidence view.
 
 ### 10.4 Data-boundary rule
 
 - **EmusaSoft:** source of truth for work orders, movements, consumption, production, serials, weighing, and other operational data.
 - **Monitor:** source of truth for rule definitions, evaluations, incidents, frozen evidence, conversations, messages, reads, deliveries, roster assignments, and administrative closures.
 - **Forbidden:** direct Monitor writes to EmusaSoft production tables.
-- **Allowed:** EmusaSoft SSE and backend-only SQL queries using a read-only user.
+- **Allowed:** approved backend-only SQL detection/context queries using a read-only user, plus versioned authorized deep links.
 - **Adjustments:** entirely outside Monitor; EmusaSoft decides and executes them.
 - **Redis:** ephemeral transport and coordination, never an operational or communication source of truth.
 - **Correction:** performed in EmusaSoft and later observed by Monitor.
@@ -431,25 +433,26 @@ flowchart LR
 |---|---|
 | `monitor_rule_definition` | Active catalog code, version, category, parameters, configured label, and status. |
 | `monitor_rule_parameter` | Effective-dated parameter by plant, operation, machine, or rule. |
-| `monitor_source_event` | Idempotent canonical ERP event. |
+| `monitor_detection_query` | Approved query ID/version, key-schema version, natural-key schema, output contract, interval, bounds, plan evidence, and status. |
+| `monitor_condition` | Stable condition key, active occurrence, last healthy presence/absence, and source freshness. |
 | `monitor_evaluation` | Inputs, formula, output, confidence, duration, and internal disposition of a rule evaluation. |
-| `monitor_incident` | Deduplicated incident and current lifecycle state. |
+| `monitor_incident` | One distinct occurrence and its current lifecycle state. |
 | `monitor_incident_subject` | Work order, serial, material, flow, machine, warehouse, and document references. |
 | `monitor_incident_evidence` | Immutable explainable evidence. |
 | `monitor_incident_transition` | Complete lifecycle history and actor. |
 | `monitor_incident_relation` | Cause, consequence, replacement, correlation, or duplicate. |
 | `monitor_incident_recipient` | Resolved recipient and routing reason. |
 | `monitor_admin_closure` | Reason, comment, administrator, chain, and preserved evidence. |
-| `monitor_detector_cursor` | Cursor by source and detector. |
+| `monitor_condition_suppression` | Temporary suppression for one uninterrupted condition after closure without resolution. |
 | `monitor_delivery` | Channel, attempt, provider, delivery status, and error. |
 
 ### 11.2 Deduplication key
 
-The key is deterministic and versioned:
+The condition key is deterministic and versioned:
 
-`factory + rule_family + work_order + primary_subject + workflow_stage + rule_generation`
+`alert_type_code + query_id + key_schema_version + normalized natural-key values`
 
-`primary_subject` can be a serial, required material, machine, container, or pair of work orders. Each rule defines its concrete key.
+It identifies a continuing ERP condition but is not the incident primary key. A predicate or evidence-only query-version change preserves the condition key; changing the key's meaning requires a new key-schema version. Each activation receives a new immutable occurrence ID. Continued healthy detections update the same open occurrence; healthy disappearance resolves it; a later reappearance creates another occurrence for the same condition key.
 
 Correlation rules:
 
@@ -457,7 +460,7 @@ Correlation rules:
 - A03 closes with first valid consumption and is suppressed when A07 provides stronger evidence.
 - D03 is suppressed when A03, A04, A05, A06, A07, D01, or D02 explains the same balance.
 - A deterministic rule replaces or enriches a generic statistical alert.
-- Closed historical evidence does not reopen; a genuinely new event creates another generation.
+- Closed historical evidence does not reopen. After a condition clears, a later recurrence creates another occurrence.
 
 ### 11.3 Incident lifecycle and internal disposition
 
@@ -468,6 +471,8 @@ The incident lifecycle contains exactly the three states represented in the prod
 - `CLOSED_WITHOUT_RESOLUTION`
 
 The code-specific descriptive label is stored and displayed separately. `RESOLVED` occurs only when the rule passes again. `CLOSED_WITHOUT_RESOLUTION` requires authorization, standardized reason, comment, actor, timestamp, and evidence. Neither state changes ERP records.
+
+Closing without resolution creates a temporary internal suppression for the occurrence's condition key. The same uninterrupted condition does not reopen. The first healthy cycle proving that the condition cleared expires the suppression; any later recurrence creates a new occurrence. No permanent exclusion list or Monitor follow-up ticket is created.
 
 Suppression and invalidation are internal evaluation dispositions, not incident lifecycle states and not user-visible status filters:
 
@@ -484,7 +489,7 @@ The view is informational and read-only. It contains no controls to adjust, appr
 
 ### 11.5 Explainable evidence
 
-Each evaluation stores rule version, effective parameters and source, ERP IDs, `occurred_at`, `observed_at`, and `evaluated_at`, readable formula, values/units/tolerances, SSE events and read-only queries without credentials, snapshot hash, result/confidence, and insufficient-evidence reason when applicable.
+Each evaluation stores query/rule versions, effective parameters and source, ERP IDs, `source_timestamp` when authoritative, `first_seen_at`, `observed_at`, and `evaluated_at`, readable formula, values/units/tolerances, read-only query identity without credentials, snapshot hash, result/confidence, and insufficient-evidence reason when applicable. Effective incident time uses authoritative ERP source time when available and otherwise Monitor's first-detection time; it is not user configurable.
 
 ## 12. Rule-to-source mapping
 
@@ -512,19 +517,21 @@ Each evaluation stores rule version, effective parameters and source, ERP IDs, `
 | E03 | previous close, next opening, movements | Deterministic | Depends on E02 immutable snapshot. |
 | E04 | recipe snapshot, opening, additions, close, screw | Mixed | Complete resin/screw events and tolerance. |
 
-## 13. Ingestion and real-time strategy
+## 13. Detection and real-time strategy
 
-### 13.1 Input from EmusaSoft: SSE
+### 13.1 Input from EmusaSoft: condition-based SQL polling
 
-Before implementation, define endpoint, service authentication, globally unique `event_id`, event type/version, `occurred_at`, `published_at`, affected entity/ID/plant, minimum payload or context reference, `Last-Event-ID`, retention/replay, ordering/duplicate policy, heartbeats, timeout, reconnection/backoff, environments, ownership, and version-change procedure.
+Each alert type uses an approved, versioned, bounded SQL query against the Aurora MySQL read replica. Its contract includes predicate, natural key, typed output, optional authoritative source timestamp, required indexes, plan evidence, timeout, result bound, schema revision, and load measurement.
 
-Assume at-least-once delivery: deduplicate by `event_id`, tolerate reordering, and persist before processing or downstream publication. SSE has no per-message acknowledgement. If EmusaSoft replay is insufficient, recover gaps through read-only reconciliation.
+The scheduler runs each query at a configurable per-alert interval. Phase 0 sets initial intervals from product urgency, measured query cost, and EmusaSoft's load budget. Polling configuration is backend-owned and versioned; it is not a user-facing setting or part of `docs/alert_catalog.md`.
 
-### 13.2 Read-only reconciliation
+### 13.2 Safe cycle processing and recovery
 
-SSE reduces latency but does not prove completeness. Monitor must query from the backend using a no-write SQL user, prefer a read-only replica when available, persist cursors/checkpoints by domain, reconcile recent and post-downtime windows, reevaluate deadlines through the scheduler even without events, use bounded indexed incremental queries, apply backoff/jitter/concurrency limits/timeouts, and measure lag, gaps, duplicates, and SSE/database divergence.
+Monitor marks a cycle healthy only after the query completes, the result contract validates, the full result is processed, replica lag is known and acceptable, and the Monitor transaction commits. Only a healthy absence may resolve a previously present condition.
 
-Scraping, browser SQL, and full-table polling are forbidden. GraphQL can complement validation but is not the confirmed runtime ingestion boundary.
+Failures, timeouts, invalid or truncated results, unknown or excessive replica lag, and Monitor persistence errors retain the last known incident state and emit source-freshness telemetry. After downtime, Monitor runs complete bounded evaluations of current state. There is no inbound cursor, event replay, source-event queue, outbox, or broker.
+
+Scraping, browser SQL, unbounded queries, runtime ad-hoc SQL, and direct access to EmusaSoft Redis are forbidden. GraphQL and the MCP can support discovery and validation but are not the confirmed runtime detection boundary.
 
 ### 13.3 Client output and interaction: WebSockets
 
@@ -532,7 +539,7 @@ Monitor owns a separate client contract including `incident.created`, `incident.
 
 Clients subscribe by user and authorized scopes. Messages and receipts are accepted only after server-side authentication and authorization. Persistent commands include `client_message_id` or another idempotency key. On reconnection, clients send their last cursor, recover gaps by API, and resume the stream. WebSockets alone never guarantee consistency.
 
-Monitor Redis distributes events and ephemeral presence. Confirmed history lives in Monitor DB. EmusaSoft Redis is not shared unless an explicit operating contract says otherwise.
+Monitor Redis distributes committed Monitor changes and ephemeral presence. Confirmed history lives in Monitor DB. EmusaSoft Redis is not shared or accessed.
 
 ## 14. Recommended Monitor API
 
@@ -565,7 +572,7 @@ Work-order, material, consumption, production, weighing, inventory, and accounti
 
 ## 15. Security and privacy
 
-- EmusaSoft SSE and SQL credentials live only in backend secret management.
+- EmusaSoft read-only SQL and MCP service credentials live only in backend secret management.
 - The browser never receives service credentials.
 - The UI has no production database access; adapters have read-only access.
 - Apply least privilege, TLS in transit, encryption at rest, environment separation, and secret separation.
@@ -580,12 +587,12 @@ Work-order, material, consumption, production, weighing, inventory, and accounti
 
 ## 16. Observability and operating objectives
 
-Minimum metrics include ERP-to-observation lag, observation-to-incident lag, cursor age, evaluations by rule/result, incident lifecycle counts, prevented duplicates, notification attempts/delivery/failures, real-time connections/reconnections, message send/delivery/read counts, GraphQL errors, pending/failed jobs, p50/p95/p99 response time, and reconciliation discrepancies.
+Minimum metrics include replica lag, query schedule delay/duration/result count/failures, ERP-to-observation lag, observation-to-incident lag, source-freshness state, evaluations by rule/result, incident lifecycle counts, prevented duplicates, notification attempts/delivery/failures, real-time connections/reconnections, message send/delivery/read counts, GraphQL errors, pending/failed jobs, p50/p95/p99 response time, and condition-state discrepancies.
 
 Proposed pilot SLOs, pending approval:
 
 - 99.5% monthly Monitor availability;
-- 95% of supported events evaluated within 60 seconds;
+- 95% of due supported detection cycles completed within their configured latency target;
 - 99% of deterministic incidents without duplicates for the same key;
 - 100% audit coverage for transitions and administrative closures; and
 - gap recovery after reconnection without losing messages or incidents.
@@ -604,8 +611,9 @@ Proposed pilot SLOs, pending approval:
 - anonymized fixtures per rule;
 - exact time/tolerance boundaries;
 - idempotency and deduplication properties;
-- reordered, duplicated, and delayed events;
-- late correction and automatic resolution;
+- persistent, cleared, and later-recurring conditions;
+- failed, partial, invalid, and stale polling cycles;
+- late correction and healthy-cycle automatic resolution;
 - D03 suppression by a specific cause;
 - effective-dated parameter changes.
 
@@ -613,7 +621,7 @@ Proposed pilot SLOs, pending approval:
 
 - authorized EmusaSoft sandbox or recordings;
 - network failures, timeouts, rate limits, and schema drift;
-- post-downtime reconciliation;
+- post-downtime complete condition evaluation;
 - real permission and recipient resolution;
 - no duplicate notification through multiple routing paths.
 
@@ -649,22 +657,23 @@ Durations are effort ranges for a small multidisciplinary team, not committed da
 Deliverables:
 
 - boundary, authentication, technical-kit, and protocol ADRs;
-- versioned SSE and read-only SQL contracts;
-- Monitor WebSocket protocol and canonical event schema;
+- versioned detection-query, natural-key and key-schema, result, read-only access, and replica-freshness contracts;
+- initial per-query polling intervals based on urgency, measured plans, and the approved replica load budget;
+- Monitor WebSocket protocol and canonical incident-change schema;
 - environments, secrets, ownership, and operating boundaries;
 - design-system and three-prototype audit with a UX/accessibility/responsive backlog;
 - ADR for consuming versioned `emusa-ui` components through an adapter layer where available, while retaining Monitor-owned composition, tokens, and product behavior;
 - design brief for the Operational Responsibility Roster;
 - initial threat model and proof that EmusaSoft credentials never reach the browser.
 
-Exit gate: contracts are approved and a sample SSE event can be mapped to a WebSocket event and recovered by API without implicit critical decisions.
+Exit gate: representative A05 and A02 queries run on staging within budget, demonstrate stable condition keys and safe failure behavior, and a committed incident change can be published by WebSocket and recovered by API without implicit critical decisions.
 
 ### Phase 1 — Data and rule contracts
 
 **Effort:** 2–3 weeks
 **Objective:** turn active A–E rules into executable specifications.
 
-Deliverables include canonical event contracts, event/table/field/join/unit/timestamp mapping per rule, deduplication keys, versioned parameters, anonymized fixtures, sufficient/insufficient-evidence matrices, formal resolution of A04/A06/A07/B01/D01/E02–E04 blockers, and final deterministic/deadline/physical/statistical classification.
+Deliverables include detection-query contracts, table/field/join/unit/timestamp mapping per rule, condition keys and occurrence rules, versioned parameters, anonymized fixtures, sufficient/insufficient-evidence matrices, formal resolution of A04/A06/A07/B01/D01/E02–E04 blockers, and final deterministic/deadline/physical/statistical classification.
 
 Exit gate: each candidate rule produces a reproducible fixture result or is explicitly excluded from the initial production implementation.
 
@@ -677,14 +686,14 @@ Deliverables include repository and CI, local/test/staging environments, Monitor
 
 Exit gate: a staging user authenticates, receives correct scopes, opens a WebSocket session, and tests prove Monitor cannot write to EmusaSoft.
 
-### Phase 3 — SSE, reads, and reconciliation
+### Phase 3 — Polling, freshness, and recovery
 
 **Effort:** 2–4 weeks
 **Objective:** obtain reliable and repeatable evidence.
 
-Deliverables include a contract-validated reconnecting SSE consumer, read-only adapters for work orders/materials/flows/serials/weighing/pauses/users, idempotent source-event storage, cursors and `Last-Event-ID`, retries/backoff, a Monitor-owned failed-event record for diagnostic replay without introducing a queue or broker, SQL reconciliation, source-freshness dashboard, and drift tests.
+Deliverables include the detection-query registry and scheduler; approved read-only adapters for work orders/materials/flows/serials/weighing/pauses/users; bounded concurrency, timeouts, retries, and backoff; complete-cycle tracking; replica-lag and result-integrity guards; condition-state storage; source-freshness dashboard; post-downtime full evaluation; and schema/query-plan drift tests. Failed cycles are retained as diagnostic records without introducing a queue or broker.
 
-Exit gate: staging can drop, duplicate, and reorder SSE events and still recover the correct state.
+Exit gate: staging can simulate timeouts, partial results, invalid schemas, excess lag, and downtime without resolving incidents incorrectly, then recover correct current condition state on the next healthy cycle.
 
 ### Phase 4 — Incident vertical slice
 
@@ -700,7 +709,7 @@ Exit gate: synthetic and anonymized historical cases create, update, and resolve
 **Effort:** 2–3 weeks
 **Objective:** notify the correct people once.
 
-Deliverables include validated design and implementation of the Operational Responsibility Roster; effective-dated assignments by operation/machine/shift with history, temporary replacements, conflicts, and missing assignments; work-order-to-operator and machine-to-warehouse resolution; manager/supervisor resolution; audited routing reasons; recipient deduplication; in-app notification; approved external providers; retries, delivery state, and dead letters.
+Deliverables include validated design and implementation of the Operational Responsibility Roster; effective-dated assignments by operation/machine/shift with history, temporary replacements, conflicts, and missing assignments; work-order-to-operator and machine-to-warehouse resolution; manager/supervisor resolution; audited routing reasons; recipient deduplication; in-app notification; approved external providers; retries, delivery state, and failed-delivery records.
 
 Exit gate: the roster screen maintains and audits assignments, permission tests prevent zone-wide over-notification, and each user receives one delivery.
 
@@ -729,7 +738,7 @@ Exit gate: process experts reproduce each calculation and EmusaSoft staff can un
 **Effort:** 4–8 weeks
 **Objective:** add higher-uncertainty rules without reducing trust.
 
-Deliverables include C01/C02/C06 datasets and model versioning, A04 after rewinder capacity is confirmed, E01–E04 after container snapshots/events are resolved, model-quality/sample-size/false-positive reporting, backtesting, and shadow mode.
+Deliverables include C01/C02/C06 datasets and model versioning, A04 after rewinder capacity is confirmed, E01–E04 after immutable container snapshots and records are resolved, model-quality/sample-size/false-positive reporting, backtesting, and shadow mode.
 
 Exit gate: each model meets the approved shadow-mode precision threshold and displays confidence.
 
@@ -762,29 +771,32 @@ The first three screens have active prototypes. The fourth was identified during
 
 ## 20. Decisions pending before coding
 
-1. Concrete SSE endpoint, authentication, payloads, cursors, replay, and limits.
-2. Identity provider and Monitor session mechanism.
-3. Runtime, API framework, database engine, ORM, and WebSocket library.
-4. Functional source for shifts, active operator, and influence zones.
-5. Exact permission for Monitor access and administration.
-6. Retention policy for incidents, messages, attachments, and evidence.
-7. External channels for the initial production implementation.
-8. Essential chat functions for the initial production implementation.
-9. Exact pilot rules and unresolved tolerances.
-10. Team, environments, and deployment process.
+1. Approved detection queries, stable natural keys, result bounds, indexes, plans, and initial polling intervals for the first implemented alerts.
+2. Replica credentials, freshness-signal access, thresholds, and load limits.
+3. Identity provider and Monitor session mechanism.
+4. Runtime, API framework, database engine, ORM, scheduler/query runner, and WebSocket library.
+5. Functional source for shifts, active operator, and influence zones.
+6. Exact permission for Monitor access and administration.
+7. Retention policy for incidents, messages, attachments, and evidence.
+8. External channels for the initial production implementation.
+9. Essential chat functions for the initial production implementation.
+10. Exact pilot rules and unresolved tolerances.
+11. Team, environments, and deployment process.
 
 ## 21. Definition of Done for the initial production implementation
 
 - Every authenticated identity maps to `sysUserId`; permissions are verified server-side.
 - Monitor has no direct writes or SQL write credentials for EmusaSoft.
-- SSE and every used read-only SQL query have contract tests.
-- Ingestion is idempotent, recoverable, and reconcilable.
+- Every used read-only SQL query and deep-link pattern has contract tests.
+- Polling and incident occurrence handling are idempotent, recoverable, and auditable.
 - Every incident has explainable rule, version, evidence, timestamps, subjects, and recipients.
 - One-incident rules prevent confirmed duplicates.
 - The UI displays each code's configured Spanish label plus stale/offline conditions without depending only on color.
-- SSE and WebSocket reconnection recover missing events/messages by reconciliation or API.
+- Failed, partial, invalid, or stale polling cycles never resolve an incident; the next healthy cycle restores current condition state.
+- WebSocket reconnection recovers missing client changes and messages through the API.
 - EmusaSoft corrections automatically resolve incidents when rules pass again.
 - Administrative closures are audited and never alter ERP evidence.
+- Closing without resolution suppresses only the same uninterrupted condition until a healthy cycle proves it cleared; a later recurrence creates a new occurrence.
 - The unresolved-closure view is filtered, read-only, and evidence-rich.
 - Monitor never schedules, requests, or records inventory/kardex/accounting adjustments.
 - Notifications record attempts, delivery, and errors.
@@ -795,6 +807,6 @@ The first three screens have active prototypes. The fourth was identified during
 
 ## 22. Technical conclusion
 
-Monitor is a fully independent system with its own repository, service, and control database. It consumes EmusaSoft's Redis-backed SSE and uses read-only SQL for context and reconciliation. It exposes a recoverable API and bidirectional WebSockets backed by its own Redis. EmusaSoft retains operational truth; Monitor retains incidents, communications, roster assignments, and administrative closures.
+Monitor is a fully independent system with its own repository, service, and control database. It detects current EmusaSoft conditions through approved bounded SQL queries against an Aurora MySQL read replica. It exposes a recoverable API and bidirectional WebSockets backed by its own Redis. EmusaSoft retains operational truth; Monitor retains condition state, incident occurrences, communications, roster assignments, temporary closure suppressions, and audit history.
 
-Monitor provides only a read-only view of incidents closed without resolution. Every later adjustment belongs to EmusaSoft and remains outside the project. Authentication, SSE specification, read-only queries, technical kit, and WebSocket protocol must be resolved before scaffolding.
+Monitor provides only a read-only view of incidents closed without resolution and links users to the relevant EmusaSoft screens. Every correction and later adjustment belongs to EmusaSoft and remains outside the project. Detection-query contracts, replica access and freshness, authentication, technical kit, deep links, and WebSocket protocol must be resolved through the roadmap gates.

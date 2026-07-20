@@ -16,7 +16,7 @@ Before acting, read these current authoritative files completely:
 - README.md
 - docs/product_definition.md
 - docs/monitor_architecture_and_production_roadmap.md
-- docs/emusasoft_architecture_decisions.md
+- docs/emusasoft_integration_architecture.md
 - docs/emusasoft_preimplementation_requests.md
 - docs/alert_catalog.md
 - docs/ux_ui_decisions.md
@@ -32,9 +32,11 @@ Execute only Phase 0. Create a tracked checklist mapped to every Phase 0 deliver
 2. decisions that require my approval;
 3. external dependencies already assigned in docs/emusasoft_preimplementation_requests.md.
 
-Do not invent missing SSE, authentication, replay, identity, deep-link, extrusion-snapshot, or emusa-ui contracts. Use versioned placeholders and contract tests where external artifacts are pending.
+Do not invent missing detection queries, natural keys, read-only access, replica-freshness, load-budget, authentication, identity, deep-link, extrusion-snapshot, or emusa-ui contracts. Use versioned placeholders and contract tests where external artifacts are pending.
 
-For the technical-kit ADR, recommend one concrete TypeScript stack for the Monitor API, relational database, ORM, WebSocket layer, Redis integration, testing, and deployment. Explain only material tradeoffs and stop for my approval before scaffolding the application.
+Treat the EmusaSoft MCP as schema-discovery evidence, not as proof that its drifted catalog is current. Validate every production detection query against the approved current schema and staging replica.
+
+For the technical-kit ADR, recommend one concrete TypeScript stack for the Monitor API, relational database, ORM, scheduler/query runner, WebSocket layer, Redis integration, testing, and deployment. Explain only material tradeoffs and stop for my approval before scaffolding the application.
 
 Once I approve the ADRs, implement every unblocked Phase 0 artifact, validate it, update the roadmap/checklist with evidence, and report exactly which exit criteria pass or remain externally blocked. Do not begin Phase 1 until I approve the Phase 0 gate.
 ```

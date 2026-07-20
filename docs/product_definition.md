@@ -1,7 +1,7 @@
 # Monitor Product Definition
 
 **Status:** Canonical current-state summary
-**Last consolidated:** 2026-07-19
+**Last consolidated:** 2026-07-20
 
 This document is the primary entry point for the current Monitor product definition. Historical discovery and exploratory prototypes must not override it. Detailed documents remain authoritative only within the domains listed below.
 
@@ -23,11 +23,13 @@ The earlier dashboard-only product direction is superseded. Technical implementa
 ## System boundary
 
 - EmusaSoft remains the operational system of record.
-- Monitor is an independent system with its own repository, service, database, deployment, migrations, incidents, evidence, conversations, messages, cursors, and audit history.
-- Monitor consumes EmusaSoft events through SSE, reads EmusaSoft data with read-only access, and uses its own WebSockets for clients.
+- Monitor is an independent system with its own repository, service, database, deployment, migrations, incidents, evidence, conversations, messages, client synchronization state, and audit history.
+- Monitor detects current ERP conditions through approved read-only SQL queries against an EmusaSoft Aurora MySQL replica and uses its own WebSockets for clients. EmusaSoft provides no SSE service to Monitor.
 - Monitor never writes to the EmusaSoft database.
 - Monitor does not create, submit, approve, track, or apply adjustment requests.
+- Monitor links incidents to relevant EmusaSoft screens, such as work orders or material reservations, where users perform every correction.
 - Incidents closed without resolution remain available through a read-only evidence view. Any later adjustment belongs entirely to EmusaSoft.
+- Closing without resolution suppresses only the same uninterrupted condition until a healthy polling cycle proves it cleared. A later recurrence creates a new incident occurrence.
 
 ## Alert and routing model
 
@@ -44,11 +46,11 @@ If documents disagree, use this order within the relevant domain:
 1. **Current product definition:** this document.
 2. **Alert logic and routing:** `docs/alert_catalog.md`.
 3. **Screen behavior and UX/UI:** `docs/ux_ui_decisions.md`.
-4. **Architecture and engineering plan:** `docs/monitor_architecture_and_production_roadmap.md`.
+4. **Architecture and engineering plan:** `docs/emusasoft_integration_architecture.md` for the EmusaSoft boundary and `docs/monitor_architecture_and_production_roadmap.md` for the complete system and sequencing.
 5. **Visual system and brand:** `docs/design/design.md`, `docs/design/brand_guidelines.md`, and `docs/design/design-system/`.
 6. **Repository navigation:** `README.md`, which contains no product authority.
 
-`docs/emusasoft_architecture_decisions.md` records confirmed integration inputs from the EmusaSoft architect. `AGENTS.md` contains tooling instructions rather than product requirements.
+The consolidated current integration contract is `docs/emusasoft_integration_architecture.md`. The earlier architect decision record is historical material in `docs/archive/`. `AGENTS.md` contains tooling instructions rather than product requirements.
 
 ## Current product prototypes
 
@@ -69,6 +71,7 @@ The following files remain only for history or inspiration and have no current p
 - `docs/archive/project_context.md`;
 - `docs/archive/dashboard_rationale.md`;
 - `docs/archive/discovery.md`;
+- `docs/archive/emusasoft_architecture_decisions.md`;
 - `prototype/dashboard/`;
 - `prototype/alert-catalog/v1/` through `v10/`; and
 - `prototype/chat-list-review/01-familiar.html` through `04-pinned-focus.html`.
@@ -76,7 +79,7 @@ The following files remain only for history or inspiration and have no current p
 ## Current open decisions
 
 - Design the Operational Responsibility Roster screen, workflow, permissions, conflict handling, and audit presentation.
-- Complete the concrete SSE contract, authentication, replay, reconciliation, and WebSocket contracts.
+- Complete the detection-query, read-only access, replica-freshness, authentication, deep-link, and WebSocket contracts.
 - Confirm unresolved alert formulas, tolerances, data mappings, and representative live evidence identified by the alert catalog and architecture roadmap.
 - Define production policies for identity, permissions, retention, attachments, moderation, reporting, offline behavior, and external notification channels.
 

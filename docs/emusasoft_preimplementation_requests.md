@@ -11,17 +11,17 @@ These requests do not change Monitor's approved boundary. Monitor remains an ind
 
 ### ES-01 — Approve the detection query set (supersedes the SSE contract, 2026-07-20)
 
-**Priority:** blocking Phase 3
-**Provide:** review and approval of Monitor's SQL detection queries — one per catalog alert type — including each query's declared natural key, required indexes on the read-only endpoint, representative query plans, and the load budget for the configurable polling interval. See `emusasoft_integration_architecture.md` for the agreed model. No SSE service exists or will be built.
+**Priority:** blocking the Phase 0 exit gate and Phase 3 implementation
+**Provide:** review and approval of Monitor's bounded SQL detection queries — one per implemented alert type — including each predicate, declared natural key and key-schema version, output schema, required indexes, representative query plan, result bound, timeout, and load budget. See `emusasoft_integration_architecture.md`. No SSE service exists or will be built.
 
-**Acceptance:** each catalog alert type has an approved detection query whose plan runs within the agreed budget on the staging replica, detects a seeded condition, maps it to a stable incident key across cycles, and auto-resolves when the condition clears.
+**Acceptance:** each implemented alert type has an approved query that runs within budget on staging, detects a seeded condition, preserves one occurrence while it persists, resolves only after a complete healthy cycle proves it cleared, and creates a new occurrence if it later returns.
 
-### ES-02 — Provision and document read-only reconciliation access
+### ES-02 — Provision and document read-only detection access
 
-**Priority:** blocking Phase 3
-**Provide:** environment-specific no-write credentials, approved replica or endpoint, permitted schemas/tables/views, connection limits, time zone, soft-delete rules, indexed incremental-query fields, representative query plans, maintenance expectations, and credential rotation procedure.
+**Priority:** blocking the Phase 0 exit gate and Phase 3 implementation
+**Provide:** environment-specific no-write credentials, approved Aurora MySQL replica or endpoint, permitted schemas/tables/views, connection and concurrency limits, time zone, soft-delete rules, representative query plans, maintenance expectations, credential rotation procedure, and a testable replica-freshness signal. Confirm access to `information_schema.replica_host_status` or provide CloudWatch `AuroraReplicaLag` access or another approved alternative.
 
-**Acceptance:** automated tests prove that Monitor can execute approved bounded reads and cannot perform inserts, updates, deletes, DDL, procedures, or privilege changes.
+**Acceptance:** automated tests prove that Monitor can execute approved bounded reads, measure or retrieve freshness, and cannot perform inserts, updates, deletes, DDL, procedures, or privilege changes. Failed, partial, invalid, or stale cycles must not resolve incidents.
 
 ### ES-03 — Confirm the identity and session integration
 
@@ -33,21 +33,21 @@ These requests do not change Monitor's approved boundary. Monitor remains an ind
 ### ES-04 — Confirm operational actor and routing evidence
 
 **Priority:** blocking Phase 5
-**Provide:** authoritative sources for the active OT operator, event actor, operation supervisor, technical leader, material planner, warehouse sender or dispatcher, process-team positions, shifts, and effective time. Identify which values already exist in EmusaSoft and which must be maintained only in Monitor's Operational Responsibility Roster.
+**Provide:** authoritative sources for the active OT operator, actor recorded on relevant ERP evidence, operation supervisor, technical leader, material planner, warehouse sender or dispatcher, process-team positions, shifts, and effective time. Identify which values already exist in EmusaSoft and which must be maintained only in Monitor's Operational Responsibility Roster.
 
 **Acceptance:** anonymized cases resolve each required standardized position to evidence or explicitly to the Monitor roster, without notifying every user in a warehouse or inferred zone.
 
 ### ES-05 — Resolve the immutable extrusion opening-inventory source
 
 **Priority:** blocking E02–E04 in Phase 8
-**Provide:** confirm whether the opening quantity for each `locationId + articleId` is persisted immutably through `WorkOrderMaterial.quantityIncoming`, a separate snapshot, or another field/event. If it does not exist, the EmusaSoft team must expose an immutable read-visible record or event; Monitor will not write it.
+**Provide:** confirm whether the opening quantity for each `locationId + articleId` is persisted immutably through `WorkOrderMaterial.quantityIncoming`, a separate snapshot, or another stored field or record. If it does not exist, the EmusaSoft team must expose an immutable read-visible record; Monitor will not write it.
 
 **Acceptance:** two consecutive extrusion or Exlam OTs can reproduce opening, additions, closing, and recipe proportions from immutable evidence.
 
 ### ES-06 — Publish stable deep-link patterns
 
 **Priority:** blocking production navigation
-**Provide:** environment-aware URL patterns and authorization behavior for work orders, production orders, documents, material flows, serials, scale loads, warehouses, and equipment.
+**Provide:** environment-aware URL patterns and authorization behavior for work orders, production orders, documents, material reservations, material flows, serials, scale loads, warehouses, and equipment.
 
 **Acceptance:** every supported Monitor evidence link opens the correct authorized EmusaSoft record and handles missing or inaccessible records safely.
 
@@ -91,9 +91,9 @@ These requests do not change Monitor's approved boundary. Monitor remains an ind
 ### MCP-05 — Expose versioned non-GraphQL integration resources
 
 **Priority:** blocking reliable MCP-based verification of Phase 0
-**Fix:** publish read-only MCP resources or catalog entries for the approved SSE schema, example events, authentication summary, replay contract, deep-link patterns, and `emusa-ui` package/version metadata. Do not expose secrets or internal Redis credentials.
+**Fix:** publish read-only MCP resources or catalog entries for the approved detection-query contract format, current schema/catalog revision, read-endpoint capability summary, replica-freshness mechanism, deep-link patterns, and `emusa-ui` package/version metadata. Do not expose credentials or internal Redis details.
 
-**Acceptance:** MCP can identify the current contract version and retrieve sanitized examples that match the contracts supplied under ES-01, ES-06, and ES-07.
+**Acceptance:** MCP identifies the current versions and retrieves sanitized examples matching ES-01, ES-02, ES-06, and ES-07 without claiming that a stale generated catalog proves the live schema.
 
 ### MCP-06 — Add sanitized representative read examples
 
