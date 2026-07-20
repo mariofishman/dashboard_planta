@@ -10,7 +10,7 @@ The current prototype surfaces are:
 - `prototype/chat-list-review/chat-detail.html` — conversation detail and alert attachment; and
 - `prototype/chat-list-review/dashboard.html` — historical and current alert dashboard.
 
-This document records product behavior and presentation decisions. Business rules, alert detection, and recipient routing remain governed by `docs/alert_catalog.md`. Visual tokens and component rules remain governed by `docs/design/design.md`, `docs/design/brand_guidelines.md`, and `docs/design/design-system/tokens.json`. Release sequencing and technical scope remain governed by `docs/monitor_architecture_and_production_roadmap.md`.
+This document records product behavior and presentation decisions. Business rules, alert detection, and recipient routing remain governed by `docs/alert_catalog.md`. Visual tokens and component rules remain governed by `docs/design/design.md`, `docs/design/brand_guidelines.md`, and `docs/design/design-system/tokens.json`. The EmusaSoft boundary remains governed by `docs/emusasoft_integration_architecture.md`; release sequencing and wider technical scope remain governed by `docs/monitor_architecture_and_production_roadmap.md`.
 
 When a prototype and an older exploratory screen differ, the three current prototype files listed above and this document represent the current design direction. The older `01-familiar.html`, `02-role-aware.html`, `03-operations-triage.html`, and `04-pinned-focus.html` files are exploratory alternatives, not parallel product variants.
 
@@ -42,7 +42,7 @@ An alert is not the name of a conversation, and a conversation is not the alert 
 The application has four main screens:
 
 - **Dashboard** — summary, history, analysis, filtering, reporting, and drill-down;
-- **Chats** — the user's conversation list; and
+- **Chats** — the user's conversation list;
 - **Chat detail** — a subordinate view opened from a conversation, not a separate primary navigation destination; and
 - **Operational Responsibility Roster** — assignment administration for deterministic alert routing; currently conceptual and not yet prototyped.
 
@@ -101,7 +101,7 @@ The administration surface must support:
 - warnings for missing assignments; and
 - traceability of the assignment used for each routing decision.
 
-The roster must not use an LLM to choose recipients. Alert code and reason determine the required standardized position; the roster resolves that position to the valid person for the affected operation, machine, shift, and event time.
+The roster must not use an LLM to choose recipients. Alert code and reason determine the required standardized position; the roster resolves that position to the valid person for the affected operation, machine, shift, and relevant ERP evidence time.
 
 No information architecture, layout, workflow, permissions model, or component design has yet been approved for this administration surface.
 
@@ -132,7 +132,7 @@ The previous product-brand label was removed from this location because the avai
 
 ### 3.3 Language and naming
 
-- Interface language is currently Spanish.
+- All current user-visible interface labels and messages are Spanish. English and Portuguese are future localization targets; current layouts must tolerate their expansion without mixing languages into the Spanish product.
 - Labels use familiar plant vocabulary and direct operational language.
 - Buttons use verbs.
 - Dates, times, quantities, and durations are explicit.
@@ -173,7 +173,8 @@ Alert label and alert age are separate dimensions.
 Alert labels are code-specific rather than a shared state vocabulary. Current examples include:
 
 - **Error** — a rule has been violated;
-- **Por vencer** — the error has not happened yet, but a deadline is approaching; and
+- **Por vencer** — the error has not happened yet, but a deadline is approaching;
+- **Alerta** — a monitoring threshold has passed but the condition may still be legitimate; and
 - **Error posible** — the evidence suggests an inconsistency that requires investigation.
 
 Every label uses written text and a marker; meaning never depends on color alone. Incident lifecycle states such as open, resolved, and closed without resolution are represented separately.
@@ -366,14 +367,14 @@ An alert is presented like an operational file attached to a message. It travels
 
 The alert object may contain:
 
-- state label;
+- code-specific descriptive alert label;
 - alert code;
 - unresolved duration;
 - concise operational title;
 - evidence-based explanation;
 - work order;
 - machine;
-- detection time; and
+- effective incident time, using authoritative ERP source time when available and otherwise Monitor's first-detection time; and
 - other relevant facts supported by the alert catalog.
 
 ### 7.2 Primary destinations
@@ -396,10 +397,10 @@ The resolution guide explains what is blocked or inconsistent and the safe steps
 
 ### 7.4 Color and age
 
-- State color appears in a compact marker and written label.
+- Alert-label color appears in a compact marker and written label; lifecycle state is presented separately.
 - The unresolved duration is written explicitly at the opposite edge of the header.
 - Age does not overlap the message-action control.
-- Older alerts can receive a restrained container accent, but the text and state label remain the primary explanation.
+- Older alerts can receive a restrained container accent, but the text, descriptive alert label, and separate lifecycle state remain the primary explanation.
 
 ## 8. Message actions
 
@@ -564,7 +565,7 @@ The interface must not claim that one alert is more important than another until
 
 The filtered detail table includes:
 
-- detection date and time;
+- effective incident date and time, following the same ERP-source-or-first-detection fallback;
 - error;
 - responsible person or role;
 - work order;

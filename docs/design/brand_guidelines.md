@@ -19,22 +19,22 @@ Write with direct operational clarity. Lead with the fact, state, or required ac
 - **Precise:** Name the work order, line, material, quantity, unit, timestamp, and responsible area when relevant.
 - **Actionable:** Alerts explain what happened, its operational effect, and the next safe action.
 - **Calm:** Urgency comes from severity and evidence, not exclamation marks or alarming prose.
-- **Global:** Keep Spanish, English, and Portuguese translations structurally equivalent and easy to scan.
+- **Global:** Current UI copy is Spanish. Keep layouts ready for structurally equivalent future English and Portuguese translations without mixing languages in the current product.
 - **Human:** Use familiar plant vocabulary without bureaucratic or overly technical filler.
 
 ### Examples
 
 | Avoid | Use |
 |---|---|
-| Algo salió mal | No se pudo actualizar el inventario. La cantidad anterior sigue vigente. |
+| Algo salió mal | No se pudo actualizar la información. Se muestran los últimos datos disponibles. |
 | ¡Problema crítico! | La línea de producción 3 lleva detenida 18 minutos. |
 | Optimiza tu flujo de trabajo | Revisa las dos órdenes de trabajo que esperan material. |
 | Sin datos | No se ha reportado producción para este turno. |
 
 ### UI writing rules
 
-- Buttons use Spanish verbs: `Crear orden de trabajo`, `Confirmar recepción`, `Exportar reporte`.
-- User-visible statuses use short, stable Spanish terms: `Programada`, `En proceso`, `Bloqueada`, `Completada`, `Cancelada`.
+- Buttons use Spanish verbs appropriate to Monitor's boundary: `Ver orden de trabajo`, `Abrir reserva de material`, `Enviar mensaje`, `Cerrar sin resolución`, and `Exportar reporte`. Operational corrections occur after following the relevant link into EmusaSoft.
+- User-visible incident lifecycle states use `Abierta`, `Resuelta`, and `Cerrada sin resolución`. Code-specific descriptive labels such as `Error`, `Por vencer`, `Alerta`, and `Error posible` remain separate from lifecycle state.
 - Dates use an explicit locale and timezone where ambiguity matters.
 - Quantities always include units.
 - Avoid marketing claims inside dashboards, forms, errors, and alerts.
@@ -84,7 +84,7 @@ Do not use generic office teamwork, abstract AI networks, fake factories, neon m
 - Keyboard focus must always be visible.
 - Controls require at least a 40px desktop target and 44px touch target where mobile use is expected.
 - Do not encode meaning through color alone.
-- Layouts must tolerate Spanish, English, and Portuguese expansion without truncation.
+- Current labels remain Spanish; layouts must tolerate future English and Portuguese expansion without truncation.
 - Respect `prefers-reduced-motion`; operational state must remain understandable without animation.
 
 ## Governance

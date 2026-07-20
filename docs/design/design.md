@@ -188,7 +188,7 @@ The system is flat by default. Depth comes first from canvas-versus-surface cont
 - **Primary:** cyan background, white text, `40px` height, `10px 18px` padding, label weight 600.
 - **Hover / Focus:** darken to `#006BA8`; use a `2px #3D7EFF` focus ring with `2px` offset. Active state may translate by at most `1px`.
 - **Secondary:** white surface, navy text, `1px #D8DDE8` border, no wide shadow.
-- **Destructive:** red only when the action is genuinely destructive; require confirmation for irreversible factory or inventory changes.
+- **Destructive:** red only for destructive actions on Monitor-owned data, such as an authorized message deletion. Monitor exposes no control for irreversible factory or inventory changes.
 
 ### Chips
 
@@ -235,7 +235,7 @@ The system is flat by default. Depth comes first from canvas-versus-surface cont
 - **Do** use fixed product typography, consistent component states, and tabular numbers for metrics.
 - **Do** reserve color for action, status, selection, and data identity.
 - **Do** use real EMUSA production, material, machinery, packaging, and workforce imagery on brand-facing surfaces.
-- **Do** support Spanish, English, and Portuguese without truncation or layout breakage.
+- **Do** author all current user-visible copy in Spanish and keep layouts ready for future English and Portuguese expansion without truncation or layout breakage.
 - **Do** provide hover, focus, active, disabled, loading, empty, success, warning, and error states.
 
 ### Don't:
