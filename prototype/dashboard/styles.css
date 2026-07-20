@@ -41,6 +41,21 @@ body {
   background: var(--factory-canvas);
 }
 
+.deprecation-notice {
+  padding: 10px 20px;
+  background: #fff1c2;
+  border-bottom: 1px solid #d7ad24;
+  color: #40340b;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.deprecation-notice a {
+  color: inherit;
+  text-decoration: underline;
+}
+
 button,
 input,
 select {

@@ -1,4 +1,6 @@
-# Project Context
+# Archived Project Context
+
+> **Deprecated historical document.** This handoff accumulated superseded scope and planning assumptions. Use `docs/product_definition.md` for the current product definition.
 
 ## Project goals
 
@@ -15,10 +17,10 @@
 - The primary value is rapid detection, explanation, prioritization, and support for correcting factory errors through existing operational workflows.
 - Initial scope follows the live work-order and material-flow lifecycle, from reservation and pre-start movement through consumption, production, weighing, downstream movement, and closure.
 - The dashboard should preserve evidence and distinguish confirmed violations from suspected inconsistencies.
-- Version 1 will treat every violated rule as an error rather than distinguishing critical and non-critical exceptions. Approaching-deadline warnings remain separate because the error has not happened yet.
+- Each alert code defines its own descriptive label for the condition it reports. Labels such as `Error`, `Por vencer`, `Warning`, or `Possible error` are code-specific presentation text, not a shared incident-state taxonomy and not a severity model.
 - EMUSA Soft prevents a reel from being digitally consumed unless it was reserved for that specific work order. A consumed-versus-reserved reel mismatch is therefore not a valid dashboard exception; missing consumption declarations remain relevant.
-- Current machines do not provide a rewinder-completion signal; PLC-based detection is a possible future capability, not version 1 evidence.
-- A version 1 inferred warning may compare cumulative raw-material kilograms with the rewinder's maximum retained mass and declared output. If the input mass cannot physically remain on the rewinder, one or more produced reels may be undeclared. Capacity source, waste, losses, partial-reel treatment, and tolerances remain unresolved.
+- Current machines do not provide a rewinder-completion signal; PLC-based detection is a possible future capability, not currently available evidence.
+- An inferred alert may compare cumulative raw-material kilograms with the rewinder's maximum retained mass and declared output. If the input mass cannot physically remain on the rewinder, one or more produced reels may be undeclared. Capacity source, waste, losses, partial-reel treatment, and tolerances remain unresolved.
 - Exceptions should link directly to the relevant EMUSA Soft work order, reel, material transfer, machine, or user record.
 - The first known candidate rules are:
   1. Work order started before required material transfer.
@@ -34,7 +36,8 @@
 - Every alert code and reason has a deterministic Primary Action Owner mapping to a standardized position. An LLM does not select operational recipients.
 - Standardized supporting positions include material planner, planner, raw-material warehouse dispatcher or sender, raw-material warehouse supervisor or leader, process-team operator, and process-team supervisor. OT receiving, opening, closing, pause, and production declarations belong to the OT machine operator.
 - Monitor owns an Operational Responsibility Roster master table and administration UI that map standardized positions to actual people by operation, machine, shift, and effective date. It preserves history and temporary replacements and warns about missing or conflicting assignments.
-- Version 1 is a live, socket-updated informational dashboard. It will not acknowledge, assign, resolve, dismiss, override, or correct exceptions inside the dashboard.
+- The current product direction supersedes the earlier informational-dashboard-only concept.
+- The product has four main screens: Dashboard, Chat list, Chat detail, and the Operational Responsibility Roster. The first three have current prototypes; the roster remains conceptual and has no prototype yet.
 - Monitor is a new system with its own repository and control database.
 - Monitor owns its service, deployment, migrations, and database independently from EmusaSoft.
 - Monitor consumes EmusaSoft events directly through SSE backed by Redis and reads the EmusaSoft database with read-only access.
@@ -42,7 +45,7 @@
 - EmusaSoft remains the operational source of truth; Monitor owns incidents, evidence, conversations, messages, cursors, and audit history.
 - Monitor provides a read-only view of incidents closed without resolution. Any later inventory, valued-kardex, or accounting adjustment belongs entirely to the EmusaSoft team.
 - Monitor never receives SQL write access to EmusaSoft.
-- Detailed discovery findings are maintained in `docs/discovery.md`.
+- Historical discovery findings are preserved in deprecated `docs/discovery.md`; current product authority begins at `docs/product_definition.md`.
 - The approved alert catalog is maintained in `docs/alert_catalog.md`. Its final browser publication is `prototype/alert-catalog/final/index.html`; review iterations 1–10 remain available for comparison.
 
 ## Current configuration
@@ -86,7 +89,7 @@
   - Planned millares: `2,450`.
   - The API record lacked executed dates and actual production values at inspection time, despite being opened through a `/closed/` route. This requires clarification before defining closure rules.
 - Reviewed the rationale document; it is clear and suitable as persistent discovery context.
-- Documented the confirmed users, operating structure, first-release boundary, end-to-end flow discovered so far, candidate rules, evidence hypotheses, and unresolved questions in `docs/discovery.md`.
+- Preserved the original users, operating structure, scope boundary, workflow discovery, candidate rules, evidence hypotheses, and unresolved questions in deprecated `docs/discovery.md`.
 - Created a persistent alert catalog and browser review surface for line-by-line annotations.
 - Organized the dashboard and versioned alert-catalog prototypes into separate directories.
 - Added a GitHub-facing `README.md` and a credential-safe `.env.example`.
@@ -96,7 +99,7 @@
 ## Pending work
 
 - Validate dashboard access and notification routing for every affected operational role.
-- Define the out-of-dashboard investigation, correction, and escalation process used in version 1.
+- Define the investigation, correction, and escalation behavior across the four current product screens.
 - Confirm the exact ERP conditions that mean a work order is started, finished, or closed.
 - Validate each candidate exception with factory stakeholders.
 - Map every exception to available ERP fields, events, timestamps, and relationships.
@@ -119,11 +122,16 @@
 ### Paths
 
 - Project root: `/Users/mariofishman/projects/dashboard_planta`
-- Rationale: `/Users/mariofishman/projects/dashboard_planta/dashboard_rationale.md`
+- Canonical product definition: `/Users/mariofishman/projects/dashboard_planta/docs/product_definition.md`
+- Deprecated historical rationale: `/Users/mariofishman/projects/dashboard_planta/dashboard_rationale.md`
 - Alert catalog: `/Users/mariofishman/projects/dashboard_planta/docs/alert_catalog.md`
-- Dashboard prototype: `/Users/mariofishman/projects/dashboard_planta/prototype/dashboard/index.html`
+- Current dashboard prototype: `/Users/mariofishman/projects/dashboard_planta/prototype/chat-list-review/dashboard.html`
+- Current chat-list prototype: `/Users/mariofishman/projects/dashboard_planta/prototype/chat-list-review/chat-list-final.html`
+- Current chat-detail prototype: `/Users/mariofishman/projects/dashboard_planta/prototype/chat-list-review/chat-detail.html`
+- Operational Responsibility Roster: conceptual fourth screen; prototype pending.
+- Deprecated historical dashboard: `/Users/mariofishman/projects/dashboard_planta/prototype/dashboard/index.html` — retained only for reference or inspiration and must not guide current implementation.
 - Final alert catalog: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/final/index.html`
-- Previous annotated alert catalogs: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v1/` through `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v9/`
+- Deprecated historical alert-catalog reviews: `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v1/` through `/Users/mariofishman/projects/dashboard_planta/prototype/alert-catalog/v10/`
 - Agent instructions: `/Users/mariofishman/projects/dashboard_planta/AGENTS.md`
 - Credential file: `/Users/mariofishman/projects/dashboard_planta/.env`
 - Project handoff: `/Users/mariofishman/projects/dashboard_planta/project_context.md`
@@ -153,6 +161,6 @@ rg --files -g '!.git' -g '!.env'
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000/prototype/dashboard/` or `http://localhost:8000/prototype/alert-catalog/final/`.
+Then open `http://localhost:8000/prototype/chat-list-review/dashboard.html` or `http://localhost:8000/prototype/alert-catalog/final/`.
 
 Do not display `.env` contents or run commands that print `EMUSASOFT_MCP_TOKEN`.

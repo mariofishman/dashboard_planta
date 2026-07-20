@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-07-18T00:00:00-05:00",
-  "title": "Design System: EMUSA Operations",
+  "title": "Design System: Monitor",
   "extensions": {
     "colorMeta": {
       "emusa-navy": { "role": "primary", "displayName": "EMUSA Navy", "canonical": "#00246B", "tonalRamp": ["#000B20", "#00143B", "#001D57", "#00246B", "#284A86", "#5D75A0", "#A6B2CA", "#EEF1F6"] },
@@ -87,7 +87,7 @@
   ],
   "narrative": {
     "northStar": "The Connected Production Floor",
-    "overview": "EMUSA Operations combines EMUSA's corporate authority with Vescrow's quiet, soft-futuristic product grammar. Brand color structures the interface and communicates state without competing with operational data.",
+    "overview": "Monitor combines EMUSA's corporate authority with Vescrow's quiet, soft-futuristic product grammar. Brand color structures the interface and communicates meaning without competing with operational data.",
     "keyCharacteristics": ["EMUSA identity first", "Soft but compact product controls", "Restrained functional color", "Real manufacturing imagery", "Dense information with earned familiarity"],
     "rules": [
       { "name": "Brand Authority", "body": "EMUSA navy and cyan own structure; Vescrow expansion colors are limited to charts.", "section": "colors" },

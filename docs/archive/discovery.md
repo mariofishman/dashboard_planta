@@ -1,8 +1,10 @@
-# EMUSA Soft Factory Operations Dashboard: Product Discovery
+# Archived EMUSA Soft Factory Operations Dashboard Discovery
+
+> **Deprecated historical document.** This file preserves early discovery and has no current product authority. Use `docs/product_definition.md` for the current product definition and the active specialized documents it identifies.
 
 ## Purpose
 
-This is the canonical detailed record of product-discovery findings for the EMUSA Soft factory-operations dashboard. It captures confirmed operating knowledge, candidate exception rules, available evidence, unresolved decisions, and the first-release boundary.
+This is the canonical detailed record of product-discovery findings for Monitor. It captures confirmed operating knowledge, candidate exception rules, available evidence, unresolved decisions, and the current product boundary.
 
 Use this document for detailed discovery. Keep `project_context.md` as the concise project handoff and `dashboard_rationale.md` as the stable product rationale.
 
@@ -14,26 +16,16 @@ The product is a live operational exception dashboard. It should compare the exp
 
 The dashboard complements the ERP. It does not replace production, inventory, weighing, or work-order workflows.
 
-### First-release boundary
+### Current product boundary
 
-Version 1 should:
+The earlier informational-dashboard-only version was superseded through design iteration. The current product has four main screens:
 
-- be an online dashboard updated live through sockets;
-- detect and display operational exceptions;
-- show enough evidence to understand the affected work order, reel, machine, operation, timing, and responsible area;
-- make the factory manager aware of all exceptions;
-- make the affected operation's supervisors and technical leaders aware;
-- involve the process team when transport, weighing, or another process-team action is implicated; and
-- direct users back to existing operational workflows to correct the underlying record or process.
+- **Dashboard:** current and historical alert analysis, filtering, reporting, and drill-down.
+- **Chat list:** conversations in which the current user participates.
+- **Chat detail:** message history, replies, attachments, and structured alert objects.
+- **Operational Responsibility Roster:** administration of position assignments used for deterministic alert routing; conceptual, with no approved prototype yet.
 
-Version 1 should not:
-
-- acknowledge, assign, resolve, dismiss, or override exceptions inside the dashboard;
-- edit ERP records;
-- replace the existing factory applications; or
-- implement the complete digital-twin direction.
-
-Operational personnel will try to correct an exception using existing processes. If they cannot, they will contact the project leader. In-dashboard resolution may be considered for version 2.
+Monitor still does not edit EmusaSoft records or replace existing factory applications. The architecture roadmap may sequence engineering work, but those phases are not separate product releases and do not remove any of the four screens from the current product definition.
 
 ## Users and operational organization
 
@@ -74,7 +66,7 @@ The process team and its supervisors are important dashboard users whenever an e
 
 ## Notification and responsibility model
 
-The dashboard is informative in version 1, so ownership means responsibility for operational attention rather than assignment inside the product.
+Ownership identifies the standardized operational position responsible for attention. The Operational Responsibility Roster maps that position to the applicable person by operation, machine, shift, and effective date.
 
 - The factory manager should always be aware of every exception.
 - Supervisors and technical leaders of the affected operation should be made aware immediately.
@@ -260,7 +252,7 @@ During a running work order, the operator should declare each produced reel when
 
 The declaration prints a label with a barcode and unique code. The new reel initially has an unweighed status because there is no scale at the machine.
 
-Current machinery does not report rewinder completion to EMUSA Soft. A PLC could provide that signal in the future, but it is not available for version 1. The ERP also cannot prove that a physical label was printed unless it records a separate print-job acknowledgment or failure.
+Current machinery does not report rewinder completion to EMUSA Soft. A PLC could provide that signal in the future, but it is not currently available evidence. The ERP also cannot prove that a physical label was printed unless it records a separate print-job acknowledgment or failure.
 
 Candidate inferred warning:
 
@@ -394,23 +386,18 @@ Catalog discovery identified the following likely data sources. Their precise Gr
 
 Do not assume that catalog field availability proves that a rule is implementable. Each rule still needs an exact GraphQL data mapping, timestamp semantics, join path, latency check, and representative live-record validation.
 
-## Exception status model
+## Alert labels and incident lifecycle
 
-Version 1 will not distinguish critical from non-critical exceptions. Every violated rule represents an operational or data-recording error that should be corrected.
+Each alert code defines the descriptive label that best explains its condition. Labels such as `Error`, `Por vencer`, `Warning`, and `Possible error` are not a shared state taxonomy and do not determine the incident lifecycle.
 
-The interface should distinguish only between:
-
-- **Error detected:** the expected sequence, declaration, deadline, or balance rule has already been violated.
-- **Approaching deadline:** no error exists yet, but the system warns that a required action will become overdue soon.
-
-Thresholds for approaching deadlines should be configurable where operating times may change.
+The lifecycle is recorded separately, including whether an incident is open, resolved, or closed without resolution. Each code's label and thresholds remain governed by `docs/alert_catalog.md`.
 
 ## Unresolved discovery questions
 
 Highest-priority unresolved issues are:
 
 1. What happens to good reels and waste after weighing, and which failures occur in the downstream flow?
-2. What remaining exception scenarios should version 1 include?
+2. What remaining exception scenarios should the current product include?
 3. Which proposed time thresholds are universal, and which vary by operation, shift, machine, or material?
 4. What is the exact latest-approved production sequence and how is a factory-floor update to the planner's plan recorded?
 5. Where should each machine's maximum rewinder capacity come from, and what waste, process-loss, partial-reel, and operation-specific allowances should the inferred warning use?

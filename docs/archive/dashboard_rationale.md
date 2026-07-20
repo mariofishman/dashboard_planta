@@ -1,4 +1,6 @@
-# Factory Operations Dashboard: Rationale and Operational Context
+# Archived Factory Operations Dashboard Rationale
+
+> **Deprecated historical document.** This file preserves the original project rationale and has no current product authority. Use `docs/product_definition.md` for the current product definition.
 
 ## Purpose of this document
 
@@ -309,7 +311,7 @@ The dashboard should help supervisors:
 7. Confirm that the digital state once again matches the physical state.
 8. Review recurring patterns to determine where additional training or workflow improvements are needed.
 
-For version 1, the dashboard is an informative, live, socket-updated monitoring surface. Assignment, acknowledgment, correction, dismissal, and resolution inside the dashboard are deferred beyond version 1.
+The earlier informational-dashboard-only direction was superseded through design iteration. The current product includes four main screens: Dashboard, Chat list, Chat detail, and the conceptual Operational Responsibility Roster. Current screen behavior is governed by `docs/ux_ui_decisions.md`.
 
 ## Digital-twin direction
 
@@ -578,7 +580,7 @@ This is the original discovery agenda. Current answers, first-release decisions,
 
 ### Historical analysis
 
-- Is the first release primarily a live exception dashboard, a user-training dashboard, or both?
+- Should the current product prioritize live exception handling, historical training analysis, or both?
 - Which historical measures are fair and useful for training?
 - How should errors be attributed when several users or areas participated in a process?
 
@@ -601,9 +603,11 @@ The dashboard should eventually be considered successful if it measurably:
 
 ## Scope boundary for the initial design
 
+The original dashboard-only scope in this rationale is historical context, not the current screen definition. The current product direction is governed by `docs/ux_ui_decisions.md` and includes Dashboard, Chat list, Chat detail, and the conceptual Operational Responsibility Roster.
+
 The initial design should focus on understanding and supervising operational exceptions derived from existing production and inventory data.
 
-It should not assume that the first release must include:
+It should not assume that the initial implementation must include:
 
 - a complete industrial digital-twin simulation;
 - predictive maintenance;
@@ -626,7 +630,7 @@ When using this document as context, do not jump directly to visual design. Firs
 3. the data and evidence available for each exception;
 4. severity and escalation logic;
 5. the resolution workflow; and
-6. whether the first release prioritizes live operations, historical training analysis, or both.
+6. whether the current product prioritizes live operations, historical training analysis, or both.
 
 When searching for UX references, prioritize products and patterns involving:
 

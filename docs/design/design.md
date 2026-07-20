@@ -1,5 +1,5 @@
 ---
-name: EMUSA Operations
+name: Monitor
 description: A precise, trustworthy interface system for EMUSA's factory and inventory operations.
 colors:
   emusa-navy: "#00246B"
@@ -96,13 +96,13 @@ components:
     padding: "24px"
 ---
 
-# Design System: EMUSA Operations
+# Design System: Monitor
 
 ## 1. Overview
 
 **Creative North Star: "The Connected Production Floor"**
 
-EMUSA Operations combines the visual authority of EMUSA's corporate site with the quiet, soft-futuristic interaction grammar of Vescrow 1.2. EMUSA owns the identity: deep navy, bright process cyan, technical green, Montserrat typography, industrial imagery, and a global manufacturing voice. Vescrow contributes the product layer: pale selected states, rounded controls, clear cards, compact form patterns, restrained elevation, and a 4px spacing foundation.
+Monitor combines the visual authority of EMUSA's corporate site with the quiet, soft-futuristic interaction grammar of Vescrow 1.2. EMUSA owns the identity: deep navy, bright process cyan, technical green, Montserrat typography, industrial imagery, and a global manufacturing voice. Vescrow contributes the product layer: pale selected states, rounded controls, clear cards, compact form patterns, restrained elevation, and a 4px spacing foundation.
 
 The system should feel precise, calm, and operational. It is designed for people monitoring production, inventory, quality, and logistics for long periods. Brand color identifies structure and state; it never competes with the data. The interface rejects decorative gradients, excessive card nesting, glass effects, oversized radii, and marketing language inside operational workflows.
 
@@ -249,4 +249,3 @@ The system is flat by default. Depth comes first from canvas-versus-surface cont
 - **Don't** use marketing claims inside operational controls, alerts, tables, or error messages.
 - **Don't** communicate status through color alone.
 - **Don't** invent custom form behavior, decorative motion, or non-standard modals where familiar controls work.
-

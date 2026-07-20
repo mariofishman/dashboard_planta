@@ -1,6 +1,6 @@
 # Factory Alert Catalog
 
-This is the canonical source for the factory dashboard's approved alert rules. The final browser publication is `prototype/alert-catalog/final/index.html`.
+This is the canonical source for Monitor's approved alert rules within the product defined by `docs/product_definition.md`. The final browser publication is `prototype/alert-catalog/final/index.html`.
 
 ## Catalog structure
 
@@ -10,18 +10,18 @@ Alert codes identify the type of operational control:
 - `B`: production-plan adherence and machine activity;
 - `C`: statistical or physical plausibility of recorded values;
 - `D`: work-order closure and material balance;
-- `E`: extrusion-specific alerts;
-- `F`: extrusion-lamination (`Exlam`) specific alerts; and
-- `G`: sealing or bag-making specific alerts.
+- `E`: resin-container alerts shared by extrusion and extrusion lamination (`Exlam`).
 
-Shared `A`, `C`, and `D` rules apply across operations whenever the same evidence and failure condition exist. Families `E`, `F`, and `G` contain only genuinely operation-specific rules and explicitly reference shared rules instead of duplicating them.
+Shared `A`, `C`, and `D` rules apply across operations whenever the same evidence and failure condition exists. Family `E` applies to both Extrusion and Exlam because they share the same resin-container controls. Additional families will be introduced only when approved rules exist that do not belong in the current catalog structure.
 
-Statuses describe timing or certainty, not severity:
+Each alert code defines its own descriptive alert label. Labels are presentation text for that rule, not shared lifecycle states and not a required global taxonomy. Current labels include:
 
 - `Error`: a defined rule has already been violated.
 - `Por vencer`: a deadline is approaching but has not yet been violated.
-- `Warning`: a monitoring threshold has passed, but the condition may still be legitimate and should close automatically when the expected action occurs.
-- `Possible error`: available evidence suggests a problem but does not prove it.
+- `Alerta`: a monitoring threshold has passed, but the condition may still be legitimate and should close automatically when the expected action occurs.
+- `Error posible`: available evidence suggests a problem but does not prove it.
+
+The stored incident lifecycle is separate from these labels.
 
 ## One-incident rule
 
@@ -37,13 +37,13 @@ The dashboard must not create duplicate alerts for the same underlying problem.
 Every incident has two distinct terminal outcomes:
 
 - `Resolved`: the underlying ERP or physical condition was corrected and the detection rule now passes.
-- `Closed without resolution`: an authorized administrator confirms that the historical operational record can no longer be reconstructed safely. Closure never invents reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT events. When the unreconstructed history leaves inventory quantity, location, cost, valuation, or OT reconciliation incorrect, closure creates an explicit EmusaSoft adjustment-queue item instead.
+- `Closed without resolution`: an authorized administrator confirms that the historical operational record can no longer be reconstructed safely. Closure never invents reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT events. Any later inventory, location, cost, valuation, or OT reconciliation adjustment belongs entirely to EmusaSoft.
 
 Administrative closure requires a standardized reason, mandatory comment, administrator identity, timestamp, and preserved evidence. It stops reminders and escalations but does not state that the business condition was fixed. Before confirmation, show incidents correlated by OT, material or reel, machine, and time window. The administrator may close the root incident and selected consequences as one audited cascade with a shared closure reference. The same historical evidence must not reopen that chain automatically; genuinely new events may create a new incident.
 
-Closure itself does not alter EmusaSoft. It creates one or more auditable adjustment-queue items for the corrections that EmusaSoft must perform. Each item records the affected inventory item or reel, warehouse/location, OT when applicable, current quantity and cost, proposed quantity and cost, reason, evidence, originating incident, requester, and status. Queue statuses are `Pending review`, `Approved`, `Applied`, or `Rejected`. An authorized EmusaSoft role reviews and applies the adjustment as an explicit present-time inventory, location, valuation, cost, or OT-reconciliation transaction. Monitor stores the resulting EmusaSoft transaction identifier and recalculates any still-open consequential incidents. Rejection requires a reason and leaves the historical closure unchanged.
+Monitor does not create, submit, approve, track, or apply adjustment requests. It provides a read-only record of the closure, its evidence, and its EmusaSoft references. Any later adjustment workflow belongs entirely to EmusaSoft and remains outside Monitor.
 
-For the A01 exception described during review, material may have been physically sent and consumed without reservation or EmusaSoft movements. Close A01 and only the selected downstream missing-dispatch, missing-consumption, and balance incidents for the same OT and material under reason `physical_operation_outside_erp`. Do not backfill transactions that cannot be proven. Create adjustment-queue items for any resulting raw-material inventory reduction, location correction, finished-output inventory increase, cost allocation, valuation correction, or OT reconciliation that EmusaSoft must post.
+For the A01 exception described during review, material may have been physically sent and consumed without reservation or EmusaSoft movements. Close A01 and only the selected downstream missing-dispatch, missing-consumption, and balance incidents for the same OT and material under reason `physical_operation_outside_erp`. Do not backfill transactions that cannot be proven. Preserve the evidence for EmusaSoft to handle any later adjustment outside Monitor.
 
 | Code | Recommended resolution |
 |---|---|
@@ -63,7 +63,7 @@ For the A01 exception described during review, material may have been physically
 | D01 | Add missing consumption or correct meters/reel data. If the locked history cannot be recovered, close without resolution with the remaining meter difference. |
 | D02 | Declare consumed material, return/reassign unused material, or correct completion/reservation. Preserve an unproven reel disposition as an inventory exception. |
 | D03 | Resolve the specific upstream cause and recalculate. Close an unreconstructable or accepted residual gap without resolution with final gap, tolerance, evidence, and linked incidents. |
-| D04 | Declare, weigh, label, and return the remnant reel or correct run-meter and reel data. If locked history cannot be reconstructed, create inventory and cost adjustment-queue items. |
+| D04 | Declare, weigh, label, and return the remnant reel or correct run-meter and reel data. If locked history cannot be reconstructed, close without resolution and preserve the discrepancy for EmusaSoft follow-up outside Monitor. |
 | E01 | Replenish safety stock, use an approved substitute, or reschedule/cancel. Close a passed historical readiness window without resolution and record whether production continued. |
 | E02 | Capture starting quantities or reconstruct them only from traceable records. Otherwise close without resolution and link E03/E04/D03. |
 | E03 | Correct closing/opening quantity or the missing intervening movement. If neither side is provable, close without resolution for the OT pair and preserve the difference. |
@@ -111,7 +111,7 @@ For the A01 exception described during review, material may have been physically
 - Generalized A04 to cover missing or implausible output in reels or bags and removed duplicate G01.
 - Removed G02 because ERP catalog review found stored bundle counters but did not establish an independently declared package total that could create the proposed mismatch.
 
-## Changes for iteration 6 (final)
+## Changes for iteration 6 (then considered final; superseded by later iterations)
 
 - Limited A02 to reserved material moving toward a work order; non-OT storage relocations are excluded.
 - Restored the iteration-4 A04 rule for possible undeclared produced reels based only on rewinder capacity; bags are excluded.
@@ -131,7 +131,7 @@ For the A01 exception described during review, material may have been physically
 - Replaced personal-name examples with positions and runtime role resolution.
 - Reclassified A03 as a warning that closes when first consumption is declared, and documented `WorkOrder.readOnlyInput` as the runtime editability check.
 - Added A07 for possible raw material consumed but not declared when output and waste exceed recorded input consumption.
-- Corrected administrative closure so it creates an auditable EmusaSoft adjustment queue for inventory, location, cost, valuation, and OT reconciliation without fabricating historical operational events.
+- Introduced an adjustment-queue proposal during iteration 8; the later architecture decision superseded it with a read-only closure view and no Monitor adjustment queue.
 
 ## Changes for iteration 9
 
@@ -157,7 +157,7 @@ For the A01 exception described during review, material may have been physically
 
 ### A01 — Required material not ready before OT start
 
-**Status:** Por vencer, then Error
+**Alert label:** Por vencer → Error
 **Scope:** Printing, lamination, adhesive lamination, and cutting
 
 | Field | Definition |
@@ -176,7 +176,7 @@ For the A01 exception described during review, material may have been physically
 
 ### A02 — Reserved OT material not received within 30 minutes
 
-**Status:** Warning
+**Alert label:** Alerta
 **Scope:** Reserved material moving toward a work order
 
 | Field | Definition |
@@ -193,7 +193,7 @@ For the A01 exception described during review, material may have been physically
 
 ### A03 — Active OT without consumption after 15 minutes
 
-**Status:** Warning
+**Alert label:** Alerta
 **Scope:** Printing, lamination, adhesive lamination, and cutting
 
 | Field | Definition |
@@ -212,7 +212,7 @@ For the A01 exception described during review, material may have been physically
 
 ### A04 — Possible undeclared produced reel
 
-**Status:** Possible error  
+**Alert label:** Error posible
 **Scope:** Rewinder-based operations without PLC signals
 
 **Remnant-reel scope:** A04 also covers an undeclared remnant, leftover, or remaining raw-material reel removed from the unwinder when an OT stops before consuming it completely. The existing missing-reel logic is unchanged: the remnant must be represented digitally so its remaining mass is accounted for.
@@ -231,7 +231,7 @@ For the A01 exception described during review, material may have been physically
 
 ### A05 — Produced or remnant reel not weighed or not moved from the machine
 
-**Status:** Por vencer, then Error  
+**Alert label:** Por vencer → Error
 **Scope:** Produced- and remnant-reel handling
 
 **Remnant-reel scope:** A05 uses the same declaration, weighing, labeling, and movement logic for produced reels and remnant raw-material reels. A partially consumed input reel must be declared with its remaining kilograms, weighed, labeled or ticketed, and returned to the raw-material warehouse. The 30-minute weighing and movement checks do not change.
@@ -250,7 +250,7 @@ For the A01 exception described during review, material may have been physically
 
 ### A06 — Waste missing or not weighed
 
-**Status:** Possible error or Error  
+**Alert label:** Error posible / Error
 **Scope:** Waste registration and weighing
 
 | Field | Definition |
@@ -266,7 +266,7 @@ For the A01 exception described during review, material may have been physically
 
 ### A07 — Possible raw material consumed but not declared
 
-**Status:** Possible error; Error when verified weights confirm the gap
+**Alert label:** Error posible → Error when verified weights confirm the gap
 **Scope:** Operations that produce weighed or statistically estimable output
 
 | Field | Definition |
@@ -287,7 +287,7 @@ For the A01 exception described during review, material may have been physically
 
 ### B01 — OT started outside the latest approved plan sequence
 
-**Status:** Error
+**Alert label:** Error
 
 | Field | Definition |
 |---|---|
@@ -303,7 +303,7 @@ For the A01 exception described during review, material may have been physically
 
 ### B02 — Planned OT has not started on time
 
-**Status:** Error
+**Alert label:** Error
 
 | Field | Definition |
 |---|---|
@@ -321,7 +321,7 @@ For the A01 exception described during review, material may have been physically
 
 ### B03 — Machine has no active OT for more than 30 minutes
 
-**Status:** Error
+**Alert label:** Error
 
 | Field | Definition |
 |---|---|
@@ -343,7 +343,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ### C01 — Produced reel weight outside the plausible range
 
-**Status:** Possible error
+**Alert label:** Error posible
 
 | Field | Definition |
 |---|---|
@@ -359,7 +359,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ### C02 — Waste amount outside the plausible range
 
-**Status:** Possible error
+**Alert label:** Error posible
 
 | Field | Definition |
 |---|---|
@@ -381,7 +381,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ### C06 — Declared production rate outside the machine's plausible range
 
-**Status:** Possible error
+**Alert label:** Error posible
 
 | Field | Definition |
 |---|---|
@@ -399,7 +399,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ### D01 — Declared meters exceed consumed-reel meters
 
-**Status:** Error  
+**Alert label:** Error
 **Confirmed:** Yes
 
 | Field | Definition |
@@ -416,7 +416,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ### D02 — Completed OT has delivered reserved reels unconsumed
 
-**Status:** Error  
+**Alert label:** Error
 **Confirmed:** Yes
 
 | Field | Definition |
@@ -433,7 +433,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ### D03 — OT input, good production, and waste do not balance
 
-**Status:** Possible error or Error
+**Alert label:** Error posible / Error
 
 | Field | Definition |
 |---|---|
@@ -448,7 +448,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ### D04 — Consumed-reel meters exceed declared meters
 
-**Status:** Error
+**Alert label:** Error
 
 | Field | Definition |
 |---|---|
@@ -461,7 +461,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 **Primary action owner:** Missing remnant declaration or incorrect run meters → **OT machine operator**. A declared remnant that is not weighed or moved inherits A05 and routes to the **Process-team operator**.
 
-**Resolution:** Declare the remnant reel, record its remaining kilograms, weigh it, print or attach its identifying label, and return it to the raw-material warehouse. Otherwise correct run meters or reel data. If the OT is locked and the history cannot be reconstructed, close without resolution and create the required EmusaSoft inventory and cost adjustment-queue items.
+**Resolution:** Declare the remnant reel, record its remaining kilograms, weigh it, print or attach its identifying label, and return it to the raw-material warehouse. Otherwise correct run meters or reel data. If the OT is locked and the history cannot be reconstructed, close without resolution and preserve the discrepancy for EmusaSoft follow-up outside Monitor.
 
 
 ## E — Extrusion and Exlam resin-container alerts
@@ -470,7 +470,7 @@ Every E01–E04 rule applies to both Extrusion and Exlam. Both operations use re
 
 ### E01 — Required extrusion safety inventory is incomplete
 
-**Status:** Por vencer, then Error
+**Alert label:** Por vencer → Error
 **Initial parameters:** 4-hour safety horizon; alert 3 hours before the affected OT starts. Both values may become configurable.
 
 | Field | Definition |
@@ -487,7 +487,7 @@ Every E01–E04 rule applies to both Extrusion and Exlam. Both operations use re
 
 ### E02 — Extrusion OT opened without complete starting-container inventory
 
-**Status:** Error
+**Alert label:** Error
 
 | Field | Definition |
 |---|---|
@@ -503,7 +503,7 @@ Every E01–E04 rule applies to both Extrusion and Exlam. Both operations use re
 
 ### E03 — Previous closing stock does not match the next opening stock
 
-**Status:** Error
+**Alert label:** Error
 
 | Field | Definition |
 |---|---|
@@ -519,7 +519,7 @@ Every E01–E04 rule applies to both Extrusion and Exlam. Both operations use re
 
 ### E04 — Consumed resin proportions do not match the recipe
 
-**Status:** Possible error or Error
+**Alert label:** Error posible / Error
 
 | Field | Definition |
 |---|---|

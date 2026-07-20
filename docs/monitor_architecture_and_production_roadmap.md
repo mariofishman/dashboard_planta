@@ -1,371 +1,262 @@
-# Monitor: arquitectura de integración con EmusaSoft y roadmap de producción
+# Monitor: EmusaSoft Integration Architecture and Production Roadmap
 
-**Sistema:** Monitor — Dashboard, Mensajes, Errores y Alertas
-**Versión:** 1.0
-**Estado:** arquitectura aprobada para iniciar la Fase 0
-**Fecha de análisis:** 2026-07-19
-**Fuentes principales:** catálogo MCP de EmusaSoft, esquema MySQL de producción extraído el 2026-07-16, documentación y prototipos del workspace, respuestas del arquitecto de EmusaSoft del 2026-07-19
-**No incluye:** scaffold, código de aplicación, migraciones ejecutables ni cambios en EmusaSoft
+> **Scope:** This document governs architecture and technical sequencing within the product defined in `docs/product_definition.md`. Technical phases are not product releases and do not redefine the four main screens.
 
-## 1. Resumen de la decisión arquitectónica
+**System:** Monitor — Dashboard, Chats, Errors, and Alerts
 
-Monitor debe construirse como una aplicación y servicio separados que se integran con EmusaSoft, no como lógica incrustada directamente en la base de datos productiva del ERP.
+**Version:** 1.0
 
-La arquitectura objetivo confirmada es:
+**Status:** architecture approved to begin Phase 0
 
-1. Monitor es un sistema nuevo, con repositorio, despliegue y base de datos de control propios.
-2. La base de datos de EmusaSoft es una fuente operacional externa de solo lectura. Monitor no escribe en ella.
-3. Monitor consume directamente el stream SSE de EmusaSoft. EmusaSoft utiliza Redis como infraestructura realtime.
-4. El contrato de eventos SSE se define desde los requerimientos funcionales de Monitor y se implementa como un contrato versionado entre ambos sistemas.
-5. Un adaptador SSE normaliza los eventos de EmusaSoft; un lector SQL read-only reconcilia, completa contexto y recupera gaps.
-6. Un motor de detección idempotente transforma evidencia de EmusaSoft en incidentes de Monitor.
-7. La base propia de Monitor conserva reglas, eventos normalizados, cursores, incidentes, evidencia, conversaciones, mensajes, lecturas, entregas y auditoría.
-8. Monitor utiliza WebSockets para la comunicación bidireccional con sus clientes: mensajes, recibos de lectura, presencia, escritura y actualizaciones del dashboard.
-9. Redis de Monitor coordina fan-out, presencia y escalamiento horizontal de WebSockets. La base de datos, no Redis, es la fuente de verdad de mensajes e incidentes.
-10. Una API de Monitor atiende consultas, recuperación de historial y comandos persistentes; el WebSocket distribuye cambios confirmados y señales efímeras.
-11. Los registros operacionales se corrigen en EmusaSoft. Monitor conserva enlaces profundos y observa posteriormente la corrección.
-12. Monitor ofrece una vista de todas las alertas `CLOSED_WITHOUT_RESOLUTION`, con evidencia, motivo, administrador y referencias operacionales suficientes para que el equipo de EmusaSoft evalúe ajustes posteriores.
-13. Las regularizaciones de inventario, kardex valorizado o contabilidad quedan fuera del alcance de Monitor. Monitor no agenda, solicita ni ejecuta ajustes y nunca obtiene permisos de escritura sobre EmusaSoft.
+**Analysis date:** 2026-07-19
 
-### Estrategia técnica: diagnóstico, políticas y acciones
+**Primary sources:** EmusaSoft MCP catalog, production MySQL schema extracted on 2026-07-16, workspace documentation and prototypes, and EmusaSoft architect answers dated 2026-07-19
+**Not included:** application scaffold, application code, executable migrations, or EmusaSoft changes
 
-**Diagnóstico:** EmusaSoft ya contiene el registro operacional y emite realtime mediante SSE/Redis, pero Monitor es un sistema independiente y comunicacional. La brecha es una capa confiable que consuma eventos, reconcilie contra datos read-only, detecte divergencias, conserve evidencia y sostenga conversaciones bidireccionales. El riesgo principal es confundir el SSE de entrada con el canal WebSocket de clientes, depender de Redis como persistencia o interpretar timestamps de base de datos como eventos físicos.
+## 1. Architecture decision summary
 
-**Políticas guía:** una sola fuente de verdad por dominio; escritura exclusivamente en la base de Monitor; lectura exclusivamente en EmusaSoft; ninguna integración de regularización; SSE para entrada desde EmusaSoft; WebSockets para interacción bidireccional con clientes; persistir antes de publicar; reconciliar todo stream; hacer detectores y comandos idempotentes, versionados y explicables; entregar primero reglas deterministas.
+Monitor must be built as a separate application and service integrated with EmusaSoft, not as logic embedded directly in the ERP production database.
 
-**Acciones:** formalizar los contratos SSE, SQL read-only y WebSocket; crear el repositorio y la base de Monitor; construir ingestión y reconciliación recuperables; entregar un vertical slice con A02/A03/A05; habilitar conversaciones bidireccionales; añadir la vista de cierres sin resolución; y después incorporar balances y modelos estadísticos. El kit mínimo propuesto es TypeScript, una API de Monitor, una base relacional, Redis y WebSockets; las librerías concretas se fijan en ADRs antes del scaffold.
+The confirmed target architecture is:
 
-## 2. Nivel de certeza
+1. Monitor is a new system with its own repository, deployment, and control database.
+2. The EmusaSoft database is an external, read-only operational source. Monitor never writes to it.
+3. Monitor consumes the EmusaSoft SSE stream directly. EmusaSoft uses Redis for its real-time infrastructure.
+4. The SSE event contract is derived from Monitor's functional requirements and versioned between both systems.
+5. An SSE adapter normalizes EmusaSoft events; a read-only SQL adapter reconciles data, adds context, and recovers gaps.
+6. An idempotent detection engine transforms EmusaSoft evidence into Monitor incidents.
+7. Monitor's database stores rules, normalized events, cursors, incidents, evidence, conversations, messages, receipts, deliveries, and audit history.
+8. Monitor uses WebSockets for bidirectional client communication, including messages, read receipts, presence, typing, and dashboard updates.
+9. Monitor's Redis coordinates fan-out, presence, and horizontal WebSocket scaling. The database—not Redis—is the source of truth for messages and incidents.
+10. A Monitor API serves queries, history recovery, and persistent commands. WebSockets distribute committed changes and ephemeral signals.
+11. Operational records are corrected in EmusaSoft. Monitor keeps deep links and later observes the correction.
+12. Monitor provides a read-only view of every `CLOSED_WITHOUT_RESOLUTION` incident, including evidence, reason, administrator, and operational references.
+13. Inventory, valued-kardex, and accounting adjustments are outside Monitor. Monitor never schedules, requests, tracks, or applies adjustments and never receives EmusaSoft write credentials.
 
-Las afirmaciones se clasifican así:
+### Technical strategy
 
-- **Confirmado:** visible directamente en el dump SQL, catálogo MCP o documentación aprobada.
-- **Inferido:** conclusión técnica razonable basada en evidencia directa, pero sin acceso al archivo fuente que la implementa.
-- **Pendiente:** no puede confirmarse con las fuentes disponibles.
+**Diagnosis:** EmusaSoft already owns the operational record and emits real-time changes through SSE and Redis. Monitor is an independent communication and control system. The missing layer must consume events reliably, reconcile them against read-only data, detect divergence, preserve evidence, and support bidirectional conversations. The primary architectural risks are confusing inbound SSE with client WebSockets, treating Redis as persistence, or interpreting database timestamps as physical events.
 
-El MCP disponible no expone archivos del repositorio ni dependencias, módulos, controladores, resolvers o infraestructura de despliegue. Expone un catálogo generado de GraphQL, entidades, tablas SQL, ejemplos y el sistema de UI. Las respuestas del arquitecto añaden cinco decisiones: EmusaSoft usa SSE y Redis; Monitor consumirá ese SSE directamente; el contrato se definirá según los requerimientos funcionales; Monitor tendrá repositorio y base propios; y su acceso a la base de EmusaSoft será de solo lectura. Siguen pendientes los detalles de endpoints, autenticación, payloads, garantías y topología, que se convierten en contratos de implementación de la Fase 0 y no cambian la arquitectura objetivo.
+**Guiding policies:** one source of truth per domain; writes only to Monitor's database; read-only access to EmusaSoft; no adjustment integration; SSE for EmusaSoft input; WebSockets for client interaction; persist before publishing; reconcile every stream; keep detectors and commands idempotent, versioned, and explainable; deliver deterministic rules first.
 
-**Precedencia vigente:** la decisión de producto del 2026-07-19 elimina la cola y cualquier API de regularización. Si `docs/alert_catalog.md` todavía menciona una cola de ajustes durante su edición paralela, esa parte queda reemplazada por la vista read-only de cierres sin resolución definida aquí. Las reglas de detección y su evidencia continúan viniendo del catálogo vigente.
+**Actions:** formalize SSE, read-only SQL, and WebSocket contracts; create the Monitor repository and database; build recoverable ingestion and reconciliation; deliver a vertical slice using A02, A03, and A05; enable bidirectional conversations; add the unresolved-closure view; then add balance and statistical models. The minimum proposed kit is TypeScript, a Monitor API, a relational database, Redis, and WebSockets. Concrete libraries must be selected through ADRs before scaffolding.
 
-## 3. Fuentes inspeccionadas
+## 2. Confidence levels
+
+- **Confirmed:** directly visible in the SQL dump, MCP catalog, approved documentation, or architect answers.
+- **Inferred:** a reasonable technical conclusion based on direct evidence without access to the implementing source file.
+- **Pending:** cannot be confirmed from the available sources.
+
+The MCP does not expose repository files, dependencies, modules, controllers, resolvers, or deployment infrastructure. It exposes a generated GraphQL catalog, entities, SQL tables, examples, and the UI system. Architect answers add five decisions: EmusaSoft uses SSE and Redis; Monitor consumes SSE directly; the contract follows functional requirements; Monitor owns its repository and database; and EmusaSoft database access is read-only. Endpoint, authentication, payload, delivery guarantee, and topology details remain Phase 0 contracts and do not change the target architecture.
+
+**Current precedence:** the product decision dated 2026-07-19 removes the adjustment queue and every regularization API. Detection rules and evidence remain governed by the active alert catalog; unresolved closures remain a read-only Monitor view.
+
+## 3. Sources inspected
 
 ### 3.1 EmusaSoft MCP
 
-Catálogo versión 2, generado el 2026-07-13T08:16:37Z:
+Catalog version 2, generated on 2026-07-13T08:16:37Z:
 
-- 1,034 operaciones GraphQL.
-- 345 entidades.
-- 345 tablas SQL catalogadas.
-- 1,034 ejemplos.
+- 1,034 GraphQL operations;
+- 345 entities;
+- 345 cataloged SQL tables; and
+- 1,034 examples.
 
-Superficies MCP usadas:
+MCP surfaces used:
 
 - `erp_get_catalog_info`
 - `erp_search`
 - `erp_describe`
 - `erp_get_example`
+- `erp_validate_graphql`
+- `erp_run_graphql`
 
-Operaciones inspeccionadas:
+The 2026-07-19 verification successfully executed an authenticated read-only `getUserContext` query. Catalog-backed validation returned `schema unavailable`; restoring the validator and regenerating the drifted catalog are assigned to the MCP implementation team in `docs/emusasoft_preimplementation_requests.md`.
 
-- `getUserContext`
-- `getSysUserById`
-- `getUsers`
-- `getRolesByUser`
-- `getPermissionsByUserOrGroup`
-- `getAvailableDocumentUsers`
-- `getDocumentResponsibleUsers`
-- `getSysCommentUsersByCommentId`
-- `createSysCommentUser`
-- `addSysReadUser`
-- `notifyUsersInDocument`
-- `pingActiveUser`
-- `updateStateUser`
-- `getWorkOrder`
-- `getWorkOrderClosureById`
-- `getWorkOrdersWithActiveFinalProcess`
-- `getWorkProduction`
-- `getWorkOrderMaterialStocksById`
-- `getWorkOrderMaterialStockContainersConsumed`
+Representative operations inspected:
 
-Entidades inspeccionadas:
+- identity and permissions: `getUserContext`, `getSysUserById`, `getUsers`, `getRolesByUser`, `getPermissionsByUserOrGroup`;
+- document participation: `getAvailableDocumentUsers`, `getDocumentResponsibleUsers`, `notifyUsersInDocument`;
+- comments and reads: `getSysCommentUsersByCommentId`, `createSysCommentUser`, `addSysReadUser`;
+- presence: `pingActiveUser`, `updateStateUser`;
+- production: `getWorkOrder`, `getWorkOrderClosureById`, `getWorkOrdersWithActiveFinalProcess`, `getWorkProduction`;
+- materials: `getWorkOrderMaterialStocksById`, `getWorkOrderMaterialStockContainersConsumed`.
 
-- `Document`
-- `SysUser`
-- `WorkProduction`
-- `WorkOrder`
-- `WorkOrderMaterialStock`
-- `WorkOrderMaterialStockContainer`
-- `MaterialFlow`
-- `MaterialFlowDetail`
-- `ArticleSerial`
-- `ScaleLoad`
-- `Warehouse`
-- `Equipment`
-- `ProductionSerial`
+Representative entities inspected:
 
-### 3.2 Base de datos extraída
+- `Document`, `SysUser`, `WorkProduction`, `WorkOrder`;
+- `WorkOrderMaterialStock`, `WorkOrderMaterialStockContainer`;
+- `MaterialFlow`, `MaterialFlowDetail`, `ArticleSerial`, `ScaleLoad`;
+- `Warehouse`, `Equipment`, `ProductionSerial`.
 
-Archivo: `local-data/database/prod_emusa_core-20260716-143040.sql`
+### 3.2 Extracted database
 
-- Dump de MySQL 8.0.45.
-- Servidor de origen MySQL 8.0.43.
-- Base: `prod_emusa_core`.
-- Host de origen: RDS MySQL de producción en `us-east-1`.
-- Charset y collation predominantes: `utf8mb4` y `utf8mb4_unicode_ci`.
-- 363 sentencias `CREATE TABLE` en el dump.
-- 361 claves primarias.
-- 179 índices únicos.
-- 718 índices secundarios.
-- 803 restricciones de clave foránea.
-- No se observaron definiciones `CREATE VIEW`, `CREATE TRIGGER`, `CREATE PROCEDURE`, `CREATE FUNCTION` o `CREATE EVENT` en el dump.
-- Tablas sin clave primaria: `centro_costo_usuario` y `documento_relaciones`; ambas poseen índices compuestos, pero no PK formal.
+File: `local-data/database/prod_emusa_core-20260716-143040.sql`
 
-El dump tiene 18 tablas más que el catálogo MCP. La explicación más probable es deriva entre el catálogo generado el 2026-07-13 y el dump del 2026-07-16. Antes de construir adaptadores se debe regenerar el catálogo o validar cada operación contra el esquema vigente.
+- MySQL 8.0.45 dump from a MySQL 8.0.43 production server;
+- database: `prod_emusa_core`;
+- source: production RDS MySQL in `us-east-1`;
+- predominant charset and collation: `utf8mb4` and `utf8mb4_unicode_ci`;
+- 363 `CREATE TABLE` statements;
+- 361 primary keys, 179 unique indexes, 718 secondary indexes, and 803 foreign-key constraints;
+- no observed `CREATE VIEW`, `CREATE TRIGGER`, `CREATE PROCEDURE`, `CREATE FUNCTION`, or `CREATE EVENT` definitions;
+- tables without formal primary keys: `centro_costo_usuario` and `documento_relaciones`, both with composite indexes.
 
-### 3.3 Documentación y UX/UI del workspace
+The dump contains 18 more tables than the MCP catalog. The most likely cause is drift between the catalog generated on 2026-07-13 and the dump produced on 2026-07-16. Regenerate the catalog or validate each operation against the current schema before building adapters.
 
-- `project_context.md`
-- `dashboard_rationale.md`
-- `docs/discovery.md`
+### 3.3 Workspace documentation and UX/UI
+
+Active sources:
+
+- `docs/product_definition.md`
 - `docs/alert_catalog.md`
+- `docs/ux_ui_decisions.md`
 - `docs/design/design.md`
 - `docs/design/brand_guidelines.md`
 - `docs/design/design-system/tokens.json`
-- `prototype/dashboard/`
-- `prototype/alert-catalog/v1` a `v8`
+- `docs/emusasoft_preimplementation_requests.md`
+- `prototype/alert-catalog/final/index.html`
 - `prototype/chat-list-review/chat-list-final.html`
 - `prototype/chat-list-review/chat-detail.html`
 - `prototype/chat-list-review/dashboard.html`
 
-## 4. Arquitectura observable de EmusaSoft
+Deprecated historical sources:
 
-### 4.1 Capas confirmadas
+- `docs/archive/project_context.md`
+- `docs/archive/dashboard_rationale.md`
+- `docs/archive/discovery.md`
+- `prototype/dashboard/`
+- `prototype/alert-catalog/v1/` through `v10/`
 
-| Capa | Evidencia | Conclusión |
+## 4. Observable EmusaSoft architecture
+
+### 4.1 Confirmed layers
+
+| Layer | Evidence | Conclusion |
 |---|---|---|
-| Cliente web | Rutas ERP, Storybook de Emusa UI y prototipos existentes | EmusaSoft es una aplicación web modular. |
-| Contrato API | 1,034 operaciones GraphQL y ejemplos generados | GraphQL es la interfaz principal observable del ERP. |
-| Modelo de dominio | 345 entidades GraphQL | La API expone entidades relacionales amplias, no únicamente DTOs planos. |
-| Persistencia | Dump MySQL 8 con 363 tablas | MySQL es el sistema de registro principal observado. |
-| ORM/migraciones | `_prisma_migrations` | Prisma administra al menos parte del esquema. |
-| Autorización | tablas `sys_*`, recursos, grupos, roles, permisos y matrices | El acceso mezcla RBAC, agrupamiento y control por recurso. |
-| Documentos/workflows | `documentos`, tipos, estados, etapas, responsables y logs | Existe un núcleo transversal de documentos y flujos de trabajo. |
-| Comunicación saliente | `mensaje_flujos`, `mensaje_plantillas`, `notifyUsersInDocument` | EmusaSoft tiene una capa de plantillas y notificación multicanal. |
-| Comentarios y lectura | `sys_comentarios`, `sys_comentario_usuarios`, `sys_lecturas`, `sys_lectura_usuarios` | Existen primitivas reutilizables para comentarios y recibos de lectura. |
-| Presencia | `SysUser.state`, `pingActiveUser`, `updateStateUser` | La API modela usuario disponible, en pausa o desconectado. |
+| Web client | ERP routes, Emusa UI Storybook, and existing prototypes | EmusaSoft is a modular web application. |
+| API contract | 1,034 GraphQL operations and generated examples | GraphQL is the main observable ERP interface. |
+| Domain model | 345 GraphQL entities | The API exposes broad relational entities, not only flat DTOs. |
+| Persistence | MySQL 8 dump with 363 tables | MySQL is the observed primary system of record. |
+| ORM and migrations | `_prisma_migrations` | Prisma manages at least part of the schema. |
+| Authorization | `sys_*` tables, resources, groups, roles, permissions, and matrices | Access combines RBAC, grouping, and resource-level control. |
+| Documents and workflows | `documentos`, types, states, stages, assignees, and logs | A cross-cutting document and workflow core exists. |
+| Outbound communication | `mensaje_flujos`, `mensaje_plantillas`, `notifyUsersInDocument` | EmusaSoft has template-based multichannel notification capabilities. |
+| Comments and reads | `sys_comentarios`, `sys_comentario_usuarios`, `sys_lecturas`, `sys_lectura_usuarios` | Reusable comment and read-receipt primitives exist. |
+| Presence | `SysUser.state`, `pingActiveUser`, `updateStateUser` | The API models available, paused, and disconnected users. |
 
-### 4.2 Lo que no está confirmado
+### 4.2 Not confirmed
 
-- Framework backend exacto.
-- Estructura de monorepo o repositorios.
-- Límites reales entre servicios.
-- Topología exacta de Redis y ownership de sus canales.
-- Garantías del SSE: orden, duplicados, retención, replay y backpressure.
-- Proveedor de identidad y protocolo exacto de login.
-- Topología de despliegue, contenedores, ingress, balanceadores y autoscaling.
-- Cache, colas, jobs y scheduler.
-- Observabilidad y proveedor de logs/trazas.
-- Endpoint, autenticación y payloads del SSE de EmusaSoft.
-- Tecnología concreta del gateway WebSocket de Monitor.
+- exact backend framework or repository topology;
+- actual service boundaries;
+- exact Redis topology and channel ownership;
+- SSE ordering, duplicates, retention, replay, and backpressure guarantees;
+- identity provider and login protocol;
+- deployment, container, ingress, load-balancer, and autoscaling topology;
+- caches, queues, jobs, and scheduler;
+- observability providers;
+- concrete EmusaSoft SSE endpoint, authentication, and payloads; and
+- Monitor WebSocket gateway technology.
 
-No se encontró ninguna operación GraphQL de `subscription` ni resultados para `websocket`, `socket`, `realtime` o `subscription` en el catálogo. El arquitecto confirmó que el realtime de EmusaSoft es SSE con Redis; por tanto, no se debe buscar ni asumir un socket bidireccional de EmusaSoft para Monitor.
+No GraphQL `subscription` operation or catalog result for `websocket`, `socket`, `realtime`, or `subscription` was found. The architect confirmed that EmusaSoft real-time transport is SSE backed by Redis; Monitor must not assume an EmusaSoft bidirectional socket.
 
-## 5. Núcleo transversal de documentos
+## 5. Cross-cutting document core
 
-La arquitectura de EmusaSoft se organiza alrededor de un documento genérico y entidades de módulo relacionadas.
+EmusaSoft is organized around a generic document and related module entities.
 
 ### 5.1 `documentos`
 
-`documentos` contiene:
+The table stores type, state, code, plant, company/contact, creator/updater/deleter/finalizer, lifecycle timestamps, deletion and read-only flags, root-document status, authorization resource, read container, attachments, comments, observations, parent/owner/inherited/generated relationships, previous state, and destination document type.
 
-- tipo y estado;
-- código;
-- planta;
-- empresa y contacto;
-- creador, actualizador, eliminador y finalizador;
-- timestamps de creación, actualización, eliminación y finalización;
-- banderas `eliminado`, `deshabilitado`, `solo_lectura`, `automatico` y `es_documento_raiz`;
-- `id_recurso` para autorización por recurso;
-- `id_lectura` para seguimiento de lectura;
-- `id_adjunto` para adjuntos;
-- `id_comentario` y `id_observacion` para conversaciones o anotaciones;
-- relaciones padre, propietario, heredado y generado;
-- estado anterior y tipo de documento destino.
+Confirmed GraphQL relationships include `Document.workOrder`, `Document.scaleLoad`, `Document.inventoryAdjustment`, `Document.requestWaste`, `Document.dispatchOrder`, and trigger-document relationships to material-flow details, plus commercial, purchasing, prepress, and dispatch surfaces.
 
-Relaciones de dominio confirmadas en GraphQL:
+### 5.2 Types, states, and stages
 
-- `Document.workOrder`
-- `Document.scaleLoad`
-- `Document.inventoryAdjustment`
-- `Document.requestWaste`
-- `Document.dispatchOrder`
-- `Document.materialFlowDetails` mediante documentos disparadores
-- otras superficies comerciales, compras, preprensa y despacho
+`documento_tipos.codigo` includes `MATERIALS_FLOW`, `WORK_ORDER`, `SCALE_LOAD`, `INVENTORY_ADJUSTMENTS`, `REQUEST_WASTE`, `DISPATCH_ORDER`, and `DISPATCH_DELIVERY_NOTE`. Each type can be associated with a workflow type, document role, icon, color, resource configuration, and attachment configuration.
 
-### 5.2 Tipos, estados y etapas
+`documento_estados` defines ordering, lock behavior, terminal behavior, defaults, and endpoints. `documento_estados_logs` stores state intervals and actors. `documento_detalles` stores stages, article references, estimated wait times, and separate creation and stage-change timestamps. `documento_logs` records assignee, state, activity, and information changes with old/new values, comments, actors, dates, and optional attachments.
 
-`documento_tipos.codigo` incluye, entre otros:
+### 5.3 Participation, responsibility, and visibility
 
-- `MATERIALS_FLOW`
-- `WORK_ORDER`
-- `SCALE_LOAD`
-- `INVENTORY_ADJUSTMENTS`
-- `REQUEST_WASTE`
-- `DISPATCH_ORDER`
-- `DISPATCH_DELIVERY_NOTE`
+- `documento_usuarios`: requester or commercial executive;
+- `documento_responsable`: `DEFAULT`, `OPERATOR`, or `SUPERVISOR` assignee;
+- `documento_responsable_tipo_config`: allowed instances per type;
+- `sys_visibilidad_matriz_tipodocumento_rol`: visibility by type, role, and state;
+- `sys_visibilidad_matriz_estadodocumento_etapa`: visibility and ordering by stage, type, transaction, state, role, and user type;
+- `sys_matriz_flujotrabajotipos_rolparticipante`: workflow participation by workflow type and role.
 
-Cada tipo se asocia con un tipo de flujo de trabajo, rol documental, icono, color y configuración de recursos o adjuntos.
+### 5.4 Monitor implications
 
-`documento_estados` define el orden del estado, si bloquea el documento, si es terminal y si es un estado por defecto o endpoint.
+Monitor must retain external references to `documentId`, `workOrderId`, `articleSerialId`, `materialFlowDetailId`, `scaleLoadId`, `warehouseId`, `equipmentId`, `factoryId`, and `sysUserId`. It must not copy complete ERP documents except for minimum immutable evidence snapshots needed for audit.
 
-`documento_estados_logs` conserva intervalos de estado con creador, inicio, finalizador y finalización.
+A Monitor alert must not automatically become a new EmusaSoft `documentos` record. Doing so would require a new ERP document type, states, matrices, permissions, and GraphQL contracts. Monitor owns incidents and links them to existing ERP documents.
 
-`documento_detalles` conserva etapa, estado, artículo y tiempos de espera estimados, además de timestamps separados para creación y cambio de etapa.
+## 6. Identity, roles, and authorization
 
-`documento_logs` registra cambios de responsable, estado, actividad o información, con valor anterior, valor actual, comentario, actor, fecha y adjunto opcional.
+### 6.1 Users and presence
 
-### 5.3 Participación, responsabilidad y visibilidad
+`sys_usuarios` and `SysUser` provide the internal numeric identity, external `userAccountId`, name, email, phone, internal/external status, enabled/disabled and soft-delete status, presence state (`DISPONIBLE`, `EN_PAUSA`, or `DESCONECTADO`), and relationships to plants, groups, roles, resources, documents, comments, and reads.
 
-- `documento_usuarios`: requester o ejecutivo comercial.
-- `documento_responsable`: responsable `DEFAULT`, `OPERATOR` o `SUPERVISOR`.
-- `documento_responsable_tipo_config`: número de instancias permitido por tipo.
-- `sys_visibilidad_matriz_tipodocumento_rol`: visibilidad por tipo, rol y estado.
-- `sys_visibilidad_matriz_estadodocumento_etapa`: visibilidad y orden por etapa, tipo, transacción, estado, roles y tipos de usuario.
-- `sys_matriz_flujotrabajotipos_rolparticipante`: participación por tipo de workflow y rol.
+`getUserContext` returns identity, role, `roleSlug`, `sysUserId`, additional data, `sysUser`, and `requiredPingActive`. `pingActiveUser` and `updateStateUser` confirm application-level presence.
 
-### 5.4 Implicación para Monitor
+### 6.2 Permission model
 
-Monitor debe conservar referencias externas a `documentId`, `workOrderId`, `articleSerialId`, `materialFlowDetailId`, `scaleLoadId`, `warehouseId`, `equipmentId`, `factoryId` y `sysUserId`. No debe copiar documentos completos salvo snapshots mínimos de evidencia necesarios para auditoría.
-
-Una alerta de Monitor no debe convertirse automáticamente en un nuevo `documentos` de EmusaSoft. Esa extensión requeriría agregar un tipo documental, estados, matrices, permisos y contratos GraphQL al ERP. Para v1 es más seguro mantener incidentes propios y enlazarlos con documentos ERP existentes.
-
-## 6. Identidad, roles y autorización
-
-### 6.1 Usuario y presencia
-
-`sys_usuarios` y `SysUser` proporcionan:
-
-- identidad interna numérica;
-- `userAccountId` externo;
-- nombre, apellido, correo y teléfono;
-- usuario interno o externo;
-- habilitado/deshabilitado y borrado lógico;
-- estado `DISPONIBLE`, `EN_PAUSA` o `DESCONECTADO`;
-- relaciones con planta, grupos, roles, recursos, documentos, comentarios y lecturas.
-
-`getUserContext` retorna identidad, rol, `roleSlug`, `sysUserId`, datos adicionales, `sysUser` y `requiredPingActive`.
-
-`pingActiveUser` y `updateStateUser` confirman un mecanismo de presencia a nivel de aplicación.
-
-### 6.2 Modelo de permisos
-
-| Tabla | Función |
+| Table | Function |
 |---|---|
-| `sys_grupos` | Árbol de grupos globales, maestros, módulos, reportes, permisos, roles y utilidades. |
-| `sys_grupo_usuarios` | Membresía usuario-grupo. |
-| `sys_roles` | Roles con código estable y capacidad de agrupamiento. |
-| `sys_role_asignamientos` | Asigna rol a usuario, grupo o ambos. |
-| `sys_permisos` | Permisos `ADMIN`, `GRANT`, `ACCESO_TOTAL`, `EDITAR`, `VER`. |
-| `sys_role_permisos` | Incluye o excluye permisos por rol. |
-| `sys_recursos` | Recursos de compañía, documento, grupo o almacén. |
-| `sys_recurso_compartidos` | Comparte recursos con grupo o usuario como ver, editar o acceso total. |
-| `sys_control_accesos` | Permisos JSON por recurso y usuario. |
-| `planta_usuarios` | Limita o asigna usuarios a plantas. |
+| `sys_grupos` | Global group tree for masters, modules, reports, permissions, roles, and utilities. |
+| `sys_grupo_usuarios` | User-group membership. |
+| `sys_roles` | Roles with stable codes and grouping capability. |
+| `sys_role_asignamientos` | Assigns a role to a user, group, or both. |
+| `sys_permisos` | `ADMIN`, `GRANT`, `ACCESO_TOTAL`, `EDITAR`, and `VER` permissions. |
+| `sys_role_permisos` | Includes or excludes permissions by role. |
+| `sys_recursos` | Company, document, group, or warehouse resources. |
+| `sys_recurso_compartidos` | Shares view, edit, or full access with groups or users. |
+| `sys_control_accesos` | JSON permissions by resource and user. |
+| `planta_usuarios` | Assigns or limits users to plants. |
 
-Operaciones GraphQL relevantes:
+Relevant operations include `getRolesByUser`, `getPermissionsByUserOrGroup`, `getAvailableDocumentUsers`, and `getDocumentResponsibleUsers`.
 
-- `getRolesByUser(userId)`
-- `getPermissionsByUserOrGroup(groupIds, userIds, includePermissionsIds)`
-- `getAvailableDocumentUsers`
-- `getDocumentResponsibleUsers`
+### 6.3 Monitor authorization policy
 
-### 6.3 Política de autorización para Monitor
+1. Each authenticated Monitor user maps to an EmusaSoft `sysUserId`.
+2. Authentication—SSO, token exchange, or another supported approach—is selected by ADR before scaffolding. Monitor should not create passwords when supported corporate integration exists.
+3. The Monitor backend resolves and verifies `sysUserId` for every session.
+4. Authorization is calculated server-side; the browser never decides access.
+5. The user must belong to an authorized plant.
+6. Incident visibility derives from plant, operation, machine, warehouse, group, role, and explicit participation.
+7. The plant manager sees every incident in the plant.
+8. Supervisors and technical leaders see operations under their responsibility.
+9. Operators and process personnel see conversations or incidents in which the roster resolves them as participants.
+10. A person reached through multiple paths is deduplicated by `sysUserId`.
+11. Example names in the alert catalog are never hard-coded recipients.
 
-1. Monitor no duplica la identidad operacional: cada usuario autenticado se mapea a un `sysUserId` de EmusaSoft.
-2. El mecanismo de autenticación —SSO, token exchange u otro— se decide mediante ADR antes del scaffold; Monitor no crea contraseñas mientras exista una integración corporativa soportada.
-3. El backend de Monitor resuelve y verifica `sysUserId` en cada sesión.
-4. La autorización se calcula en servidor; el navegador no decide acceso.
-5. El usuario debe pertenecer a una planta autorizada.
-6. La visibilidad de incidentes se deriva de planta, operación, máquina, almacén, grupo, rol y participación específica.
-7. El gerente de planta ve todos los incidentes de su planta.
-8. Supervisores y líderes ven las operaciones bajo su responsabilidad.
-9. Operadores y personal de proceso ven conversaciones o incidentes donde son participantes resueltos.
-10. La misma persona encontrada por varios caminos se deduplica por `sysUserId`.
-11. Los ejemplos de personas incluidos en `docs/alert_catalog.md` no se codifican como destinatarios.
+The influence-zone concept in the alert catalog is not an explicit table or operation in the current MCP catalog. Before production, confirm whether it is represented through groups, warehouse resources, external configuration, or uncataloged code.
 
-La “zona de influencia” usada en el catálogo de alertas no aparece como tabla ni operación explícita en el catálogo MCP actual. Antes de producción se debe confirmar si se representa mediante grupos, recursos de almacén, configuración externa o código no catalogado.
+## 7. Messages, comments, reads, and notifications
 
-## 7. Mensajes, comentarios, lecturas y notificaciones
+### 7.1 Existing outbound communication
 
-### 7.1 Comunicación saliente existente
+`mensaje_flujos` defines notification flows with event name, channel (`EMAIL`, `WHATSAPP`, or `SMS`), and target origins including `DOCUMENT`, `WORK_ORDER`, `ARTICLE_SERIAL`, `REQUEST_WASTE`, and `WORK_PRODUCTION`.
 
-`mensaje_flujos` define flujos de notificación con:
+Relevant flows include `NOTIFY_DOCUMENT_TRUNCATE`, `WORK_ORDER_TRUNCATED`, `MACHINE_PAUSED_LACK_OF_SUPPLIES`, `PRODUCTION_PLAN_CHANGED_LACK_OF_SUPPLIES`, `WORK_ORDER_CONSUMPTION_DIFFERENCE`, `WORK_ORDER_CONSUMPTION_ADJUSTMENT_REQUIRED`, `WORK_ORDER_CONSUMPTION_ADJUSTED`, `ARTICLE_SERIAL_OBSERVED`, `LAMINATING_PENDING_BALANCE`, `WORK_PRODUCTION_APPROVAL_REQUEST`, and `WORK_PRODUCTION_REJECTED`.
 
-- nombre del evento;
-- canal `EMAIL`, `WHATSAPP` o `SMS`;
-- origen objetivo, incluidos `DOCUMENT`, `WORK_ORDER`, `ARTICLE_SERIAL`, `REQUEST_WASTE` y `WORK_PRODUCTION`.
+`mensaje_plantillas` connects a flow to a template and custom input JSON. `notifyUsersInDocument(documentId, userReceivedId, event)` confirms that EmusaSoft can notify document-linked users, but its implementation and delivery guarantees are not visible.
 
-Flujos existentes relevantes para Monitor:
+### 7.2 Existing comments and reads
 
-- `NOTIFY_DOCUMENT_TRUNCATE`
-- `WORK_ORDER_TRUNCATED`
-- `MACHINE_PAUSED_LACK_OF_SUPPLIES`
-- `PRODUCTION_PLAN_CHANGED_LACK_OF_SUPPLIES`
-- `WORK_ORDER_CONSUMPTION_DIFFERENCE`
-- `WORK_ORDER_CONSUMPTION_ADJUSTMENT_REQUIRED`
-- `WORK_ORDER_CONSUMPTION_ADJUSTED`
-- `ARTICLE_SERIAL_OBSERVED`
-- `LAMINATING_PENDING_BALANCE`
-- `WORK_PRODUCTION_APPROVAL_REQUEST`
-- `WORK_PRODUCTION_REJECTED`
+`sys_comentarios` is a container of type `COMENTARIO` or `OBSERVACION`. `sys_comentario_usuarios` stores comment container, user, up to 500 characters of text, optional file, soft-delete status, actors, and lifecycle timestamps. Relevant operations include `getSysCommentUsersByCommentId`, `createSysCommentUser`, `editSysCommentUser`, and `deleteSysCommentUser`.
 
-`mensaje_plantillas` une un flujo con una plantilla y JSON de entrada personalizada.
+`sys_lecturas` is a read container; `sys_lectura_usuarios` connects reads to users and audit data. `addSysReadUser` records a read.
 
-`notifyUsersInDocument(documentId, userReceivedId, event)` confirma que existe una mutación para notificar usuarios vinculados con documentos. Su implementación y garantía de entrega no son visibles.
+### 7.3 Reuse boundary
 
-### 7.2 Comentarios y lectura existentes
+These primitives support document comments but do not explicitly cover Monitor conversations by machine/operation/shift/person, multiple incidents per conversation, replies, reactions, pins, stars, forwarding, private messages, edit/delete history, per-recipient delivery/read status, secure attachment metadata, or versioned system-message templates.
 
-`sys_comentarios` es un contenedor con tipo `COMENTARIO` u `OBSERVACION`.
+Forcing those capabilities into `sys_comentarios` would create coupling and ambiguous semantics. Monitor needs its own conversation model while retaining `sysUserId` and ERP references.
 
-`sys_comentario_usuarios` almacena:
+### 7.4 Recommended conversation model
 
-- contenedor de comentario;
-- usuario;
-- texto de hasta 500 caracteres;
-- archivo opcional;
-- borrado lógico;
-- actor y timestamps de creación, actualización y eliminación.
-
-Operaciones relevantes:
-
-- `getSysCommentUsersByCommentId`
-- `createSysCommentUser`
-- `editSysCommentUser`
-- `deleteSysCommentUser`
-
-`sys_lecturas` es un contenedor y `sys_lectura_usuarios` vincula lectura con usuario y auditoría. `addSysReadUser` agrega la lectura.
-
-### 7.3 Límite de reutilización
-
-Las primitivas existentes sirven para comentarios asociados a documentos, pero no cubren explícitamente todas las capacidades diseñadas para Monitor:
-
-- conversaciones por máquina, operación, turno o persona;
-- múltiples incidentes adjuntos a una conversación;
-- respuesta a un mensaje;
-- reacciones;
-- mensajes fijados o destacados;
-- reenvío;
-- mensajes privados;
-- edición y borrado con historial;
-- estado enviado, entregado y leído por destinatario;
-- adjuntos con metadata de seguridad;
-- mensajes generados por el sistema y versiones de su plantilla.
-
-Forzar esas capacidades dentro de `sys_comentarios` produciría acoplamiento y semántica ambigua. Monitor debe tener un modelo de conversación propio, conservando `sysUserId` y referencias ERP.
-
-### 7.4 Modelo recomendado de conversación
-
-| Entidad | Campos esenciales |
+| Entity | Essential fields |
 |---|---|
 | `monitor_conversation` | id, type, factory_id, operation_id, equipment_id, warehouse_id, shift_key, direct_pair_key, title, status, created_at, archived_at |
 | `monitor_conversation_participant` | conversation_id, sys_user_id, role, joined_at, left_at, muted_until, notification_level |
@@ -376,165 +267,117 @@ Forzar esas capacidades dentro de `sys_comentarios` produciría acoplamiento y s
 | `monitor_message_pin` | message_id, conversation_id, pinned_by, pinned_at |
 | `monitor_user_star` | message_id, sys_user_id, created_at |
 
-Reglas:
+Rules:
 
-- `client_message_id` es único por remitente para evitar duplicados en reconexiones.
-- Mensajes de sistema sólo se crean desde eventos de incidente firmados por el backend.
-- El borrado normal es lógico; la auditoría conserva actor y timestamp.
-- Un mensaje no cambia la condición del ERP ni resuelve un incidente.
-- Los recibos son por usuario, no un contador global.
-- La conversación y el incidente se relacionan muchos-a-muchos mediante una tabla explícita si una conversación puede agrupar más de un incidente.
+- `client_message_id` is unique per sender to prevent reconnection duplicates.
+- System messages are created only from backend-signed incident events.
+- Normal deletion is soft deletion; audit retains actor and timestamp.
+- A message never changes an ERP condition or resolves an incident.
+- Receipts are per user, not a global counter.
+- Use an explicit many-to-many table when a conversation can group multiple incidents.
 
-## 8. Modelo operacional relevante
+## 8. Relevant operational model
 
-### 8.1 Planta, operación, máquina, almacén y ubicación
+### 8.1 Plant, operation, machine, warehouse, and location
 
-- `plantas`: entidad organizativa superior.
-- `planta_usuarios`: usuarios autorizados por planta.
-- `operaciones`: códigos de operación, precedencias, sucesiones, unidad resultado, duración mínima, tolerancias, límite de merma y ordenamiento.
-- `equipos`: máquina, código, capacidad organizativa, velocidad, dimensiones y estado.
-- `operacion_equipos`: relación muchos-a-muchos operación-equipo.
-- `almacenes`: almacén por planta, tipo, recepción, equipo asociado y recurso de autorización.
-- `ubicaciones`: ubicación dentro de almacén, rol `INPUT`, `OUTPUT` o `STORAGE`, capacidad y contenedor de extrusión.
+- `plantas`: top-level organizational entity;
+- `planta_usuarios`: authorized users by plant;
+- `operaciones`: operation codes, precedence, successors, result unit, minimum duration, tolerances, waste limit, and ordering;
+- `equipos`: machine, code, organizational capacity, speed, dimensions, and status;
+- `operacion_equipos`: many-to-many operation-equipment relationship;
+- `almacenes`: warehouse by plant, type, reception, associated equipment, and authorization resource;
+- `ubicaciones`: warehouse location, `INPUT`, `OUTPUT`, or `STORAGE` role, capacity, and extrusion container.
 
-Relación importante: un almacén puede apuntar a un equipo mediante `almacenes.id_equipo`. Esa es la unión confirmada que permite resolver máquina hacia almacén. No confirma por sí sola la zona de influencia ni el turno activo.
+A warehouse can reference equipment through `almacenes.id_equipo`. This confirmed join resolves machine to warehouse, but does not prove influence zone or active shift.
 
-### 8.2 Producción y orden de trabajo
+### 8.2 Production and work orders
 
-`ordenes_produccion` / `WorkProduction`:
+`ordenes_produccion` / `WorkProduction` stores code, state, type, planning and execution, plant, planned quantity/meters, production result, structure, comments, attachments, reviews, logs, parent-child relationships, and work orders.
 
-- código, estado y tipo;
-- plan y ejecución;
-- planta;
-- cantidad planificada y metros;
-- resultado de producción;
-- estructura;
-- comentario, adjunto, revisiones y logs;
-- relación padre-hijos;
-- colección de órdenes de trabajo.
+`ordenes_trabajo` / `WorkOrder` connects production, operation, equipment, and document; sequence and code; planned and execution dates; closure dates; planned quantities, meters, and thousands; planned and consumed materials; reel tolerances; truncation, pause, closure, and closing user; neighboring orders; and materials, flows, outputs, serials, stocks, logs, and pre-reservations.
 
-`ordenes_trabajo` / `WorkOrder`:
+`getWorkOrder(workOrderId)` returns a broad aggregation and is the best confirmed starting point for a work-order snapshot. It does not replace incremental queries or events.
 
-- pertenece a producción, operación, equipo y documento;
-- secuencia y código;
-- fechas planificadas, ejecución, inicio efectivo, inicio de cierre y fin;
-- cantidades planificadas, metros y millares;
-- material planificado y consumido, incluidos valores ERP;
-- tolerancias de bobina;
-- truncamiento, pausa, cierre y usuario de cierre;
-- orden anterior y operación siguiente;
-- relaciones con materiales, flujos, salidas, seriales, stocks, logs y pre-reservas.
+### 8.3 Reservations, stock, and consumption
 
-`getWorkOrder(workOrderId)` devuelve una agregación amplia con documento, materiales, producción, operación, equipo, salidas, seriales, stocks, OTs vecinas, usuarios de cierre/truncamiento y resumen. Es el mejor punto de partida confirmado para el snapshot de una OT, pero no sustituye consultas incrementales ni eventos.
+- `pre_reserva_orden_trabajo`: source/destination work orders, material, stock, article, and `PENDIENTE` or `COMPLETADO` state;
+- `orden_trabajo_material_stock`: planned/pending demand by work order, article, unit, structure, and type;
+- `orden_trabajo_material_stock_contenedores`: container, location, current inventory, real/ideal closure, empty status, date, and user;
+- `orden_trabajo_materiales`: work-order article/serial/batch, planned/distributed/unplanned type, incoming/returned/consumed quantities, meters, thousands, reservation, closure, and consumption origin.
 
-### 8.3 Reserva, stock y consumo
+Consumption can be traced to serial, location, stock, container, pre-reservation, and creator. For time-based alerts, verify whether `fecha_creacion` represents the operational event or only persistence.
 
-- `pre_reserva_orden_trabajo`: enlaza OT origen y destino, material, stock, artículo y estado `PENDIENTE` o `COMPLETADO`.
-- `orden_trabajo_material_stock`: demanda planificada y pendiente por OT, artículo, unidad, estructura y tipo.
-- `orden_trabajo_material_stock_contenedores`: contenedor, ubicación, inventario actual, cierre real/ideal, vacío, fecha y usuario.
-- `orden_trabajo_materiales`: artículo/serial/lote de la OT, tipo planificado/distribuido/no planificado, cantidades entrante/devuelta/consumida, metros, millares, reserva, cierre y origen de consumo.
+### 8.4 Material flow
 
-La base confirma que el consumo puede ser trazado a serial, ubicación, stock, contenedor, pre-reserva y usuario creador. Para alertas temporales debe verificarse si `fecha_creacion` representa el instante operacional o únicamente persistencia.
+`flujo_materiales` owns a unique document and parent/root hierarchy. `flujo_materiales_detalles` stores article, serial, batch, initial/in-transit/received quantities, usage and inventory units, origin/destination warehouses and locations, work order/material, `TRANSITO`, `RECIBIDO`, `RECHAZADO`, or `ANULADO` state, receiver and receipt time, trigger documents, hierarchy, timestamps, and audit users. It is the primary source for A02 and part of A01/A05.
 
-### 8.4 Flujo de materiales
+### 8.5 Declared production, serials, and weighing
 
-`flujo_materiales` tiene un documento único y jerarquía padre/raíz.
+`orden_trabajo_salidas` stores planned/result output, meters, type, grammage, width, reservations, and observed/weighed/unweighed package counters. `orden_trabajo_salida_detalles` identifies output, article, quantity, weighed/observed/partial status, and actor.
 
-`flujo_materiales_detalles` contiene:
+`articulo_serial` is the reel/material traceability record: unique serial code, initial/available quantity, warehouse/location, status including `CONFIRMAR_PESO`, type (`PRODUCTO_EN_PROCESO`, `ARTICULO`, `MERMA`, `SALDO`, or `SOBRANTE`), current/source work orders, output, target operation, parent serial, last closure, dimensions, scan/user, deletion, and audit.
 
-- artículo, serial y lote;
-- cantidades iniciales, en tránsito y recibidas;
-- unidad de uso e inventario;
-- almacén y ubicación origen/destino;
-- OT y material de OT;
-- estado `TRANSITO`, `RECIBIDO`, `RECHAZADO` o `ANULADO`;
-- receptor y fecha de recepción;
-- documentos disparadores;
-- jerarquía padre-hijos;
-- timestamps y usuarios de auditoría.
+`balanza_cargas` has a one-to-one document relationship and stores weighing mode, tare/gross/net weights, warehouse, and location. `balanza_carga_detalle_registros` uniquely references `articulo_serial` and stores net/tare/gross weight, `BOX` or `REEL` type, output, and audit.
 
-Esta tabla es la fuente principal para A02 y parte de A01/A05.
+### 8.6 Pauses, closure, and plausibility
 
-### 8.5 Producción declarada, serial y pesaje
+- `equipo_pausa`: equipment, user, state, manual/automatic pause, start, resume, and source work order;
+- `orden_trabajo_etapa_logs`: stage changes caused by closure or pause;
+- `ordenes_produccion_logs`: state or information changes;
+- `documento_logs` and `documento_estados_logs`: cross-cutting history;
+- `equipos.velocidad_maquina`: machine-speed baseline for C06.
+- `operaciones.min_duracion_proceso_min`, reel tolerances, and waste threshold: operation-level parameters for C and D rules.
 
-`orden_trabajo_salidas` contiene salida planificada y resultante, metros, tipo, gramaje, ancho, reservas y contadores de bultos observados, pesados y sin pesar.
+## 9. Production-schema patterns and risks
 
-`orden_trabajo_salida_detalles` identifica salida, artículo, cantidad, pesado, observado, parcial y actor.
+### 9.1 Patterns Monitor must respect
 
-`articulo_serial` es el registro de trazabilidad de bobina o material:
+- numeric integer IDs;
+- millisecond dates through `datetime(3)`;
+- soft deletion with flag, user, and date;
+- creator/updater/deleter audit fields;
+- MySQL enums for stable states;
+- explicit foreign keys and indexes;
+- JSON for flexible configuration, not core relationships;
+- GraphQL relationships that aggregate broad models.
 
-- código serial único;
-- cantidades inicial y disponible;
-- almacén y ubicación;
-- estado, incluido `CONFIRMAR_PESO`;
-- tipo `PRODUCTO_EN_PROCESO`, `ARTICULO`, `MERMA`, `SALDO` o `SOBRANTE`;
-- OT actual, OT origen, salida, operación objetivo, serial padre y último cierre;
-- ancho, gramaje, metros, área y dimensiones;
-- escaneo y usuario;
-- borrado y auditoría.
+### 9.2 Risks not to copy without review
 
-`balanza_cargas` se vincula uno-a-uno con `documentos` y almacena modo de pesaje, pesos de tara, bruto, neto, almacén y ubicación.
+- `double` appears in money, quantities, and measures; Monitor must use `DECIMAL` for auditable balances.
+- MySQL dates lack time zones; Monitor stores UTC and preserves presentation zone. Lima uses `America/Lima`.
+- Timestamps may represent persistence rather than physical events.
+- Actors use both integers and external strings.
+- Soft delete and business state can coexist; queries must filter both correctly.
+- Database enums require migrations for new values.
+- Two tables lack formal primary keys.
+- The production dump may contain production data and operational secrets and must never enter CI, remote repositories, or shared environments.
+- The MCP catalog is behind the dump.
 
-`balanza_carga_detalle_registros` se vincula de forma única con `articulo_serial` y guarda peso neto, tara, bruto, tipo `BOX` o `REEL`, salida y auditoría.
+## 10. Target Monitor architecture
 
-### 8.6 Pausas, cierre y plausibilidad
+### 10.1 Components
 
-- `equipo_pausa`: equipo, usuario, estado, pausa manual/automática, inicio, reanudación y OT origen.
-- `orden_trabajo_etapa_logs`: cambio de etapa por cierre o pausa.
-- `ordenes_produccion_logs`: cambio de estado o información.
-- `documento_logs` y `documento_estados_logs`: historial transversal.
-- `operaciones.velocidad_maquina`, `min_duracion_proceso_min`, tolerancias y umbral de merma: parámetros base para reglas C y D.
-
-## 9. Patrones y riesgos del esquema productivo
-
-### 9.1 Patrones que Monitor debe respetar
-
-- IDs numéricos enteros.
-- Fechas con milisegundos mediante `datetime(3)`.
-- Borrado lógico con `eliminado`, usuario y fecha.
-- Auditoría por creador, actualizador y eliminador.
-- Enums de MySQL para estados estables.
-- Claves foráneas e índices explícitos.
-- JSON para configuraciones flexibles, no para relaciones centrales.
-- Relaciones GraphQL que agregan modelos amplios.
-
-### 9.2 Riesgos que no se deben copiar sin revisión
-
-- `double` aparece en dinero, cantidades y medidas. Monitor debe usar `DECIMAL` para valores auditables y fórmulas de balance.
-- Fechas MySQL sin zona horaria. Monitor debe almacenar UTC y conservar la zona de presentación; la planta de Lima usa `America/Lima`.
-- Timestamps no siempre indican evento físico; pueden indicar persistencia.
-- Algunos actores se guardan como enteros y otros como strings externos.
-- Soft delete y estado pueden coexistir; las consultas deben filtrar ambos correctamente.
-- Enums de base requieren migraciones para nuevos valores.
-- Dos tablas no tienen PK formal.
-- El dump contiene datos productivos y secretos operacionales potenciales; no debe cargarse en CI, repositorios remotos ni entornos compartidos.
-- El catálogo MCP está desfasado respecto del dump.
-
-## 10. Arquitectura objetivo de Monitor
-
-### 10.1 Componentes
-
-| Componente | Responsabilidad |
+| Component | Responsibility |
 |---|---|
-| Monitor Web | Dashboard, lista de conversaciones, detalle, evidencia y enlaces ERP. |
-| Monitor API | Contrato de UI, autorización, consultas, historial y comandos persistentes. GraphQL o REST se decide por ADR. |
-| Identity Adapter | Autentica al usuario según el contrato que se defina y lo mapea al usuario y scopes operacionales de EmusaSoft. |
-| Emusa Read Model Adapter | Consulta la base de EmusaSoft con credenciales estrictamente read-only para snapshots, reconciliación y contexto. |
-| Emusa SSE Adapter | Mantiene la conexión SSE directa, valida el contrato, registra cursores y normaliza eventos. |
-| Normalizer | Convierte payloads ERP en eventos canónicos de Monitor. |
-| Detection Engine | Evalúa reglas deterministas, de deadline y estadísticas. |
-| Incident Service | Deduplica, actualiza, correlaciona, resuelve y audita incidentes. |
-| Routing Service | Resuelve destinatarios por planta, OT, turno, actor, operación, máquina y almacén. |
-| Conversation Service | Conversaciones, mensajes, adjuntos, lecturas, reacciones y mensajes del sistema. |
-| Notification Worker | Entrega in-app y, cuando corresponda, email, WhatsApp o SMS mediante proveedores propios de Monitor. |
-| Unresolved Closure Read Model | Proyecta y filtra alertas cerradas sin resolución para revisión del equipo de EmusaSoft. |
-| WebSocket Gateway | Recibe señales bidireccionales y distribuye cambios autorizados a clientes conectados. |
-| Redis de Monitor | Coordina fan-out, presencia y escalamiento del gateway; no conserva el historial canónico. |
-| Scheduler | Checkpoints de tiempo, reevaluaciones, escalación y reconciliación. |
-| Monitor DB | Estado propio, auditoría, cursores, reglas, incidentes y mensajes. |
-| Observability | Métricas, logs estructurados, trazas, healthchecks y registro de jobs fallidos. |
+| Monitor Web | Dashboard, chat list, chat detail, roster, evidence, and ERP links. |
+| Monitor API | UI contract, authorization, queries, history, and persistent commands; GraphQL or REST selected by ADR. |
+| Identity Adapter | Authenticates users and maps them to EmusaSoft users and operational scopes. |
+| Emusa Read Model Adapter | Uses strict read-only credentials for snapshots, reconciliation, and context. |
+| Emusa SSE Adapter | Maintains SSE, validates contracts, records cursors, and normalizes events. |
+| Normalizer | Converts ERP payloads into canonical Monitor events. |
+| Detection Engine | Evaluates deterministic, deadline, physical, and statistical rules. |
+| Incident Service | Deduplicates, updates, correlates, resolves, and audits incidents. |
+| Routing Service | Resolves recipients by plant, work order, shift, actor, operation, machine, warehouse, and roster. |
+| Conversation Service | Owns conversations, messages, attachments, reads, reactions, and system messages. |
+| Notification Worker | Delivers in-app and approved external channels through Monitor-owned providers. |
+| Unresolved Closure Read Model | Filters closed-without-resolution incidents for EmusaSoft review. |
+| WebSocket Gateway | Receives bidirectional signals and distributes authorized changes. |
+| Monitor Redis | Coordinates fan-out, presence, and scaling; never stores canonical history. |
+| Scheduler | Runs deadlines, reevaluations, escalation, and reconciliation. |
+| Monitor DB | Owns Monitor state, audit, cursors, rules, incidents, messages, and roster assignments. |
+| Observability | Metrics, structured logs, traces, health checks, and failed-job records. |
 
-### 10.2 Diagrama de contexto
+### 10.2 Context diagram
 
 ```mermaid
 flowchart LR
@@ -551,195 +394,151 @@ flowchart LR
     WS <--> WEB
 ```
 
-### 10.3 Flujo de datos
+### 10.3 Data flow
 
-1. Un cambio ocurre en EmusaSoft y se publica por SSE mediante su infraestructura Redis.
-2. Emusa SSE Adapter consume directamente el stream, valida la versión y registra el cursor recibido.
-3. El normalizador crea un evento canónico con `source`, `source_id`, `occurred_at`, `observed_at`, `version` y payload mínimo.
-4. Monitor persiste el evento de entrada con una clave idempotente antes de procesarlo.
-5. Si el payload está incompleto o existe un gap, Emusa Read Model Adapter consulta la base read-only y reconcilia una ventana acotada.
-6. El motor selecciona reglas por tipo de evento y checkpoints activos.
-7. Cada regla produce `pass`, `warning`, `possible_error`, `error` o `insufficient_evidence`.
-8. Incident Service busca la clave de incidente y crea o actualiza una sola cadena.
-9. Se persiste evidencia inmutable y snapshot de versión de regla.
-10. Routing Service resuelve participantes nominales y deduplica usuarios.
-11. Se escribe un mensaje de sistema en la conversación correspondiente y se programan las notificaciones permitidas.
-12. Después del commit, el gateway WebSocket publica el cambio sólo a sesiones autorizadas mediante Redis de Monitor.
-13. Los comandos del cliente entran por API o WebSocket, se validan y persisten antes de emitir su confirmación.
-14. Cuando nueva evidencia hace pasar la regla, el incidente se marca resuelto automáticamente.
-15. Las alertas cerradas sin resolución quedan disponibles inmediatamente en una vista read-only para que el equipo de EmusaSoft determine cualquier acción fuera de Monitor.
+1. EmusaSoft changes and publishes an SSE event through its Redis-backed infrastructure.
+2. The SSE adapter consumes the stream, validates the version, and records the cursor.
+3. The normalizer creates a canonical event with `source`, `source_id`, `occurred_at`, `observed_at`, `version`, and a minimum payload.
+4. Monitor persists the input event with an idempotency key before processing.
+5. If context is incomplete or a gap exists, the read-model adapter reconciles a bounded window.
+6. The engine selects rules by event type and active checkpoints.
+7. Each rule produces a reproducible result and attaches its configured descriptive label. User-visible labels such as `Por vencer`, `Error posible`, or `Error` are explanatory text, not lifecycle states.
+8. The incident service creates or updates one incident chain using its deterministic key.
+9. Monitor persists immutable evidence and a rule-version snapshot.
+10. The routing service resolves named participants and deduplicates users.
+11. Monitor writes a system message and schedules allowed notifications.
+12. After commit, WebSockets publish only to authorized sessions through Monitor Redis.
+13. Client commands arrive by API or WebSocket and are validated and persisted before confirmation.
+14. When new evidence makes the rule pass, Monitor resolves the incident automatically.
+15. Closed-without-resolution incidents immediately enter the read-only view for EmusaSoft follow-up outside Monitor.
 
-### 10.4 Regla de frontera de datos
+### 10.4 Data-boundary rule
 
-- **EmusaSoft:** fuente de verdad de OT, movimientos, consumos, producción, seriales, pesajes y demás datos operacionales.
-- **Monitor:** fuente de verdad de definiciones de regla, evaluaciones, incidentes, evidencia congelada, conversaciones, mensajes, lecturas, entregas y cierre administrativo.
-- **No permitido:** escritura directa desde Monitor en tablas productivas de EmusaSoft.
-- **Acceso permitido:** SSE de EmusaSoft y consultas SQL con un usuario read-only; nunca desde el navegador.
-- **Regularización:** fuera del alcance de Monitor; el equipo de EmusaSoft decide y ejecuta cualquier ajuste usando sus propios procesos.
-- **Redis:** transporte y coordinación efímera; nunca fuente de verdad operacional ni comunicacional.
-- **Corrección:** se realiza en EmusaSoft y Monitor observa el cambio.
-- **Cierre sin resolución:** sólo cambia el estado administrativo en Monitor y conserva que la regla ERP continuó fallando.
+- **EmusaSoft:** source of truth for work orders, movements, consumption, production, serials, weighing, and other operational data.
+- **Monitor:** source of truth for rule definitions, evaluations, incidents, frozen evidence, conversations, messages, reads, deliveries, roster assignments, and administrative closures.
+- **Forbidden:** direct Monitor writes to EmusaSoft production tables.
+- **Allowed:** EmusaSoft SSE and backend-only SQL queries using a read-only user.
+- **Adjustments:** entirely outside Monitor; EmusaSoft decides and executes them.
+- **Redis:** ephemeral transport and coordination, never an operational or communication source of truth.
+- **Correction:** performed in EmusaSoft and later observed by Monitor.
+- **Closure without resolution:** changes only the Monitor lifecycle and records that the ERP rule still failed.
 
-## 11. Modelo de incidentes
+## 11. Incident model
 
-### 11.1 Entidades recomendadas
+### 11.1 Recommended entities
 
-| Entidad | Propósito |
+| Entity | Purpose |
 |---|---|
-| `monitor_rule_definition` | Código vigente del catálogo, versión, categoría, certeza, parámetros y estado. |
-| `monitor_rule_parameter` | Parámetro por planta, operación, máquina o regla con vigencia. |
-| `monitor_source_event` | Evento canónico idempotente recibido del ERP. |
-| `monitor_evaluation` | Resultado de evaluar regla, entradas, fórmula, salida y duración. |
-| `monitor_incident` | Incidente deduplicado y estado actual. |
-| `monitor_incident_subject` | Referencias a OT, serial, material, flujo, máquina, almacén y documento. |
-| `monitor_incident_evidence` | Evidencia inmutable y snapshot explicable. |
-| `monitor_incident_transition` | Historial completo de estados y actor. |
-| `monitor_incident_relation` | Causa, consecuencia, reemplazo, correlación o duplicado. |
-| `monitor_incident_recipient` | Destinatario resuelto, razón y prioridad. |
-| `monitor_admin_closure` | Motivo, comentario, administrador, cadena y evidencia preservada. |
-| `monitor_detector_cursor` | Cursor por fuente y detector. |
-| `monitor_delivery` | Entrega por canal, intentos, proveedor, estado y error. |
+| `monitor_rule_definition` | Active catalog code, version, category, parameters, configured label, and status. |
+| `monitor_rule_parameter` | Effective-dated parameter by plant, operation, machine, or rule. |
+| `monitor_source_event` | Idempotent canonical ERP event. |
+| `monitor_evaluation` | Inputs, formula, output, confidence, duration, and internal disposition of a rule evaluation. |
+| `monitor_incident` | Deduplicated incident and current lifecycle state. |
+| `monitor_incident_subject` | Work order, serial, material, flow, machine, warehouse, and document references. |
+| `monitor_incident_evidence` | Immutable explainable evidence. |
+| `monitor_incident_transition` | Complete lifecycle history and actor. |
+| `monitor_incident_relation` | Cause, consequence, replacement, correlation, or duplicate. |
+| `monitor_incident_recipient` | Resolved recipient and routing reason. |
+| `monitor_admin_closure` | Reason, comment, administrator, chain, and preserved evidence. |
+| `monitor_detector_cursor` | Cursor by source and detector. |
+| `monitor_delivery` | Channel, attempt, provider, delivery status, and error. |
 
-### 11.2 Clave de deduplicación
+### 11.2 Deduplication key
 
-La clave debe ser determinista y versionada:
+The key is deterministic and versioned:
 
 `factory + rule_family + work_order + primary_subject + workflow_stage + rule_generation`
 
-`primary_subject` puede ser serial, material requerido, máquina, contenedor o par de OTs. La clave concreta se define por regla.
+`primary_subject` can be a serial, required material, machine, container, or pair of work orders. Each rule defines its concrete key.
 
-Reglas de correlación:
+Correlation rules:
 
-- A01 cambia de razón en los checkpoints de 60 y 30 minutos; no crea un segundo incidente.
-- A03 se cierra con el primer consumo válido y se suprime cuando A07 aporta evidencia más fuerte.
-- D03 se suprime cuando A03, A04, A05, A06, A07, D01 o D02 explica el mismo balance.
-- Una regla determinista reemplaza o enriquece una advertencia estadística genérica.
-- Un evento histórico ya cerrado sin resolución no reabre; un evento nuevo crea otra generación.
+- A01 changes reason at the 60- and 30-minute checkpoints rather than creating another incident.
+- A03 closes with first valid consumption and is suppressed when A07 provides stronger evidence.
+- D03 is suppressed when A03, A04, A05, A06, A07, D01, or D02 explains the same balance.
+- A deterministic rule replaces or enriches a generic statistical alert.
+- Closed historical evidence does not reopen; a genuinely new event creates another generation.
 
-### 11.3 Estados
+### 11.3 Incident lifecycle and internal disposition
 
-Estados técnicos recomendados:
+The incident lifecycle contains exactly the three states represented in the product and UX documentation:
 
-- `APPROACHING_DEADLINE`
-- `POSSIBLE_ERROR`
-- `ERROR`
+- `OPEN`
 - `RESOLVED`
 - `CLOSED_WITHOUT_RESOLUTION`
-- `SUPPRESSED_BY_SPECIFIC_INCIDENT`
-- `INVALIDATED`
 
-`RESOLVED` sólo ocurre cuando la condición vuelve a pasar. `CLOSED_WITHOUT_RESOLUTION` requiere autorización, razón estandarizada, comentario, actor, timestamp y evidencia. Ninguno modifica registros ERP.
+The code-specific descriptive label is stored and displayed separately. `RESOLVED` occurs only when the rule passes again. `CLOSED_WITHOUT_RESOLUTION` requires authorization, standardized reason, comment, actor, timestamp, and evidence. Neither state changes ERP records.
 
-### 11.4 Vista de cierres sin resolución
+Suppression and invalidation are internal evaluation dispositions, not incident lifecycle states and not user-visible status filters:
 
-La vista debe mostrar, como mínimo:
+- `SUPPRESSED_BY_SPECIFIC_INCIDENT` prevents a generic rule result from creating or retaining a duplicate incident when a more specific incident explains the same evidence.
+- `INVALIDATED` records that an evaluation result was withdrawn because its evidence was superseded, malformed, or associated incorrectly.
 
-- ID, regla, estado, motivo, comentario, administrador y fecha de cierre;
-- planta, OT, documento, material, reel, máquina, almacén y ubicación relacionados;
-- condición detectada, valores observados, diferencia y unidades;
-- evidencia congelada y enlaces profundos hacia EmusaSoft;
-- incidentes correlacionados y cadena de cierre;
-- filtros por fecha, planta, regla, OT, material, máquina y administrador;
-- búsqueda, ordenamiento, paginación y exportación controlada.
+Store disposition on `monitor_evaluation`, separately from incident lifecycle, and retain its reason, actor or process, timestamp, and correlation target for audit. A suppressed or invalidated evaluation does not create a new incident and does not invent a lifecycle transition for an existing incident.
 
-La vista es informativa y read-only. No contiene botones para ajustar, aprobar, enviar, reintentar ni marcar una regularización como ejecutada. Cualquier proceso posterior pertenece a EmusaSoft.
+### 11.4 Unresolved-closure view
 
-### 11.5 Evidencia explicable
+At minimum, show incident ID, rule, lifecycle, reason, comment, administrator, closure date, related plant/work order/document/material/reel/machine/warehouse/location, detected condition, observed values, difference and units, frozen evidence, EmusaSoft links, correlated incidents, closure chain, search, sorting, pagination, controlled export, and filters.
 
-Cada evaluación debe guardar:
+The view is informational and read-only. It contains no controls to adjust, approve, submit, retry, or mark regularization as complete. Every later process belongs to EmusaSoft.
 
-- versión de regla;
-- parámetros efectivos y su fuente;
-- IDs ERP usados;
-- timestamps `occurred_at`, `observed_at` y `evaluated_at`;
-- fórmula legible;
-- valores, unidades y tolerancias;
-- eventos SSE y consultas read-only usados, sin credenciales;
-- hash del snapshot;
-- resultado y nivel de confianza;
-- razón de evidencia insuficiente, si aplica.
+### 11.5 Explainable evidence
 
-## 12. Mapeo de reglas a fuentes
+Each evaluation stores rule version, effective parameters and source, ERP IDs, `occurred_at`, `observed_at`, and `evaluated_at`, readable formula, values/units/tolerances, SSE events and read-only queries without credentials, snapshot hash, result/confidence, and insufficient-evidence reason when applicable.
 
-| Regla | Fuentes principales | Tipo | Bloqueador previo a producción |
+## 12. Rule-to-source mapping
+
+| Rule | Primary sources | Type | Pre-production blocker |
 |---|---|---|---|
-| A01 | OT planificada, `pre_reserva_orden_trabajo`, stock, `flujo_materiales_detalles` | Deadline/determinista | Confirmar disponibilidad, compra pendiente y timestamp de despacho. |
-| A02 | `flujo_materiales_detalles` | Determinista | Confirmar instante de envío y exclusión de movimientos no ligados a OT. |
-| A03 | `ordenes_trabajo`, `orden_trabajo_materiales` | Determinista | Confirmar estado activo y timestamp del primer consumo. |
-| A04 | consumos, salidas, seriales, pesajes, merma, capacidad rebobinador | Inferida | Fuente de capacidad y tolerancia estadística. |
-| A05 | `articulo_serial`, salidas, pesaje, flujo y ubicación | Deadline/determinista | Definir si pesaje y movimiento son deadlines independientes y timestamp de pickup. |
-| A06 | salidas tipo merma, `solicitudes_merma`, seriales y pesaje | Mixta | Señal de bolsa cerrada no declarada. |
-| A07 | consumos, producción buena, merma y pesajes | Mixta | Tolerancia, pesos verificados y tratamiento de estimaciones. |
-| B01 | OT, plan aprobado y versiones/secuencia | Determinista | Fuente exacta de “último plan aprobado”. |
-| B02 | fechas planificadas/ejecutadas, pausa, plan | Deadline | Política de reprogramación y tolerancia. |
-| B03 | equipo, OT activa, pausas y plan | Deadline | Definir intervalo esperado y estados que excluyen alerta. |
-| C01 | `balanza_carga_detalle_registros`, serial, salida, OT, equipo | Estadística/física | Segmentación, mínimo de muestra y hard limits. |
-| C02 | merma, pesaje, matriz de waste y histórico | Estadística | Confirmar joins de matriz y versión del baseline. |
-| C06 | OT inicio/fin, `equipo_pausa`, metros/kg, velocidad máquina | Estadística/física | Confirmar pausas completas y unidades. |
-| D01 | OT cierre, materiales consumidos, peso/ancho/gramaje | Determinista con tolerancia | Fórmula, core, remanentes y unidades. |
-| D02 | reserva, recepción, consumo, producción completa y truncamiento | Determinista | Criterio exacto de “producción completa”. |
-| D03 | input, buena producción, merma y pesajes | Mixta | Validar tolerancia inicial de 5% y estimaciones sin peso. |
-| E01 | receta, OT futuras, almacén de seguridad, stock | Deadline | Confirmar mapeo máquina-almacén y query de stock. |
-| E02 | receta, contenedores y snapshot de apertura | Determinista | Confirmar campo inmutable de apertura; si no existe, requiere cambio ERP. |
-| E03 | cierre de contenedor, apertura siguiente, movimientos | Determinista | Depende del snapshot inmutable de E02. |
-| E04 | receta snapshot, apertura, adiciones, cierre y tornillo | Mixta | Confirmar todos los eventos por resina/tornillo y tolerancia. |
+| A01 | planned work order, `pre_reserva_orden_trabajo`, stock, `flujo_materiales_detalles` | Deadline/deterministic | Confirm availability, pending purchase, and dispatch timestamp. |
+| A02 | `flujo_materiales_detalles` | Deterministic | Confirm send timestamp and exclusion of non-work-order movements. |
+| A03 | `ordenes_trabajo`, `orden_trabajo_materiales` | Deterministic | Confirm active state and first-consumption timestamp. |
+| A04 | consumption, output, serials, weighing, waste, rewinder capacity | Inferred | Capacity source and statistical tolerance. |
+| A05 | `articulo_serial`, output, weighing, flow, location | Deadline/deterministic | Decide independent weighing/movement deadlines and pickup timestamp. |
+| A06 | waste output, `solicitudes_merma`, serials, weighing | Mixed | Signal for a closed but undeclared waste bag. |
+| A07 | consumption, good production, waste, weighing | Mixed | Tolerance, verified weights, and estimate treatment. |
+| B01 | work order, approved plan, versions/sequence | Deterministic | Exact source of the latest approved plan. |
+| B02 | planned/executed dates, pause, plan | Deadline | Rescheduling policy and tolerance. |
+| B03 | equipment, active work order, pauses, plan | Deadline | Expected interval and exclusion states. |
+| C01 | scale records, serial, output, work order, equipment | Statistical/physical | Segmentation, minimum sample, and hard limits. |
+| C02 | waste, weighing, quotation matrix, history | Statistical | Matrix joins and baseline version. |
+| C06 | work-order start/end, pauses, meters/kg, machine speed | Statistical/physical | Complete pauses and units. |
+| D01 | closure, consumed materials, weight/width/grammage | Deterministic with tolerance | Formula, core, remnants, and units. |
+| D02 | reservation, receipt, consumption, completion, truncation | Deterministic | Exact complete-production criterion. |
+| D03 | input, good production, waste, weighing | Mixed | Validate initial 5% tolerance and unweighed estimates. |
+| D04 | input reels, run meters, declared remnants, weighing | Deterministic with tolerance | Remnant conversion and lock behavior. |
+| E01 | recipe, future work orders, safety warehouse, stock | Deadline | Machine-warehouse mapping and stock query. |
+| E02 | recipe, containers, opening snapshot | Deterministic | Immutable opening field or required ERP change. |
+| E03 | previous close, next opening, movements | Deterministic | Depends on E02 immutable snapshot. |
+| E04 | recipe snapshot, opening, additions, close, screw | Mixed | Complete resin/screw events and tolerance. |
 
-## 13. Estrategia de ingestión y tiempo real
+## 13. Ingestion and real-time strategy
 
-### 13.1 Entrada desde EmusaSoft: SSE
+### 13.1 Input from EmusaSoft: SSE
 
-Monitor consumirá directamente el SSE de EmusaSoft. El contrato mínimo que debe definirse antes de implementar contiene:
+Before implementation, define endpoint, service authentication, globally unique `event_id`, event type/version, `occurred_at`, `published_at`, affected entity/ID/plant, minimum payload or context reference, `Last-Event-ID`, retention/replay, ordering/duplicate policy, heartbeats, timeout, reconnection/backoff, environments, ownership, and version-change procedure.
 
-- endpoint y autenticación de servicio;
-- `event_id` globalmente único o clave equivalente;
-- tipo y versión del evento;
-- `occurred_at` en origen y `published_at`;
-- entidad, ID y planta afectada;
-- payload mínimo o referencia suficiente para consultar contexto;
-- semántica de `Last-Event-ID`, retención y replay;
-- política explícita de orden y duplicados;
-- heartbeats, timeout, reconexión y backoff;
-- ambientes, ownership y procedimiento de cambio de versión.
+Assume at-least-once delivery: deduplicate by `event_id`, tolerate reordering, and persist before processing or downstream publication. SSE has no per-message acknowledgement. If EmusaSoft replay is insufficient, recover gaps through read-only reconciliation.
 
-El adaptador debe asumir entrega al menos una vez: deduplicar por `event_id`, tolerar reordenamiento y persistir antes de cualquier procesamiento o publicación downstream. SSE no ofrece confirmación por mensaje. Si EmusaSoft no ofrece replay suficiente, Monitor recupera el gap mediante reconciliación read-only.
+### 13.2 Read-only reconciliation
 
-### 13.2 Reconciliación contra la base read-only
+SSE reduces latency but does not prove completeness. Monitor must query from the backend using a no-write SQL user, prefer a read-only replica when available, persist cursors/checkpoints by domain, reconcile recent and post-downtime windows, reevaluate deadlines through the scheduler even without events, use bounded indexed incremental queries, apply backoff/jitter/concurrency limits/timeouts, and measure lag, gaps, duplicates, and SSE/database divergence.
 
-El SSE reduce latencia, pero no demuestra por sí solo completitud. Monitor debe:
+Scraping, browser SQL, and full-table polling are forbidden. GraphQL can complement validation but is not the confirmed runtime ingestion boundary.
 
-- consultar desde backend con un usuario SQL sin permisos de escritura;
-- preferir una réplica read-only cuando EmusaSoft la tenga disponible;
-- persistir cursores y checkpoints por dominio;
-- reconciliar ventanas recientes y periodos posteriores a downtime;
-- reevaluar deadlines mediante scheduler aunque no llegue un evento;
-- usar índices y consultas incrementales acotadas;
-- aplicar backoff, jitter, límites de concurrencia y query timeouts;
-- medir retraso, gaps, duplicados y divergencias entre SSE y base.
+### 13.3 Client output and interaction: WebSockets
 
-No se permite scraping, acceso SQL desde el navegador ni polling completo de tablas. GraphQL puede usarse como herramienta complementaria de validación, pero no es la frontera runtime confirmada para la ingestión.
+Monitor owns a separate client contract including `incident.created`, `incident.updated`, `incident.resolved`, `message.created`, `message.updated`, `receipt.updated`, `presence.updated`, and `source.freshness.changed`.
 
-### 13.3 Salida e interacción con clientes: WebSockets
+Clients subscribe by user and authorized scopes. Messages and receipts are accepted only after server-side authentication and authorization. Persistent commands include `client_message_id` or another idempotency key. On reconnection, clients send their last cursor, recover gaps by API, and resume the stream. WebSockets alone never guarantee consistency.
 
-El contrato de clientes es propio de Monitor y distinto del SSE de EmusaSoft:
+Monitor Redis distributes events and ephemeral presence. Confirmed history lives in Monitor DB. EmusaSoft Redis is not shared unless an explicit operating contract says otherwise.
 
-- `incident.created`
-- `incident.updated`
-- `incident.resolved`
-- `message.created`
-- `message.updated`
-- `receipt.updated`
-- `presence.updated`
-- `source.freshness.changed`
+## 14. Recommended Monitor API
 
-El cliente se suscribe por usuario y scopes autorizados. Los mensajes y recibos se aceptan sólo después de autenticación y autorización server-side. Cada comando persistente lleva `client_message_id` o clave idempotente. Tras reconectar, el cliente envía su último cursor, recupera el gap por API y reanuda el stream. Nunca se confía sólo en WebSockets para consistencia.
+GraphQL aligns with EmusaSoft but is not mandatory. Phase 0 selects GraphQL or REST based on what the team can operate and test with the least complexity.
 
-Redis de Monitor distribuye eventos entre instancias y mantiene presencia efímera. El historial y los estados confirmados viven en Monitor DB. El Redis usado internamente por EmusaSoft no se considera compartido con Monitor salvo contrato operativo explícito.
-
-## 14. API recomendada de Monitor
-
-GraphQL es una opción coherente con EmusaSoft, pero no es una restricción impuesta al nuevo sistema. La Fase 0 decidirá GraphQL o REST con un criterio simple: escoger el contrato que el equipo pueda operar y probar con menor complejidad. Las capacidades mínimas son las mismas en ambos casos.
-
-Queries mínimas:
+Minimum queries:
 
 - `monitorContext`
 - `incidents(filter, page)`
@@ -750,7 +549,7 @@ Queries mínimas:
 - `ruleDefinitions`
 - `sourceFreshness`
 
-Mutations mínimas:
+Minimum commands:
 
 - `sendMessage`
 - `editMessage`
@@ -759,412 +558,243 @@ Mutations mínimas:
 - `reactToMessage`
 - `pinMessage`
 - `starMessage`
-- `closeIncidentWithoutResolution` sólo si se aprueba para la primera versión
-- `reopenAdministrativeClosure` sólo para administradores y con auditoría
+- `closeIncidentWithoutResolution`
+- `reopenAdministrativeClosure` for authorized administrators with audit
 
-Las operaciones de corrección de OT, material, consumo, producción o pesaje no pertenecen a Monitor v1.
+Work-order, material, consumption, production, weighing, inventory, and accounting corrections never belong to Monitor.
 
-## 15. Seguridad y privacidad
+## 15. Security and privacy
 
-- Las credenciales SSE y SQL de EmusaSoft sólo viven en backend o secret manager.
-- El navegador nunca recibe credenciales de servicio.
-- Acceso de base de datos productiva: ninguno desde la UI; read-only desde adaptadores autorizados.
-- Least privilege para SSE, API y bases de datos.
-- TLS en tránsito y cifrado en reposo.
-- Separación de ambientes y secretos.
-- Logs sin tokens, cuerpos sensibles ni PII innecesaria.
-- Sanitización de texto y archivos.
-- Antivirus/scan para adjuntos.
-- Rate limits para mensajes, búsquedas y mutaciones.
-- Auditoría inmutable para cierre administrativo, cambios de regla y destinatarios.
-- Retención definida para mensajes, evidencia y entregas.
-- Exportación de cierres sin resolución restringida por rol, auditada y sin credenciales ni PII innecesaria.
-- Backups y pruebas periódicas de restauración.
-- El dump de producción se mantiene fuera de Git y fuera de artefactos de CI.
+- EmusaSoft SSE and SQL credentials live only in backend secret management.
+- The browser never receives service credentials.
+- The UI has no production database access; adapters have read-only access.
+- Apply least privilege, TLS in transit, encryption at rest, environment separation, and secret separation.
+- Logs exclude tokens, sensitive bodies, and unnecessary personal data.
+- Sanitize text and files; scan attachments for malware.
+- Rate-limit messages, searches, and commands.
+- Keep immutable audit for administrative closure, rule changes, and routing.
+- Define retention for messages, evidence, and deliveries.
+- Restrict and audit unresolved-closure exports.
+- Test backups and restoration regularly.
+- Keep the production dump outside Git and CI artifacts.
 
-## 16. Observabilidad y objetivos operativos
+## 16. Observability and operating objectives
 
-Métricas mínimas:
+Minimum metrics include ERP-to-observation lag, observation-to-incident lag, cursor age, evaluations by rule/result, incident lifecycle counts, prevented duplicates, notification attempts/delivery/failures, real-time connections/reconnections, message send/delivery/read counts, GraphQL errors, pending/failed jobs, p50/p95/p99 response time, and reconciliation discrepancies.
 
-- retraso entre evento ERP y observación;
-- retraso entre observación e incidente;
-- edad del cursor por fuente;
-- evaluaciones por regla y resultado;
-- incidentes creados, actualizados, resueltos, suprimidos y cerrados;
-- duplicados evitados;
-- notificaciones intentadas, entregadas y fallidas;
-- conexiones realtime y reconexiones;
-- mensajes enviados, entregados y leídos;
-- errores GraphQL por operación;
-- jobs pendientes y fallidos;
-- tiempo de respuesta p50/p95/p99;
-- discrepancias detectadas en reconciliación.
+Proposed pilot SLOs, pending approval:
 
-SLOs propuestos para el piloto, pendientes de aprobación:
+- 99.5% monthly Monitor availability;
+- 95% of supported events evaluated within 60 seconds;
+- 99% of deterministic incidents without duplicates for the same key;
+- 100% audit coverage for transitions and administrative closures; and
+- gap recovery after reconnection without losing messages or incidents.
 
-- 99.5% de disponibilidad mensual del Monitor.
-- 95% de eventos soportados convertidos en evaluación en menos de 60 segundos.
-- 99% de incidentes deterministas sin duplicación para la misma clave.
-- 100% de transiciones y cierres administrativos auditados.
-- Recuperación de gap después de reconexión sin pérdida de mensajes o incidentes.
+## 17. Testing strategy
 
-## 17. Estrategia de pruebas
+### 17.1 Contracts
 
-### 17.1 Contratos
+- snapshot the EmusaSoft GraphQL schema;
+- validate every adapter operation;
+- detect field, nullability, enum, and argument changes;
+- test against the current catalog and database schema.
 
-- Snapshot de schema GraphQL de EmusaSoft.
-- Validación de operaciones usadas por cada adaptador.
-- Alertas cuando cambian campos, nullability, enums o argumentos.
-- Compatibilidad con catálogo y esquema de base vigentes.
+### 17.2 Detectors
 
-### 17.2 Detectores
+- anonymized fixtures per rule;
+- exact time/tolerance boundaries;
+- idempotency and deduplication properties;
+- reordered, duplicated, and delayed events;
+- late correction and automatic resolution;
+- D03 suppression by a specific cause;
+- effective-dated parameter changes.
 
-- Fixtures anonimizados por regla.
-- Pruebas de límites exactos de tiempo y tolerancia.
-- Propiedades de idempotencia y deduplicación.
-- Reordenamiento, duplicación y retraso de eventos.
-- Corrección tardía y resolución automática.
-- Supresión D03 por causa específica.
-- Cambio de parámetros con vigencia temporal.
+### 17.3 Integration
 
-### 17.3 Integración
+- authorized EmusaSoft sandbox or recordings;
+- network failures, timeouts, rate limits, and schema drift;
+- post-downtime reconciliation;
+- real permission and recipient resolution;
+- no duplicate notification through multiple routing paths.
 
-- EmusaSoft sandbox o respuestas grabadas autorizadas.
-- Fallos de red, timeout, rate limit y schema drift.
-- Reconciliación después de downtime.
-- Resolución real de permisos y destinatarios.
-- Notificaciones sin duplicar usuario por múltiples rutas.
+### 17.4 Real-time and messaging
 
-### 17.4 Realtime y mensajes
-
-- Reconexión y recuperación por cursor.
-- Mensaje duplicado por retry del cliente.
-- Lecturas por varios dispositivos.
-- orden de mensajes con reloj desfasado;
-- adjuntos inválidos y malware;
-- permisos revocados mientras existe una conexión.
+- cursor reconnection and recovery;
+- duplicate client retries;
+- reads across devices;
+- message ordering with clock skew;
+- invalid and malicious attachments;
+- permissions revoked during a connection.
 
 ### 17.5 UX/UI
 
-- Desktop y móvil.
-- Teclado, foco, lectores de pantalla y reduced motion.
-- Contraste y estados no dependientes del color.
-- Expansión de español, inglés y portugués.
-- Carga, vacío, error, offline, stale y reconexión.
-- Volúmenes altos de incidentes y conversaciones.
-- Filtros, paginación, permisos y exportación de la vista de cierres sin resolución.
-- Verificación de que la vista no expone acciones de ajuste ni estados ficticios de regularización.
+- desktop and mobile;
+- keyboard, focus, screen readers, and reduced motion;
+- contrast and meaning independent of color;
+- Spanish UI labels and copy expansion for future languages;
+- loading, empty, error, offline, stale, and reconnecting conditions;
+- high incident and conversation volume;
+- unresolved-closure filters, pagination, permissions, and exports;
+- proof that the closure view exposes no adjustment actions.
 
-## 18. Roadmap de producción
+## 18. Production roadmap
 
-Las duraciones son rangos de esfuerzo de un equipo pequeño multidisciplinario y no fechas comprometidas. Deben recalibrarse cuando se conozcan tamaño del equipo, ambientes y disponibilidad de EmusaSoft.
+Durations are effort ranges for a small multidisciplinary team, not committed dates. Recalibrate them when team size, environments, and EmusaSoft availability are known.
 
-### Fase 0 — Contratos y decisiones de implementación
+### Phase 0 — Contracts and implementation decisions
 
-**Esfuerzo:** 1 semana
-**Objetivo:** convertir la arquitectura confirmada en contratos implementables sin escribir todavía lógica de producto.
+**Effort:** 1 week
+**Objective:** convert confirmed architecture into implementable contracts before writing product logic.
 
-Entregables:
+Deliverables:
 
-- ADR de frontera: EmusaSoft read-only y Monitor con repositorio y base propios;
-- especificación versionada del SSE: endpoint, autenticación, eventos, payloads, cursores, replay y errores;
-- contrato del acceso SQL read-only, preferentemente contra réplica;
-- ADR de autenticación de usuarios y mapeo con `sysUserId`;
-- ADR del kit técnico: runtime, framework API, motor de base, ORM, WebSocket y Redis;
-- protocolo WebSocket de Monitor: autenticación, comandos, eventos, cursores e idempotencia;
-- esquema del evento canónico y política de reconciliación;
-- inventario de ambientes, secretos, ownership y límites operativos;
-- threat model inicial y prueba de que las credenciales de EmusaSoft no llegan al navegador.
+- boundary, authentication, technical-kit, and protocol ADRs;
+- versioned SSE and read-only SQL contracts;
+- Monitor WebSocket protocol and canonical event schema;
+- environments, secrets, ownership, and operating boundaries;
+- design-system and three-prototype audit with a UX/accessibility/responsive backlog;
+- ADR for consuming versioned `emusa-ui` components through an adapter layer where available, while retaining Monitor-owned composition, tokens, and product behavior;
+- design brief for the Operational Responsibility Roster;
+- initial threat model and proof that EmusaSoft credentials never reach the browser.
 
-Gate de salida:
+Exit gate: contracts are approved and a sample SSE event can be mapped to a WebSocket event and recovered by API without implicit critical decisions.
 
-- un evento SSE de prueba puede mapearse en papel hasta un evento WebSocket y recuperarse por API;
-- están aprobados los contratos de autenticación, SSE, SQL read-only y WebSocket;
-- ninguna decisión crítica de transporte o persistencia queda implícita.
+### Phase 1 — Data and rule contracts
 
-### Fase 1 — Contratos de datos y reglas
+**Effort:** 2–3 weeks
+**Objective:** turn active A–E rules into executable specifications.
 
-**Esfuerzo:** 2–3 semanas  
-**Objetivo:** convertir las reglas vigentes de las familias A–E en especificaciones ejecutables.
+Deliverables include canonical event contracts, event/table/field/join/unit/timestamp mapping per rule, deduplication keys, versioned parameters, anonymized fixtures, sufficient/insufficient-evidence matrices, formal resolution of A04/A06/A07/B01/D01/E02–E04 blockers, and final deterministic/deadline/physical/statistical classification.
 
-Entregables:
+Exit gate: each candidate rule produces a reproducible fixture result or is explicitly excluded from the initial production implementation.
 
-- contrato de evento canónico;
-- mapping de cada regla a evento SSE, tabla/campo read-only, join, unidad y timestamp;
-- definición de clave de deduplicación por regla;
-- parámetros versionados;
-- fixtures anonimizados;
-- matriz de evidencia suficiente/insuficiente;
-- resolución formal de bloqueadores A04, A06, A07, B01, D01, E02–E04;
-- clasificación final: determinista, deadline, física o estadística.
+### Phase 2 — Platform foundation
 
-Gate de salida:
+**Effort:** 2–3 weeks
+**Objective:** create the technical foundation without broad business logic.
 
-- cada regla candidata puede producir un resultado reproducible desde un fixture o queda explícitamente fuera del primer release.
+Deliverables include repository and CI, local/test/staging environments, Monitor API, relational database and migrations, identity adapter, server-side authorization, structured logs/metrics/traces/health checks, secret management, Redis, cursor-based WebSocket gateway, and feature flags.
 
-### Fase 2 — Fundación de plataforma
+Exit gate: a staging user authenticates, receives correct scopes, opens a WebSocket session, and tests prove Monitor cannot write to EmusaSoft.
 
-**Esfuerzo:** 2–3 semanas  
-**Objetivo:** crear el kit técnico sin lógica de negocio extensa.
+### Phase 3 — SSE, reads, and reconciliation
 
-Entregables:
+**Effort:** 2–4 weeks
+**Objective:** obtain reliable and repeatable evidence.
 
-- repositorio y pipeline CI;
-- environments local, test y staging;
-- API de Monitor según ADR;
-- base relacional de Monitor y migraciones según ADR;
-- identity adapter;
-- autorización server-side;
-- logging estructurado, métricas, tracing y healthchecks;
-- secret management;
-- Redis y gateway WebSocket con reconexión por cursor;
-- feature flags.
+Deliverables include a contract-validated reconnecting SSE consumer, read-only adapters for work orders/materials/flows/serials/weighing/pauses/users, idempotent source-event storage, cursors and `Last-Event-ID`, retries/backoff, a Monitor-owned failed-event record for diagnostic replay without introducing a queue or broker, SQL reconciliation, source-freshness dashboard, and drift tests.
 
-Gate de salida:
+Exit gate: staging can drop, duplicate, and reorder SSE events and still recover the correct state.
 
-- un usuario de staging se autentica, recibe scopes correctos y abre una sesión WebSocket sin exposición de credenciales;
-- una prueba de permisos demuestra que Monitor no puede escribir en la base de EmusaSoft.
+### Phase 4 — Incident vertical slice
 
-### Fase 3 — SSE, lectura y reconciliación
+**Effort:** 2–3 weeks
+**Objective:** deliver a complete chain using low-risk rules A02, A03, and A05.
 
-**Esfuerzo:** 2–4 semanas  
-**Objetivo:** obtener evidencia confiable y repetible.
+Deliverables include the rule engine, incident/evidence/transitions/deduplication, automatic resolution, basic correlation, incident API, post-commit WebSocket events, and dashboard/detail views connected to staging data.
 
-Entregables:
+Exit gate: synthetic and anonymized historical cases create, update, and resolve one explainable incident.
 
-- consumidor SSE de EmusaSoft con validación de contrato y reconexión;
-- adaptadores SQL read-only para OT, materiales, flujos, seriales, pesajes, pausas y usuarios;
-- source event store idempotente;
-- cursores, `Last-Event-ID`, retries, backoff, DLQ y reconciliación SQL;
-- dashboard de frescura de fuentes;
-- pruebas de drift del esquema y del contrato SSE.
+### Phase 5 — Routing and notifications
 
-Gate de salida:
+**Effort:** 2–3 weeks
+**Objective:** notify the correct people once.
 
-- staging puede cortar SSE, omitir, duplicar y reordenar eventos y luego recuperar el estado correcto mediante idempotencia y reconciliación.
+Deliverables include validated design and implementation of the Operational Responsibility Roster; effective-dated assignments by operation/machine/shift with history, temporary replacements, conflicts, and missing assignments; work-order-to-operator and machine-to-warehouse resolution; manager/supervisor resolution; audited routing reasons; recipient deduplication; in-app notification; approved external providers; retries, delivery state, and dead letters.
 
-### Fase 4 — Vertical slice de incidentes
+Exit gate: the roster screen maintains and audits assignments, permission tests prevent zone-wide over-notification, and each user receives one delivery.
 
-**Esfuerzo:** 2–3 semanas  
-**Objetivo:** entregar una cadena completa con reglas de bajo riesgo.
+### Phase 6 — Conversations and messages
 
-Reglas iniciales recomendadas:
+**Effort:** 3–5 weeks
+**Objective:** implement the designed chat screens.
 
-- A02 — material en tránsito más de 30 minutos;
-- A03 — OT activa sin consumo después de 15 minutos;
-- A05 — reel declarado sin pesaje o movimiento dentro del umbral;
+Recommended order: list/search/filters; conversations and system messages; send/reply/read; attachments; reactions/pins/stars; forwarding/private replies; moderation/audit.
 
-Entregables:
+Technical deliverables include idempotent API/WebSocket commands, message/receipt/presence/typing events, transactional persistence before Redis fan-out, paginated API recovery and synchronization cursors, per-conversation authorization, and multi-device reconnection without duplicates.
 
-- motor de reglas;
-- incidente, evidencia, transición y deduplicación;
-- resolución automática;
-- correlación básica;
-- API de incidentes;
-- eventos WebSocket posteriores al commit;
-- vista dashboard y drawer conectados a datos reales de staging.
+Exit gate: desktop and mobile pass authorization, reconnection, idempotency, ordering, accessibility, and API recovery tests.
 
-Gate de salida:
+### Phase 7 — Closure and balance rules
 
-- casos sintéticos y casos históricos anonimizados crean, actualizan y resuelven un solo incidente con evidencia explicable.
+**Effort:** 3–5 weeks
+**Objective:** add D01–D04 and calculations requiring unit precision.
 
-### Fase 5 — Routing y notificaciones
+Deliverables include decimal/unit libraries, parameter/formula snapshots, D01–D04, correlation and suppression, actual-versus-estimated evidence, authorized administrative closure, and the controlled read-only unresolved-closure view.
 
-**Esfuerzo:** 2–3 semanas  
-**Objetivo:** informar a las personas correctas, una sola vez.
+Exit gate: process experts reproduce each calculation and EmusaSoft staff can understand a closure without Monitor administrative access.
 
-Entregables:
+### Phase 8 — Statistical and operation-specific rules
 
-- resolución OT → máquina → operación → turno → operador;
-- máquina → almacén → configuración de influencia;
-- gerente y supervisor por planta/operación;
-- razones de routing auditadas;
-- deduplicación de destinatarios;
-- notificación in-app;
-- proveedor propio de Monitor para cada canal externo aprobado;
-- retry, delivery state y dead letters.
+**Effort:** 4–8 weeks
+**Objective:** add higher-uncertainty rules without reducing trust.
 
-Gate de salida:
+Deliverables include C01/C02/C06 datasets and model versioning, A04 after rewinder capacity is confirmed, E01–E04 after container snapshots/events are resolved, model-quality/sample-size/false-positive reporting, backtesting, and shadow mode.
 
-- pruebas de roster y permisos demuestran que no se notifica a toda una zona por defecto y que cada usuario recibe una sola entrega.
+Exit gate: each model meets the approved shadow-mode precision threshold and displays confidence.
 
-### Fase 6 — Conversaciones y mensajes
+### Phase 9 — Plant pilot
 
-**Esfuerzo:** 3–5 semanas  
-**Objetivo:** implementar las superficies de chat ya diseñadas.
+**Effort:** 3–4 weeks
+**Objective:** operate with real users without depending on Monitor to execute factory processes.
 
-Orden recomendado:
+Deliverables include role-based training, runbooks/support/on-call/escalation, SLO dashboards, daily feedback, usability and accessibility testing across all four screens, design-system and prototype refinement, false-positive/false-negative/routing review, rollback, and rule kill switches.
 
-1. lista, búsqueda y filtros;
-2. conversación y mensajes del sistema;
-3. enviar, responder y lectura;
-4. adjuntos;
-5. reacciones, fijar y destacar;
-6. reenvío y respuesta privada;
-7. herramientas de moderación y auditoría.
+Exit gate: pilot SLOs, user acceptance, and security criteria pass for an agreed window.
 
-Entregables técnicos:
+### Phase 10 — Production and expansion
 
-- comandos WebSocket o API idempotentes para enviar y marcar lectura;
-- eventos WebSocket para mensajes, recibos, presencia y escritura;
-- persistencia transaccional antes del fan-out por Redis;
-- recuperación paginada por API y cursor de sincronización;
-- autorización por conversación en cada conexión y comando;
-- soporte de reconexión y múltiples dispositivos sin duplicar mensajes.
+**Effort:** continuous
+**Objective:** harden and expand Monitor.
 
-Gate de salida:
+Deliverables include gradual rollout by operation/plant, backups and restore tests, disaster recovery, capacity tests, security review, continuous evolution of Monitor's design system and four screens, rule governance, localization, and approved integrations/rules.
 
-- desktop y móvil pasan pruebas de permisos, reconexión, idempotencia, orden, accesibilidad y recuperación de mensajes por API.
+## 19. Main product screens
 
-### Fase 7 — Reglas de cierre y balance
+Technical phases sequence implementation but are not separate product releases. The current product has four main screens:
 
-**Esfuerzo:** 3–5 semanas  
-**Objetivo:** agregar D01–D03 y reglas que requieren cálculos de unidades.
+1. **Dashboard:** current and historical alert analysis, filters, reports, and drill-down.
+2. **Chat list:** conversations in which the user participates.
+3. **Chat detail:** history, replies, attachments, and alert objects.
+4. **Operational Responsibility Roster:** deterministic-routing assignment administration; currently conceptual with no approved prototype.
 
-Entregables:
+The first three screens have active prototypes. The fourth was identified during alert-catalog work and must be designed before implementation.
 
-- biblioteca de unidades y precisión decimal;
-- snapshots de parámetros y fórmulas;
-- D01, D02 y D03;
-- correlación y supresión de causas específicas;
-- evidencia de peso real versus estimado;
-- cierre administrativo si se aprueba su inclusión;
-- vista read-only de cierres sin resolución con filtros, búsqueda, evidencia, referencias ERP y exportación controlada.
+## 20. Decisions pending before coding
 
-Gate de salida:
+1. Concrete SSE endpoint, authentication, payloads, cursors, replay, and limits.
+2. Identity provider and Monitor session mechanism.
+3. Runtime, API framework, database engine, ORM, and WebSocket library.
+4. Functional source for shifts, active operator, and influence zones.
+5. Exact permission for Monitor access and administration.
+6. Retention policy for incidents, messages, attachments, and evidence.
+7. External channels for the initial production implementation.
+8. Essential chat functions for the initial production implementation.
+9. Exact pilot rules and unresolved tolerances.
+10. Team, environments, and deployment process.
 
-- expertos de proceso reproducen cada cálculo con datos de origen y aprueban tolerancias y explicaciones;
-- el equipo de EmusaSoft puede localizar y comprender un cierre sin resolución sin acceso administrativo a Monitor.
+## 21. Definition of Done for the initial production implementation
 
-### Fase 8 — Reglas estadísticas y específicas de operación
+- Every authenticated identity maps to `sysUserId`; permissions are verified server-side.
+- Monitor has no direct writes or SQL write credentials for EmusaSoft.
+- SSE and every used read-only SQL query have contract tests.
+- Ingestion is idempotent, recoverable, and reconcilable.
+- Every incident has explainable rule, version, evidence, timestamps, subjects, and recipients.
+- One-incident rules prevent confirmed duplicates.
+- The UI displays each code's configured Spanish label plus stale/offline conditions without depending only on color.
+- SSE and WebSocket reconnection recover missing events/messages by reconciliation or API.
+- EmusaSoft corrections automatically resolve incidents when rules pass again.
+- Administrative closures are audited and never alter ERP evidence.
+- The unresolved-closure view is filtered, read-only, and evidence-rich.
+- Monitor never schedules, requests, or records inventory/kardex/accounting adjustments.
+- Notifications record attempts, delivery, and errors.
+- Logs and traces expose no tokens or unnecessary sensitive data.
+- Backups and restore tests pass.
+- Monitor operating alerts have runbooks and owners.
+- The plant, process, operations, and technology teams approve the pilot.
 
-**Esfuerzo:** 4–8 semanas  
-**Objetivo:** incorporar reglas de mayor incertidumbre sin degradar la confianza.
+## 22. Technical conclusion
 
-Entregables:
+Monitor is a fully independent system with its own repository, service, and control database. It consumes EmusaSoft's Redis-backed SSE and uses read-only SQL for context and reconciliation. It exposes a recoverable API and bidirectional WebSockets backed by its own Redis. EmusaSoft retains operational truth; Monitor retains incidents, communications, roster assignments, and administrative closures.
 
-- C01, C02 y C06 con datasets y model versioning;
-- A04 sólo después de confirmar capacidad de rebobinador;
-- E01–E04 sólo después de resolver snapshots y eventos de contenedor;
-- panel de calidad de modelo, tamaño de muestra y falsos positivos;
-- backtesting y shadow mode.
-
-Gate de salida:
-
-- cada modelo cumple el umbral de precisión acordado en shadow mode y muestra nivel de confianza.
-
-### Fase 9 — Piloto de planta
-
-**Esfuerzo:** 3–4 semanas  
-**Objetivo:** operar con usuarios reales sin depender de Monitor para ejecutar el proceso.
-
-Entregables:
-
-- capacitación breve por rol;
-- runbook y soporte;
-- on-call y escalación;
-- dashboards de SLO;
-- feedback diario;
-- revisión de falsos positivos, falsos negativos y routing;
-- rollback y kill switches por regla.
-
-Gate de salida:
-
-- SLOs del piloto, aceptación de usuarios y criterios de seguridad cumplidos durante una ventana acordada.
-
-### Fase 10 — Producción y expansión
-
-**Esfuerzo:** continuo  
-**Objetivo:** endurecer y ampliar Monitor.
-
-Entregables:
-
-- rollout gradual por operación y planta;
-- backups y restore test;
-- disaster recovery;
-- capacity testing;
-- revisión de seguridad;
-- gobierno de reglas;
-- localización;
-- nuevas integraciones y reglas aprobadas.
-
-## 19. Orden recomendado de releases
-
-### Release 0 — Shadow monitor
-
-- Consumo SSE y reconciliación SQL read-only.
-- Evaluación sin notificar usuarios.
-- A02, A03 y A05.
-- Comparación con hechos históricos.
-
-### Release 1 — Monitor informativo
-
-- Dashboard real.
-- Incidentes y evidencia.
-- Actualizaciones WebSocket del dashboard.
-- Routing y notificación in-app.
-- Enlaces a EmusaSoft.
-- Sin correcciones de ERP desde Monitor.
-
-### Release 1.1 — Mensajes
-
-- Lista de conversaciones.
-- Mensajes de sistema y humanos.
-- Respuestas, lecturas y adjuntos.
-- Funciones avanzadas bajo feature flags.
-
-### Release 1.2 — Balance y cierre
-
-- D01–D03.
-- Cierre administrativo si se aprueba.
-- Vista read-only de alertas cerradas sin resolución.
-- Correlación avanzada.
-
-### Release 2 — Estadística y operación específica
-
-- C01, C02, C06, A04 y E01–E04 validadas.
-- Modelos versionados y shadow mode.
-- Posibles flujos de intervención, sólo con nueva aprobación de alcance.
-
-## 20. Decisiones pendientes antes de escribir código
-
-Estas decisiones pertenecen al equipo de Monitor o a Product; ya no requieren descubrir la arquitectura interna de EmusaSoft:
-
-1. Endpoint, autenticación, payloads, cursores, replay y límites concretos del SSE.
-2. Proveedor de identidad y mecanismo de sesión para usuarios de Monitor.
-3. Runtime, framework API, motor de base, ORM y librería WebSocket del nuevo repositorio.
-4. Fuente funcional de turnos, operador activo y zonas de influencia.
-5. Permiso exacto que habilita acceso y administración en Monitor.
-6. Política de retención de incidentes, mensajes, adjuntos y evidencia.
-7. Canales externos del primer release.
-8. Si `CLOSED_WITHOUT_RESOLUTION` entra en Release 1 o 1.2.
-9. Funciones imprescindibles del chat en el primer release.
-10. Reglas exactas del piloto y tolerancias todavía abiertas.
-11. Equipo, ambientes y proceso de despliegue.
-
-## 21. Definition of Done del primer release productivo
-
-- Cada identidad autenticada se mapea a `sysUserId` y sus permisos se verifican en backend.
-- No existe escritura directa a la base productiva de EmusaSoft.
-- El contrato SSE y cada consulta SQL read-only usada tienen contract tests.
-- La ingestión es idempotente, recuperable y reconciliable.
-- Cada incidente tiene regla, versión, evidencia, timestamps, sujetos y destinatarios explicables.
-- La regla de un incidente evita duplicados confirmados.
-- La UI muestra error, por vencer, posible error, stale y offline sin depender sólo del color.
-- La reconexión SSE recupera o reconcilia gaps y la reconexión WebSocket recupera eventos y mensajes faltantes por API.
-- Las correcciones realizadas en EmusaSoft resuelven automáticamente el incidente cuando la regla vuelve a pasar.
-- Los cierres administrativos, si están habilitados, son auditados y no alteran evidencia ERP.
-- Monitor nunca tiene credenciales SQL de escritura sobre EmusaSoft.
-- La vista de cierres sin resolución muestra evidencia, motivo, administrador y referencias ERP, con filtros y acceso read-only.
-- Monitor no agenda, solicita ni registra como ejecutados ajustes de inventario, kardex o contabilidad.
-- Las notificaciones registran intentos, entrega y error.
-- Logs y trazas no exponen tokens ni datos sensibles innecesarios.
-- Backups y restore test están aprobados.
-- Alertas operacionales de Monitor tienen runbook y responsables.
-- Piloto aprobado por fábrica, proceso, operaciones y tecnología.
-
-## 22. Conclusión técnica
-
-Monitor será un sistema completamente independiente con repositorio, servicio y base de control propios. Consume el SSE de EmusaSoft respaldado por Redis y utiliza acceso SQL read-only para contexto y reconciliación. Hacia sus clientes, Monitor expone una API recuperable y WebSockets bidireccionales respaldados por su propio Redis. EmusaSoft conserva la verdad operacional; Monitor conserva incidentes, comunicaciones y cierres administrativos.
-
-Monitor sólo ofrece una vista read-only de alertas cerradas sin resolución. Cualquier ajuste posterior pertenece al equipo de EmusaSoft y queda fuera del alcance del proyecto. Antes del scaffold deben cerrarse autenticación, especificación SSE, consultas read-only, kit técnico y protocolo WebSocket.
+Monitor provides only a read-only view of incidents closed without resolution. Every later adjustment belongs to EmusaSoft and remains outside the project. Authentication, SSE specification, read-only queries, technical kit, and WebSocket protocol must be resolved before scaffolding.

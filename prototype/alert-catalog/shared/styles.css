@@ -29,6 +29,18 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+.archive-notice {
+  padding: 10px 20px;
+  background: #fff1c2;
+  border-bottom: 1px solid #d7ad24;
+  color: #40340b;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.archive-notice a { color: inherit; text-decoration: underline; }
+
 .review-header {
   position: sticky;
   top: 0;

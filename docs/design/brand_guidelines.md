@@ -1,8 +1,8 @@
-# EMUSA Operations Brand Guidelines
+# Monitor Brand Guidelines
 
 ## Brand foundation
 
-EMUSA Operations extends EMUSA's corporate identity into production and inventory software. The interface must feel like the control layer of a global packaging manufacturer: precise, dependable, technically capable, and close to the realities of the plant floor.
+Monitor extends EMUSA's corporate identity into production and inventory software. The interface must feel like the control layer of a global packaging manufacturer: precise, dependable, technically capable, and close to the realities of the plant floor.
 
 **Brand promise:** Turn factory activity into clear, actionable operational knowledge.
 
@@ -26,15 +26,15 @@ Write with direct operational clarity. Lead with the fact, state, or required ac
 
 | Avoid | Use |
 |---|---|
-| Something went wrong | Inventory update failed. The previous quantity is still active. |
-| Critical problem! | Production line 3 has been stopped for 18 minutes. |
-| Optimize your workflow | Review the two work orders waiting for material. |
-| No data | No production has been reported for this shift. |
+| Algo salió mal | No se pudo actualizar el inventario. La cantidad anterior sigue vigente. |
+| ¡Problema crítico! | La línea de producción 3 lleva detenida 18 minutos. |
+| Optimiza tu flujo de trabajo | Revisa las dos órdenes de trabajo que esperan material. |
+| Sin datos | No se ha reportado producción para este turno. |
 
 ### UI writing rules
 
-- Buttons use verbs: `Create work order`, `Confirm receipt`, `Export report`.
-- Statuses use short, stable terms: `Scheduled`, `In progress`, `Blocked`, `Completed`, `Cancelled`.
+- Buttons use Spanish verbs: `Crear orden de trabajo`, `Confirmar recepción`, `Exportar reporte`.
+- User-visible statuses use short, stable Spanish terms: `Programada`, `En proceso`, `Bloqueada`, `Completada`, `Cancelada`.
 - Dates use an explicit locale and timezone where ambiguity matters.
 - Quantities always include units.
 - Avoid marketing claims inside dashboards, forms, errors, and alerts.
@@ -76,7 +76,7 @@ Do not use generic office teamwork, abstract AI networks, fake factories, neon m
 - Maintain clear space around the logo equal to at least the height of the central `E` mark.
 - Prefer the white logo on EMUSA navy and the navy logo on white or light gray.
 - Do not place the logo on visually busy imagery without a controlled overlay.
-- Product identity may add the descriptor `Operations`, but it must remain typographically secondary to EMUSA.
+- The product name is `Monitor`. Do not replace it with `EMUSA Operations`, `Monitor Soft`, or another product descriptor.
 
 ## Accessibility and localization
 

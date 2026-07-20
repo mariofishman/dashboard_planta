@@ -2,7 +2,7 @@
 
 ## 1. Purpose and authority
 
-This document is the canonical record of the UX and UI decisions represented by the current Monitor prototypes. It consolidates decisions that were previously distributed across review annotations, prototype code, product discovery, the alert catalog, and the design system.
+This document is the canonical record of UX and UI decisions within the current product defined by `docs/product_definition.md`. It consolidates decisions that were previously distributed across review annotations, prototype code, product discovery, the alert catalog, and the design system.
 
 The current prototype surfaces are:
 
@@ -32,18 +32,21 @@ The conversation experience intentionally follows familiar WhatsApp conventions 
 The interface must still distinguish three different concepts:
 
 - a conversation, which contains participants and a message history;
-- a message, which is sent by a person or by Monitor Soft; and
+- a message, which is sent by a person or by Monitor; and
 - an alert, which is a structured operational object that can travel inside a message.
 
 An alert is not the name of a conversation, and a conversation is not the alert itself.
 
 ### 2.3 Main surfaces
 
-The application has three surfaces but only two primary destinations:
+The application has four main screens:
 
 - **Dashboard** — summary, history, analysis, filtering, reporting, and drill-down;
 - **Chats** — the user's conversation list; and
-- **Chat detail** — a subordinate view opened from a conversation, not a separate primary navigation destination.
+- **Chat detail** — a subordinate view opened from a conversation, not a separate primary navigation destination; and
+- **Operational Responsibility Roster** — assignment administration for deterministic alert routing; currently conceptual and not yet prototyped.
+
+Dashboard and Chats remain the two primary navigation destinations. Chat detail opens from Chats, and the roster's navigation placement remains undecided until its design is approved.
 
 The former idea of a third bottom-navigation destination called **Messages** was rejected. Messages are accessed by opening a chat.
 
@@ -125,7 +128,7 @@ The prototype includes:
 - Calidad; and
 - Mantenimiento.
 
-The previous “EMUSA Operations” brand label was removed from this location because the available header space is more useful for ecosystem navigation. The user-avatar/profile control was also removed from this header because it did not add value to the current task flow.
+The previous product-brand label was removed from this location because the available header space is more useful for ecosystem navigation. The user-avatar/profile control was also removed from this header because it did not add value to the current task flow.
 
 ### 3.3 Language and naming
 
@@ -134,7 +137,7 @@ The previous “EMUSA Operations” brand label was removed from this location b
 - Buttons use verbs.
 - Dates, times, quantities, and durations are explicit.
 - Exclamation marks, marketing copy, and vague messages are avoided.
-- “Monitor Soft” is the visible name of the automated system sender and is treated typographically like any other sender.
+- “Monitor” is the product name and the visible name of the automated system sender. It is treated typographically like any other sender.
 
 ### 3.4 Density
 
@@ -159,21 +162,21 @@ The product is intended for frequent operational use. Layouts should favor compa
 
 ### 4.2 Color carries one meaning at a time
 
-Alert state and alert age are separate dimensions.
+Alert label and alert age are separate dimensions.
 
-- Color communicates the kind or state of the alert.
+- Color communicates the kind of condition described by that alert code.
 - Written duration communicates age.
-- Age does not progressively enlarge a chip, change its typography, or change the chip's state color.
+- Age does not progressively enlarge a chip, change its typography, or change the chip's label color.
 - The interface does not invent urgency thresholds from age alone.
 - If operational escalation thresholds are documented later, a separate urgency treatment may be introduced.
 
-The current alert-state vocabulary is:
+Alert labels are code-specific rather than a shared state vocabulary. Current examples include:
 
 - **Error** — a rule has been violated;
 - **Por vencer** — the error has not happened yet, but a deadline is approaching; and
-- **Posible** — the evidence suggests an inconsistency that requires investigation.
+- **Error posible** — the evidence suggests an inconsistency that requires investigation.
 
-Every state uses a written label and marker; meaning never depends on color alone.
+Every label uses written text and a marker; meaning never depends on color alone. Incident lifecycle states such as open, resolved, and closed without resolution are represented separately.
 
 ### 4.3 Shape, spacing, and elevation
 
@@ -190,7 +193,7 @@ Every state uses a written label and marker; meaning never depends on color alon
 - Sender name is bold in group-message previews and incoming group messages.
 - Message content is regular weight.
 - Metadata such as timestamp, age, work order, and machine is smaller but remains legible.
-- Monitor Soft uses the same sender typography as a person such as Jorge A.; it is not styled as a separate heading system.
+- Monitor uses the same sender typography as a person such as Jorge A.; it is not styled as a separate heading system.
 
 ## 5. Chat list
 
@@ -208,7 +211,7 @@ For a group conversation:
 
 - the bold title is the group name;
 - the latest-message preview begins with the sender's name and a colon; and
-- automated messages use `Monitor Soft:` as the sender prefix.
+- automated messages use `Monitor:` as the sender prefix.
 
 For a direct conversation:
 
@@ -238,8 +241,8 @@ Machine-code or group-initial avatars were removed. They consumed space without 
 ### 5.4 Alert chips in rows
 
 - Chips identify unresolved alert code and short name.
-- Chips include the written state: Error, Por vencer, or Posible.
-- Chips use a neutral surface compatible with the EMUSA palette; semantic color is limited to the state marker and label.
+- Chips include the descriptive label configured by that alert code; examples include `Error`, `Por vencer`, `Alerta`, and `Error posible`.
+- Chips use a neutral surface compatible with the EMUSA palette; semantic color is limited to the code-specific label marker and text.
 - Multiple alerts appear as multiple chips.
 - When the complete set does not fit, show a limited number and an explicit overflow such as `+3 más`.
 - Chip size and typography remain stable regardless of age.
@@ -287,7 +290,7 @@ When search and filters produce no results, the list shows a concise empty state
 
 ### 6.1 Purpose
 
-Chat detail is the shared history for one group or direct conversation. People discuss operational events around the same alert objects, while Monitor Soft posts automated detections and updates.
+Chat detail is the shared history for one group or direct conversation. People discuss operational events around the same alert objects, while Monitor posts automated detections and updates.
 
 ### 6.2 Header
 
@@ -348,9 +351,9 @@ A reply can embed a quoted reference above the new message.
 - The composer offers both image-library selection and direct camera capture.
 - A selected image receives a preview and can be removed before sending.
 
-### 6.8 Monitor Soft messages
+### 6.8 Monitor messages
 
-- Monitor Soft is treated as a participant and uses the same sender-name hierarchy as human senders.
+- Monitor is treated as a participant and uses the same sender-name hierarchy as human senders.
 - Automated alert messages avoid filler such as “Se detectó una condición que requiere seguimiento.”
 - The structured alert object supplies the useful information directly.
 - System and human messages remain in the same chronological history.
@@ -584,7 +587,7 @@ When filters produce no dashboard rows, the detail area explains that no errors 
 
 ## 11. Responsive behavior
 
-All three surfaces must work on desktop and mobile.
+All four main screens must work on desktop and mobile. The roster's detailed responsive behavior will be defined with its future prototype.
 
 - Layouts reflow without horizontal page overflow.
 - Touch targets are at least 44px where mobile interaction is expected.
@@ -642,7 +645,7 @@ The prototypes demonstrate interaction and information architecture. They do not
 - Deep-link URL patterns must be verified against actual EmusaSoft routes before implementation.
 - Authentication, authorization, message retention, moderation, audit, reporting, and attachment policies must follow the production architecture.
 - Alert detection and routing must use canonical rules and deterministic ownership mappings.
-- The architecture roadmap currently sequences dashboard monitoring before the complete messaging feature set. This document preserves the approved UX direction without changing that release order.
+- Engineering phases do not represent separate product releases and do not change the four-screen product definition.
 - Monitor's closed-without-resolution view remains read-only; operational adjustments belong to EmusaSoft.
 
 ## 15. Open UX/UI decisions
@@ -673,9 +676,9 @@ A production implementation matches the current UX/UI direction only if:
 - Dashboard and Chats share the same primary navigation.
 - Chat detail is entered from Chats and is not a third primary destination.
 - Group and direct conversation titles follow the sender rules in this document.
-- Monitor Soft is treated as a sender.
+- Monitor is treated as a sender.
 - Unread badges count unread messages only.
-- Alert state and alert age remain separate visual dimensions.
+- Alert label, incident lifecycle, and alert age remain separate visual dimensions.
 - Alert chips include text labels and support overflow.
 - Search and filters affect the complete surface, not an isolated component.
 - Dashboard chart drill-down updates all dependent views and can be reset.
