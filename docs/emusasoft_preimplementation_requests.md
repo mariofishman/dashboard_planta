@@ -9,12 +9,12 @@ These requests do not change Monitor's approved boundary. Monitor remains an ind
 
 ## EmusaSoft product and engineering team
 
-### ES-01 — Publish the SSE contract
+### ES-01 — Approve the detection query set (supersedes the SSE contract, 2026-07-20)
 
 **Priority:** blocking Phase 3
-**Provide:** endpoint by environment, service authentication, event type and version, globally unique event ID, affected entity and ID, plant ID, occurrence and publication timestamps, cursor or `Last-Event-ID`, heartbeat behavior, ordering and duplicate guarantees, retention and replay limits, reconnection expectations, payload examples, ownership, and change procedure.
+**Provide:** review and approval of Monitor's SQL detection queries — one per catalog alert type — including each query's declared natural key, required indexes on the read-only endpoint, representative query plans, and the load budget for the configurable polling interval. See `emusasoft_integration_architecture.md` for the agreed model. No SSE service exists or will be built.
 
-**Acceptance:** Monitor can consume a staging event, disconnect, resume from its cursor, deduplicate a replayed event, and reconcile the affected record through read-only access.
+**Acceptance:** each catalog alert type has an approved detection query whose plan runs within the agreed budget on the staging replica, detects a seeded condition, maps it to a stable incident key across cycles, and auto-resolves when the condition clears.
 
 ### ES-02 — Provision and document read-only reconciliation access
 

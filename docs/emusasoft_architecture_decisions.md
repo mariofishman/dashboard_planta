@@ -2,11 +2,13 @@
 
 **Date:** 2026-07-19
 
-**Status:** high-level decisions answered; implementation contracts pending
+**Status:** partially superseded on 2026-07-20 — see `emusasoft_integration_architecture.md`
+
+> **Amendment (2026-07-20):** the EmusaSoft architect confirmed that no SSE service exists. Point 1 below is superseded. The agreed transport is condition-based SQL polling owned by Monitor, documented in `emusasoft_integration_architecture.md`.
 
 ## Confirmed answers
 
-1. EmusaSoft's real-time transport is **SSE**.
+1. ~~EmusaSoft's real-time transport is **SSE**.~~ Superseded 2026-07-20: no SSE service exists; Monitor detects alerts via approved read-only SQL detection queries.
 2. The event contract must be defined from Monitor's functional requirements.
 3. EmusaSoft's real-time infrastructure uses **Redis**.
 4. Monitor must consume EmusaSoft's real-time service directly.
