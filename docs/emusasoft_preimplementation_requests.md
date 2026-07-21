@@ -104,4 +104,4 @@ These requests do not change Monitor's approved boundary. Monitor remains an ind
 
 ## Monitor-team tracking rule
 
-Each item must record owner, target environment, delivery date, contract version, evidence link, validation result, and affected roadmap phase. A verbal confirmation does not close an item. Closure requires the stated acceptance test and a versioned artifact suitable for automated contract tests.
+Per-item delivery state — responsible team, state, contract version, delivery date, evidence link, validation result, and affected roadmap phase — is tracked in `emusasoft_requests_tracking.md`, not in this contract. A verbal confirmation does not close an item: closure requires the request's stated acceptance test and a versioned artifact suitable for automated contract tests.
