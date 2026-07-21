@@ -27,8 +27,8 @@ The stored incident lifecycle is separate from these labels.
 
 The dashboard must not create duplicate alerts for the same underlying problem.
 
-- One incident is keyed by the affected OT, reel or material requirement, and workflow stage.
-- Later evidence updates the existing incident with a more precise reason.
+- Each alert defines a stable natural key from the affected OT, reel, material requirement, machine, container, or workflow stage. Architecture combines that key with the alert type, detection-query ID, and key-schema version to identify one continuing condition.
+- A continuing condition updates the same incident occurrence with more precise evidence. After a healthy cycle proves it cleared, a later recurrence creates a new occurrence rather than reopening history.
 - A specific deterministic rule replaces or enriches a generic statistical warning.
 - An OT-level balance warning must not appear separately when its imbalance has already been explained by a specific missing-consumption, missing-output, missing-waste, or weighing incident.
 
@@ -36,10 +36,10 @@ The dashboard must not create duplicate alerts for the same underlying problem.
 
 Every incident has two distinct terminal outcomes:
 
-- `Resolved`: the underlying ERP or physical condition was corrected and the detection rule now passes.
-- `Closed without resolution`: an authorized administrator confirms that the historical operational record can no longer be reconstructed safely. Closure never invents reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT events. Any later inventory, location, cost, valuation, or OT reconciliation adjustment belongs entirely to EmusaSoft.
+- `Resolved` (user-visible label: `Resuelta`): the underlying ERP or physical condition was corrected and the detection rule now passes.
+- `Closed without resolution` (user-visible label: `Cerrada sin resolución`): an authorized administrator confirms that the historical operational record can no longer be reconstructed safely. Closure never invents reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT records. Any later inventory, location, cost, valuation, or OT reconciliation adjustment belongs entirely to EmusaSoft.
 
-Administrative closure requires a standardized reason, mandatory comment, administrator identity, timestamp, and preserved evidence. It stops reminders and escalations but does not state that the business condition was fixed. Before confirmation, show incidents correlated by OT, material or reel, machine, and time window. The administrator may close the root incident and selected consequences as one audited cascade with a shared closure reference. The same historical evidence must not reopen that chain automatically; genuinely new events may create a new incident.
+Administrative closure requires a standardized reason, mandatory comment, administrator identity, timestamp, and preserved evidence. It stops reminders and escalations but does not state that the business condition was fixed. Before confirmation, show incidents correlated by OT, material or reel, machine, and time window. The administrator may close the root incident and selected consequences as one audited cascade with a shared closure reference. While the same uninterrupted ERP condition persists, Monitor suppresses reopening that closed occurrence. A healthy polling cycle that proves the condition cleared ends the suppression; if the condition later recurs, Monitor creates a new incident occurrence.
 
 Monitor does not create, submit, approve, track, or apply adjustment requests. It provides a read-only record of the closure, its evidence, and its EmusaSoft references. Any later adjustment workflow belongs entirely to EmusaSoft and remains outside Monitor.
 
@@ -107,9 +107,9 @@ For the A01 exception described during review, material may have been physically
 
 - Corrected E01 terminology: readiness uses the machine-specific safety warehouse, while each extrusion container holds one resin for the current OT.
 - Kept E04 as a separate formulation-proportion rule because a wrong resin mix can pass D03 aggregate mass balance.
-- Applied E04 to both extrusion and Exlam and removed duplicate F01.
-- Generalized A04 to cover missing or implausible output in reels or bags and removed duplicate G01.
-- Removed G02 because ERP catalog review found stored bundle counters but did not establish an independently declared package total that could create the proposed mismatch.
+- Applied E04 to both extrusion and Exlam and removed the duplicate operation-specific formulation candidate.
+- Generalized A04 to cover missing or implausible output in reels or bags and removed the duplicate bag-output candidate.
+- Removed the unsupported package-count candidate because ERP catalog review found stored bundle counters but did not establish an independently declared package total that could create the proposed mismatch.
 
 ## Changes for iteration 6 (then considered final; superseded by later iterations)
 
@@ -122,7 +122,7 @@ For the A01 exception described during review, material may have been physically
 
 - Added an alert-distribution model based on `OT → machine → operation → shift → named operator` and the machine warehouse as a proxy into zones of influence.
 - Added a distribution rule under every active alert card.
-- Required runtime resolution of named people from the OT, shift roster, event actor, and live zone assignments instead of notifying every user in a zone.
+- Required runtime resolution of named people from the OT, shift roster, actor recorded on the relevant ERP evidence, and live zone assignments instead of notifying every user in a zone.
 - Added concrete named examples from current P15, AMP-001, Balanza PP, and KF1 configuration for review; these examples are not hard-coded recipients.
 
 ## Changes for iteration 8
@@ -165,7 +165,7 @@ For the A01 exception described during review, material may have been physically
 | When it happens | At 60 minutes before planned OT start, required material is unavailable in the warehouse or has not been reserved. At 30 minutes before start, the same incident is updated if the material has not been dispatched. |
 | Why the alert exists | The OT is at risk of starting without the required material at the machine. |
 | Possible causes | The material planner did not reserve the material or secure its short-term availability; a supplier has not delivered; or the material was reserved but warehouse dispatch is late. |
-| Example | OT 151200.1 starts at 10:00. At 09:00, one substrate is not reserved because it is not in stock. At 09:30, the incident states: `Not dispatched because material is not reserved and not available in the warehouse`. |
+| Example | OT 151200.1 starts at 10:00. At 09:00, one substrate is not reserved because it is not in stock. At 09:30, the user-visible incident states: `No despachado porque el material no está reservado ni disponible en almacén`. |
 
 **Detection indicators and algorithm:** At `planned start - 60 minutes`, evaluate required materials, reservation records, warehouse availability, and open purchase or supplier-delivery status. At `planned start - 30 minutes`, add dispatch status. Maintain one incident per OT and required material. Use reason codes such as `not_reserved_stock_available`, `material_not_in_warehouse`, `purchase_or_supplier_pending`, and `reserved_not_dispatched`.
 
@@ -266,7 +266,7 @@ For the A01 exception described during review, material may have been physically
 
 ### A07 — Possible raw material consumed but not declared
 
-**Alert label:** Error posible → Error when verified weights confirm the gap
+**Alert label:** Error posible → Error
 **Scope:** Operations that produce weighed or statistically estimable output
 
 | Field | Definition |
@@ -316,7 +316,7 @@ For the A01 exception described during review, material may have been physically
 
 **Primary action owner:** Previous OT still running or schedule simply delayed → **Planner**. Nothing running and no recorded pause → **OT machine operator** until the real machine state is recorded; after that, the **Planner** owns the plan update.
 
-**Resolution:** If the preceding OT is still running, the planner supplies the expected delay and selects `Update All Plan`; the system shifts every subsequent OT on that machine. If nothing is running, record a categorized equipment pause and then update the plan. If the historical delay can no longer be reconstructed, an administrator closes without resolution and preserves the observed delay and affected plan version.
+**Resolution:** If the preceding OT is still running, the planner supplies the expected delay and selects `Actualizar todo el plan`; the system shifts every subsequent OT on that machine. If nothing is running, record a categorized equipment pause and then update the plan. If the historical delay can no longer be reconstructed, an administrator closes without resolution and preserves the observed delay and affected plan version.
 
 
 ### B03 — Machine has no active OT for more than 30 minutes
@@ -334,7 +334,7 @@ For the A01 exception described during review, material may have been physically
 
 **Primary action owner:** No machine-state or pause record → **OT machine operator**. Valid pause exists but the production plan still expects activity → **Planner**.
 
-**Resolution:** Record the machine’s real state using the equipment-pause workflow, including category, explanation when required, and expected duration. Then shift the remaining plan using the same `Update All Plan` behavior described in `B02`. Close normally when an OT starts, a valid pause is recorded, or the plan no longer expects production. If the interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration.
+**Resolution:** Record the machine’s real state using the equipment-pause workflow, including category, explanation when required, and expected duration. Then shift the remaining plan using the same `Actualizar todo el plan` behavior described in `B02`. Close normally when an OT starts, a valid pause is recorded, or the plan no longer expects production. If the interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration.
 
 
 ## C — Statistical and physical plausibility
@@ -541,7 +541,7 @@ Apply these rules to every alert:
 3. Inform the operator assigned to the OT, machine, and shift when the exception concerns machine execution or production.
 4. Determine the primary action owner from the alert code and reason mapping documented under each alert. This routing is deterministic and configurable; an LLM never selects operational recipients.
 5. Add only implicated supporting positions: material planner, planner, raw-material warehouse dispatcher or sender, raw-material warehouse supervisor or leader, process-team operator, or process-team supervisor. Include them only when the evidence or required action implicates their area.
-6. Resolve actual people through Monitor's Operational Responsibility Roster, supplemented by the OT and event actor. Positions define routing; personal names are runtime results, never hard-coded rules.
+6. Resolve actual people through Monitor's Operational Responsibility Roster, supplemented by the OT and actor recorded on the relevant ERP evidence. Positions define routing; personal names are runtime results, never hard-coded rules.
 7. Deduplicate recipients and correlated incidents so each person receives one notification for the same incident chain.
 
 ### Operational Responsibility Roster
@@ -565,7 +565,7 @@ Codes not listed use the seven general rules without modification.
 
 ## Distribution role glossary
 
-These are positions, not personal names. Actual people are resolved through the Operational Responsibility Roster, supplemented by the OT and event actor.
+These are positions, not personal names. Actual people are resolved through the Operational Responsibility Roster, supplemented by the OT and actor recorded on the relevant ERP evidence.
 
 | Position | Working definition |
 |---|---|
