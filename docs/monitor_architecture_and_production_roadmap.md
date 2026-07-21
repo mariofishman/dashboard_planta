@@ -758,6 +758,17 @@ Exit gate: pilot SLOs, user acceptance, and security criteria pass for an agreed
 
 Deliverables include gradual rollout by operation/plant, backups and restore tests, disaster recovery, capacity tests, security review, continuous evolution of Monitor's design system and four screens, rule governance, localization, and approved integrations/rules.
 
+### Phase 11 — Detection-latency optimization (optional, access-gated)
+
+**Effort:** opportunistic; only after Phase 10 and only if the access precondition is met
+**Objective:** reduce detection latency for urgency-sensitive alerts without changing the detection or resolution model.
+
+**Precondition (hard gate):** EmusaSoft grants and documents binlog access (`REPLICATION SLAVE` / `REPLICATION CLIENT`) on the approved endpoint, provisioned as supported infrastructure and distinct from the read-only `SELECT` user. If this access is not granted, Phase 11 is not implemented and Monitor operates on scheduled polling alone with no loss of correctness or independence.
+
+Deliverables include an optional binlog Change-Data-Capture listener built on **`go-mysql` (siddontang/go-mysql)** that subscribes to committed row events on the approved tables and, on a relevant change, triggers an immediate run of the corresponding approved condition query. The CDC signal is only a hint to poll sooner: it never creates, updates, or resolves an incident directly, never carries resolution semantics, and never replaces the scheduled cycle. Scheduled condition-based polling (Phase 3) remains the authoritative path for detection completeness and for resolving cleared conditions. Also includes dual-run validation proving CDC-triggered and scheduled evaluations agree, automatic fallback to polling on stream lag/gaps/disconnect with no missed conditions, and load and lag guards so the listener never overloads the source.
+
+Exit gate: for a selected urgency-sensitive alert, CDC-triggered evaluation lowers median detection latency versus the scheduled interval while dual-run validation shows identical incident outcomes, and a forced stream failure transparently falls back to polling without missing or mis-resolving any condition.
+
 ## 19. Main product screens
 
 Technical phases sequence implementation but are not separate product releases. The current product has four main screens:

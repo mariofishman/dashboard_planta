@@ -33,6 +33,8 @@ Every successful cycle re-derives the alert's current state. A missed cycle does
 
 Monitor-owned WebSockets remain the bidirectional real-time channel between Monitor's backend and its clients.
 
+Binlog Change-Data-Capture is not rejected as a future latency optimization, only as a detection or resolution path. An optional, access-gated CDC listener may later trigger an immediate run of an approved condition query (see Phase 11 in `monitor_architecture_and_production_roadmap.md`). It remains subordinate to scheduled polling, carries no resolution semantics, and is implemented only if EmusaSoft provisions binlog access.
+
 ## 3. Authentication and access
 
 - **Database:** EmusaSoft provisions environment-specific no-write credentials and a documented rotation procedure. Automated tests must prove that write operations are impossible.
