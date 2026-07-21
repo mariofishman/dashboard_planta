@@ -1,0 +1,88 @@
+{
+  "fixtureVersion": "1.0.0",
+  "cases": [
+    {"id":"A01-trigger","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":45,"materialAvailable":false,"reserved":false,"dispatched":false},"expectedStatus":"triggered","expectedReasons":["material_not_in_warehouse"]},
+    {"id":"A01-clear","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":20,"materialAvailable":true,"reserved":true,"dispatched":true},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A01-insufficient","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":20,"materialAvailable":true,"reserved":true},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"A02-trigger","ruleCode":"A02","input":{"materialFlowDetailId":202,"isWorkOrderReservation":true,"state":"TRANSITO","receivedAt":null,"elapsedMinutes":31},"expectedStatus":"triggered","expectedReasons":["not_received"]},
+    {"id":"A02-clear","ruleCode":"A02","input":{"materialFlowDetailId":202,"isWorkOrderReservation":true,"state":"RECIBIDO","receivedAt":"2026-07-20T10:20:00Z","elapsedMinutes":20},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A02-insufficient","ruleCode":"A02","input":{"materialFlowDetailId":202,"isWorkOrderReservation":true,"state":"TRANSITO","receivedAt":null},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"A03-trigger","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":15,"consumptionCount":0,"strongerA07":false},"expectedStatus":"triggered","expectedReasons":["no_first_consumption"]},
+    {"id":"A03-clear","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":27,"consumptionCount":1,"strongerA07":false},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A03-insufficient","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":15,"consumptionCount":0},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"A04-trigger","ruleCode":"A04","input":{"workOrderId":104,"consumedInputKg":1000,"declaredOutputKg":300,"declaredWasteKg":100,"rewinderCapacityKg":500,"toleranceKg":20},"expectedStatus":"triggered","expectedReasons":["capacity_exceeded"]},
+    {"id":"A04-clear","ruleCode":"A04","input":{"workOrderId":104,"consumedInputKg":1000,"declaredOutputKg":400,"declaredWasteKg":100,"rewinderCapacityKg":500,"toleranceKg":20},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A04-insufficient","ruleCode":"A04","input":{"workOrderId":104,"consumedInputKg":1000,"declaredOutputKg":300,"declaredWasteKg":100,"toleranceKg":20},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"A05-trigger","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":31,"weighed":false,"sourceWorkOrderFinished":true,"movedFromMachine":false},"expectedStatus":"triggered","expectedReasons":["not_weighed","still_at_machine"]},
+    {"id":"A05-clear","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":31,"weighed":true,"sourceWorkOrderFinished":true,"movedFromMachine":true},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A05-insufficient","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":31,"weighed":false,"sourceWorkOrderFinished":true},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"A06-trigger","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteAgeMinutes":31,"wasteWeighed":false,"balanceSuggestsWaste":false,"specificD03Exists":false},"expectedStatus":"triggered","expectedReasons":["waste_not_weighed"]},
+    {"id":"A06-clear","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteAgeMinutes":31,"wasteWeighed":true,"balanceSuggestsWaste":false,"specificD03Exists":false},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A06-insufficient","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteAgeMinutes":31,"wasteWeighed":false,"balanceSuggestsWaste":false},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"A07-trigger","ruleCode":"A07","input":{"workOrderId":107,"goodOutputKg":700,"wasteKg":100,"declaredInputKg":500,"toleranceKg":20},"expectedStatus":"triggered","expectedReasons":["input_evidence_gap"]},
+    {"id":"A07-clear","ruleCode":"A07","input":{"workOrderId":107,"goodOutputKg":700,"wasteKg":100,"declaredInputKg":790,"toleranceKg":20},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A07-insufficient","ruleCode":"A07","input":{"workOrderId":107,"goodOutputKg":700,"wasteKg":100,"declaredInputKg":500},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"B01-trigger","ruleCode":"B01","input":{"workOrderId":201,"actualStarted":true,"nextApprovedWorkOrderId":202,"sequenceUpdatedBeforeStart":false},"expectedStatus":"triggered","expectedReasons":["outside_approved_sequence"]},
+    {"id":"B01-clear","ruleCode":"B01","input":{"workOrderId":201,"actualStarted":true,"nextApprovedWorkOrderId":201,"sequenceUpdatedBeforeStart":false},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"B01-insufficient","ruleCode":"B01","input":{"workOrderId":201,"actualStarted":true,"sequenceUpdatedBeforeStart":false},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"B02-trigger","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false,"approvedReschedule":false},"expectedStatus":"triggered","expectedReasons":["planned_start_missed"]},
+    {"id":"B02-clear","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false,"approvedReschedule":true},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"B02-insufficient","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"B03-trigger","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","expectedToOperate":true,"activeWorkOrder":false,"excludedState":false,"idleMinutes":31},"expectedStatus":"triggered","expectedReasons":["unexplained_machine_idle"]},
+    {"id":"B03-clear","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","expectedToOperate":true,"activeWorkOrder":false,"excludedState":true,"idleMinutes":31},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"B03-insufficient","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","expectedToOperate":true,"activeWorkOrder":false,"excludedState":false},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"C01-trigger","ruleCode":"C01","input":{"articleSerialId":301,"actualKg":700,"lowerKg":250,"upperKg":600,"sampleCount":30,"minimumSampleSize":20},"expectedStatus":"triggered","expectedReasons":["weight_outside_range"]},
+    {"id":"C01-clear","ruleCode":"C01","input":{"articleSerialId":301,"actualKg":450,"lowerKg":250,"upperKg":600,"sampleCount":30,"minimumSampleSize":20},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"C01-insufficient","ruleCode":"C01","input":{"articleSerialId":301,"actualKg":700,"lowerKg":250,"upperKg":600,"minimumSampleSize":20},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"C02-trigger","ruleCode":"C02","input":{"workOrderId":302,"actualWasteKg":450,"lowerKg":60,"upperKg":100,"sampleCount":30,"minimumSampleSize":20},"expectedStatus":"triggered","expectedReasons":["waste_outside_range"]},
+    {"id":"C02-clear","ruleCode":"C02","input":{"workOrderId":302,"actualWasteKg":80,"lowerKg":60,"upperKg":100,"sampleCount":30,"minimumSampleSize":20},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"C02-insufficient","ruleCode":"C02","input":{"workOrderId":302,"actualWasteKg":450,"lowerKg":60,"upperKg":100,"minimumSampleSize":20},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"C06-trigger","ruleCode":"C06","input":{"workOrderId":306,"outputMeters":12000,"effectiveRuntimeMinutes":10,"minimumMetersPerMinute":100,"maximumMetersPerMinute":400},"expectedStatus":"triggered","expectedReasons":["production_rate_outside_range"]},
+    {"id":"C06-clear","ruleCode":"C06","input":{"workOrderId":306,"outputMeters":2500,"effectiveRuntimeMinutes":10,"minimumMetersPerMinute":100,"maximumMetersPerMinute":400},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"C06-insufficient","ruleCode":"C06","input":{"workOrderId":306,"outputMeters":12000,"minimumMetersPerMinute":100,"maximumMetersPerMinute":400},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"D01-trigger","ruleCode":"D01","input":{"workOrderId":401,"consumedReelMeters":30000,"declaredRunMeters":40000,"toleranceMeters":500},"expectedStatus":"triggered","expectedReasons":["declared_meters_exceed_input"]},
+    {"id":"D01-clear","ruleCode":"D01","input":{"workOrderId":401,"consumedReelMeters":30000,"declaredRunMeters":30300,"toleranceMeters":500},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"D01-insufficient","ruleCode":"D01","input":{"workOrderId":401,"consumedReelMeters":30000,"declaredRunMeters":40000},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"D02-trigger","ruleCode":"D02","input":{"workOrderId":402,"articleSerialId":42,"fullProductionCompleted":true,"reservedReelDelivered":true,"reelConsumed":false,"truncated":false},"expectedStatus":"triggered","expectedReasons":["delivered_reel_unconsumed"]},
+    {"id":"D02-clear","ruleCode":"D02","input":{"workOrderId":402,"articleSerialId":42,"fullProductionCompleted":true,"reservedReelDelivered":true,"reelConsumed":true,"truncated":false},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"D02-insufficient","ruleCode":"D02","input":{"workOrderId":402,"articleSerialId":42,"fullProductionCompleted":true,"reservedReelDelivered":true,"reelConsumed":false},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"D03-trigger","ruleCode":"D03","input":{"workOrderId":403,"consumedInputKg":1500,"goodOutputKg":1300,"wasteKg":90,"specificCausePresent":false},"expectedStatus":"triggered","expectedReasons":["mass_balance_gap"]},
+    {"id":"D03-clear","ruleCode":"D03","input":{"workOrderId":403,"consumedInputKg":1500,"goodOutputKg":1300,"wasteKg":200,"specificCausePresent":false},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"D03-insufficient","ruleCode":"D03","input":{"workOrderId":403,"consumedInputKg":1500,"goodOutputKg":1300,"wasteKg":90},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"D04-trigger","ruleCode":"D04","input":{"workOrderId":404,"consumedReelMeters":10000,"declaredRunMeters":5000,"remnantReelMeters":0,"toleranceMeters":500},"expectedStatus":"triggered","expectedReasons":["unexplained_consumed_meters"]},
+    {"id":"D04-clear","ruleCode":"D04","input":{"workOrderId":404,"consumedReelMeters":10000,"declaredRunMeters":5000,"remnantReelMeters":4800,"toleranceMeters":500},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"D04-insufficient","ruleCode":"D04","input":{"workOrderId":404,"consumedReelMeters":10000,"declaredRunMeters":5000,"remnantReelMeters":0},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"E01-trigger","ruleCode":"E01","input":{"workOrderId":501,"articleId":51,"machineWarehouseMapped":true,"minutesToPlannedStart":180,"safetyStockKg":100,"demandNext4HoursKg":200},"expectedStatus":"triggered","expectedReasons":["safety_inventory_shortfall"]},
+    {"id":"E01-clear","ruleCode":"E01","input":{"workOrderId":501,"articleId":51,"machineWarehouseMapped":true,"minutesToPlannedStart":180,"safetyStockKg":220,"demandNext4HoursKg":200},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"E01-insufficient","ruleCode":"E01","input":{"workOrderId":501,"articleId":51,"minutesToPlannedStart":180,"safetyStockKg":100,"demandNext4HoursKg":200},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"E02-trigger","ruleCode":"E02","input":{"workOrderId":502,"locationId":5,"articleId":52,"workOrderOpen":true,"recipeRequiresMaterial":true,"openingQuantityRecorded":false},"expectedStatus":"triggered","expectedReasons":["opening_quantity_missing"]},
+    {"id":"E02-clear","ruleCode":"E02","input":{"workOrderId":502,"locationId":5,"articleId":52,"workOrderOpen":true,"recipeRequiresMaterial":true,"openingQuantityRecorded":true},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"E02-insufficient","ruleCode":"E02","input":{"workOrderId":502,"locationId":5,"articleId":52,"workOrderOpen":true,"recipeRequiresMaterial":true},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"E03-trigger","ruleCode":"E03","input":{"previousWorkOrderId":502,"currentWorkOrderId":503,"locationId":5,"articleId":52,"previousClosingKg":420,"currentOpeningKg":365,"interveningMovement":false,"toleranceKg":5},"expectedStatus":"triggered","expectedReasons":["container_continuity_gap"]},
+    {"id":"E03-clear","ruleCode":"E03","input":{"previousWorkOrderId":502,"currentWorkOrderId":503,"locationId":5,"articleId":52,"previousClosingKg":420,"currentOpeningKg":418,"interveningMovement":false,"toleranceKg":5},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"E03-insufficient","ruleCode":"E03","input":{"previousWorkOrderId":502,"currentWorkOrderId":503,"locationId":5,"articleId":52,"previousClosingKg":420,"currentOpeningKg":365,"interveningMovement":false},"expectedStatus":"insufficient","expectedReasons":[]},
+
+    {"id":"E04-trigger","ruleCode":"E04","input":{"workOrderId":504,"articleId":54,"screwId":1,"openingKg":100,"addedKg":0,"endingKg":90,"totalActualConsumptionKg":100,"recipeFraction":0.05,"ingredientToleranceFraction":0.02},"expectedStatus":"triggered","expectedReasons":["recipe_proportion_gap"]},
+    {"id":"E04-clear","ruleCode":"E04","input":{"workOrderId":504,"articleId":54,"screwId":1,"openingKg":100,"addedKg":0,"endingKg":95,"totalActualConsumptionKg":100,"recipeFraction":0.05,"ingredientToleranceFraction":0.02},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"E04-insufficient","ruleCode":"E04","input":{"workOrderId":504,"articleId":54,"screwId":1,"openingKg":100,"addedKg":0,"endingKg":90,"recipeFraction":0.05,"ingredientToleranceFraction":0.02},"expectedStatus":"insufficient","expectedReasons":[]}
+  ]
+}

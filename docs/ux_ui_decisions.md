@@ -54,7 +54,7 @@ The former idea of a third bottom-navigation destination called **Messages** was
 
 - EmusaSoft remains the operational system of record.
 - Monitor owns incidents, alert evidence, conversations, messages, read state, pins, reactions, and audit history.
-- Work orders and other operational entities open in the corresponding EmusaSoft view.
+- Work orders and other operational entities remain identifiable through their ERP codes and evidence; Monitor exposes no unsupported navigation route.
 - A conversation maintains the shared history of the incident instead of producing duplicate alerts for each reply or system update.
 
 ### 2.5 Participants and visibility
@@ -379,9 +379,9 @@ The alert object may contain:
 
 ### 7.2 Primary destinations
 
-The object has two clear destinations:
+The object has two clear actions:
 
-1. open the related EmusaSoft work order or operational record; and
+1. copy or inspect the related EmusaSoft work-order or operational-record identifier; and
 2. expand a concise explanation and resolution guide.
 
 The resolution guide explains what is blocked or inconsistent and the safe steps for investigating or correcting it through the existing operational workflow.
@@ -390,7 +390,7 @@ The resolution guide explains what is blocked or inconsistent and the safe steps
 
 - The object is keyboard focusable.
 - Selecting the object may expand its summary unless the user selected a nested link or button.
-- The work-order action is a real link.
+- The work-order identifier can be copied; it is not presented as an unsupported external link.
 - The summary action exposes its expanded state.
 - Open-alert jump controls target the object directly.
 - An alert attachment keeps enough evidence to be useful when forwarded.
@@ -576,7 +576,7 @@ The filtered detail table includes:
 - status; and
 - navigation to the related conversation or detail.
 
-Work-order numbers are clickable and open the corresponding order. Horizontal scrolling is permitted on small screens because hiding operational columns would remove important evidence.
+Work-order numbers are selectable and copyable identifiers. Horizontal scrolling is permitted on small screens because hiding operational columns would remove important evidence.
 
 ### 10.10 Report export
 

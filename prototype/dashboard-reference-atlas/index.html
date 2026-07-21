@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UI Reference Atlas</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Design research</p>
+      <h1 id="page-title">UI Reference Atlas</h1>
+    </div>
+    <nav class="tabs" aria-label="Review stages">
+      <button class="tab is-active" type="button" data-tab="selection">1. Select references</button>
+      <button class="tab" type="button" data-tab="analysis">2. Analyze components</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="selection" class="tab-panel is-active" aria-labelledby="selection-heading">
+      <header class="section-heading">
+        <div>
+          <p class="step">Step 1</p>
+          <h2 id="selection-heading">Choose useful directions</h2>
+          <p>Review the complete screens. Keep promising references and explain what should influence the next search.</p>
+        </div>
+        <p id="selection-count" class="count"></p>
+      </header>
+      <div id="rounds" class="rounds"></div>
+    </section>
+
+    <section id="analysis" class="tab-panel" aria-labelledby="analysis-heading">
+      <header class="section-heading analysis-heading">
+        <div>
+          <p class="step">Step 2</p>
+          <h2 id="analysis-heading">Annotate useful components</h2>
+          <p>Inspect accepted screens in context, then comment on the selectable regions.</p>
+        </div>
+        <label class="boundary-toggle"><input id="show-boundaries" type="checkbox"> Show region boundaries</label>
+      </header>
+      <div id="accepted-empty" class="empty-state">Select references in Step 1 to analyze them here.</div>
+      <div id="analysis-list" class="analysis-list"></div>
+    </section>
+  </main>
+
+  <script src="atlas-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

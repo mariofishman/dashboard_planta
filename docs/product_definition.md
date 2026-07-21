@@ -27,7 +27,7 @@ The earlier dashboard-only product direction is superseded. Technical implementa
 - Monitor detects current ERP conditions through approved read-only SQL queries against an EmusaSoft Aurora MySQL replica and uses its own WebSockets for clients. EmusaSoft provides no SSE service to Monitor.
 - Monitor never writes to the EmusaSoft database.
 - Monitor does not create, submit, approve, track, or apply adjustment requests.
-- Monitor links incidents to relevant EmusaSoft screens, such as work orders or material reservations, where users perform every correction.
+- Monitor shows the ERP identifiers and evidence needed to locate relevant work orders or material reservations in EmusaSoft, where users perform every correction.
 - Incidents closed without resolution remain available through a read-only evidence view. Any later adjustment belongs entirely to EmusaSoft.
 - Closing without resolution suppresses only the same uninterrupted condition until a healthy polling cycle proves it cleared. A later recurrence creates a new incident occurrence.
 
@@ -83,4 +83,4 @@ The following files remain only for history or inspiration and have no current p
 - Confirm unresolved alert formulas, tolerances, data mappings, and representative live evidence identified by the alert catalog and architecture roadmap.
 - Define production policies for identity, permissions, retention, attachments, moderation, reporting, offline behavior, and external notification channels.
 
-Phase 0 is complete and Phase 1 may begin locally. External EmusaSoft and MCP delivery dependencies are tracked in `docs/emusasoft_preimplementation_requests.md`; they gate the affected Phase 10 integration tests, not local product construction. EmusaSoft exposes no supported frontend-route contract, so Monitor shows ERP identifiers and evidence rather than promising deep links.
+Phases 0 and 1 are complete locally. Every active alert has a versioned executable rule contract and reproducible triggered, clear, and insufficient fixture cases under `docs/phase1/`. External EmusaSoft and MCP delivery dependencies gate the affected Phase 10 integration tests, not local product construction. EmusaSoft exposes no supported frontend-route contract, so Monitor shows ERP identifiers and evidence rather than promising deep links.

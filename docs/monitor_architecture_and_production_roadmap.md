@@ -6,12 +6,12 @@
 
 **Version:** 1.2
 
-**Status:** Phase 0 complete; Phase 1 authorized for local-first implementation
+**Status:** Phases 0–4 complete locally; Phase 5 not started
 
 **Analysis date:** 2026-07-21
 
 **Primary sources:** EmusaSoft MCP catalog, production MySQL schema extracted on 2026-07-16, workspace documentation and prototypes, and EmusaSoft architect answers through 2026-07-20
-**Not included:** application scaffold, application code, executable migrations, or EmusaSoft changes
+**Not included:** EmusaSoft changes or real EmusaSoft integration before Phase 10
 
 ## 1. Architecture decision summary
 
@@ -361,7 +361,7 @@ Consumption can be traced to serial, location, stock, container, pre-reservation
 
 | Component | Responsibility |
 |---|---|
-| Monitor Web | Dashboard, chat list, chat detail, roster, evidence, and ERP links. |
+| Monitor Web | Dashboard, chat list, chat detail, roster, evidence, and ERP identifiers. |
 | Monitor API | UI contract, authorization, queries, history, and persistent commands; GraphQL or REST selected by ADR. |
 | Identity Adapter | Authenticates users and maps them to EmusaSoft users and operational scopes. |
 | Detection Query Registry | Stores approved query versions, natural-key schemas, result contracts, intervals, and load limits. |
@@ -679,6 +679,8 @@ Deliverables include detection-query contracts, table/field/join/unit/timestamp 
 
 Exit gate: each candidate rule produces a reproducible fixture result or is explicitly excluded from the initial production implementation.
 
+**Execution record (2026-07-21):** all 21 active rules have versioned contracts, source mappings, natural keys, classifications, parameters, evidence requirements, predicates, reason rules, resolution behavior, correlations, and production dependencies under `docs/phase1/`. Sixty-three sanitized fixtures reproduce triggered, clear, and insufficient outcomes. Contract tests validate the JSON Schema, evaluator, stable condition identity, and 76 backup-confirmed fields across 17 protected local tables. A02 and A05 retain their Phase 0 local-query proof; every other rule is fixture-proven with production dependencies explicit. The Phase 1 local exit gate passes. Phase 2 is complete locally.
+
 ### Phase 2 — Platform foundation
 
 **Effort:** 2–3 weeks
@@ -687,6 +689,8 @@ Exit gate: each candidate rule produces a reproducible fixture result or is expl
 Deliverables include repository and CI, local/test environments, Monitor API, relational database and migrations, a replaceable mock identity adapter and mock authentication page, server-side authorization from mock claims, structured logs/metrics/traces/health checks, local secret handling, Redis, cursor-based WebSocket gateway, and feature flags. The authentication boundary must be contract-tested so the EmusaSoft authentication microservice can replace the mock adapter in Phase 10.
 
 Exit gate: local test users authenticate through the mock provider, receive correct server-calculated scopes, open a WebSocket session, and no application component has an EmusaSoft write path.
+
+**Execution record (2026-07-21):** the TypeScript workspaces, CI workflow, Fastify API, Monitor-owned PostgreSQL-compatible schema and migration, replaceable identity adapter, Material UI mock login and application shell, server authorization, observability endpoints, Redis adapter, cursor-based Socket.IO gateway, and feature flags are implemented. Local PGlite avoids requiring Docker while preserving the PostgreSQL migration path. Eight automated tests pass, the dependency audit reports zero vulnerabilities, and browser checks pass at desktop and mobile widths. The exit gate passes locally: users authenticate, scopes remain server-controlled, WebSockets connect and resume cursors, and the application contains no EmusaSoft write integration. Detailed evidence is in `docs/phase2/README.md`. Phase 3 is complete locally.
 
 ### Phase 3 — Polling, freshness, and recovery
 
@@ -697,12 +701,16 @@ Deliverables include the detection-query registry and scheduler; local read adap
 
 Exit gate: local tests simulate timeouts, partial results, invalid schemas, stale-source signals, and downtime without resolving incidents incorrectly, then recover correct current condition state on the next healthy cycle.
 
+**Execution record (2026-07-21):** the registry, scheduler, bounded runner, retry/backoff, fixed and fake freshness providers, result-integrity guards, poll-cycle diagnostics, condition-state reconciliation, recovery entry point, read-only A02/A05 backup adapters, all-rule fixture adapters, authenticated diagnostics API, and clearly labeled local diagnostic screen are implemented. Tests cover timeouts, partial and truncated results, invalid schemas, stale and unknown freshness, source-revision changes, duplicate keys, downtime, recovery, overlap protection, concurrency, retry, all 21 fixture contracts, and the protected A02/A05 backup pagination and index plans. The local exit gate passes. Phase 4 is now complete locally; Aurora freshness and capacity proof remain Phase 10.
+
 ### Phase 4 — Incident vertical slice
 
 **Effort:** 2–3 weeks
 **Objective:** deliver a complete chain using low-risk rules A02, A03, and A05.
 
 Deliverables include the rule engine, incident/evidence/transitions/deduplication, automatic resolution, basic correlation, incident API, post-commit WebSocket events, and dashboard/detail views connected to local sample data.
+
+**Execution record (2026-07-21):** A02, A03, and A05 now run through a versioned local rule evaluator into Monitor-owned incident, immutable evidence, transition, recurrence, deduplication, and work-order correlation storage. Authorized list/detail/change-recovery APIs expose only committed records; WebSocket publication occurs after the incident and change-event transaction commits. The Material UI dashboard is connected to seeded local incident histories with global filters and evidence detail. Automated tests cover triggered, clear, insufficient, deduplication, automatic resolution, recurrence, post-commit publication, API authorization, and cursor recovery. Desktop and 390 px mobile browser validation pass without page-level horizontal overflow. The user accepted the local Phase 4 functional gate on 2026-07-21 while explicitly withholding approval of the dashboard design. Work stops here until the roadmap is revised; Phase 5 has not started. All real EmusaSoft integration remains Phase 10.
 
 Exit gate: synthetic and anonymized historical cases create, update, and resolve one explainable incident.
 
@@ -773,7 +781,7 @@ Technical phases sequence implementation but are not separate product releases. 
 
 The first three screens have active prototypes. The fourth was identified during alert-catalog work and must be designed before implementation.
 
-## 20. Decisions pending before coding
+## 20. Decisions pending before Phase 10 integration
 
 1. Approved detection queries, stable natural keys, result bounds, indexes, plans, and initial polling intervals for the first implemented alerts.
 2. Replica credentials, freshness-signal access, thresholds, and load limits.

@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://monitor.emusa.dev/contracts/alert-rules/1.0.0",
+  "title": "Monitor Phase 1 alert-rule catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contractVersion", "catalogRevision", "rules"],
+  "properties": {
+    "contractVersion": { "const": "1.0.0" },
+    "catalogRevision": { "const": "2026-07-20" },
+    "rules": {
+      "type": "array",
+      "minItems": 21,
+      "maxItems": 21,
+      "items": { "$ref": "#/$defs/rule" }
+    }
+  },
+  "$defs": {
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code", "title", "ruleVersion", "queryId", "queryVersion",
+        "keySchemaVersion", "naturalKey", "classification", "labels",
+        "productionReadiness", "sourceMappings", "requiredEvidence",
+        "parameters", "predicate", "reasonRules", "resolution",
+        "correlations", "productionDependencies"
+      ],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-E][0-9]{2}$" },
+        "title": { "type": "string", "minLength": 5 },
+        "ruleVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "queryId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "queryVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+-candidate$" },
+        "keySchemaVersion": { "type": "integer", "minimum": 1 },
+        "naturalKey": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*$" }
+        },
+        "classification": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "enum": ["deterministic", "deadline", "physical", "statistical"] }
+        },
+        "labels": {
+          "type": "array", "minItems": 1,
+          "items": { "enum": ["Error", "Por vencer", "Alerta", "Error posible"] }
+        },
+        "productionReadiness": {
+          "enum": ["local-query-proven", "fixture-proven-production-pending"]
+        },
+        "sourceMappings": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["source", "fields", "evidence"],
+            "properties": {
+              "source": { "type": "string" },
+              "fields": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+              "evidence": { "enum": ["backup-confirmed", "documentation-confirmed", "phase10-pending"] }
+            }
+          }
+        },
+        "requiredEvidence": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[a-z][A-Za-z0-9]*$" }
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object", "additionalProperties": false,
+            "required": ["value", "unit", "status"],
+            "properties": {
+              "value": {
+                "anyOf": [
+                  { "type": "number" },
+                  { "type": "string" },
+                  { "type": "boolean" }
+                ]
+              },
+              "unit": { "type": "string" },
+              "status": { "enum": ["approved", "provisional", "fixture-only"] }
+            }
+          }
+        },
+        "predicate": { "type": "object", "minProperties": 1 },
+        "reasonRules": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["code", "when"],
+            "properties": {
+              "code": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+              "when": { "type": "object", "minProperties": 1 }
+            }
+          }
+        },
+        "resolution": { "type": "string", "minLength": 5 },
+        "correlations": { "type": "array", "items": { "type": "string" } },
+        "productionDependencies": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

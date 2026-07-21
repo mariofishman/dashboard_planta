@@ -11,6 +11,10 @@ Monitor is a factory alert and collaboration product with four main screens: Das
 - `docs/emusasoft_preimplementation_requests.md` — owned delivery requests for the EmusaSoft and MCP implementation teams.
 - `docs/emusasoft_integration_architecture.md` — approved read-only SQL polling contract between Monitor and EmusaSoft.
 - `docs/codex_implementation_kickoff.md` — reusable prompts and phase-gated workflow for starting implementation with Codex.
+- `apps/api/` — Monitor API, mock identity boundary, authorization, health, metrics, and WebSocket gateway.
+- `apps/web/` — Material UI mock login and approved local incident dashboard.
+- `packages/` — shared contracts, database migrations, detection, incident lifecycle, and design-system theme.
+- `docs/phase0/` through `docs/phase4/` — phase checklists and validation evidence.
 - `prototype/chat-list-review/dashboard.html` — current dashboard prototype.
 - `prototype/chat-list-review/chat-list-final.html` — current chat-list prototype.
 - `prototype/chat-list-review/chat-detail.html` — current chat-detail prototype.
@@ -45,6 +49,24 @@ cp .env.example .env
 
 Never commit `.env` or expose `EMUSASOFT_MCP_TOKEN`.
 
+## Run Monitor locally
+
+```sh
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:5173` and choose a mock role. This local application uses an embedded Monitor database and does not connect to EmusaSoft.
+
+Validate the foundation with:
+
+```sh
+npm run db:migrate
+npm run typecheck
+npm test
+npm run build
+```
+
 ## Current status
 
-Phase 0 is complete and its local exit gate passes, as tracked in `docs/phase0/README.md`. The owner approved Monitor's independent, read-only product boundary on 2026-07-21 and directed the project to proceed locally. Phase 1 may begin without EmusaSoft production access or pending architect answers. Real authentication, Aurora access, current-schema and load validation, staging, pilot, and production deployment are consolidated in Phase 10.
+Phases 0–4 are complete locally. Monitor now has a mock login, server-controlled permissions, safe local detection, an incident lifecycle with evidence and recurrence, authorized APIs, recoverable live changes, and the approved product dashboard connected to sample incidents. Phase 5 has not begun. Real authentication, Aurora access, current-schema and load validation, staging, pilot, and production deployment remain consolidated in Phase 10.
