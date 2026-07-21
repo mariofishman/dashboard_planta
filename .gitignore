@@ -1,5 +1,13 @@
 .env
 .DS_Store
+node_modules/
+dist/
+coverage/
+__pycache__/
+*.pyc
+
+# Phase 0 validation databases are derived from the protected local backup.
+/local-data/phase0-validation/
 
 # Local database backups and extracted dumps
 /local-data/database/

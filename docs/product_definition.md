@@ -79,8 +79,8 @@ The following files remain only for history or inspiration and have no current p
 ## Current open decisions
 
 - Design the Operational Responsibility Roster screen, workflow, permissions, conflict handling, and audit presentation.
-- Complete the detection-query, read-only access, replica-freshness, authentication, deep-link, and WebSocket contracts.
+- Build and validate detection, authorization, freshness, and WebSocket contracts locally; integrate real EmusaSoft authentication, read-only access, current-schema validation, and replica freshness in Phase 10.
 - Confirm unresolved alert formulas, tolerances, data mappings, and representative live evidence identified by the alert catalog and architecture roadmap.
 - Define production policies for identity, permissions, retention, attachments, moderation, reporting, offline behavior, and external notification channels.
 
-The documentation is internally consistent and implementation may begin with Phase 0. External EmusaSoft and MCP delivery dependencies are tracked in `docs/emusasoft_preimplementation_requests.md`; they are implementation gates for the affected features, not reasons to reopen the approved product boundary.
+Phase 0 is complete and Phase 1 may begin locally. External EmusaSoft and MCP delivery dependencies are tracked in `docs/emusasoft_preimplementation_requests.md`; they gate the affected Phase 10 integration tests, not local product construction. EmusaSoft exposes no supported frontend-route contract, so Monitor shows ERP identifiers and evidence rather than promising deep links.

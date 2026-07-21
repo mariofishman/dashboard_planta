@@ -4,11 +4,11 @@
 
 **System:** Monitor — Dashboard, Chats, Errors, and Alerts
 
-**Version:** 1.1
+**Version:** 1.2
 
-**Status:** architecture approved to begin Phase 0
+**Status:** Phase 0 complete; Phase 1 authorized for local-first implementation
 
-**Analysis date:** 2026-07-20
+**Analysis date:** 2026-07-21
 
 **Primary sources:** EmusaSoft MCP catalog, production MySQL schema extracted on 2026-07-16, workspace documentation and prototypes, and EmusaSoft architect answers through 2026-07-20
 **Not included:** application scaffold, application code, executable migrations, or EmusaSoft changes
@@ -23,13 +23,13 @@ The confirmed target architecture is:
 2. The EmusaSoft database is an external, read-only operational source. Monitor never writes to it.
 3. EmusaSoft provides no SSE service to Monitor. EmusaSoft's internal Redis is not an integration boundary.
 4. Monitor runs approved condition-based SQL detection queries against an Aurora MySQL read replica.
-5. A Monitor-owned scheduler runs each query at a versioned per-alert interval selected during Phase 0 from urgency, measured performance, and the approved replica load budget.
+5. A Monitor-owned scheduler runs each query at a versioned per-alert interval. Local limits are measured against protected sample data; production limits are approved during Phase 10.
 6. A source-freshness guard prevents failed, partial, invalid, or stale cycles from resolving incidents.
 7. Monitor's database stores query definitions, condition state, incident occurrences, temporary suppressions, evidence, conversations, messages, receipts, deliveries, client synchronization state, and audit history.
 8. Monitor uses WebSockets for bidirectional client communication, including messages, read receipts, presence, typing, and dashboard updates.
 9. Monitor's Redis coordinates fan-out, presence, and horizontal WebSocket scaling. The database—not Redis—is the source of truth for messages and incidents.
 10. A Monitor API serves queries, history recovery, and persistent commands. WebSockets distribute committed changes and ephemeral signals.
-11. Operational records are corrected in EmusaSoft. Monitor keeps deep links and later observes the correction.
+11. Operational records are corrected in EmusaSoft. Monitor shows their ERP identifiers and later observes the correction; no supported EmusaSoft frontend-route contract currently exists.
 12. Monitor provides a read-only view of every `CLOSED_WITHOUT_RESOLUTION` incident, including evidence, reason, administrator, and operational references.
 13. Inventory, valued-kardex, and accounting adjustments are outside Monitor. Monitor never schedules, requests, tracks, or applies adjustments and never receives EmusaSoft write credentials.
 
@@ -39,7 +39,7 @@ The confirmed target architecture is:
 
 **Guiding policies:** one source of truth per domain; writes only to Monitor's database; approved bounded reads from EmusaSoft; no adjustment or document-request integration; condition polling for ERP input; WebSockets for client interaction; healthy-cycle proof before automatic resolution; persist before publishing; keep queries, detectors, and commands idempotent, versioned, and explainable; deliver deterministic rules first.
 
-**Actions:** formalize detection-query, replica-freshness, read-only access, deep-link, and WebSocket contracts; create the Monitor repository and database; build safe polling and occurrence management; deliver a vertical slice using A02, A03, and A05; enable bidirectional conversations; add the unresolved-closure view; then add balance and statistical models. The minimum proposed kit is TypeScript, a Monitor API, a relational database, Redis, a scheduler/query runner, and WebSockets. Concrete libraries must be selected through ADRs before scaffolding.
+**Actions:** formalize detection-query, replica-freshness, read-only access, navigation, and WebSocket contracts; build and harden the complete system locally with mock identity, fixtures, and protected sample databases; then integrate real EmusaSoft authentication, Aurora reads, staging, pilot, and production in Phase 10. Phase 0 selected the concrete kit in `docs/phase0/adrs/0003-technical-kit.md` and recorded every gate item in `docs/phase0/README.md`.
 
 ## 2. Confidence levels
 
@@ -47,7 +47,7 @@ The confirmed target architecture is:
 - **Inferred:** a reasonable technical conclusion based on direct evidence without access to the implementing source file.
 - **Pending:** cannot be confirmed from the available sources.
 
-The MCP does not expose repository files, dependencies, modules, controllers, resolvers, or deployment infrastructure. It exposes a generated GraphQL catalog, entities, SQL tables, examples, and the UI system. Its catalog is useful for discovery but is currently behind the extracted database and cannot alone prove a production query. The architect confirmed an Aurora MySQL read replica, condition-based SQL polling, independent Monitor ownership, and read-only access. Query contracts, replica credentials, freshness access, load limits, identity, deep links, and runtime details remain Phase 0 contracts.
+The MCP does not expose repository files, dependencies, modules, controllers, resolvers, or deployment infrastructure. It exposes a generated GraphQL catalog, entities, SQL tables, and examples. Its catalog is useful for discovery but is currently behind the extracted database and cannot alone prove a production query. The architect confirmed an Aurora MySQL read replica, condition-based SQL polling, independent Monitor ownership, and read-only access. Real credentials, freshness access, load limits, identity, current-schema validation, and runtime details are deferred to Phase 10. The architect reports no supported frontend route patterns; GraphQL operations must not be treated as browser links.
 
 **Current precedence:** the product decision dated 2026-07-19 removes the adjustment queue and every regularization API. Detection rules and evidence remain governed by the active alert catalog; unresolved closures remain a read-only Monitor view.
 
@@ -411,7 +411,7 @@ flowchart LR
 11. Monitor writes a system message and schedules allowed notifications.
 12. After commit, WebSockets publish only to authorized sessions through Monitor Redis.
 13. Client commands arrive by API or WebSocket and are validated and persisted before confirmation.
-14. Incidents expose authorized deep links to relevant EmusaSoft screens; Monitor performs no correction.
+14. Incidents expose ERP identifiers and evidence inside Monitor; Monitor performs no correction and does not fabricate browser routes from GraphQL operations.
 15. Closed-without-resolution incidents immediately enter the read-only evidence view.
 
 ### 10.4 Data-boundary rule
@@ -419,7 +419,7 @@ flowchart LR
 - **EmusaSoft:** source of truth for work orders, movements, consumption, production, serials, weighing, and other operational data.
 - **Monitor:** source of truth for rule definitions, evaluations, incidents, frozen evidence, conversations, messages, reads, deliveries, roster assignments, and administrative closures.
 - **Forbidden:** direct Monitor writes to EmusaSoft production tables.
-- **Allowed:** approved backend-only SQL detection/context queries using a read-only user, plus versioned authorized deep links.
+- **Allowed:** protected local/sample reads during Phases 1–9 and approved backend-only SQL detection/context queries using a read-only user during Phase 10.
 - **Adjustments:** entirely outside Monitor; EmusaSoft decides and executes them.
 - **Redis:** ephemeral transport and coordination, never an operational or communication source of truth.
 - **Correction:** performed in EmusaSoft and later observed by Monitor.
@@ -658,22 +658,24 @@ Deliverables:
 
 - boundary, authentication, technical-kit, and protocol ADRs;
 - versioned detection-query, natural-key and key-schema, result, read-only access, and replica-freshness contracts;
-- initial per-query polling intervals based on urgency, measured plans, and the approved replica load budget;
+- provisional per-query polling intervals based on urgency and measured local execution, with production budgets deferred to Phase 10;
 - Monitor WebSocket protocol and canonical incident-change schema;
 - environments, secrets, ownership, and operating boundaries;
 - design-system and three-prototype audit with a UX/accessibility/responsive backlog;
-- ADR for consuming versioned `emusa-ui` components through an adapter layer where available, while retaining Monitor-owned composition, tokens, and product behavior;
+- ADR for using Material UI through a Monitor-owned component layer with the tokens in `docs/design/`; Monitor has no `emusa-ui` dependency;
 - design brief for the Operational Responsibility Roster;
 - initial threat model and proof that EmusaSoft credentials never reach the browser.
 
-Exit gate: representative A05 and A02 queries run on staging within budget, demonstrate stable condition keys and safe failure behavior, and a committed incident change can be published by WebSocket and recovered by API without implicit critical decisions.
+Exit gate: representative A05 and A02 queries run against the protected local backup within provisional safe limits, demonstrate stable condition keys and safe failure behavior, and a committed incident change can be published by WebSocket and recovered by API without implicit critical decisions. Aurora staging validation and its approved production load budget are Phase 10 integration gates under ES-01 and ES-02.
+
+**Execution record (updated 2026-07-21):** all Monitor-owned Phase 0 artifacts and local proofs are implemented under `docs/phase0/`, `scripts/phase0/`, and `phase0-proof/`. Local-backup query execution, stable keys, bounded failure behavior, WebSocket publication after commit, and API cursor recovery pass. The owner approved the independent read-only boundary. Pending architect answers and real EmusaSoft access gate Phase 10 only. Phase 0 is complete and Phase 1 is authorized.
 
 ### Phase 1 — Data and rule contracts
 
 **Effort:** 2–3 weeks
 **Objective:** turn active A–E rules into executable specifications.
 
-Deliverables include detection-query contracts, table/field/join/unit/timestamp mapping per rule, condition keys and occurrence rules, versioned parameters, anonymized fixtures, sufficient/insufficient-evidence matrices, formal resolution of A04/A06/A07/B01/D01/E02–E04 blockers, and final deterministic/deadline/physical/statistical classification.
+Deliverables include detection-query contracts, table/field/join/unit/timestamp mapping per rule, condition keys and occurrence rules, versioned parameters, anonymized fixtures from protected local/sample data, sufficient/insufficient-evidence matrices, explicit mock assumptions for unresolved A04/A06/A07/B01/D01/E02–E04 inputs, and final deterministic/deadline/physical/statistical classification. A rule without sufficient local evidence is marked fixture-only or excluded; its contract is not invented.
 
 Exit gate: each candidate rule produces a reproducible fixture result or is explicitly excluded from the initial production implementation.
 
@@ -682,25 +684,25 @@ Exit gate: each candidate rule produces a reproducible fixture result or is expl
 **Effort:** 2–3 weeks
 **Objective:** create the technical foundation without broad business logic.
 
-Deliverables include repository and CI, local/test/staging environments, Monitor API, relational database and migrations, identity adapter, server-side authorization, structured logs/metrics/traces/health checks, secret management, Redis, cursor-based WebSocket gateway, and feature flags.
+Deliverables include repository and CI, local/test environments, Monitor API, relational database and migrations, a replaceable mock identity adapter and mock authentication page, server-side authorization from mock claims, structured logs/metrics/traces/health checks, local secret handling, Redis, cursor-based WebSocket gateway, and feature flags. The authentication boundary must be contract-tested so the EmusaSoft authentication microservice can replace the mock adapter in Phase 10.
 
-Exit gate: a staging user authenticates, receives correct scopes, opens a WebSocket session, and tests prove Monitor cannot write to EmusaSoft.
+Exit gate: local test users authenticate through the mock provider, receive correct server-calculated scopes, open a WebSocket session, and no application component has an EmusaSoft write path.
 
 ### Phase 3 — Polling, freshness, and recovery
 
 **Effort:** 2–4 weeks
-**Objective:** obtain reliable and repeatable evidence.
+**Objective:** obtain reliable and repeatable evidence locally.
 
-Deliverables include the detection-query registry and scheduler; approved read-only adapters for work orders/materials/flows/serials/weighing/pauses/users; bounded concurrency, timeouts, retries, and backoff; complete-cycle tracking; replica-lag and result-integrity guards; condition-state storage; source-freshness dashboard; post-downtime full evaluation; and schema/query-plan drift tests. Failed cycles are retained as diagnostic records without introducing a queue or broker.
+Deliverables include the detection-query registry and scheduler; local read adapters for protected backup/sample work orders, materials, flows, serials, weighing, pauses, and users; bounded concurrency, timeouts, retries, and backoff; complete-cycle tracking; a fake freshness provider plus result-integrity guards; condition-state storage; source-freshness dashboard; post-downtime full evaluation; and local schema/query-plan tests. Failed cycles are retained as diagnostic records without introducing a queue or broker. Replica-lag monitoring is implemented only as a replaceable contract until Phase 10.
 
-Exit gate: staging can simulate timeouts, partial results, invalid schemas, excess lag, and downtime without resolving incidents incorrectly, then recover correct current condition state on the next healthy cycle.
+Exit gate: local tests simulate timeouts, partial results, invalid schemas, stale-source signals, and downtime without resolving incidents incorrectly, then recover correct current condition state on the next healthy cycle.
 
 ### Phase 4 — Incident vertical slice
 
 **Effort:** 2–3 weeks
 **Objective:** deliver a complete chain using low-risk rules A02, A03, and A05.
 
-Deliverables include the rule engine, incident/evidence/transitions/deduplication, automatic resolution, basic correlation, incident API, post-commit WebSocket events, and dashboard/detail views connected to staging data.
+Deliverables include the rule engine, incident/evidence/transitions/deduplication, automatic resolution, basic correlation, incident API, post-commit WebSocket events, and dashboard/detail views connected to local sample data.
 
 Exit gate: synthetic and anonymized historical cases create, update, and resolve one explainable incident.
 
@@ -709,9 +711,9 @@ Exit gate: synthetic and anonymized historical cases create, update, and resolve
 **Effort:** 2–3 weeks
 **Objective:** notify the correct people once.
 
-Deliverables include validated design and implementation of the Operational Responsibility Roster; effective-dated assignments by operation/machine/shift with history, temporary replacements, conflicts, and missing assignments; work-order-to-operator and machine-to-warehouse resolution; manager/supervisor resolution; audited routing reasons; recipient deduplication; in-app notification; approved external providers; retries, delivery state, and failed-delivery records.
+Deliverables include validated design and implementation of the Operational Responsibility Roster; effective-dated assignments by operation/machine/shift with history, temporary replacements, conflicts, and missing assignments; mock work-order-to-operator and machine-to-warehouse resolution; mock manager/supervisor resolution; audited routing reasons; recipient deduplication; in-app notification; a fake external-notification provider; retries, delivery state, and failed-delivery records.
 
-Exit gate: the roster screen maintains and audits assignments, permission tests prevent zone-wide over-notification, and each user receives one delivery.
+Exit gate: the roster screen maintains and audits local assignments, permission tests prevent zone-wide over-notification, and each mock user receives one delivery.
 
 ### Phase 6 — Conversations and messages
 
@@ -731,32 +733,34 @@ Exit gate: desktop and mobile pass authorization, reconnection, idempotency, ord
 
 Deliverables include decimal/unit libraries, parameter/formula snapshots, D01–D04, correlation and suppression, actual-versus-estimated evidence, authorized administrative closure, and the controlled read-only unresolved-closure view.
 
-Exit gate: process experts reproduce each calculation and EmusaSoft staff can understand a closure without Monitor administrative access.
+Exit gate: fixture calculations are reproducible and a non-administrator can understand a closure from its evidence and ERP identifiers.
 
 ### Phase 8 — Statistical and operation-specific rules
 
 **Effort:** 4–8 weeks
 **Objective:** add higher-uncertainty rules without reducing trust.
 
-Deliverables include C01/C02/C06 datasets and model versioning, A04 after rewinder capacity is confirmed, E01–E04 after immutable container snapshots and records are resolved, model-quality/sample-size/false-positive reporting, backtesting, and shadow mode.
+Deliverables include fixture-based C01/C02/C06 datasets and model versioning, mock capacity and immutable-container contracts for A04 and E01–E04, model-quality/sample-size/false-positive reporting, local backtesting, and simulated shadow mode. Any unresolved production mapping remains explicitly configurable and cannot be enabled in Phase 10 until EmusaSoft confirms it.
 
 Exit gate: each model meets the approved shadow-mode precision threshold and displays confidence.
 
-### Phase 9 — Plant pilot
+### Phase 9 — Local acceptance and hardening
 
 **Effort:** 3–4 weeks
-**Objective:** operate with real users without depending on Monitor to execute factory processes.
+**Objective:** prove the complete product is ready to integrate without using live EmusaSoft systems.
 
-Deliverables include role-based training, runbooks/support/on-call/escalation, SLO dashboards, daily feedback, usability and accessibility testing across all four screens, design-system and prototype refinement, false-positive/false-negative/routing review, rollback, and rule kill switches.
+Deliverables include local end-to-end acceptance across all four screens, mock role-based training scenarios, runbooks/support/on-call/escalation drafts, SLO dashboards, usability and accessibility testing, design-system refinement, synthetic false-positive/false-negative/routing review, backup/restore exercises, rollback, and rule kill switches.
 
-Exit gate: pilot SLOs, user acceptance, and security criteria pass for an agreed window.
+Exit gate: the locally deployable system passes functional, recovery, accessibility, security, and performance criteria using mock identities and protected sample data.
 
-### Phase 10 — Production and expansion
+### Phase 10 — EmusaSoft integration, pilot, and production
 
-**Effort:** continuous
-**Objective:** harden and expand Monitor.
+**Effort:** 5–9 weeks for initial integration and pilot, then continuous expansion
+**Objective:** replace local adapters with approved real EmusaSoft contracts and deploy safely.
 
-Deliverables include gradual rollout by operation/plant, backups and restore tests, disaster recovery, capacity tests, security review, continuous evolution of Monitor's design system and four screens, rule governance, localization, and approved integrations/rules.
+Deliverables include the EmusaSoft authentication-microservice adapter and revocation tests; staging identities; approved Aurora no-write credentials and write-denial tests; current-schema reconciliation; query/index/plan/load validation; real replica-freshness monitoring; reconciliation of architect answers and production field/routing mappings; staging end-to-end tests; security and capacity review; production hosting approval and provisioning; a controlled plant pilot; gradual rollout by operation/plant; disaster recovery; rule governance; and ongoing expansion. No EmusaSoft frontend navigation is included unless a future supported route contract is explicitly approved.
+
+Exit gate: staging proves real authentication, authorization, no-write database access, freshness-safe detection, current-schema compatibility, and acceptable load; then pilot SLOs, user acceptance, security, rollback, and operational-support criteria pass for an agreed window before production expansion.
 
 ## 19. Main product screens
 
@@ -774,7 +778,7 @@ The first three screens have active prototypes. The fourth was identified during
 1. Approved detection queries, stable natural keys, result bounds, indexes, plans, and initial polling intervals for the first implemented alerts.
 2. Replica credentials, freshness-signal access, thresholds, and load limits.
 3. Identity provider and Monitor session mechanism.
-4. Runtime, API framework, database engine, ORM, scheduler/query runner, and WebSocket library.
+4. Production hosting budget/account approval; the runtime, API, database, ORM, scheduler/query runner, and WebSocket library are selected in ADR 0003.
 5. Functional source for shifts, active operator, and influence zones.
 6. Exact permission for Monitor access and administration.
 7. Retention policy for incidents, messages, attachments, and evidence.
@@ -787,7 +791,7 @@ The first three screens have active prototypes. The fourth was identified during
 
 - Every authenticated identity maps to `sysUserId`; permissions are verified server-side.
 - Monitor has no direct writes or SQL write credentials for EmusaSoft.
-- Every used read-only SQL query and deep-link pattern has contract tests.
+- Every production read-only SQL query and authentication/data adapter has contract tests.
 - Polling and incident occurrence handling are idempotent, recoverable, and auditable.
 - Every incident has explainable rule, version, evidence, timestamps, subjects, and recipients.
 - One-incident rules prevent confirmed duplicates.
@@ -809,4 +813,4 @@ The first three screens have active prototypes. The fourth was identified during
 
 Monitor is a fully independent system with its own repository, service, and control database. It detects current EmusaSoft conditions through approved bounded SQL queries against an Aurora MySQL read replica. It exposes a recoverable API and bidirectional WebSockets backed by its own Redis. EmusaSoft retains operational truth; Monitor retains condition state, incident occurrences, communications, roster assignments, temporary closure suppressions, and audit history.
 
-Monitor provides only a read-only view of incidents closed without resolution and links users to the relevant EmusaSoft screens. Every correction and later adjustment belongs to EmusaSoft and remains outside the project. Detection-query contracts, replica access and freshness, authentication, technical kit, deep links, and WebSocket protocol must be resolved through the roadmap gates.
+Monitor provides only a read-only view of incidents closed without resolution and displays the ERP identifiers needed to locate the source records. Every correction and later adjustment belongs to EmusaSoft and remains outside the project. The product is built and validated locally first; real authentication, replica access and freshness, current-schema detection queries, staging, pilot, and production deployment are resolved together in Phase 10.

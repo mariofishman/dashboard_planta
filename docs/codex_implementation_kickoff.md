@@ -2,7 +2,7 @@
 
 ## Recommended workflow
 
-Use one direct kickoff prompt for Phase 0. After the Phase 0 ADRs and contracts are approved, use the installed `$microplan-workflow` skill for each bounded implementation unit. Do not ask one task to implement the entire roadmap without phase gates; the external contracts and architectural approvals require explicit evidence.
+Use one direct kickoff prompt for Phase 0. Codex should make safe, reversible technical decisions autonomously and present the completed Phase 0 gate in plain language. After Phase 0 is complete and any actual business boundary is approved, use the installed `$microplan-workflow` skill for each bounded implementation unit only when explicitly requested. Do not use `$microplan-workflow` to execute an entire roadmap phase.
 
 ## Phase 0 kickoff prompt
 
@@ -29,21 +29,29 @@ Use the EmusaSoft MCP for current ERP evidence. First load EMUSASOFT_MCP_TOKEN f
 
 Execute only Phase 0. Create a tracked checklist mapped to every Phase 0 deliverable and exit criterion. Separate:
 1. Monitor-owned work that can be completed now;
-2. decisions that require my approval;
+2. business decisions, credentials, external access, costly commitments, or irreversible decisions that genuinely require my approval;
 3. external dependencies already assigned in docs/emusasoft_preimplementation_requests.md.
 
-Do not invent missing detection queries, natural keys, read-only access, replica-freshness, load-budget, authentication, identity, deep-link, extrusion-snapshot, or emusa-ui contracts. Use versioned placeholders and contract tests where external artifacts are pending.
+I am not an experienced programmer. Make safe, reversible technical choices yourself, document the reasons briefly, and validate them. Do not ask me to approve routine implementation details or choose between technologies I cannot reasonably evaluate. Escalate only the decisions described above, explaining their user or business consequences in plain language.
+
+Use the local EmusaSoft database backup for development and Phase 0 query validation. Design and optimize the detection queries, measure them locally, and propose safe polling and database-load limits. Production validation against Aurora remains later integration work. Replica-lag monitoring is not required while using the local backup; retain it only as a production-integration requirement.
+
+Inspect the EmusaSoft authentication contract through the MCP and define a replaceable adapter contract. Use mock authentication locally; real authentication is a Phase 10 integration. Do not infer browser links from GraphQL operations. If EmusaSoft provides no supported frontend-route contract, show ERP identifiers and evidence without an external navigation action.
+
+Monitor must not depend on or connect to emusa-ui. Build its interface with Material UI and the colors, tokens, and design rules in docs/design/.
+
+Do not invent missing production credentials, external access, or unsupported ERP behavior. Use versioned placeholders and contract tests only where external artifacts are genuinely pending.
 
 Treat the EmusaSoft MCP as schema-discovery evidence, not as proof that its drifted catalog is current. Validate every production detection query against the approved current schema and staging replica.
 
-For the technical-kit ADR, recommend one concrete TypeScript stack for the Monitor API, relational database, ORM, scheduler/query runner, WebSocket layer, Redis integration, testing, and deployment. Explain only material tradeoffs and stop for my approval before scaffolding the application.
+For the technical-kit ADR, select one concrete TypeScript stack for the Monitor API, relational database, ORM, scheduler/query runner, WebSocket layer, Redis integration, testing, and deployment. Explain the decision briefly in plain language, then continue without waiting unless it creates a costly, irreversible, or externally binding commitment.
 
-Once I approve the ADRs, implement every unblocked Phase 0 artifact, validate it, update the roadmap/checklist with evidence, and report exactly which exit criteria pass or remain externally blocked. Do not begin Phase 1 until I approve the Phase 0 gate.
+Implement every unblocked Phase 0 artifact, validate it, update the roadmap/checklist with evidence, and report exactly which exit criteria pass or remain externally blocked. Summarize the result for a non-expert, including what was tested, important risks, and anything that requires outside help. Ask only for a specific unresolved business decision; do not request approval of successful tests or a vague overall gate.
 ```
 
 ## Implementation-unit prompt
 
-After Phase 0 is approved, start each bounded unit with this pattern:
+After Phase 0 is complete, start each bounded unit with this pattern when the user explicitly requests the microplan workflow:
 
 ```text
 Use $microplan-workflow to implement the next approved unit from Phase [number] of docs/monitor_architecture_and_production_roadmap.md.

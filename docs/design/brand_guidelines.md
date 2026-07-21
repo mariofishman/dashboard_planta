@@ -33,7 +33,7 @@ Write with direct operational clarity. Lead with the fact, state, or required ac
 
 ### UI writing rules
 
-- Buttons use Spanish verbs appropriate to Monitor's boundary: `Ver orden de trabajo`, `Abrir reserva de material`, `Enviar mensaje`, `Cerrar sin resolución`, and `Exportar reporte`. Operational corrections occur after following the relevant link into EmusaSoft.
+- Buttons use Spanish verbs appropriate to Monitor's boundary: `Ver detalles`, `Copiar identificador`, `Enviar mensaje`, `Cerrar sin resolución`, and `Exportar reporte`. Monitor does not show unsupported EmusaSoft navigation actions; operational corrections occur separately in EmusaSoft.
 - User-visible incident lifecycle states use `Abierta`, `Resuelta`, and `Cerrada sin resolución`. Code-specific descriptive labels such as `Error`, `Por vencer`, `Alerta`, and `Error posible` remain separate from lifecycle state.
 - Dates use an explicit locale and timezone where ambiguity matters.
 - Quantities always include units.

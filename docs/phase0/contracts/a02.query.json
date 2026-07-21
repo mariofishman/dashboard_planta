@@ -1,0 +1,35 @@
+{
+  "$schema": "./detection-query.schema.json",
+  "contractVersion": "1.0.0",
+  "alertTypeCode": "A02",
+  "queryId": "a02-reserved-material-in-transit",
+  "queryVersion": "1.0.0-candidate",
+  "keySchemaVersion": 1,
+  "naturalKey": ["materialFlowDetailId"],
+  "output": {
+    "materialFlowDetailId": "integer",
+    "workOrderId": "integer",
+    "workOrderMaterialId": "integer",
+    "articleSerialId": "nullable-integer",
+    "workOrderCode": "string",
+    "sourceTimestamp": "timestamp",
+    "warehouseOriginId": "nullable-integer",
+    "warehouseDestinationId": "nullable-integer",
+    "locationOriginId": "nullable-integer",
+    "locationDestinationId": "nullable-integer"
+  },
+  "sqlFile": "../queries/a02-reserved-material-in-transit.v1.sql",
+  "timeoutMs": 3000,
+  "resultLimit": 1000,
+  "cycleRowLimit": 10000,
+  "paginationKey": "materialFlowDetailId",
+  "pollingIntervalSeconds": 300,
+  "resolutionPolicy": {
+    "requiresCompleteHealthyCycle": true,
+    "replicaFreshnessRequiredInProduction": true
+  },
+  "validation": {
+    "localBackupRevision": "prod_emusa_core-20260716-143040",
+    "productionStatus": "pending-es-01-es-02"
+  }
+}

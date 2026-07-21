@@ -47,4 +47,4 @@ Never commit `.env` or expose `EMUSASOFT_MCP_TOKEN`.
 
 ## Current status
 
-The product definition and target architecture are internally consistent. The project is ready to begin Phase 0 contracts and ADRs for approved read-only SQL polling, identity, deep links, WebSockets, and the application foundation. External EmusaSoft and MCP dependencies are tracked explicitly in `docs/emusasoft_preimplementation_requests.md`.
+Phase 0 is complete and its local exit gate passes, as tracked in `docs/phase0/README.md`. The owner approved Monitor's independent, read-only product boundary on 2026-07-21 and directed the project to proceed locally. Phase 1 may begin without EmusaSoft production access or pending architect answers. Real authentication, Aurora access, current-schema and load validation, staging, pilot, and production deployment are consolidated in Phase 10.

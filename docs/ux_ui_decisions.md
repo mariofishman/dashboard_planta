@@ -23,7 +23,7 @@ Monitor is an operational alert system for factory activity recorded in EmusaSof
 1. a familiar conversation model for receiving, discussing, forwarding, and following alerts; and
 2. a dashboard model for historical analysis, recurrence, current state, and drill-down.
 
-Monitor complements EmusaSoft. It does not replace work-order, material-flow, production, weighing, inventory, or correction workflows. Alerts and conversations may deep-link to the relevant EmusaSoft record.
+Monitor complements EmusaSoft. It does not replace work-order, material-flow, production, weighing, inventory, or correction workflows. Alerts and conversations show the relevant ERP identifiers and evidence; EmusaSoft currently provides no supported frontend routes for direct navigation.
 
 ### 2.2 Mental model
 
@@ -643,7 +643,7 @@ The prototypes demonstrate interaction and information architecture. They do not
 - Current static data is illustrative.
 - Prototype toasts simulate completion of some actions.
 - Ecosystem destinations other than Control de alertas are placeholders.
-- Deep-link URL patterns must be verified against actual EmusaSoft routes before implementation.
+- Prototype EmusaSoft navigation actions are illustrative only and must not appear in implementation because no supported frontend-route contract exists.
 - Authentication, authorization, message retention, moderation, audit, reporting, and attachment policies must follow the production architecture.
 - Alert detection and routing must use canonical rules and deterministic ownership mappings.
 - Engineering phases do not represent separate product releases and do not change the four-screen product definition.
@@ -662,7 +662,6 @@ The following items are not yet fully decided and should not be inferred from th
 - read receipts, delivery receipts, typing state, and presence requirements;
 - maximum visible chips before overflow at each responsive width;
 - attachment size, file type, compression, retention, and privacy rules;
-- the exact EmusaSoft routes for each deep-linked entity;
 - report formats, fields, permissions, and audit trail;
 - whether search is local, server-backed, or hybrid at production scale;
 - loading, stale-data, offline, reconnection, and partial-failure copy;
@@ -684,7 +683,7 @@ A production implementation matches the current UX/UI direction only if:
 - Search and filters affect the complete surface, not an isolated component.
 - Dashboard chart drill-down updates all dependent views and can be reset.
 - Open, resolved, and closed-without-resolution states remain distinct.
-- Work orders and operational objects are actionable deep links.
+- Work orders and operational objects show clear identifiers and evidence without an unsupported external navigation action.
 - Message actions are compact on desktop and long-press driven on mobile.
 - Photos, optional captions, quoted replies, and alert attachments preserve their designed hierarchy.
 - The interface remains usable by keyboard, touch, and assistive technology.

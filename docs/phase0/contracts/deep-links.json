@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "1.1.0",
+  "status": "unsupported-by-current-emusasoft-contract",
+  "destinations": {
+    "workOrder": {
+      "requiredIdentifiers": ["workOrderId"],
+      "template": null,
+      "fallback": "display the work-order identifier and available evidence inside Monitor"
+    },
+    "materialReservation": {
+      "requiredIdentifiers": ["workOrderId", "reservationId"],
+      "template": null,
+      "fallback": "display the reservation and work-order identifiers with available evidence inside Monitor"
+    }
+  },
+  "rules": [
+    "GraphQL operations are data APIs, not browser navigation routes.",
+    "Never infer a browser route from a GraphQL operation name.",
+    "Render identifiers and evidence, but no EmusaSoft navigation action.",
+    "A future navigation adapter requires a new supported EmusaSoft contract and contract tests."
+  ]
+}

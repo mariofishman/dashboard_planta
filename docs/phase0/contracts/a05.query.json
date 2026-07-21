@@ -1,0 +1,34 @@
+{
+  "$schema": "./detection-query.schema.json",
+  "contractVersion": "1.0.0",
+  "alertTypeCode": "A05",
+  "queryId": "a05-reel-handling",
+  "queryVersion": "1.0.0-candidate",
+  "keySchemaVersion": 1,
+  "naturalKey": ["articleSerialId"],
+  "output": {
+    "articleSerialId": "integer",
+    "serialCode": "string",
+    "workOrderId": "integer",
+    "workOrderCode": "string",
+    "sourceTimestamp": "timestamp",
+    "warehouseId": "nullable-integer",
+    "locationId": "nullable-integer",
+    "notWeighed": "boolean",
+    "stillAtMachine": "boolean"
+  },
+  "sqlFile": "../queries/a05-reel-handling.v1.sql",
+  "timeoutMs": 3000,
+  "resultLimit": 1000,
+  "cycleRowLimit": 10000,
+  "paginationKey": "articleSerialId",
+  "pollingIntervalSeconds": 300,
+  "resolutionPolicy": {
+    "requiresCompleteHealthyCycle": true,
+    "replicaFreshnessRequiredInProduction": true
+  },
+  "validation": {
+    "localBackupRevision": "prod_emusa_core-20260716-143040",
+    "productionStatus": "pending-es-01-es-02"
+  }
+}
