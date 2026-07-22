@@ -11,6 +11,7 @@
     <div>
       <p class="eyebrow">Design research</p>
       <h1 id="page-title">UI Reference Atlas</h1>
+      <p id="persistence-status" class="persistence-status" role="status">Loading saved review…</p>
     </div>
     <nav class="tabs" aria-label="Review stages">
       <button class="tab is-active" type="button" data-tab="selection">1. Select references</button>
@@ -39,8 +40,13 @@
           <p>Inspect accepted screens in context, then comment on the selectable regions.</p>
         </div>
         <div class="boundary-controls">
+          <div class="review-transfer" aria-label="Portable review state">
+            <button id="export-review" class="transfer-button" type="button">Export review</button>
+            <label class="transfer-button import-button">Import review<input id="import-review" type="file" accept="application/json,.json"></label>
+          </div>
           <label class="boundary-toggle"><input id="show-boundaries" type="checkbox"> Show region boundaries</label>
           <p id="boundary-status" class="boundary-status" role="status" hidden></p>
+          <p id="transfer-status" class="boundary-status" role="status" hidden></p>
         </div>
       </header>
       <div id="accepted-empty" class="empty-state">Select references in Step 1 to analyze them here.</div>
