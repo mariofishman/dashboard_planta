@@ -38,6 +38,9 @@ main { width: 100%; margin: 0 auto; padding: var(--space-2xl) clamp(var(--space-
 .section-heading h2 { margin: 0; font-size: clamp(24px, 3vw, 38px); letter-spacing: -.03em; }
 .section-heading p:not(.step):not(.count) { max-width: 720px; margin: 8px 0 0; color: var(--muted); }
 .count, .boundary-toggle { white-space: nowrap; font-size: 14px; font-weight: 700; }
+.boundary-controls { display: grid; justify-items: end; gap: var(--space-xs); }
+.boundary-toggle:has(input:disabled) { color: var(--muted); }
+.boundary-status { max-width: 36ch; margin: 0; color: #8a3f0a; font-size: 12px; text-align: right; }
 .round { margin-bottom: var(--space-2xl); }
 .round-heading { display: flex; gap: var(--space-md); align-items: baseline; margin: 0 0 var(--space-lg); }
 .round-heading h3 { margin: 0; font-size: 18px; }
@@ -75,9 +78,11 @@ textarea:focus, button:focus-visible, a:focus-visible { outline: 3px solid color
 .draw-region-button, .save-region { flex: 0 0 auto; min-height: 38px; padding: 0 13px; border: 1px solid var(--line); border-radius: 9px; color: var(--ink); background: white; font-weight: 750; cursor: pointer; }
 .draw-region-button.is-active { border-color: var(--focus); color: white; background: var(--focus); }
 .draw-help { margin: -4px 0 10px; padding: 8px 10px; border-radius: 7px; color: #07569f; background: #e8f3ff; font-size: 13px; }
+.no-regions { margin: -4px 0 10px; padding: 8px 10px; border-radius: 7px; color: #713507; background: #fff2df; font-size: 13px; }
 .atlas-image { position: relative; width: min(100%, 1180px); margin: 0 auto; }
 .atlas-image img { display: block; width: 100%; height: auto; border: 1px solid var(--line); }
 .atlas-image.is-drawing { touch-action: none; cursor: crosshair; user-select: none; }
+.atlas-image.is-drawing .region { pointer-events: none; }
 .region { position: absolute; border: 1px solid transparent; border-radius: 4px; color: transparent; background: transparent; cursor: crosshair; }
 .region:hover, .region:focus-visible { border-color: var(--focus); color: white; background: rgba(8, 127, 245, .12); box-shadow: inset 0 0 0 1px var(--focus); }
 .custom-region { border-style: dashed; border-color: rgba(11, 107, 79, .8); background: rgba(11, 107, 79, .08); }
@@ -92,6 +97,12 @@ textarea:focus, button:focus-visible, a:focus-visible { outline: 3px solid color
 .region-editor input, .region-editor textarea { width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: white; }
 .region-editor textarea { height: 40px; resize: vertical; }
 .save-region { border-color: var(--accent); color: white; background: var(--accent); }
+.region-summary { display: flex; align-items: start; justify-content: space-between; gap: var(--space-lg); max-width: 1180px; margin: 12px auto 0; padding: 13px; border: 1px solid #bcd2c7; border-radius: 10px; background: #f2f8f5; }
+.region-summary > div:first-child { display: grid; gap: var(--space-xs); min-width: 0; }
+.region-summary span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.region-summary strong { font-size: 15px; }
+.region-summary p { max-width: 75ch; margin: 0; color: #3f4942; font-size: 14px; line-height: 1.45; white-space: pre-wrap; }
+.region-summary-actions { display: flex; flex: 0 0 auto; gap: var(--space-md); }
 .text-button { padding: 4px; border: 0; background: transparent; font-size: 13px; font-weight: 700; cursor: pointer; }
 .text-button.danger { color: #a32b2b; }
 
@@ -102,12 +113,15 @@ textarea:focus, button:focus-visible, a:focus-visible { outline: 3px solid color
   .tab { flex: 1 0 auto; }
   main { padding: var(--space-xl) var(--space-lg) var(--space-4xl); }
   .section-heading { align-items: start; flex-direction: column; }
+  .boundary-controls { justify-items: start; }
+  .boundary-status { text-align: left; }
   .reference-grid { grid-template-columns: minmax(0, 1fr); }
   .analysis-card { padding: 8px; }
   .analysis-card header { align-items: stretch; flex-direction: column; }
   .draw-region-button { align-self: start; }
   .region-editor { grid-template-columns: 1fr; }
   .region-editor-heading { grid-column: 1; }
+  .region-summary { flex-direction: column; }
   .screen-arrow { width: 44px; height: 44px; }
   .screen-arrow.previous { left: 8px; }
   .screen-arrow.next { right: 8px; }

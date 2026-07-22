@@ -38,7 +38,10 @@
           <h2 id="analysis-heading">Annotate useful components</h2>
           <p>Inspect accepted screens in context, then comment on the selectable regions.</p>
         </div>
-        <label class="boundary-toggle"><input id="show-boundaries" type="checkbox"> Show region boundaries</label>
+        <div class="boundary-controls">
+          <label class="boundary-toggle"><input id="show-boundaries" type="checkbox"> Show region boundaries</label>
+          <p id="boundary-status" class="boundary-status" role="status" hidden></p>
+        </div>
       </header>
       <div id="accepted-empty" class="empty-state">Select references in Step 1 to analyze them here.</div>
       <div id="analysis-list" class="analysis-list"></div>
