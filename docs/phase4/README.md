@@ -1,6 +1,6 @@
 # Phase 4 — Incident vertical slice
 
-Status: functional gate accepted by the user on 2026-07-21. Dashboard design is not approved. Work is stopped pending a roadmap revision; Phase 5 has not started.
+Status: functional gate accepted by the user on 2026-07-21. Dashboard design is not approved. Roadmap Version Two adds Phase 4A for the redesign and Phase 4B for dynamic local source validation; Phase 5 has not started.
 
 ## What a beginner can test
 
@@ -44,5 +44,5 @@ The clean local seed contains five synthetic incident histories: three open inci
 
 - Chats and routing: Phases 5–6.
 - Administrative close-without-resolution workflow: Phase 7.
-- Real EmusaSoft authentication, Aurora queries, production load/freshness proof, and deployment: Phase 10.
+- Real EmusaSoft authentication, Aurora queries, production load and source-observation proof, and deployment: Phase 10.
 - The current web bundle is about 567 KB before gzip; code splitting is a production optimization, not a Phase 4 gate.

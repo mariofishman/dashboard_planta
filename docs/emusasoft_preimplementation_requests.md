@@ -4,6 +4,7 @@
 
 **Owner:** Monitor project lead
 **Purpose:** give the EmusaSoft product/engineering team and the EmusaSoft MCP implementation team a finite, testable list of answers and inputs required when the locally completed Monitor is integrated in Phase 10.
+**Response register:** [`emusasoft_preimplementation_responses.md`](emusasoft_preimplementation_responses.md)
 
 These requests do not change Monitor's approved boundary. Monitor remains an independent system, never writes to EmusaSoft, and owns its incidents, evidence, conversations, messages, roster, and audit history. None of these open items blocks Phases 1 through 9: those phases use mock authentication, explicit fixture assumptions, and protected local/sample databases. Open items block only the affected Phase 10 staging or production acceptance test. Architect answers may be recorded here as they arrive; Monitor must not invent an answer.
 

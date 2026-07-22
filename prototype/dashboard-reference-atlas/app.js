@@ -106,6 +106,20 @@
     if (!state.activeRegion || state.activeRegion.referenceId !== referenceId) return "";
     const region = customRegionsFor(referenceId).find((item) => item.id === state.activeRegion.regionId);
     if (!region) return "";
+    if (state.activeRegion.mode === "read") {
+      return `
+        <section class="region-summary" data-region-summary="${escapeHtml(referenceId)}" data-region-id="${escapeHtml(region.id)}" aria-label="Saved custom region">
+          <div>
+            <span>Saved custom region</span>
+            <strong>${escapeHtml(region.label)}</strong>
+            <p>${escapeHtml(region.note || "No note added.")}</p>
+          </div>
+          <div class="region-summary-actions">
+            <button type="button" class="text-button" data-edit-region="${escapeHtml(region.id)}" data-reference-id="${escapeHtml(referenceId)}">Edit note</button>
+            <button type="button" class="text-button danger" data-delete-region="${escapeHtml(region.id)}" data-reference-id="${escapeHtml(referenceId)}">Delete region</button>
+          </div>
+        </section>`;
+    }
     return `
       <form class="region-editor" data-region-editor="${escapeHtml(referenceId)}" data-region-id="${escapeHtml(region.id)}">
         <div class="region-editor-heading">
@@ -120,7 +134,18 @@
 
   function renderAnalysis() {
     const accepted = allReferences().filter((reference) => state.accepted[reference.id]);
-    const showBoundaries = document.querySelector("#show-boundaries").checked;
+    const boundaryToggle = document.querySelector("#show-boundaries");
+    const boundaryStatus = document.querySelector("#boundary-status");
+    const currentRegionCount = accepted.reduce((total, reference) => {
+      const screen = currentScreenFor(reference);
+      return total + (screen.regions || []).length + customRegionsFor(scopeFor(reference, screen)).length;
+    }, 0);
+    const boundariesAvailable = accepted.length > 0 && currentRegionCount > 0;
+    boundaryToggle.disabled = !boundariesAvailable;
+    if (!boundariesAvailable) boundaryToggle.checked = false;
+    boundaryStatus.hidden = accepted.length === 0 || boundariesAvailable;
+    boundaryStatus.textContent = boundariesAvailable ? "" : "No regions are defined for the current accepted screens.";
+    const showBoundaries = boundaryToggle.checked;
     document.querySelector("#accepted-empty").hidden = accepted.length > 0;
     const list = document.querySelector("#analysis-list");
     list.classList.toggle("show-boundaries", showBoundaries);
@@ -128,12 +153,14 @@
       const screen = currentScreenFor(reference);
       const scopeId = scopeFor(reference, screen);
       const isDrawing = state.drawingReference === scopeId;
+      const screenRegionCount = (screen.regions || []).length + customRegionsFor(scopeId).length;
       return `
         <article class="analysis-card" data-analysis-reference="${escapeHtml(reference.id)}">
           <header><div><h3>${escapeHtml(reference.title)}</h3><p>${escapeHtml(screen.label || "Current screen")} · ${escapeHtml(state.feedback[reference.id] || "No reference-level feedback yet")}</p></div>
             <button class="draw-region-button${isDrawing ? " is-active" : ""}" type="button" data-draw-reference="${escapeHtml(scopeId)}" aria-pressed="${isDrawing}">${isDrawing ? "Cancel drawing" : "Draw region"}</button>
           </header>
           <p class="draw-help" ${isDrawing ? "" : "hidden"}>Drag over any missing component. Its position will scale with the screenshot.</p>
+          ${screenRegionCount === 0 ? `<p class="no-regions">No selectable regions are defined yet. Use Draw region or add predefined regions to the manifest.</p>` : ""}
           <div class="atlas-image${isDrawing ? " is-drawing" : ""}" data-atlas-reference="${escapeHtml(scopeId)}">
             <img src="${escapeHtml(screen.image)}" alt="Annotatable full reference: ${escapeHtml(screen.label || reference.title)}" draggable="false">
             ${(screen.regions || []).map((region) => regionButton(scopeId, region)).join("")}
@@ -231,7 +258,19 @@
     if (customRegion && !state.drawingReference) {
       state.activeRegion = {
         referenceId: customRegion.dataset.regionReference,
-        regionId: customRegion.dataset.regionId
+        regionId: customRegion.dataset.regionId,
+        mode: "read"
+      };
+      renderAnalysis();
+      return;
+    }
+
+    const editButton = event.target.closest("[data-edit-region]");
+    if (editButton) {
+      state.activeRegion = {
+        referenceId: editButton.dataset.referenceId,
+        regionId: editButton.dataset.editRegion,
+        mode: "edit"
       };
       renderAnalysis();
       document.querySelector(`[data-region-editor="${CSS.escape(state.activeRegion.referenceId)}"] textarea`)?.focus();
@@ -274,13 +313,18 @@
     if (!region) return;
     region.label = editor.elements["region-label"].value.trim() || "Custom region";
     region.note = editor.elements["region-note"].value.trim();
+    state.activeRegion = {
+      referenceId: editor.dataset.regionEditor,
+      regionId: editor.dataset.regionId,
+      mode: "read"
+    };
     save();
     renderAnalysis();
   });
 
   document.addEventListener("pointerdown", (event) => {
     const atlas = event.target.closest(".atlas-image.is-drawing");
-    if (!atlas || event.target.closest(".region")) return;
+    if (!atlas || event.target.closest(".screen-arrow")) return;
     const start = pointInAtlas(event, atlas);
     const draft = document.createElement("div");
     draft.className = "draft-region";

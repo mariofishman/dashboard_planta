@@ -106,14 +106,13 @@ A polling cycle may resolve an incident only when all of the following are true:
 - the approved query completed successfully within its limits;
 - its result schema and required fields validated;
 - the result set was complete rather than truncated or partially processed;
-- the replica-freshness signal was available and below the approved threshold; and
 - the cycle transaction committed successfully in Monitor.
 
-Timeouts, connection failures, invalid results, partial result sets, excessive or unknown replica lag, and Monitor persistence failures preserve the current incident state. They create source-freshness telemetry and operational alerts; they never count as evidence that a condition cleared.
+Timeouts, connection failures, invalid results, partial result sets, and Monitor persistence failures preserve the current incident state. They create source-availability telemetry and operational diagnostics; they never count as evidence that a condition cleared.
 
 After an outage, each query performs a complete bounded evaluation of current state. No EmusaSoft cursor, replay window, or failed-event queue exists.
 
-## 8. Read-only endpoint and replica lag
+## 8. Read-only endpoint and observation delay
 
 EmusaSoft provides:
 
@@ -124,7 +123,7 @@ EmusaSoft provides:
 - required indexes and representative query plans; and
 - an approved load budget.
 
-Local development uses a fake freshness provider to exercise healthy, stale, and unknown states. During Phase 10, Monitor records real replica lag for every cycle and defers resolution when freshness is unknown or unacceptable. EmusaSoft must then confirm whether the read-only user may query `information_schema.replica_host_status`; otherwise it must provide access to the `AuroraReplicaLag` CloudWatch metric or another testable freshness signal.
+The existing Aurora read replica is Monitor's authoritative and most current available operational source. A transaction becomes observable to Monitor when it appears in a successful complete replica read. Monitor does not require a separate replica-lag signal before creating or resolving an incident. Replication delay is accepted as part of the observation delay and is measured where operational telemetry makes that possible.
 
 ## 9. Ownership
 
@@ -132,7 +131,7 @@ Local development uses a fake freshness provider to exercise healthy, stale, and
 | --- | --- |
 | Monitor repository, service, deployment, database, scheduler, Redis, and WebSockets | Monitor |
 | Detection-query definitions, condition state, incident occurrences, temporary suppressions, evidence, chats, roster, and audit history | Monitor |
-| Query review, replica, credentials, indexes, freshness signal, and load budget | EmusaSoft |
+| Replica, credentials, indexes, environment limits, and load budget | EmusaSoft |
 | MCP server and ERP catalog | EmusaSoft MCP team |
 | Work orders, reservations, documents, and all operational corrections | EmusaSoft users in EmusaSoft |
 
@@ -147,9 +146,9 @@ Local development uses a fake freshness provider to exercise healthy, stale, and
 
 ## 11. Required external deliveries
 
-- **ES-01:** EmusaSoft reviews the detection-query set, natural keys, indexes, plans, and load budget.
-- **ES-02:** EmusaSoft provisions the read-only replica access and a testable freshness signal.
-- **ES-03 through ES-05:** identity, routing evidence, and immutable extrusion evidence are required for Phase 10 as recorded in `docs/emusasoft_preimplementation_requests.md`. ES-06 is answered: no supported frontend-route patterns exist. ES-07 is superseded because Monitor uses Material UI and has no `emusa-ui` dependency.
+- **ES-01:** Monitor owns bounded detection queries; their plans, limits, and observed load are validated and tuned in staging.
+- **ES-02:** EmusaSoft provisions dedicated no-write credentials for the existing Aurora replica, separately for staging and production.
+- **ES-03 through ES-05:** identity, routing evidence, and immutable extrusion evidence are tracked in `docs/emusasoft_preimplementation_responses.md`. ES-05 blocks E02–E04 staging and production until the new snapshots are implemented and verified. ES-06 remains open and blocks deep links only. ES-07 is superseded because Monitor uses Material UI and has no `emusa-ui` dependency.
 - **MCP-01 through MCP-06:** the MCP team resolves catalog drift, validation, type/search coverage, versioned integration resources, and representative examples.
 
 ## 12. Confirmed decisions and Phase 0 validation
@@ -171,9 +170,9 @@ Phase 0 validated locally:
 
 - representative detection queries and stable natural keys, starting with A05 and A02;
 - query plans, indexes, result bounds, timeouts, and failure behavior;
-- a fake freshness signal and the behavior that blocks unsafe resolution;
+- incomplete-cycle behavior that blocks unsafe resolution;
 - provisional polling limits for each implemented query;
 - local-backup schema compatibility despite MCP catalog drift; and
 - a safe no-navigation fallback that displays ERP identifiers without inventing browser routes.
 
-Phase 10 must validate real authentication, current schema, Aurora access, no-write enforcement, query plans and load budget, replica freshness, and staging behavior before pilot or production use.
+Phase 10 must validate real authentication, current schema, Aurora access, no-write enforcement, query plans and load budget, observation delay, and staging behavior before pilot or production use.
