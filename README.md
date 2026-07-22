@@ -69,4 +69,4 @@ npm run build
 
 ## Current status
 
-Phases 0–4 are complete locally. Monitor now has a mock login, server-controlled permissions, safe local detection, an incident lifecycle with evidence and recurrence, authorized APIs, recoverable live changes, and the approved product dashboard connected to sample incidents. Phase 5 has not begun. Real authentication, Aurora access, current-schema and load validation, staging, pilot, and production deployment remain consolidated in Phase 10.
+Phases 0–4 are complete locally. Monitor now has a mock login, server-controlled permissions, safe local detection, an incident lifecycle with evidence and recurrence, authorized APIs, recoverable live changes, and a functional dashboard connected to sample incidents. The dashboard design is not approved: Version Two adds Phase 4A for its redesign and Phase 4B for dynamic local source validation before Phase 5. Real authentication, Aurora access, current-schema and load validation, staging, pilot, and production deployment remain consolidated in Phase 10.
