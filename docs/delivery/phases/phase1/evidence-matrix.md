@@ -31,9 +31,9 @@
 | D03 | Deterministic + statistical + physical | OT | Input, output, waste, specific-cause state | OT closure/latest weight; kilograms | Fixture proven; verified/estimated policy pending |
 | D04 | Deterministic + physical | OT | Consumed, run and remnant meters, tolerance | OT closure; meters | Fixture proven; remnant conversion pending |
 | E01 | Deadline + deterministic | OT + article | Warehouse mapping, start horizon, stock, four-hour demand | Planned start; minutes, hours, kilograms | Fixture proven; stock mapping pending |
-| E02 | Deterministic | OT + location + article | OT open, recipe requirement, immutable opening quantity presence | OT opening; kilograms | Fixture proven; ES2-05 blocks production use |
-| E03 | Deterministic + physical | Previous OT + current OT + location + article | Closing, opening, intervening movement, tolerance | Consecutive OT boundary; kilograms | Fixture proven; ES2-05 blocks production use |
-| E04 | Deterministic + physical | OT + article + screw | Opening, additions, ending, total consumption, recipe and tolerance | OT closure/latest container event; kilograms and fractions | Fixture proven; ES2-05 blocks production use |
+| E02 | Deterministic | OT + container + article | OT open, recipe requirement, `saldo_apertura` presence, container-to-article mapping | OT opening; kilograms | Product rules define capture at opening, kilograms, a required container ID, and one opening/closing snapshot; Phase 10 validates deployed behavior |
+| E03 | Deterministic + physical | Previous OT + current OT + container + article | Previous `saldo_final`, current `saldo_apertura`, intervening movement, tolerance | Consecutive OT boundary; kilograms | Product rules define the expected values; Phase 10 validates deployed capture, correction, and movement behavior |
+| E04 | Deterministic + physical | OT + container + article + screw | Opening, recorded additions, final balance, recipe and tolerance | OT closure; kilograms and fractions | Product formula is opening + recorded additions − ending; Phase 10 maps delivered fields and validates screw mapping |
 
 ## Explicit mock assumptions
 
@@ -42,7 +42,7 @@
 - A07 fixtures supply an effective tolerance and do not decide whether estimated evidence is strong enough for a production `Error` label.
 - B01 uses a mock latest-approved-plan record. No production plan-version source is inferred.
 - D01 fixtures supply already-normalized consumed-reel meters and tolerance. Core weight and conversion rules remain pending.
-- E02–E04 use immutable opening, addition, and ending values supplied by fixtures. Mutable current inventory is not accepted as a substitute.
+- E02–E04 use opening, recorded-addition, and ending values supplied by fixtures. Mutable current inventory is not accepted as a substitute. Phase 10 will verify deployed snapshot capture and correction behavior.
 - A01, B02, B03, C01, C02, C06, D02, D03, D04, and E01 also retain the production dependencies named in their contracts. Local fixtures prove rule behavior, not ERP availability.
 
 ## Exclusions

@@ -1,0 +1,27 @@
+{
+  "revision": "staging_emusa_core-20260723-025548",
+  "dumpFile": "local-data/database/staging_emusa_core-20260723-025548.sql",
+  "dumpBytes": 2903569374,
+  "validatedAt": "2026-07-23",
+  "loadedRows": {
+    "flujo_materiales_detalles": 57232,
+    "ordenes_trabajo": 17112,
+    "articulo_serial": 122991,
+    "balanza_carga_detalle_registros": 43,
+    "almacenes": 78
+  },
+  "queryResults": {
+    "A02": {
+      "rows": 1249,
+      "pages": 2,
+      "totalCycleMs": 2.313,
+      "maxPageMs": 1.778
+    },
+    "A05": {
+      "rows": 838,
+      "pages": 1,
+      "totalCycleMs": 11.855,
+      "maxPageMs": 11.855
+    }
+  }
+}

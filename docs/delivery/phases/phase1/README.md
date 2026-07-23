@@ -36,9 +36,9 @@ Current Phase 10 status belongs only in `docs/integrations/emusasoft/integration
 | Every rule produces a reproducible result or is excluded | Pass | 63 fixtures: one triggered, one clear, and one insufficient case for every rule |
 | Stable condition identity is defined | Pass | every rule has a natural key, query ID, and key-schema version; trigger and clear fixtures retain the same condition key |
 | Missing evidence cannot create an alert | Pass | every rule's insufficient fixture returns `insufficient`, not `triggered` or `clear` |
-| Local schema claims are checked against the backup | Pass | 76 fields across 17 backup-confirmed tables match the protected 2026-07-16 DDL |
+| Local schema claims are checked against the backup | Pass | 87 fields across 18 backup-confirmed tables match the protected 2026-07-23 DDL |
 | Mock assumptions are separated from production facts | Pass | provisional and fixture-only inputs are listed in `evidence-matrix.md`; production validation remains Phase 10 |
 
-**Validation:** 3 Vitest tests passed, TypeScript type-checking passed, 21 contracts and 63 fixtures passed the reference evaluator, 76 mapped fields across 17 tables matched the backup DDL, and no production data rows were printed.
+**Current revalidation — 2026-07-23:** 5 contract tests passed, TypeScript type-checking passed, 21 contracts and 63 fixtures passed the reference evaluator, 87 mapped fields across 18 tables matched the backup DDL, and no production data rows were printed.
 
 **Gate result:** Phase 1 passed locally for the 21-rule inventory that existed on 2026-07-21. E05 is a later catalog addition and is explicitly pending.

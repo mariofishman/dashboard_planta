@@ -4,7 +4,7 @@
 
 | Environment | EmusaSoft source | Observation boundary | Purpose |
 |---|---|---|---|
-| Local | Protected 2026-07-16 SQL backup subset | Not applicable; immutable snapshot | Query shape, fixture, and timing validation |
+| Local | Protected 2026-07-23 staging SQL backup subset | Not applicable; immutable snapshot | Query shape, fixture, and timing validation |
 | Test | Synthetic/anonymized data only | Fake provider | Deterministic contracts and failures |
 | Staging | Approved Aurora read replica | Successful complete read | Phase 10 EmusaSoft integration and acceptance |
 | Production | Approved Aurora read replica | Successful complete read | Phase 10 deployment; disabled until all production gates pass |

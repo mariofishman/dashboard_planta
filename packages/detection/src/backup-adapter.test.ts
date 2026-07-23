@@ -10,10 +10,16 @@ import type { DetectionQueryDefinition } from "./types.js";
 const root = resolve(import.meta.dirname, "../../..");
 const databasePath = resolve(root, "local-data/phase0-validation/emusa-subset.sqlite");
 const backupAvailable = existsSync(databasePath);
+const snapshot = JSON.parse(
+  await readFile(resolve(root, "config/integrations/emusasoft-local-snapshot.json"), "utf8"),
+) as {
+  revision: string;
+  queryResults: Record<"A02" | "A05", { rows: number }>;
+};
 
 const definitions: Array<{ code: "A02" | "A05"; file: string; key: string; expectedRows: number }> = [
-  { code: "A02", file: "a02-reserved-material-in-transit.v1.sql", key: "materialFlowDetailId", expectedRows: 1245 },
-  { code: "A05", file: "a05-reel-handling.v1.sql", key: "articleSerialId", expectedRows: 763 },
+  { code: "A02", file: "a02-reserved-material-in-transit.v1.sql", key: "materialFlowDetailId", expectedRows: snapshot.queryResults.A02.rows },
+  { code: "A05", file: "a05-reel-handling.v1.sql", key: "articleSerialId", expectedRows: snapshot.queryResults.A05.rows },
 ];
 
 describe("protected local backup adapters", { skip: !backupAvailable }, () => {
@@ -25,7 +31,7 @@ describe("protected local backup adapters", { skip: !backupAvailable }, () => {
         adapterKind: "backup", keyField: definition.key, requiredFields: [definition.key], intervalMs: 300_000,
         timeoutMs: 3_000, pageSize: 1_000, maxRows: 10_000, maxAttempts: 1, retryBaseMs: 1, enabled: true,
       };
-      const adapter = new ReadonlyBackupSqliteAdapter(databasePath, sql, backupCutoff(databasePath), "backup-20260716.local.v1");
+      const adapter = new ReadonlyBackupSqliteAdapter(databasePath, sql, backupCutoff(databasePath), `${snapshot.revision}.local.v1`);
       const keys: string[] = [];
       let cursor: string | null = null;
       let pages = 0;

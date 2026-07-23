@@ -16,12 +16,14 @@ async function json(relativePath: string) {
 
 test("detection-query contracts validate and reference read-only SQL", async () => {
   const schema = await json("config/detection/contracts/detection-query.schema.json");
+  const snapshot = await json("config/integrations/emusasoft-local-snapshot.json");
   const ajv = new Ajv2020({ allErrors: true });
   const validate = ajv.compile(schema);
 
   for (const filename of ["a02.query.json", "a05.query.json"]) {
     const contract = await json(`config/detection/contracts/${filename}`);
     assert.equal(validate(contract), true, JSON.stringify(validate.errors));
+    assert.equal(contract.validation.localBackupRevision, snapshot.revision);
 
     const sql = await readFile(resolve(root, "config/detection/contracts", contract.sqlFile), "utf8");
     assert.match(sql.trimStart(), /^SELECT\b/i);
@@ -62,6 +64,8 @@ test("discovered EmusaSoft routes stay disabled until Phase 10 validation", asyn
   assert.equal(contract.destinations.workOrder.activeTemplate, "/work-orders/:workOrderId");
   assert.equal(contract.destinations.workOrder.closedTemplate, "/work-orders/closed/:workOrderId");
   assert.equal(contract.destinations.workOrder.enabled, false);
+  assert.equal(contract.destinations.materialReservation.template, "/work-orders/:workOrderId/process/reservation");
+  assert.equal(contract.destinations.materialReservation.enabled, false);
   assert.match(contract.destinations.workOrder.fallback, /identifier/);
 });
 
@@ -98,12 +102,13 @@ test("implemented alert contracts validate and reproduce all fixtures", async ()
   );
 });
 
-test("backup-confirmed fields match the protected local schema", () => {
+test("backup-confirmed fields match the protected local schema", async () => {
+  const snapshot = await json("config/integrations/emusasoft-local-snapshot.json") as { dumpFile: string };
   const output = execFileSync(
     "python3",
     [
       resolve(root, "scripts/phase1/validate-source-mappings.py"),
-      "--dump", resolve(root, "local-data/database/prod_emusa_core-20260716-143040.sql"),
+      "--dump", resolve(root, snapshot.dumpFile),
       "--contracts", resolve(root, "config/alerts/alert-rules.v1.json"),
     ],
     { cwd: root, encoding: "utf8" },
@@ -111,6 +116,6 @@ test("backup-confirmed fields match the protected local schema", () => {
   const result = JSON.parse(output);
   assert.deepEqual(
     { result: result.result, tables: result.tables, fields: result.fields, dataRowsPrinted: result.dataRowsPrinted },
-    { result: "pass", tables: 17, fields: 76, dataRowsPrinted: 0 },
+    { result: "pass", tables: 18, fields: 87, dataRowsPrinted: 0 },
   );
 });

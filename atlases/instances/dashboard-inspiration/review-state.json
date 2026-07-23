@@ -1,6 +1,6 @@
 {
   "atlasId": "dashboard-inspiration",
-  "updatedAt": "2026-07-23T15:14:51.031073Z",
+  "updatedAt": "2026-07-23T19:52:24.076244Z",
   "accepted": {
     "mixpanel-compact-analysis": true,
     "amplitude-segmentation": true,
@@ -111,6 +111,17 @@
         "y": 1.351,
         "width": 92.606,
         "height": 89.648
+      }
+    ],
+    "mixpanel-compact-analysis::mixpanel-compact-analysis-screen": [
+      {
+        "id": "custom-1784836343622",
+        "label": "Custom region",
+        "note": "",
+        "x": 91.399,
+        "y": 5.751,
+        "width": 7.933,
+        "height": 5.314
       }
     ]
   },

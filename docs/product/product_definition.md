@@ -64,7 +64,7 @@ The design system, dashboard implementation, and two currently prototyped chat s
 ## Current documentation-review interface
 
 - `reviews/alert-catalog/publication/index.html` is the approved browser publication of the alert catalog. It is not a Monitor product screen.
-- `reviews/alert-catalog/iterations/v11/index.html` records the review in which E05 was approved; the approved result is published in the final catalog.
+- `reviews/alert-catalog/iterations/v12/index.html` records the review in which the E02–E05 closure-snapshot guidance was approved; the approved result is published in the final catalog.
 
 ## Deprecated historical material
 

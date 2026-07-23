@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23T15:14:51.033409Z",
+  "updatedAt": "2026-07-23T19:52:24.080900Z",
   "instances": [
     {
       "id": "dashboard-inspiration",
@@ -8,7 +8,7 @@
       "objective": "Find compact, minimalist dashboard patterns for Monitor",
       "status": "active",
       "createdAt": "2026-07-23T00:58:39.536987Z",
-      "updatedAt": "2026-07-23T15:14:51.031073Z",
+      "updatedAt": "2026-07-23T19:52:24.076244Z",
       "migrationVerified": true
     }
   ]

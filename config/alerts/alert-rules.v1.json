@@ -337,7 +337,8 @@
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"orden_trabajo_receta_snapshot","fields":["id_orden_trabajo","id_articulo"],"evidence":"backup-confirmed"},
-        {"source":"immutable_opening_inventory_contract","fields":["locationId","articleId","openingQuantityKg"],"evidence":"phase10-pending"}
+        {"source":"orden_trabajo_contenedor_cierre_snapshot","fields":["id_orden_trabajo","id_contenedor","id_ubicacion","saldo_apertura"],"evidence":"backup-confirmed"},
+        {"source":"snapshot_semantics_contract","fields":["openingCaptureMoment","immutable","unit","nullableContainerMeaning"],"evidence":"phase10-pending"}
       ],
       "requiredEvidence": ["workOrderId","locationId","articleId","workOrderOpen","recipeRequiresMaterial","openingQuantityRecorded"],
       "parameters": {},
@@ -354,7 +355,8 @@
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"orden_trabajo_material_stock_contenedores","fields":["id_ubicacion","id_articulo","cantidad_devuelta_real_cierre"],"evidence":"backup-confirmed"},
-        {"source":"immutable_opening_inventory_contract","fields":["openingQuantityKg","interveningMovement"],"evidence":"phase10-pending"}
+        {"source":"orden_trabajo_contenedor_cierre_snapshot","fields":["id_orden_trabajo","id_contenedor","id_ubicacion","saldo_apertura","saldo_final","fecha_creacion","fecha_actualizacion"],"evidence":"backup-confirmed"},
+        {"source":"snapshot_semantics_contract","fields":["naturalKey","immutable","interveningMovement","unit"],"evidence":"phase10-pending"}
       ],
       "requiredEvidence": ["previousWorkOrderId","currentWorkOrderId","locationId","articleId","previousClosingKg","currentOpeningKg","interveningMovement","toleranceKg"],
       "parameters": {},
@@ -371,7 +373,8 @@
       "labels": ["Error posible", "Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"orden_trabajo_receta_snapshot","fields":["id_orden_trabajo","id_articulo","porcentaje_tornillo","posicion_tornillo","valor"],"evidence":"backup-confirmed"},
-        {"source":"immutable_container_inventory_contract","fields":["openingKg","addedKg","endingKg"],"evidence":"phase10-pending"}
+        {"source":"orden_trabajo_contenedor_cierre_snapshot","fields":["id_orden_trabajo","id_contenedor","id_ubicacion","saldo_apertura","ajuste_inicial","ingreso_contenedor","ajuste_final","saldo_final","consumo_real"],"evidence":"backup-confirmed"},
+        {"source":"snapshot_semantics_contract","fields":["balanceFormula","immutable","unit","screwMapping"],"evidence":"phase10-pending"}
       ],
       "requiredEvidence": ["workOrderId","articleId","screwId","openingKg","addedKg","endingKg","totalActualConsumptionKg","recipeFraction","ingredientToleranceFraction"],
       "parameters": {},

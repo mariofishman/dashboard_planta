@@ -1,11 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "contractVersion": "2.0.0",
+  "contractVersion": "2.1.0",
   "status": "discovered-pending-phase10-validation",
   "source": {
     "catalogVersion": 5,
-    "observedAt": "2026-07-22T19:08:00-05:00",
-    "evidence": "docs/integrations/emusasoft/evidence/mcp_audit_2026-07-22.md"
+    "observedAt": "2026-07-23T14:43:34Z",
+    "evidence": "docs/integrations/emusasoft/evidence/database_and_mcp_compatibility_audit_2026-07-23.md",
+    "baseUrl": "https://erp-web.apps.emusa.dev",
+    "productExamplesConfirmedOn": "2026-07-23"
   },
   "destinations": {
     "workOrder": {
@@ -21,6 +23,13 @@
       "closedTemplate": "/work-orders/closed/:workOrderId/detail/:itemType/:itemId",
       "enabled": false,
       "fallback": "display the related identifiers and available evidence inside Monitor"
+    },
+    "materialReservation": {
+      "requiredIdentifiers": ["workOrderId"],
+      "template": "/work-orders/:workOrderId/process/reservation",
+      "manualOnly": true,
+      "enabled": false,
+      "fallback": "display the work-order and material identifiers and available evidence inside Monitor"
     }
   },
   "enablementRequirements": [

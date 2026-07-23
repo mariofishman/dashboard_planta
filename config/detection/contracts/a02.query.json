@@ -29,7 +29,7 @@
     "usesReplicaObservationBoundary": true
   },
   "validation": {
-    "localBackupRevision": "prod_emusa_core-20260716-143040",
+    "localBackupRevision": "staging_emusa_core-20260723-025548",
     "productionStatus": "pending-es2-01-es2-02"
   }
 }

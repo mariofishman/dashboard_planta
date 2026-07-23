@@ -51,10 +51,10 @@ npm test
 npm run build
 ```
 
-Local backup expectations retained from the protected 2026-07-16 snapshot:
+Local backup expectations refreshed from the protected 2026-07-23 staging snapshot:
 
-- A02: 1,245 unique rows in 2 bounded pages using `a02_candidate_idx`.
-- A05: 763 unique rows in 1 bounded page using `a05_candidate_idx`.
+- A02: 1,249 unique rows in 2 bounded pages using `a02_candidate_idx`.
+- A05: 838 unique rows in 1 bounded page using `a05_candidate_idx`.
 
 These local plans and timings do not predict or approve Aurora load. Current-schema, replica, and load validation remains Phase 10 work.
 

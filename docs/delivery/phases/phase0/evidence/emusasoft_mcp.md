@@ -1,13 +1,18 @@
-# EmusaSoft MCP evidence collected 2026-07-20
+# EmusaSoft MCP evidence
 
-- Project `.env` was loaded and `EMUSASOFT_MCP_TOKEN` was verified as non-empty without printing it.
+**Status:** Phase 0 evidence snapshot, refreshed 2026-07-23
+
+- Project `.env` was loaded and the MCP token was verified as non-empty without printing it.
 - Catalog discovery order was followed: catalog info, search, describe, example, validate, then read-only execution.
-- Catalog v2 was generated 2026-07-13 and reports 1,034 GraphQL operations, 345 entities, 345 SQL tables, and 1,034 examples. It remains behind the 2026-07-16 backup with 363 tables.
-- `getUserContext` is a zero-argument query returning stable `sysUserId`, role information, `sysUser`, and `requiredPingActive`.
-- The generated `getUserContext` example was inspected. Local catalog validation returned `schema unavailable`; authenticated read-only execution succeeded and returned exactly one enabled, non-deleted `sysUserId` for the caller.
-- A02 evidence surfaces were described: `MaterialFlowDetail` / `flujo_materiales_detalles`, including work-order, material, status, creation, and receipt fields.
-- A05 evidence surfaces were described: `ArticleSerial` / `articulo_serial`, `balanza_carga_detalle_registros`, work orders, warehouses, equipment, and locations.
-- `getWorkOrder` was described and its generated example inspected. It provides work-order, equipment, document, material, output, and serial context.
-- The Phase 0 catalog exposed no stable web-route contract. MCP v5 later added route discovery; current status and remaining validation are recorded in `docs/integrations/emusasoft/integration_register.md`.
+- Staging catalog v5 was generated 2026-07-23 and reports 1,065 GraphQL operations, 361 entities, 400 cataloged SQL tables, 121 frontend routes, 1,688 GraphQL types, and 1,065 examples.
+- `getUserContext` remains a zero-argument query returning stable `sysUserId`, role information, `sysUser`, and `requiredPingActive`.
+- GraphQL validation now works: a valid identity query passed and an invalid field failed with a source location against schema version 5.
+- A02 and A05 source surfaces remain discoverable, and their SQL mappings still validate against the protected 2026-07-23 staging backup.
+- The closure-snapshot table, entity, GraphQL query, recipe snapshot, and active, closed, and reservation work-order routes are discoverable.
+- A live structural drift check found no type or field-name drift between catalog v5 and the live GraphQL schema at audit time.
+- `erp://integration/read-capability` defines MCP live reads as bearer-authenticated queries only; mutations and subscriptions are rejected.
+- MCP examples are explicitly structural skeletons, not representative or real ERP data.
+- Catalog evidence is discovery evidence, not proof of Aurora access, load limits, authentication lifecycle, or business-field semantics.
+- No write was attempted.
 
-MCP evidence is discovery evidence only. Local backup validation and later approved staging-replica validation remain mandatory.
+Current evidence and remaining items are maintained in `docs/integrations/emusasoft/integration_register.md`.
