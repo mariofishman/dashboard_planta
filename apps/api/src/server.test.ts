@@ -171,7 +171,7 @@ describe("Phase 2 platform foundation", () => {
     assert.ok(detail.json().evidence.length >= 1);
     assert.ok(detail.json().transitions.length >= 1);
     const detectorEvidence = await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident_evidence WHERE cycle_id IS NOT NULL");
-    assert.equal(detectorEvidence.count, 3);
+    assert.equal(detectorEvidence.count, 0, "unchanged detector polls must not create duplicate evidence");
   });
 
   it("recovers committed incident events by cursor and protects the API", async () => {

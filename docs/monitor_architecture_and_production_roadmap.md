@@ -116,10 +116,10 @@ Active sources:
 - `docs/design/design-system/tokens.json`
 - `docs/emusasoft_integration_architecture.md`
 - `docs/emusasoft_preimplementation_requests.md`
+- `apps/web/`
 - `prototype/alert-catalog/final/index.html`
 - `prototype/chat-list-review/chat-list-final.html`
 - `prototype/chat-list-review/chat-detail.html`
-- `prototype/chat-list-review/dashboard.html`
 
 Deprecated historical sources:
 
@@ -128,6 +128,7 @@ Deprecated historical sources:
 - `docs/archive/discovery.md`
 - `docs/archive/emusasoft_architecture_decisions.md`
 - `prototype/dashboard/`
+- `prototype/chat-list-review/dashboard.html`
 - `prototype/alert-catalog/v1/` through `v10/`
 
 ## 4. Observable EmusaSoft architecture
@@ -491,6 +492,35 @@ The view is informational and read-only. It contains no controls to adjust, appr
 
 Each evaluation stores query/rule versions, effective parameters and source, ERP IDs, `source_timestamp` when authoritative, `first_seen_at`, `observed_at`, and `evaluated_at`, readable formula, values/units/tolerances, read-only query identity without credentials, snapshot hash, result/confidence, and insufficient-evidence reason when applicable. Effective incident time uses authoritative ERP source time when available and otherwise Monitor's first-detection time; it is not user configurable.
 
+### 11.6 Polling persistence and retention strategy
+
+**Diagnosis.** A frequent EmusaSoft polling interval can produce hundreds of identical observations for one unchanged condition. Treating each consultation as incident evidence creates unreadable history and unbounded storage without adding business meaning. The local Phase 4 incident service already fingerprints evidence and context and suppresses semantically unchanged evidence rows and `incident.updated` events, but the production retention boundary for per-cycle diagnostics remains undecided.
+
+**Guiding policies.** Incident history records the opening evidence, meaningful evidence or context changes, and lifecycle transitions. Elapsed age is derived from timestamps rather than repeated snapshots. Condition state may update its latest healthy observation metadata without appending business history. Poll-cycle diagnostics are operational telemetry, not incident evidence; they must have a documented purpose and bounded retention or aggregation policy rather than being retained indefinitely by default. Failed, partial, invalid, stale, truncated, or uncommitted cycles still preserve the last known incident state and enough diagnostic information to investigate recovery behavior.
+
+**Actions.** Before Phase 10 production polling:
+
+1. write an ADR defining which fields belong in incident evidence, condition state, poll-cycle diagnostics, metrics, and logs;
+2. define retention, roll-up, and deletion periods for successful and failed poll-cycle diagnostics based on audit, recovery, observability, privacy, and support needs;
+3. estimate database volume at proposed production polling cadences and validate the result against the production budget;
+4. retain regression tests proving that unchanged healthy polls create no evidence row, transition, or incident-change event; and
+5. add load and retention tests that prove operational diagnostics remain bounded without weakening freshness or lifecycle safety.
+
+### 11.7 Contextual incident-explanation strategy
+
+**Diagnosis.** Catalog text explains the alert rule, but an operator also needs the specific work order, machine, shift, elapsed condition, and responsible role that caused the current occurrence. Static catalog copy alone may be too generic, while unconstrained generated text could invent facts or obscure the evidence.
+
+**Guiding policies.** The displayed explanation must be grounded only in the approved alert catalog, versioned rule result, and authorized incident evidence. It must distinguish unavailable facts from known facts, never infer a named person from a role or area, remain read-only, and retain a deterministic catalog-grounded fallback. The roadmap does not yet approve deterministic composition, an LLM, or a hybrid as the production mechanism. Production LLM use requires an explicit decision covering privacy, security, latency, cost, auditability, failure behavior, and factual evaluation.
+
+**Actions.** Before selecting a production mechanism:
+
+1. define a structured, versioned explanation input and output contract;
+2. compare rule-specific deterministic composition, LLM-assisted generation, and a hybrid using the existing standard kit before introducing another service;
+3. build representative A02, A03, and A05 evaluation cases, followed by cases for every production candidate rule;
+4. score factual grounding, omissions, invented facts, readability, latency, cost, and behavior with incomplete evidence;
+5. decide whether explanations are generated on read or change, and whether generated output is cached, persisted, versioned, or regenerated; and
+6. document the approved mechanism and acceptance thresholds in an ADR before enabling it in production.
+
 ## 12. Rule-to-source mapping
 
 | Rule | Primary sources | Type | Pre-production blocker |
@@ -710,7 +740,7 @@ Exit gate: local tests simulate timeouts, partial results, invalid schemas, stal
 
 Deliverables include the rule engine, incident/evidence/transitions/deduplication, automatic resolution, basic correlation, incident API, post-commit WebSocket events, and dashboard/detail views connected to local sample data.
 
-**Execution record (2026-07-21):** A02, A03, and A05 now run through a versioned local rule evaluator into Monitor-owned incident, immutable evidence, transition, recurrence, deduplication, and work-order correlation storage. Authorized list/detail/change-recovery APIs expose only committed records; WebSocket publication occurs after the incident and change-event transaction commits. The Material UI dashboard is connected to seeded local incident histories with global filters and evidence detail. Automated tests cover triggered, clear, insufficient, deduplication, automatic resolution, recurrence, post-commit publication, API authorization, and cursor recovery. Desktop and 390 px mobile browser validation pass without page-level horizontal overflow. The user accepted the local Phase 4 functional gate on 2026-07-21 while explicitly withholding approval of the dashboard design. Work stops here until the roadmap is revised; Phase 5 has not started. All real EmusaSoft integration remains Phase 10.
+**Execution record (updated 2026-07-22):** A02, A03, and A05 now run through a versioned local rule evaluator into Monitor-owned incident, immutable meaningful evidence, transition, recurrence, deduplication, and work-order correlation storage. Authorized list/detail/change-recovery APIs expose only committed records; WebSocket publication occurs after the incident and change-event transaction commits. Unchanged polling evidence is fingerprinted and does not append an evidence row or publish an incident-change event. The Material UI dashboard is connected to seeded local incident histories with global filters and evidence detail. Automated tests cover triggered, clear, insufficient, unchanged-evidence suppression, automatic resolution, recurrence, post-commit publication, API authorization, and cursor recovery. The user accepted the local Phase 4 functional gate on 2026-07-21 and accepted Dashboard V2 as a good first version on 2026-07-22. This closes the Dashboard V2 design gate but does not start Phase 5. The polling-retention and contextual-explanation decisions in Sections 11.6 and 11.7 remain roadmap work, and all real EmusaSoft integration remains Phase 10.
 
 Exit gate: synthetic and anonymized historical cases create, update, and resolve one explainable incident.
 
@@ -794,6 +824,11 @@ The first three screens have active prototypes. The fourth was identified during
 9. Essential chat functions for the initial production implementation.
 10. Exact pilot rules and unresolved tolerances.
 11. Team, environments, and deployment process.
+12. Poll-cycle diagnostic retention, aggregation, storage-volume budget, and deletion policy under Section 11.6.
+13. Contextual explanation mechanism and its grounding, privacy, cost, latency, audit, fallback, and evaluation thresholds under Section 11.7.
+14. Supported EmusaSoft frontend route contract for work-order navigation; until confirmed, identifiers remain selectable text.
+15. Authoritative source for named responsible people when incident evidence contains only a role or operational area.
+16. Explainable relation criteria for presenting related incidents; sharing a work order alone is insufficient.
 
 ## 21. Definition of Done for the initial production implementation
 
@@ -801,7 +836,9 @@ The first three screens have active prototypes. The fourth was identified during
 - Monitor has no direct writes or SQL write credentials for EmusaSoft.
 - Every production read-only SQL query and authentication/data adapter has contract tests.
 - Polling and incident occurrence handling are idempotent, recoverable, and auditable.
+- Unchanged polling does not create incident evidence, transitions, or client change events, and retained poll-cycle diagnostics follow an approved bounded retention policy.
 - Every incident has explainable rule, version, evidence, timestamps, subjects, and recipients.
+- Every displayed contextual explanation passes the approved grounding contract and has a deterministic failure fallback; no unapproved generative service is required for incident access.
 - One-incident rules prevent confirmed duplicates.
 - The UI displays each code's configured Spanish label plus stale/offline conditions without depending only on color.
 - Failed, partial, invalid, or stale polling cycles never resolve an incident; the next healthy cycle restores current condition state.

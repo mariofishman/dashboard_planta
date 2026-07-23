@@ -1,10 +1,12 @@
 # Phase 4 — Incident vertical slice
 
-Status: functional gate accepted by the user on 2026-07-21. Dashboard design is not approved. Work is stopped pending a roadmap revision; Phase 5 has not started.
+Status: functional gate accepted by the user on 2026-07-21. Dashboard V2 accepted as a good first version on 2026-07-22. The Phase 4 functional and design gates are complete; Phase 5 has not started.
 
 ## What a beginner can test
 
-Open `http://127.0.0.1:5173/`, sign in with any local test profile, and use the product dashboard. It contains local sample incidents for A02, A03, and A05. You can filter them, copy an OT identifier, and select `Ver detalles` to inspect the evidence and lifecycle history.
+Open `http://127.0.0.1:5173/`, sign in with any local test profile, and use the product dashboard. It contains local sample incidents for A02, A03, and A05. You can group the chart, combine lifecycle filters, search, choose a preset or custom date range, filter by open age, expand or collapse the incident results, and open an incident by selecting its complete row or card.
+
+The incident detail presents compact operational data, meaningful lifecycle changes, and a concise evidence-grounded explanation. Work-order identifiers remain readable and selectable but are not copied through a dedicated icon and do not link to EmusaSoft until an authoritative frontend route contract exists. Unexplained related-alert suggestions and repeated unchanged polling observations are not displayed.
 
 The data is intentionally local. Monitor is not connected to production EmusaSoft and cannot change EmusaSoft records.
 
@@ -19,14 +21,21 @@ The clean local seed contains five synthetic incident histories: three open inci
 - [x] Insufficient or failed reads cannot resolve an incident.
 - [x] Incident list, detail, and cursor-recovery APIs require server-side authorization.
 - [x] Incident changes are stored in the same transaction and published only after commit.
-- [x] Approved Material UI dashboard uses local sample incidents and opens evidence detail.
-- [x] Global search, status, operation, and date-range filters update the visible dashboard.
-- [x] Desktop and 390 px mobile layouts were browser-tested without page-level horizontal overflow.
+- [x] Semantically unchanged healthy polls create no additional evidence row or incident-change event.
+- [x] Approved Material UI Dashboard V2 uses local sample incidents and opens authorized evidence detail from the complete incident target.
+- [x] Search, date, operation, lifecycle, chart segment, and open-age filters update both the chart and incident results.
+- [x] Lifecycle filters are additive; each active lifecycle clears independently, and no selected lifecycle means all states.
+- [x] The primary chart groups by date, worker, work order, machine, operation, shift, or error type without separate concentration or frequent-error cards.
+- [x] Chart filtering preserves category positions and scale, reserves headroom above the tallest bar, and clears a selected segment on a second selection.
+- [x] Custom date selection follows the start, end, restart cycle and provides an explicit compact clear action.
+- [x] Incident results are collapsible, use relative time, and render as a compact four-column table on desktop/tablet and complete-target cards on mobile.
+- [x] Desktop, tablet, and mobile layouts were browser-tested without page-level or incident-table horizontal overflow.
 - [x] Edge-case matrix records concurrency, recurrence, recovery, and later-phase boundaries.
-- [x] Tablet filter controls use a compact single row with 40 px fields; the 919 px layout was measured in-browser without horizontal overflow.
-- [x] Summary metrics and the date chart use the prototype's compact density instead of oversized status cards.
-- [x] Date bars display exact totals, and the incident-list action exposes `Ver detalles` before horizontally scrollable context columns.
-- [x] Date bars and summary metrics filter the incident table in place without forcing a scroll; incident detail presents context, lifecycle history, translated evidence, identifiers, and related alerts.
+- [x] Desktop and tablet controls use the binding compact scale: 11 px routine type, 28 px visible height, 6 px radius, and normally 8 px horizontal padding.
+- [x] Desktop search expands left over covered controls and exposes `Filtros avanzados`; Enter, Escape, or blur restores the compact row.
+- [x] Mobile starts without a filter toolbar in document flow; top overscroll reveals one compact quick-filter row, while the persistent header action opens `Filtros avanzados`.
+- [x] Dashboard V2 removes repeated KPI cards, the ambiguous context column, dedicated copy and detail icons, separate frequent-error/concentration panels, and unsupported related-alert presentation.
+- [x] Incident detail presents operational data, meaningful lifecycle history, and a concise catalog-and-evidence-grounded explanation without inventing a named person.
 
 ## Exit criterion
 
@@ -34,15 +43,16 @@ The clean local seed contains five synthetic incident histories: three open inci
 
 ## Validation
 
-- `npm test`: 26 tests pass (11 API/platform, 10 detection, 5 incident lifecycle/evaluator).
-- `npm run typecheck`: all workspaces pass.
-- `npm run build`: API and web build pass.
-- `npm audit`: zero known vulnerabilities after installing the new workspace package.
-- Browser: dashboard, detail drawer, evidence, desktop 1440×1000, tablet 919×863, and mobile 390×844 verified. Date filtering preserved the current scroll position and returned the expected single result.
+- `npm test` on 2026-07-22: 27 tests pass (11 API/platform, 3 design-system token/density contracts, 8 detection/polling, 5 incident lifecycle/evaluator); the protected local-backup adapter suite remains intentionally skipped without its external fixture.
+- `npm run typecheck` on 2026-07-22: all workspaces pass.
+- `npm run build` on 2026-07-22: API and web build pass; the web bundle is 639.25 KB before gzip and retains the non-blocking large-chunk warning.
+- `npm audit` on 2026-07-22: zero known vulnerabilities.
+- Browser: dashboard, incident detail, desktop 1440×1000, tablet 919×863, and mobile widths from 351–414 px verified. The chart, additive lifecycle filters, open-age filters, custom range picker, expandable search, advanced filters, collapsible results, and mobile quick-filter reveal were exercised without horizontal overflow.
 
 ## Deferred by roadmap
 
 - Chats and routing: Phases 5–6.
 - Administrative close-without-resolution workflow: Phase 7.
 - Real EmusaSoft authentication, Aurora queries, production load/freshness proof, and deployment: Phase 10.
-- The current web bundle is about 567 KB before gzip; code splitting is a production optimization, not a Phase 4 gate.
+- Production polling-diagnostic retention and contextual-explanation mechanism: roadmap Sections 11.6 and 11.7.
+- The current web bundle is 639.25 KB before gzip; code splitting is a production optimization, not a Phase 4 gate.

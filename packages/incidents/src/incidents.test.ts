@@ -34,11 +34,13 @@ describe("Phase 4 incident lifecycle", () => {
   });
   afterEach(async () => database.close());
 
-  it("creates, updates without duplication, resolves, and records immutable history", async () => {
+  it("stores meaningful changes without duplicating unchanged polling evidence", async () => {
     const opened = await service.apply({ rule: a03, evidence: triggered, context });
-    const updated = await service.apply({ rule: a03, evidence: { ...triggered, elapsedMinutes: 22 }, context });
+    const unchanged = await service.apply({ rule: a03, evidence: { ...triggered, elapsedMinutes: 22 }, context });
+    const updated = await service.apply({ rule: a03, evidence: { ...triggered, elapsedMinutes: 22, sourceVersion: "changed" }, context });
     const resolved = await service.apply({ rule: a03, evidence: clear, context });
     assert.equal(opened?.eventType, "incident.opened");
+    assert.equal(unchanged, null);
     assert.equal(updated?.incidentId, opened?.incidentId);
     assert.equal(resolved?.eventType, "incident.resolved");
     const counts = await database.queryOne(`SELECT COUNT(*)::int AS incidents,

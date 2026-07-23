@@ -57,6 +57,25 @@ export function evaluateRule(rule: RuleContract, input: Record<string, unknown>)
   };
 }
 
+function stableEvidence(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableEvidence);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter(([key]) => key !== "elapsedMinutes" && key !== "declaredAgeMinutes")
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, item]) => [key, stableEvidence(item)]));
+}
+
+function jsonValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try { return JSON.parse(value); }
+  catch { return value; }
+}
+
+function evidenceFingerprint(status: string, reasons: unknown, evidence: unknown) {
+  return JSON.stringify({ status, reasons: stableEvidence(jsonValue(reasons)), evidence: stableEvidence(jsonValue(evidence)) });
+}
+
 export interface IncidentContext {
   plantId: number;
   workOrderId?: string;
@@ -118,7 +137,12 @@ export class IncidentService {
     const observedAt = (input.observedAt ?? new Date()).toISOString();
     const change = await this.database.transaction(async (transaction) => {
       const open = await transaction.queryOne(
-        `SELECT id, lifecycle FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2 AND lifecycle='open'`,
+        `SELECT i.id,i.lifecycle,i.reasons,i.work_order_id AS "workOrderId",i.work_order_code AS "workOrderCode",
+          i.machine_code AS "machineCode",i.operation_name AS "operationName",i.shift_name AS "shiftName",i.responsible_name AS "responsibleName",
+          (SELECT status FROM monitor_incident_evidence e WHERE e.incident_id=i.id ORDER BY observed_at DESC LIMIT 1) AS "lastEvidenceStatus",
+          (SELECT reasons FROM monitor_incident_evidence e WHERE e.incident_id=i.id ORDER BY observed_at DESC LIMIT 1) AS "lastEvidenceReasons",
+          (SELECT evidence FROM monitor_incident_evidence e WHERE e.incident_id=i.id ORDER BY observed_at DESC LIMIT 1) AS "lastEvidence"
+        FROM monitor_incident i WHERE rule_code=$1 AND condition_key=$2 AND lifecycle='open'`,
         [input.rule.code, evaluated.conditionKey],
       );
       if (evaluated.status === "clear") {
@@ -131,6 +155,14 @@ export class IncidentService {
       }
       const details = presentation[input.rule.code];
       if (open.id) {
+        const contextChanged = ([
+          [open.workOrderId, input.context.workOrderId], [open.workOrderCode, input.context.workOrderCode],
+          [open.machineCode, input.context.machineCode], [open.operationName, input.context.operationName],
+          [open.shiftName, input.context.shiftName], [open.responsibleName, input.context.responsibleName],
+        ] as Array<[unknown, unknown]>).some(([current, next]) => !current && Boolean(next));
+        const evidenceChanged = evidenceFingerprint(String(open.lastEvidenceStatus), open.lastEvidenceReasons, open.lastEvidence)
+          !== evidenceFingerprint(evaluated.status, evaluated.reasons, input.evidence);
+        if (!contextChanged && !evidenceChanged) return null;
         await transaction.execute(`UPDATE monitor_incident SET updated_at=$2, reasons=$3::jsonb, summary=$4,
           work_order_id=COALESCE(work_order_id,$5),work_order_code=COALESCE(work_order_code,$6),machine_code=COALESCE(machine_code,$7),
           operation_name=COALESCE(operation_name,$8),shift_name=COALESCE(shift_name,$9),responsible_name=COALESCE(responsible_name,$10),

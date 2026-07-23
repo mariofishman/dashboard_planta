@@ -42,7 +42,7 @@ typography:
     lineHeight: 1.5
   label:
     fontFamily: "Montserrat, system-ui, sans-serif"
-    fontSize: "0.8125rem"
+    fontSize: "0.6875rem"
     fontWeight: 600
     lineHeight: 1.4
     letterSpacing: "0.02em"
@@ -65,35 +65,35 @@ components:
     backgroundColor: "{colors.action-cyan}"
     textColor: "{colors.surface}"
     typography: "{typography.label}"
-    rounded: "{rounded.md}"
-    padding: "10px 18px"
-    height: "40px"
+    rounded: "{rounded.sm}"
+    padding: "4px 8px"
+    height: "28px"
   button-primary-hover:
     backgroundColor: "{colors.action-cyan-hover}"
     textColor: "{colors.surface}"
     typography: "{typography.label}"
-    rounded: "{rounded.md}"
-    padding: "10px 18px"
-    height: "40px"
+    rounded: "{rounded.sm}"
+    padding: "4px 8px"
+    height: "28px"
   button-secondary:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.emusa-navy}"
     typography: "{typography.label}"
-    rounded: "{rounded.md}"
-    padding: "10px 18px"
-    height: "40px"
+    rounded: "{rounded.sm}"
+    padding: "4px 8px"
+    height: "28px"
   input-default:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.emusa-navy}"
-    typography: "{typography.body}"
-    rounded: "{rounded.md}"
-    padding: "10px 12px"
-    height: "40px"
+    typography: "{typography.label}"
+    rounded: "{rounded.sm}"
+    padding: "4px 8px"
+    height: "28px"
   card-default:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.emusa-navy}"
     rounded: "{rounded.lg}"
-    padding: "24px"
+    padding: "16px"
 ---
 
 # Design System: Monitor
@@ -158,14 +158,28 @@ The palette preserves EMUSA's blue-green identity while adopting Vescrow's soft 
 ### Hierarchy
 
 - **Display** (700, `52px`, `64px` line-height): public-facing hero or executive overview only; never routine dashboard labels.
-- **Headline** (700, `32px`, `1.3` line-height): page titles and major report headings.
-- **Title** (600, `20px`, `1.4` line-height): panels, dialogs, and grouped table regions.
-- **Body** (400, `16px`, `1.5` line-height): explanations, descriptions, and standard values; prose width should remain within 65–75ch.
-- **Compact Body** (400, `14px`, `20px` line-height): table cells, filters, timestamps, and metadata.
-- **Label** (600, `13px`, `0.02em` letter-spacing): controls and short navigation labels. Uppercase is reserved for short corporate or category labels.
-- **Metric** (700, `30–36px`, `1.15` line-height): important KPIs; use tabular numbers when available.
+- **Headline** (700, `32px`, `1.3` line-height): public-facing or executive report headings only; not routine Monitor product screens.
+- **Application title** (600–700, `20px`, `1.4` line-height): the application name or a true page-level heading only.
+- **Section title** (600, `14px`, `1.4` line-height): panels, dialogs, drawers, and grouped table regions.
+- **Explanatory body** (400, `16px`, `1.5` line-height): prose explanations and longer descriptions; prose width should remain within 65–75ch.
+- **Primary operational data** (400–700, `12px`, `1.4–1.5` line-height): table primary text, incident titles, identifiers, and important compact values.
+- **Routine UI** (400–600, `11px`, `1.4` line-height): controls, filters, menu items, input text, timestamps, table metadata, and short navigation labels. Uppercase is reserved for short corporate or category labels.
+- **Metric** (700, `30–36px`, `1.15` line-height): exceptional standalone reporting figures only; use tabular numbers and never add a metric treatment that merely repeats the chart, legend, or result count.
 
 **The Operational Scale Rule.** Product screens use fixed sizes, not fluid display typography. Data density must remain stable across panels and sidebars.
+
+### Compact product scale
+
+Monitor's operational interface uses one compact scale across toolbars, tables, menus, dialogs, drawers, and mobile filter surfaces:
+
+- routine controls, filter labels, menu items, input text, table metadata, and action labels use `11px` type;
+- table primary text uses `12px` type;
+- section and dialog titles use `14px` type;
+- compact visible controls are `28px` high, use a `6px` radius, and normally use `8px` horizontal padding;
+- menu options have a `28px` minimum visible row height; and
+- dialog fields and actions do not introduce a larger private scale.
+
+Larger typography is reserved for the application title, a true page heading, or explanatory prose. Library defaults must not silently enlarge nested inputs, selects, chips, buttons, or menu items. Where touch accessibility requires a larger hit area, enlarge the invisible or surrounding target without enlarging the visible control.
 
 ## 4. Elevation
 
@@ -184,15 +198,15 @@ The system is flat by default. Depth comes first from canvas-versus-surface cont
 
 ### Buttons
 
-- **Shape:** compact rounded rectangle (`10px`), not a full pill unless the control is a binary filter chip.
-- **Primary:** cyan background, white text, `40px` height, `10px 18px` padding, label weight 600.
+- **Shape:** compact rounded rectangle (`6px`), not a full pill.
+- **Primary:** cyan background, white text, `28px` visible height, `4px 8px` padding, 11px label, weight 600.
 - **Hover / Focus:** darken to `#006BA8`; use a `2px #3D7EFF` focus ring with `2px` offset. Active state may translate by at most `1px`.
 - **Secondary:** white surface, navy text, `1px #D8DDE8` border, no wide shadow.
 - **Destructive:** red only for destructive actions on Monitor-owned data, such as an authorized message deletion. Monitor exposes no control for irreversible factory or inventory changes.
 
 ### Chips
 
-- **Style:** full pill, compact `6px 12px` padding, 13–14px text.
+- **Style:** compact rounded rectangle, `28px` visible height, `6px` radius, normally `8px` horizontal padding, and 11px text. Full-pill geometry is not permitted for rectangular chips, filters, lifecycle selectors, or status labels.
 - **Unselected:** white background, navy text, subtle navy-tinted border.
 - **Selected:** `#E2EBFD` background with navy or cyan text.
 - **Status:** green, orange, or red tints must include a text label or icon; never depend on color alone.
@@ -203,12 +217,13 @@ The system is flat by default. Depth comes first from canvas-versus-surface cont
 - **Background:** white on `#F5F5F5` canvas.
 - **Shadow Strategy:** flat at rest; optional low shadow only when clickable or floating.
 - **Border:** `1px #E0E0E0` when separation is otherwise unclear.
-- **Internal Padding:** `24px` default; `16px` in dense side panels.
+- **Internal Padding:** `16px` default; reduce to the 4px spacing rhythm when a dense table or analytical surface benefits from it.
 - **Composition:** prefer sections, dividers, and aligned rows over a grid of identical cards.
+- **Information economy:** do not add standalone KPI cards or summary strips that repeat values already visible in a chart, status control, or result count.
 
 ### Inputs / Fields
 
-- **Style:** white background, navy text, `1px #D8DDE8` border, `10px` radius, `40px` minimum height.
+- **Style:** white background, navy text, `1px #D8DDE8` border, `6px` radius, and `28px` visible height for operational controls.
 - **Focus:** cyan border plus a visible `2px` ring; do not remove the native focus indication without replacement.
 - **Error / Disabled:** error uses red border plus written guidance; disabled uses a neutral fill and retains readable text.
 
@@ -237,15 +252,19 @@ The system is flat by default. Depth comes first from canvas-versus-surface cont
 - **Do** use real EMUSA production, material, machinery, packaging, and workforce imagery on brand-facing surfaces.
 - **Do** author all current user-visible copy in Spanish and keep layouts ready for future English and Portuguese expansion without truncation or layout breakage.
 - **Do** provide hover, focus, active, disabled, loading, empty, success, warning, and error states.
+- **Do** place uncommon controls in a menu, popover, drawer, dialog, or temporary expansion instead of reserving permanent vertical space.
+- **Do** keep entire visible row or cell targets interactive when the row opens one destination.
 
 ### Don't:
 
 - **Don't** replace EMUSA's identity with Vescrow's violet or pink accents.
 - **Don't** use gradients, glassmorphism, decorative glows, or repeating grid backgrounds.
 - **Don't** use cards inside cards or identical card grids when rows, sections, or tables are clearer.
-- **Don't** exceed `16px` radius on dashboard cards; reserve full pills for chips and compact selectors.
+- **Don't** exceed `16px` radius on dashboard cards; use the compact `6px` radius for rectangular controls, filters, lifecycle selectors, chips, and status labels. Reserve circular geometry for genuinely circular elements such as status dots, avatars, and unread counters.
 - **Don't** pair a `1px` border with a wide decorative shadow on the same component.
 - **Don't** use tiny uppercase labels above every section; category labels must carry real information.
 - **Don't** use marketing claims inside operational controls, alerts, tables, or error messages.
 - **Don't** communicate status through color alone.
 - **Don't** invent custom form behavior, decorative motion, or non-standard modals where familiar controls work.
+- **Don't** accept larger library defaults inside dialogs, drawers, menus, or mobile sheets.
+- **Don't** repeat chart totals in large cards or add permanent controls that displace the operational data.
