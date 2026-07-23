@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <title>Monitor · Chats</title>
+    <link rel="stylesheet" href="chat-list-final.css?v=4" />
+  </head>
+  <body>
+    <header class="review-bar">
+      <div>
+        <strong>Chat list · versión final</strong>
+        <span>Antigüedad visible y estados alineados con EMUSA</span>
+      </div>
+      <a href="http://127.0.0.1:5173/">Ver dashboard</a>
+    </header>
+
+    <main class="review-layout">
+      <aside class="review-notes" aria-labelledby="review-title">
+        <p class="review-version">Versión final para revisión</p>
+        <h1 id="review-title">El tiempo se lee; el color conserva su significado</h1>
+        <p>La lista mantiene la familiaridad de WhatsApp, pero separa claramente mensajes, alertas y tiempo sin resolver.</p>
+
+        <dl class="decision-list">
+          <div>
+            <dt>Antigüedad visible</dt>
+            <dd>Cada conversación muestra la alerta abierta más antigua con una duración explícita.</dd>
+          </div>
+          <div>
+            <dt>Sin urgencia inventada</dt>
+            <dd>El tiempo no cambia de color hasta que existan reglas operativas de escalamiento.</dd>
+          </div>
+          <div>
+            <dt>Chips compatibles</dt>
+            <dd>Superficie blanca, texto navy y un marcador rotulado con los colores semánticos de EMUSA.</dd>
+          </div>
+          <div>
+            <dt>Actividad separada</dt>
+            <dd>El contador cyan sigue representando únicamente mensajes no leídos.</dd>
+          </div>
+        </dl>
+      </aside>
+
+      <section class="app-frame" aria-label="Lista de conversaciones de Monitor">
+        <header class="app-header">
+          <div>
+            <p>Viernes 18 de julio · Turno día</p>
+            <h2>Chats</h2>
+          </div>
+          <span class="current-user">Luis V. · Supervisor de impresión</span>
+        </header>
+
+        <div class="chat-scroll" data-chat-scroll>
+          <div class="chat-controls" data-chat-controls>
+            <div class="chat-controls-inner">
+              <div class="search-area">
+                <label class="search-control">
+                  <span class="sr-only">Buscar conversaciones</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <path d="m20 20-4-4"></path>
+                  </svg>
+                  <input data-chat-search type="search" placeholder="Buscar grupo, persona, máquina, OT o alerta" />
+                </label>
+              </div>
+
+              <div class="filter-strip" aria-label="Filtros de conversaciones">
+                <button class="filter-chip" data-filter="all" aria-pressed="true" type="button">Todas <span>8</span></button>
+                <button class="filter-chip" data-filter="unread" aria-pressed="false" type="button">No leídas <span>4</span></button>
+                <button class="filter-chip" data-filter="pinned" aria-pressed="false" type="button">Fijadas <span>2</span></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="conversation-list" aria-live="polite">
+          <a class="conversation-row is-unread" data-chat-row data-tags="unread pinned" href="chat-detail.html" aria-label="Abrir Producción P15, turno día. 4 mensajes no leídos. 2 alertas abiertas. La más antigua lleva 2 horas y 14 minutos sin resolver.">
+            <span class="unread-dot" aria-hidden="true"></span>
+            <span class="conversation-copy">
+              <span class="title-line">
+                <strong>Producción P15 · Turno día</strong>
+                <span class="pinned-label">Fijada</span>
+              </span>
+              <span class="message-preview"><b>Monitor:</b> La bobina CU-98421 sigue sin pesarse.</span>
+              <span class="alert-context">
+                <span class="alert-summary">2 alertas abiertas</span>
+                <span class="oldest-age">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>
+                  <span>Más antigua</span><strong>2 h 14 min</strong>
+                </span>
+              </span>
+              <span class="alert-chips" aria-label="Alertas abiertas: Error A05 sin pesar y Error A02 en tránsito">
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">A05 · Sin pesar</span></span>
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">A02 · En tránsito</span></span>
+              </span>
+            </span>
+            <span class="conversation-meta">
+              <time datetime="2026-07-18T18:02:00-05:00">6:02 p. m.</time>
+              <span class="unread-count" aria-label="4 mensajes no leídos">4</span>
+            </span>
+          </a>
+
+          <button class="conversation-row is-unread" data-chat-row data-tags="unread" type="button" aria-label="Abrir Supervisión de impresión. 2 mensajes no leídos. 3 alertas abiertas. La más antigua lleva 48 minutos sin resolver.">
+            <span class="unread-dot" aria-hidden="true"></span>
+            <span class="conversation-copy">
+              <span class="title-line"><strong>Supervisión de impresión</strong></span>
+              <span class="message-preview"><b>David V.:</b> @Luis confirma si la P09 está lista.</span>
+              <span class="alert-context">
+                <span class="alert-summary">3 alertas abiertas</span>
+                <span class="oldest-age">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>
+                  <span>Más antigua</span><strong>48 min</strong>
+                </span>
+              </span>
+              <span class="alert-chips" aria-label="Alertas abiertas: Error B02 inicio atrasado, Por vencer A01 material no listo y Error A03 sin consumo">
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">B02 · Inicio atrasado</span></span>
+                <span class="alert-chip warning"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Por vencer</span><span class="alert-code">A01 · Material no listo</span></span>
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">A03 · Sin consumo</span></span>
+              </span>
+            </span>
+            <span class="conversation-meta">
+              <time datetime="2026-07-18T17:48:00-05:00">5:48 p. m.</time>
+              <span class="unread-count" aria-label="2 mensajes no leídos">2</span>
+            </span>
+          </button>
+
+          <button class="conversation-row" data-chat-row data-tags="pinned" type="button" aria-label="Abrir Cierre de OT, impresión. 4 alertas abiertas. La más antigua lleva 3 horas y 6 minutos sin resolver.">
+            <span class="conversation-copy">
+              <span class="title-line">
+                <strong>Cierre de OT · Impresión</strong>
+                <span class="pinned-label">Fijada</span>
+              </span>
+              <span class="message-preview"><b>Rosa P.:</b> Revisé los registros de la OT 151087.3.</span>
+              <span class="alert-context">
+                <span class="alert-summary">4 alertas abiertas</span>
+                <span class="oldest-age">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>
+                  <span>Más antigua</span><strong>3 h 06 min</strong>
+                </span>
+              </span>
+              <span class="alert-chips" aria-label="Alertas abiertas: Error D01 metros excedidos, Error D02 reel sin consumir, Error posible C01 peso atípico y Error posible C06 velocidad atípica">
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">D01 · Metros excedidos</span></span>
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">D02 · Reel sin consumir</span></span>
+                <span class="alert-chip possible"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error posible</span><span class="alert-code">C01 · Peso atípico</span></span>
+                <span class="alert-chip possible"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error posible</span><span class="alert-code">C06 · Velocidad atípica</span></span>
+              </span>
+            </span>
+            <span class="conversation-meta"><time datetime="2026-07-18T17:31:00-05:00">5:31 p. m.</time></span>
+          </button>
+
+          <button class="conversation-row is-unread" data-chat-row data-tags="unread" type="button" aria-label="Abrir Almacén, turno día. 1 mensaje no leído. 6 alertas abiertas. La más antigua lleva 1 hora y 22 minutos sin resolver.">
+            <span class="unread-dot" aria-hidden="true"></span>
+            <span class="conversation-copy">
+              <span class="title-line"><strong>Almacén · Turno día</strong></span>
+              <span class="message-preview"><b>Carmen R.:</b> Dos bobinas ya salieron hacia producción.</span>
+              <span class="alert-context">
+                <span class="alert-summary">6 alertas abiertas</span>
+                <span class="oldest-age">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>
+                  <span>Más antigua</span><strong>1 h 22 min</strong>
+                </span>
+              </span>
+              <span class="alert-chips" aria-label="Se muestran 3 de 6 alertas abiertas">
+                <span class="alert-chip warning"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Por vencer</span><span class="alert-code">A01 · Material no listo</span></span>
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">A02 · En tránsito</span></span>
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">A05 · Sin mover</span></span>
+                <span class="alert-overflow">+3 más</span>
+              </span>
+            </span>
+            <span class="conversation-meta">
+              <time datetime="2026-07-18T17:12:00-05:00">5:12 p. m.</time>
+              <span class="unread-count" aria-label="1 mensaje no leído">1</span>
+            </span>
+          </button>
+
+          <button class="conversation-row" data-chat-row data-tags="direct" type="button" aria-label="Abrir conversación directa con Jorge A. Una alerta abierta. Lleva 34 minutos sin resolver.">
+            <span class="conversation-copy">
+              <span class="title-line"><strong>Jorge A.</strong></span>
+              <span class="message-preview">Te reenvié la conversación de la OT 151230.1.</span>
+              <span class="alert-context">
+                <span class="alert-summary">1 alerta abierta</span>
+                <span class="oldest-age">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>
+                  <span>Sin resolver</span><strong>34 min</strong>
+                </span>
+              </span>
+              <span class="alert-chips" aria-label="Alerta abierta Error B02 inicio atrasado">
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">B02 · Inicio atrasado</span></span>
+              </span>
+            </span>
+            <span class="conversation-meta"><time datetime="2026-07-18T16:44:00-05:00">4:44 p. m.</time></span>
+          </button>
+
+          <button class="conversation-row is-unread" data-chat-row data-tags="unread" type="button" aria-label="Abrir Extrusión, turno día. 3 mensajes no leídos. Dos alertas abiertas. La más antigua lleva 26 minutos sin resolver.">
+            <span class="unread-dot" aria-hidden="true"></span>
+            <span class="conversation-copy">
+              <span class="title-line"><strong>Extrusión · Turno día</strong></span>
+              <span class="message-preview"><b>Monitor:</b> Falta confirmar el inventario inicial.</span>
+              <span class="alert-context">
+                <span class="alert-summary">2 alertas abiertas</span>
+                <span class="oldest-age">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>
+                  <span>Más antigua</span><strong>26 min</strong>
+                </span>
+              </span>
+              <span class="alert-chips" aria-label="Alertas abiertas: Error E02 inventario inicial y Error posible E04 balance de formulación">
+                <span class="alert-chip error"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error</span><span class="alert-code">E02 · Inventario inicial</span></span>
+                <span class="alert-chip possible"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Error posible</span><span class="alert-code">E04 · Balance formulación</span></span>
+              </span>
+            </span>
+            <span class="conversation-meta">
+              <time datetime="2026-07-18T16:31:00-05:00">4:31 p. m.</time>
+              <span class="unread-count" aria-label="3 mensajes no leídos">3</span>
+            </span>
+          </button>
+
+          <button class="conversation-row" data-chat-row data-tags="" type="button" aria-label="Abrir Sellado, turno día. Una alerta abierta. Lleva 18 minutos sin resolver.">
+            <span class="conversation-copy">
+              <span class="title-line"><strong>Sellado · Turno día</strong></span>
+              <span class="message-preview"><b>María C.:</b> Estamos revisando el conteo de bolsas.</span>
+              <span class="alert-context">
+                <span class="alert-summary">1 alerta abierta</span>
+                <span class="oldest-age">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 7v5l3 2"></path></svg>
+                  <span>Sin resolver</span><strong>18 min</strong>
+                </span>
+              </span>
+              <span class="alert-chips" aria-label="Alerta abierta Alerta A03 sin consumo declarado">
+                <span class="alert-chip warning"><span class="status-mark" aria-hidden="true"></span><span class="status-label">Alerta</span><span class="alert-code">A03 · Sin consumo</span></span>
+              </span>
+            </span>
+            <span class="conversation-meta"><time datetime="2026-07-18T16:18:00-05:00">4:18 p. m.</time></span>
+          </button>
+
+          <button class="conversation-row" data-chat-row data-tags="direct" type="button" aria-label="Abrir conversación directa con Ana M.">
+            <span class="conversation-copy">
+              <span class="title-line"><strong>Ana M.</strong></span>
+              <span class="message-preview">Ya validé la recepción de la bobina para P09.</span>
+            </span>
+            <span class="conversation-meta"><time datetime="2026-07-18T15:52:00-05:00">3:52 p. m.</time></span>
+          </button>
+          </div>
+
+          <div class="empty-state" data-empty-state hidden>
+            <strong>No hay conversaciones</strong>
+            <span>Prueba otro término o filtro.</span>
+          </div>
+        </div>
+
+        <nav class="bottom-nav" aria-label="Navegación principal">
+          <a href="http://127.0.0.1:5173/">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"></path></svg>
+            <span>Dashboard</span>
+          </a>
+          <a class="active" href="chat-list-final.html" aria-current="page">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4V5Z"></path></svg>
+            <span>Chats</span>
+          </a>
+        </nav>
+      </section>
+    </main>
+
+    <script src="chat-list-final.js?v=4"></script>
+  </body>
+</html>

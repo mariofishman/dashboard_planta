@@ -5,8 +5,8 @@ import { resolve } from "node:path";
 import process from "node:process";
 
 const root = resolve(import.meta.dirname, "../..");
-const catalogPath = resolve(root, "docs/phase1/contracts/alert-rules.v1.json");
-const fixturesPath = resolve(root, "docs/phase1/fixtures/rule-cases.v1.json");
+const catalogPath = resolve(root, "config/alerts/alert-rules.v1.json");
+const fixturesPath = resolve(root, "tests/fixtures/alerts/rule-cases.v1.json");
 
 const expectedCodes = [
   "A01", "A02", "A03", "A04", "A05", "A06", "A07",

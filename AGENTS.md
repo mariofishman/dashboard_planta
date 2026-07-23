@@ -24,7 +24,7 @@
 
 # Monitor interface density
 
-- Before any Monitor UI design, implementation, or review, read completely and follow this active authority set: `docs/product_definition.md`, `docs/ux_ui_decisions.md`, `docs/design/design.md`, `docs/design/brand_guidelines.md`, `docs/design/design-system/tokens.json`, `docs/design/design-system/tokens.css`, and `.interface-design/system.md`.
+- Before any Monitor UI design, implementation, or review, read completely and follow this active authority set: `docs/product/product_definition.md`, `docs/product/ux_ui_decisions.md`, `docs/design/design.md`, `docs/design/brand_guidelines.md`, `docs/design/design-system/tokens.json`, `docs/design/design-system/tokens.css`, and `.interface-design/system.md`.
 - Before styling or changing a component, inspect `packages/design-system/src/index.ts` and reuse its shared Material UI defaults. Before changing the dashboard, also inspect the current implementation in `apps/web/src/App.tsx` rather than an older static prototype.
 - Treat the active authority set's compact text, control-height, padding, radius, dialog, composition, responsive, and interaction measurements as binding. Do not fall back to MUI default sizing or introduce a private component scale.
-- Dashboard V2 was accepted as a good first version on 2026-07-22. Its completed design record is archived at `docs/archive/dashboard_v2_design_handoff.md`; it preserves research and rejected alternatives but has no current design authority. New decisions belong in the active authority set above rather than in the archive.
+- Dashboard V2 was accepted as a good first version on 2026-07-22. Its completed design record is archived at `archive/docs/design/dashboard_v2_design_handoff.md`; it preserves research and rejected alternatives but has no current design authority. New decisions belong in the active authority set above rather than in the archive.

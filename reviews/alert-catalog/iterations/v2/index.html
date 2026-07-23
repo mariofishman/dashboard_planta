@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EMUSA Alert Catalog Review · Iteration 2</title>
+    <link rel="stylesheet" href="../../shared/styles.css" />
+  </head>
+  <body data-review-document="emusa-alert-catalog" data-review-iteration="2" data-review-legacy-storage-key="emusa-alert-catalog-v2-review">
+    <aside class="archive-notice">Deprecated historical review iteration. Use the <a href="../../publication/">approved alert catalog</a>.</aside>
+    <header class="review-header">
+      <div class="brand">EMUSA <span>Alert catalog · iteration 2</span></div>
+      <div class="header-links"><a href="../v3/">Iteration 3</a><a href="../v1/">Iteration 1</a><a href="http://127.0.0.1:5173/">Dashboard</a></div>
+    </header>
+
+    <main>
+      <section class="intro">
+        <p class="eyebrow">Persistent product discovery · review pass 2</p>
+        <h1>Factory alert catalog</h1>
+        <p>Annotate a complete card or one statement. This iteration applies all 25 comments from the first review and maps directly to <code>docs/product/alert_catalog.md</code>.</p>
+        <div class="legend" aria-label="Alert states">
+          <span><i class="dot error"></i>Error</span>
+          <span><i class="dot upcoming"></i>Por vencer</span>
+          <span><i class="dot possible"></i>Possible error</span>
+        </div>
+      </section>
+
+      <section class="iteration-summary" aria-labelledby="iteration-title">
+        <div class="summary-heading"><span>Iteration 2</span><h2 id="iteration-title">What changed</h2></div>
+        <ul>
+          <li>Reservation and dispatch are now one incident with 60- and 30-minute checkpoints.</li>
+          <li>Sequence and machine-activity alerts moved into family B.</li>
+          <li>Truncation and downstream-incomplete alerts were removed.</li>
+          <li>Pickup and weighing were merged; waste declaration and weighing were merged.</li>
+          <li>Statistical plausibility and OT balance families were added.</li>
+          <li>Extrusion, Exlam, and sealing now have separate future families.</li>
+        </ul>
+      </section>
+
+      <nav class="stage-index" id="alert-index" aria-label="Alert index"><a href="#family-a">A</a><a href="#a01">A01</a><a href="#a02">A02</a><a href="#a03">A03</a><a href="#a04">A04</a><a href="#a05">A05</a><a href="#a06">A06</a><a href="#family-b">B</a><a href="#b01">B01</a><a href="#b02">B02</a><a href="#b03">B03</a><a href="#family-c">C</a><a href="#c01">C01</a><a href="#c02">C02</a><a href="#c03">C03</a><a href="#c04">C04</a><a href="#c05">C05</a><a href="#c06">C06</a><a href="#family-d">D</a><a href="#d01">D01</a><a href="#d02">D02</a><a href="#d03">D03</a><a href="#future">E–G</a><a href="#excluded">Excluded</a></nav>
+      <div class="catalog" id="catalog">
+  <section class="family-section" aria-labelledby="family-a-title">
+    <div class="family-heading" id="family-a">
+      <span class="family-code">A</span>
+      <div><h2 id="family-a-title">Material, inventory, and production-data registration</h2><p>Current scope: printing, lamination, adhesive lamination, and cutting.</p></div>
+    </div>
+
+    <article class="alert-card family-a state-upcoming" id="a01" aria-labelledby="a01-title">
+      <div class="card-heading">
+        <div><span class="alert-id">A01 · Readiness and dispatch</span><h2 id="a01-title">Required material not ready before OT start</h2></div>
+        <span class="state-pill">Por vencer, then Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>At 60 minutes before planned OT start, required material is unavailable in the warehouse or has not been reserved. At 30 minutes before start, the same incident is updated if the material has not been dispatched.</p></section>
+        <section><h3>Why the alert exists</h3><p>The OT is at risk of starting without the required material at the machine.</p></section>
+        <section><h3>Possible causes</h3><p>Reservation negligence; warehouse stock unavailable; supplier delivery pending after purchasing; or reserved material not dispatched by warehouse.</p></section>
+        <section><h3>Example</h3><p>OT 151200.1 starts at 10:00. At 09:00 one substrate is unavailable and unreserved. At 09:30 the incident says: Not dispatched because material is not reserved and not available in the warehouse.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>At planned start minus 60 minutes, evaluate required materials, reservations, warehouse availability, and open purchase or supplier-delivery status. At planned start minus 30 minutes, add dispatch status. Maintain one incident per OT and required material.</p></section>
+      <p class="rule-note"><strong>Incident rule:</strong> Deduplication: former A01 and A02 are one incident. Later evidence changes the reason; it does not create another alert.</p>
+    </article>
+    <article class="alert-card family-a state-error" id="a02" aria-labelledby="a02-title">
+      <div class="card-heading">
+        <div><span class="alert-id">A02 · Transit and receipt</span><h2 id="a02-title">Material flow not received within 30 minutes</h2></div>
+        <span class="state-pill">Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>A sent material flow remains in transit without digital receipt for more than 30 minutes.</p></section>
+        <section><h3>Why the alert exists</h3><p>The material may have arrived physically while the receiver failed to reproduce that action in EMUSA Soft, leaving the digital location incorrect.</p></section>
+        <section><h3>Possible causes</h3><p>Physical delivery occurred but the operator did not receive it digitally, or the physical movement itself is delayed. A wrong destination is not a valid cause for OT-reserved material.</p></section>
+        <section><h3>Example</h3><p>A reserved reel is sent to P15 at 09:00 and physically arrives, but at 09:31 it remains En tránsito because the operator has not recorded receipt.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Find material-flow details with sent or in-transit status, no receivedAt, and current time minus sent time greater than 30 minutes. Show whether the flow is linked to an OT or is a relocation without a reservation.</p></section>
+      <p class="rule-note"><strong>Incident rule:</strong> ERP catalog structure ties pre-reservation to a target OT and material-flow detail to workOrderId, workOrderMaterialId, origin, destination, receiver, and receivedAt.</p>
+    </article>
+    <article class="alert-card family-a state-error" id="a03" aria-labelledby="a03-title">
+      <div class="card-heading">
+        <div><span class="alert-id">A03 · Consumption</span><h2 id="a03-title">Active OT without consumption after 15 minutes</h2></div>
+        <span class="state-pill">Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>An OT has been active for 15 minutes without a first consumption declaration.</p></section>
+        <section><h3>Why the alert exists</h3><p>After 15 minutes of setup or operation, the first raw-material reel being used should already be represented digitally.</p></section>
+        <section><h3>Possible causes</h3><p>The operator started the OT, spent the initial setup period preparing the machine, and then failed to declare the first reel being used.</p></section>
+        <section><h3>Example</h3><p>OT 151087.3 starts at 09:00. At 09:15 it remains active with zero consumed reels.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Require OT active, current time minus actual start at least 15 minutes, and consumption count equal to zero. Production declarations may support the same incident but must not create a duplicate.</p></section>
+
+    </article>
+    <article class="alert-card family-a state-possible" id="a04" aria-labelledby="a04-title">
+      <div class="card-heading">
+        <div><span class="alert-id">A04 · Production declaration</span><h2 id="a04-title">Possible undeclared produced reel</h2></div>
+        <span class="state-pill">Possible error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>The estimated material still unaccounted for on the rewinder exceeds the maximum mass the rewinder can physically hold.</p></section>
+        <section><h3>Why the alert exists</h3><p>Enough raw material has been consumed that another finished reel should already have been declared.</p></section>
+        <section><h3>Possible causes</h3><p>The operator forgot or delayed a production declaration, or the statistical output-weight assumptions are inaccurate.</p></section>
+        <section><h3>Example</h3><p>Input consumed: 1,500 kg. Estimated declared output: 850 kg. Waste: 100 kg. Allowed loss: 50 kg. Estimated remaining mass: 500 kg. If the rewinder limit is 400 kg, a produced reel may be missing.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Estimated remaining mass equals consumed input mass minus estimated mass of declared output minus declared or estimated waste mass minus allowed process loss. Use actual weights when available; estimate unweighed output from meters, width, basis weight, and comparable historical reels. Warn when remaining mass exceeds rewinder capacity plus tolerance.</p></section>
+      <p class="rule-note"><strong>Incident rule:</strong> No PLC completion signal exists in version 1. This is an inferred warning, recalculated as actual weights arrive.</p>
+    </article>
+    <article class="alert-card family-a state-upcoming" id="a05" aria-labelledby="a05-title">
+      <div class="card-heading">
+        <div><span class="alert-id">A05 · Post-production handling</span><h2 id="a05-title">Produced reel not weighed or not moved from the machine</h2></div>
+        <span class="state-pill">Por vencer, then Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>A declared reel has no weight within 30 minutes, or a reel from a finished OT remains at the machine for more than 30 minutes instead of being sent to its next OT or warehouse.</p></section>
+        <section><h3>Why the alert exists</h3><p>Without weight, EMUSA Soft cannot calculate cost or add the correct quantity to inventory. After OT completion, the reel must also leave the machine and enter its next workflow.</p></section>
+        <section><h3>Possible causes</h3><p>Process-team delay, missed weighing, missing scale record, failure to initiate movement, or failure to record movement.</p></section>
+        <section><h3>Example</h3><p>CU-98421 was declared at 10:00. At 10:31 it has no weight and remains at P15. One incident shows reasons not_weighed and still_at_machine.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Maintain one incident per produced reel. Add not_weighed after 30 minutes without a scale record. Add still_at_machine when the source OT is finished, 30 minutes have elapsed, and no movement to the correct warehouse or next OT exists. If movement begins but is not received in 30 minutes, use A02.</p></section>
+
+    </article>
+    <article class="alert-card family-a state-possible" id="a06" aria-labelledby="a06-title">
+      <div class="card-heading">
+        <div><span class="alert-id">A06 · Waste registration and weighing</span><h2 id="a06-title">Waste missing or not weighed</h2></div>
+        <span class="state-pill">Possible error or Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>A declared waste bag remains unweighed beyond the configured interval, or OT balance and historical expectations indicate that waste should exist but sufficient waste was not declared.</p></section>
+        <section><h3>Why the alert exists</h3><p>Missing or unweighed waste prevents correct material balance, costing, and inventory reconciliation.</p></section>
+        <section><h3>Possible causes</h3><p>Waste was produced but not declared; a declared bag was not weighed; the category is wrong; or the statistical expectation does not fit this run.</p></section>
+        <section><h3>Example</h3><p>Comparable printing OTs normally produce 70–100 kg of waste. This OT closes with 5 kg declared while input and good-output estimates leave an unexplained 80 kg gap.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Use two paths in one incident: declared waste without a scale record after the weighing interval, or closure balance indicating likely missing waste. Compare actual or estimated output, declared waste, expected statistical waste by operation and OT size, allowed loss, and consumed input.</p></section>
+      <p class="rule-note"><strong>Incident rule:</strong> If D03 already represents the same balance gap, attach possible_waste_not_declared to D03 instead of creating a duplicate alert.</p>
+    </article>
+  </section>
+
+  <section class="family-section" aria-labelledby="family-b-title">
+    <div class="family-heading" id="family-b">
+      <span class="family-code">B</span>
+      <div><h2 id="family-b-title">Production-plan adherence and machine activity</h2><p>Separate from inventory accuracy: these alerts protect the planner's current recorded schedule.</p></div>
+    </div>
+
+    <article class="alert-card family-b state-error" id="b01" aria-labelledby="b01-title">
+      <div class="card-heading">
+        <div><span class="alert-id">B01 · Sequence</span><h2 id="b01-title">OT started outside the latest approved plan sequence</h2></div>
+        <span class="state-pill">Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>An operator starts an OT that is not next in the latest approved sequence. The factory floor may reorganize the planner's plan, but the change must be recorded before start.</p></section>
+        <section><h3>Why the alert exists</h3><p>The machine is no longer following the current recorded production plan created by the planner and subsequently adjusted on the floor when necessary.</p></section>
+        <section><h3>Possible causes</h3><p>Wrong OT selected; disorganization; previous OT material did not arrive; or an OT was skipped without updating the plan.</p></section>
+        <section><h3>Example</h3><p>The plan lists 151099.1 before 151104.1. Material is late, so the operator starts 151104.1 without recording the sequence change.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>At actual OT start, compare the started OT with the first pending OT in the latest recorded plan for that machine. Do not alert if an authorized floor update changed the sequence before start.</p></section>
+
+    </article>
+    <article class="alert-card family-b state-error" id="b02" aria-labelledby="b02-title">
+      <div class="card-heading">
+        <div><span class="alert-id">B02 · Planned start</span><h2 id="b02-title">Planned OT has not started on time</h2></div>
+        <span class="state-pill">Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>The planned start time has arrived but the expected OT has not started and the plan has not been updated.</p></section>
+        <section><h3>Why the alert exists</h3><p>The recorded plan and actual factory execution have diverged.</p></section>
+        <section><h3>Possible causes</h3><p>Setup delay, missing material, unavailable operator, machine problem, or an unrecorded plan change.</p></section>
+        <section><h3>Example</h3><p>OT 151230.1 should start on P15 at 16:00, but at 16:01 it has not started and no revised plan exists.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Find the first pending OT whose planned start is in the past. Alert when it has no actual start and no approved rescheduling event. Link any specific material or machine incident as its reason.</p></section>
+
+    </article>
+    <article class="alert-card family-b state-error" id="b03" aria-labelledby="b03-title">
+      <div class="card-heading">
+        <div><span class="alert-id">B03 · Machine activity</span><h2 id="b03-title">Machine has no active OT for more than 30 minutes</h2></div>
+        <span class="state-pill">Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>A machine expected to be producing has no active OT for more than 30 minutes.</p></section>
+        <section><h3>Why the alert exists</h3><p>Planned production time is being lost without a corresponding active work order.</p></section>
+        <section><h3>Possible causes</h3><p>Disorganization, unrecorded stoppage, missing material, operator delay, maintenance, or a plan that was not updated.</p></section>
+        <section><h3>Example</h3><p>P09 is scheduled to produce during the shift but has no active OT between 14:00 and 14:31.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Require that the machine is expected to operate, has no active OT, and has remained in that state for more than 30 minutes. Exclude recorded maintenance, planned shutdown, approved pause, and no-production schedule periods.</p></section>
+
+    </article>
+  </section>
+
+  <section class="family-section" aria-labelledby="family-c-title">
+    <div class="family-heading" id="family-c">
+      <span class="family-code">C</span>
+      <div><h2 id="family-c-title">Statistical and physical plausibility</h2><p>Detects values that violate physical limits, OT specifications, or reliable historical ranges.</p></div>
+    </div>
+
+    <article class="alert-card family-c state-possible" id="c01" aria-labelledby="c01-title">
+      <div class="card-heading">
+        <div><span class="alert-id">C01 · Weight plausibility</span><h2 id="c01-title">Produced reel weight outside the plausible range</h2></div>
+        <span class="state-pill">Possible error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>A produced reel's recorded weight is below the expected minimum or above the expected maximum for comparable production.</p></section>
+        <section><h3>Why the alert exists</h3><p>An implausible weight may corrupt inventory quantity, cost, yield, and downstream calculations.</p></section>
+        <section><h3>Possible causes</h3><p>Typing error, wrong scale unit, wrong barcode, scale problem, or unusual production requiring review.</p></section>
+        <section><h3>Example</h3><p>A single reel is recorded as 3,000 kg when comparable reels normally fall between 250 and 600 kg.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Compare net weight with hard physical limits and statistical percentiles for the same operation, machine, product family, width, basis weight, and OT size. Hard-limit violations are errors; statistical outliers are possible errors.</p></section>
+
+    </article>
+    <article class="alert-card family-c state-possible" id="c02" aria-labelledby="c02-title">
+      <div class="card-heading">
+        <div><span class="alert-id">C02 · Waste plausibility</span><h2 id="c02-title">Waste amount outside the plausible range</h2></div>
+        <span class="state-pill">Possible error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>Declared waste weight or percentage is materially below or above the expected range for comparable OTs.</p></section>
+        <section><h3>Why the alert exists</h3><p>Very low waste may indicate missing declarations; very high waste may indicate a wrong value or a real production problem.</p></section>
+        <section><h3>Possible causes</h3><p>Missing bag, incorrect weight, wrong category, unusual setup loss, quality problem, or atypical run conditions.</p></section>
+        <section><h3>Example</h3><p>Comparable 20,000-meter printing OTs normally produce 60–100 kg of waste, but the OT declares 5 kg or 450 kg.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Build expected minimum and maximum waste by operation, machine, product family, OT-size band, width, basis weight, setup pattern, and historical distribution.</p></section>
+
+    </article>
+    <article class="alert-card family-c state-possible" id="c03" aria-labelledby="c03-title">
+      <div class="card-heading">
+        <div><span class="alert-id">C03 · Specification</span><h2 id="c03-title">Declared reel dimensions do not match the OT specification</h2></div>
+        <span class="state-pill">Error or Possible error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>A produced reel's width, basis weight, material, or defining characteristic differs from the OT specification beyond tolerance.</p></section>
+        <section><h3>Why the alert exists</h3><p>The reel may be mislabeled, associated with the wrong OT, or represented incorrectly in inventory.</p></section>
+        <section><h3>Possible causes</h3><p>Wrong barcode, typing error, wrong OT, master-data problem, or approved substitution not recorded.</p></section>
+        <section><h3>Example</h3><p>The OT specifies 1,200 mm width, but the output reel is recorded as 1,020 mm.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Compare produced-reel fields with the OT output specification and tolerances. Treat approved substitutions separately.</p></section>
+
+    </article>
+    <article class="alert-card family-c state-error" id="c04" aria-labelledby="c04-title">
+      <div class="card-heading">
+        <div><span class="alert-id">C04 · Hard validation</span><h2 id="c04-title">Impossible numeric or chronological value</h2></div>
+        <span class="state-pill">Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>A quantity is zero or negative when physically impossible, or timestamps occur in an impossible order.</p></section>
+        <section><h3>Why the alert exists</h3><p>These values cannot represent the physical process and will corrupt calculations.</p></section>
+        <section><h3>Possible causes</h3><p>Typing error, unit conversion error, integration defect, or incorrect device time.</p></section>
+        <section><h3>Example</h3><p>A reel has negative net weight, or weighing occurs before its production declaration.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Apply field-level hard constraints and event-order rules such as production before movement, weighing, and downstream receipt, allowing only explicitly supported exceptions.</p></section>
+
+    </article>
+    <article class="alert-card family-c state-error" id="c05" aria-labelledby="c05-title">
+      <div class="card-heading">
+        <div><span class="alert-id">C05 · Uniqueness</span><h2 id="c05-title">Duplicate reel or duplicate operational event</h2></div>
+        <span class="state-pill">Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>The same unique code or physical event is recorded more than once where only one record should exist.</p></section>
+        <section><h3>Why the alert exists</h3><p>Duplicates can double inventory, weight, consumption, production, or cost.</p></section>
+        <section><h3>Possible causes</h3><p>Repeated scan, retry after slow response, duplicate integration event, or reused barcode.</p></section>
+        <section><h3>Example</h3><p>CU-98421 receives two production declarations or two active weighing records.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Monitor uniqueness by reel code and event type. Detect repeated events with the same source, OT, reel, quantity, and near-identical timestamp.</p></section>
+
+    </article>
+    <article class="alert-card family-c state-possible" id="c06" aria-labelledby="c06-title">
+      <div class="card-heading">
+        <div><span class="alert-id">C06 · Rate plausibility</span><h2 id="c06-title">Declared production rate outside the machine's plausible range</h2></div>
+        <span class="state-pill">Possible error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>Declared meters or kilograms divided by runtime imply a rate outside the machine's physical or historical range.</p></section>
+        <section><h3>Why the alert exists</h3><p>The quantity, timestamps, or machine association may be incorrect.</p></section>
+        <section><h3>Possible causes</h3><p>Extra zero, wrong unit, wrong start or end time, wrong machine, or exceptional production requiring review.</p></section>
+        <section><h3>Example</h3><p>A press normally runs below 350 m/min, but the recorded OT implies 1,200 m/min.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Compare declared production divided by effective runtime with machine hard limits and statistical ranges by product and setup. Exclude recorded pauses and setup time according to the final runtime definition.</p></section>
+
+    </article>
+  </section>
+
+  <section class="family-section" aria-labelledby="family-d-title">
+    <div class="family-heading" id="family-d">
+      <span class="family-code">D</span>
+      <div><h2 id="family-d-title">Work-order closure and material balance</h2><p>Reconciles declared meters, delivered and consumed material, good output, waste, and process loss.</p></div>
+    </div>
+
+    <article class="alert-card family-d state-error" id="d01" aria-labelledby="d01-title">
+      <div class="card-heading">
+        <div><span class="alert-id">D01 · Closure meters</span><h2 id="d01-title">Declared meters exceed consumed-reel meters</h2></div>
+        <span class="state-pill">Error · Confirmed</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>At closure, declared run meters materially exceed the estimated meters provided by consumed reels.</p></section>
+        <section><h3>Why the alert exists</h3><p>The declared production cannot be explained by recorded consumption.</p></section>
+        <section><h3>Possible causes</h3><p>Missing consumption declaration, incorrect run meters, incorrect reel data, or incorrect closure.</p></section>
+        <section><h3>Example</h3><p>Consumed reels support approximately 30,000 m, but the operator declares 40,000 m.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Estimate meters in every consumed reel from weight, width, and basis weight. Sum them and compare them with declared run meters. Alert when the difference exceeds tolerance. This is the primary closure rule.</p></section>
+
+    </article>
+    <article class="alert-card family-d state-error" id="d02" aria-labelledby="d02-title">
+      <div class="card-heading">
+        <div><span class="alert-id">D02 · Closure material</span><h2 id="d02-title">Completed OT has delivered reserved reels unconsumed</h2></div>
+        <span class="state-pill">Error · Confirmed</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>An OT completes all planned production, but a reserved reel delivered to the machine remains unconsumed.</p></section>
+        <section><h3>Why the alert exists</h3><p>If full production was completed, the delivered reserved material should have been used and declared.</p></section>
+        <section><h3>Possible causes</h3><p>Missing consumption declaration, incorrect completion status, or incorrect reservation quantity.</p></section>
+        <section><h3>Example</h3><p>Four reels were reserved and delivered; full production was completed, but only three were consumed.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Require full planned production completed, reserved reels delivered to the machine, and delivered reserved reels minus consumed reels is not empty. Do not apply automatically to truncated OTs.</p></section>
+
+    </article>
+    <article class="alert-card family-d state-possible" id="d03" aria-labelledby="d03-title">
+      <div class="card-heading">
+        <div><span class="alert-id">D03 · Closure mass balance</span><h2 id="d03-title">OT input, good production, and waste do not balance</h2></div>
+        <span class="state-pill">Possible error or Error</span>
+      </div>
+      <div class="definition-grid">
+        <section><h3>When it happens</h3><p>At closure, consumed input mass cannot be reconciled with good production, waste, and allowed process loss.</p></section>
+        <section><h3>Why the alert exists</h3><p>One or more production, waste, consumption, or weighing records may be missing or incorrect.</p></section>
+        <section><h3>Possible causes</h3><p>Undeclared output, undeclared waste, unweighed output, wrong weight, missing consumption, or statistical assumptions that do not fit the OT.</p></section>
+        <section><h3>Example</h3><p>Input is 1,500 kg; actual and estimated good production is 1,260 kg; waste is 90 kg; allowed loss is 30 kg. The unexplained 120 kg exceeds tolerance.</p></section>
+      </div>
+      <section class="detection-rule"><span>Detection indicators and algorithm</span><p>Balance gap equals consumed input mass minus good-output mass minus waste mass minus allowed process loss. Use actual weights when available. Estimate unweighed output from meters, width, basis weight, and comparable reels; use expected waste by operation and OT-size band as supporting evidence. Recalculate when actual weights arrive.</p></section>
+      <p class="rule-note"><strong>Incident rule:</strong> If evidence identifies a specific A03, A04, A05, A06, D01, or D02 cause, enrich that incident and suppress a duplicate D03 alert.</p>
+    </article>
+  </section>
+</div>
+
+      <section class="future-card" id="future" aria-labelledby="future-title">
+        <div class="card-heading"><div><span class="alert-id">FUTURE DISCOVERY</span><h2 id="future-title">Operation-specific families</h2></div></div>
+        <div class="future-grid" id="future-grid"><section><strong>E · Extrusion</strong><p>Resin and additive inputs, silos or containers, formulation consistency, extrusion output, trim waste, and extrusion-specific balance.</p></section><section><strong>F · Exlam</strong><p>Paired or multi-layer inputs, coating or bonding materials, layer sequence, curing requirements, and Exlam-specific output and balance.</p></section><section><strong>G · Sealing / bag making</strong><p>Reel-to-bag conversion, unit and bundle counts, partial packages, sealing waste, packaging declarations, and count-versus-weight reconciliation.</p></section></div>
+      </section>
+
+      <section class="excluded-card" id="excluded" aria-labelledby="excluded-title">
+        <div class="card-heading"><div><span class="alert-id">REFERENCE</span><h2 id="excluded-title">Excluded rules</h2></div></div>
+        <div class="excluded-list" id="excluded-list"><section><strong>Consumed reel was not reserved for the OT</strong><p>Impossible: EMUSA Soft prevents this consumption.</p></section><section><strong>Reserved OT material sent to an arbitrary destination</strong><p>The workflow derives the OT/material relationship and destination. Relocation without a reservation is a separate non-OT flow.</p></section><section><strong>Production declared while an active OT has no consumption</strong><p>Duplicate: A03 already covers the active OT without consumption.</p></section><section><strong>Rewinder completion detected directly</strong><p>No PLC or machine-completion signal currently exists.</p></section><section><strong>Physical label was not printed</strong><p>Not observable without printer acknowledgment or print-job failure data.</p></section><section><strong>Scale discovers an undeclared reel</strong><p>Useful as late reconciliation evidence, but too late to be the primary warning.</p></section><section><strong>Truncated OT</strong><p>Normal production condition; not inherently a digital-versus-physical mismatch.</p></section><section><strong>Incomplete reel used downstream</strong><p>Removed as a separate alert. Upstream registration, weighing, movement, and balance controls should prevent it.</p></section></div>
+      </section>
+    </main>
+
+    <script src="../../shared/app.js"></script>
+  </body>
+</html>

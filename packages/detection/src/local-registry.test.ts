@@ -10,8 +10,8 @@ import { DetectionRunner } from "./runner.js";
 it("runs all 21 Phase 1 rule contracts through the local source boundary", async () => {
   const root = resolve(import.meta.dirname, "../../..");
   const registry = await loadFixtureRegistry(
-    resolve(root, "docs/phase1/contracts/alert-rules.v1.json"),
-    resolve(root, "docs/phase1/fixtures/rule-cases.v1.json"),
+    resolve(root, "config/alerts/alert-rules.v1.json"),
+    resolve(root, "tests/fixtures/alerts/rule-cases.v1.json"),
   );
   assert.equal(registry.length, 21);
   const database = await createDatabaseRuntime({ mode: "pglite", pgliteDataDir: "memory://" });

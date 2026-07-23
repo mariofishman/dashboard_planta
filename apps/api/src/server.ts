@@ -36,7 +36,7 @@ export interface MonitorServer {
 async function seedPhase4Incidents(service: IncidentService, repositoryRoot: string, database: DatabaseRuntime) {
   const existing = await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident");
   const databaseWasEmpty = Number(existing.count) === 0;
-  const document = JSON.parse(await readFile(resolve(repositoryRoot, "docs/phase1/contracts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
+  const document = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
   const rules = new Map(document.rules.filter((rule) => ["A02", "A03", "A05"].includes(rule.code)).map((rule) => [rule.code, rule]));
   const apply = async (code: "A02" | "A03" | "A05", evidence: Record<string, unknown>, context: Parameters<IncidentService["apply"]>[0]["context"], minutesAgo: number) => {
     const rule = rules.get(code);
@@ -91,7 +91,7 @@ export async function buildMonitorServer(options: {
   const io = new SocketIOServer(app.server, { cors: { origin: config.webOrigin, credentials: true } });
   const incidentService = new IncidentService(database, (change: IncidentChange) => io.to(`plant:${change.plantId}`).emit("incident.changed", change));
   await seedPhase4Incidents(incidentService, repositoryRoot, database);
-  const ruleDocument = JSON.parse(await readFile(resolve(repositoryRoot, "docs/phase1/contracts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
+  const ruleDocument = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
   const incidentRules = new Map<string, RuleContract>(ruleDocument.rules.filter((rule) => ["A02", "A03", "A05"].includes(rule.code)).map((rule) => [rule.code, rule]));
   const detectionRepository = new DetectionRepository(database);
   const detectionRunner = new DetectionRunner(detectionRepository, new FixedBackupFreshnessProvider("phase1-fixtures.v1"), undefined, async ({ cycleId, query, rows, observedAt }) => {
@@ -101,8 +101,8 @@ export async function buildMonitorServer(options: {
   });
   const detectionScheduler = new DetectionScheduler(detectionRunner, 2);
   const localDetectionSources = await loadFixtureRegistry(
-    resolve(repositoryRoot, "docs/phase1/contracts/alert-rules.v1.json"),
-    resolve(repositoryRoot, "docs/phase1/fixtures/rule-cases.v1.json"),
+    resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"),
+    resolve(repositoryRoot, "tests/fixtures/alerts/rule-cases.v1.json"),
   );
   await Promise.all(localDetectionSources.map(({ query, adapter }) => detectionScheduler.runRecovery(query, adapter)));
   localDetectionSources.forEach(({ query, adapter }) => detectionScheduler.schedule(query, adapter));

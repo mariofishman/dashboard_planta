@@ -19,7 +19,7 @@ const definitions: Array<{ code: "A02" | "A05"; file: string; key: string; expec
 describe("protected local backup adapters", { skip: !backupAvailable }, () => {
   for (const definition of definitions) {
     it(`${definition.code} uses bounded keyset pages with stable unique keys`, async () => {
-      const sql = await readFile(resolve(root, "docs/phase0/queries", definition.file), "utf8");
+      const sql = await readFile(resolve(root, "config/detection/queries", definition.file), "utf8");
       const query: DetectionQueryDefinition = {
         queryId: definition.code.toLowerCase(), ruleCode: definition.code, queryVersion: "1.0.0-candidate",
         adapterKind: "backup", keyField: definition.key, requiredFields: [definition.key], intervalMs: 300_000,

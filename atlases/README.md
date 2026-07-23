@@ -14,4 +14,4 @@ Each instance stores its durable review state in `review-state.json`, including 
 
 Codex browser-panel comments are task-local evidence and are not captured automatically. Transfer relevant comments into Atlas feedback or region notes before considering them durable research evidence.
 
-The former single-folder implementation at `prototype/dashboard-reference-atlas/` is retained only as a verified migration source. Do not add new research there.
+The former single-folder Atlas was removed after its images and review state were verified in the active instance. Git history preserves the old implementation.

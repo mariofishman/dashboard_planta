@@ -1,6 +1,6 @@
 {
   "atlasId": "dashboard-inspiration",
-  "updatedAt": "2026-07-22T21:22:03.435Z",
+  "updatedAt": "2026-07-23T15:14:51.031073Z",
   "accepted": {
     "mixpanel-compact-analysis": true,
     "amplitude-segmentation": true,
@@ -115,6 +115,6 @@
     ]
   },
   "screenIndex": {
-    "xero-monitor-dashboard-collection": 4
+    "xero-monitor-dashboard-collection": 3
   }
 }

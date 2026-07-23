@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contractVersion": "2.0.0",
+  "status": "discovered-pending-phase10-validation",
+  "source": {
+    "catalogVersion": 5,
+    "observedAt": "2026-07-22T19:08:00-05:00",
+    "evidence": "docs/integrations/emusasoft/evidence/mcp_audit_2026-07-22.md"
+  },
+  "destinations": {
+    "workOrder": {
+      "requiredIdentifiers": ["workOrderId"],
+      "activeTemplate": "/work-orders/:workOrderId",
+      "closedTemplate": "/work-orders/closed/:workOrderId",
+      "enabled": false,
+      "fallback": "display the work-order identifier and available evidence inside Monitor"
+    },
+    "workOrderDetail": {
+      "requiredIdentifiers": ["workOrderId", "itemType", "itemId"],
+      "activeTemplate": "/work-orders/:workOrderId/detail/:itemType/:itemId",
+      "closedTemplate": "/work-orders/closed/:workOrderId/detail/:itemType/:itemId",
+      "enabled": false,
+      "fallback": "display the related identifiers and available evidence inside Monitor"
+    }
+  },
+  "enablementRequirements": [
+    "Environment base URL is supplied through configuration.",
+    "Active and closed route selection is confirmed.",
+    "Allowed itemType, itemId, and action values are documented.",
+    "Authorization behavior and compatibility policy are approved.",
+    "Representative authorized and unauthorized browser tests pass."
+  ],
+  "rules": [
+    "A discovered route is not enabled until every Phase 10 requirement passes.",
+    "Never infer a browser route from a GraphQL operation name.",
+    "Identifiers and evidence remain the fallback when navigation is unavailable."
+  ]
+}
