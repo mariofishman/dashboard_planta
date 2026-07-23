@@ -1,6 +1,8 @@
-# Design system and current-prototype audit
+# Phase 0 design-system and prototype audit
 
-**Audited:** `docs/design/`, `dashboard.html`, `chat-list-final.html`, and `chat-detail.html`  
+**Audited during Phase 0:** `docs/design/`, the then-current `dashboard.html`, `chat-list-final.html`, and `chat-detail.html`
+
+The audited static dashboard was later superseded by the approved Dashboard V2 implementation in `apps/web/`.
 **Excluded as deprecated:** historical dashboard, alert-catalog v1-v10, and chat-list 01-04
 
 ## Findings

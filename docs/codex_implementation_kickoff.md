@@ -22,8 +22,13 @@ Before acting, read these current authoritative files completely:
 - docs/ux_ui_decisions.md
 - docs/design/design.md
 - docs/design/brand_guidelines.md
+- docs/design/design-system/tokens.json
+- docs/design/design-system/tokens.css
+- .interface-design/system.md
 
-Treat docs/archive/, prototype/dashboard/, prototype/alert-catalog/v1 through v10, and prototype/chat-list-review/01 through 04 as deprecated historical material with no product authority.
+Before styling or changing a Monitor component, inspect packages/design-system/src/index.ts and reuse its shared Material UI defaults. Before changing the dashboard, also inspect apps/web/src/App.tsx as the approved local Dashboard V2 implementation.
+
+Treat docs/archive/, prototype/dashboard/, prototype/chat-list-review/dashboard.html, prototype/alert-catalog/v1 through v10, and prototype/chat-list-review/01 through 04 as deprecated historical material with no product authority. The archived Dashboard V2 handoff preserves research and rejected alternatives but is not active design authority.
 
 Use the EmusaSoft MCP for current ERP evidence. First load EMUSASOFT_MCP_TOKEN from the repository-root .env without printing or exposing it. Follow catalog discovery order before querying. Never run or design Monitor code that writes to EmusaSoft.
 

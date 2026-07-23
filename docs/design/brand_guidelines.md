@@ -33,7 +33,7 @@ Write with direct operational clarity. Lead with the fact, state, or required ac
 
 ### UI writing rules
 
-- Buttons use Spanish verbs appropriate to Monitor's boundary: `Ver detalles`, `Copiar identificador`, `Enviar mensaje`, `Cerrar sin resolución`, and `Exportar reporte`. Monitor does not show unsupported EmusaSoft navigation actions; operational corrections occur separately in EmusaSoft.
+- Buttons use concise Spanish verbs appropriate to Monitor's boundary, such as `Filtros avanzados`, `Exportar incidentes`, `Enviar mensaje`, and `Cerrar sin resolución`. Do not add dedicated `Ver detalles` or `Copiar identificador` controls when the complete row, card, or selectable identifier already provides the action. Monitor does not show unsupported EmusaSoft navigation actions; operational corrections occur separately in EmusaSoft.
 - User-visible incident lifecycle states use `Abierta`, `Resuelta`, and `Cerrada sin resolución`. Code-specific descriptive labels such as `Error`, `Por vencer`, `Alerta`, and `Error posible` remain separate from lifecycle state.
 - Dates use an explicit locale and timezone where ambiguity matters.
 - Quantities always include units.
@@ -82,7 +82,8 @@ Do not use generic office teamwork, abstract AI networks, fake factories, neon m
 
 - Body text requires at least 4.5:1 contrast; large text requires at least 3:1.
 - Keyboard focus must always be visible.
-- Controls require at least a 40px desktop target and 44px touch target where mobile use is expected.
+- Compact operational controls remain visually `28px` high with a `6px` radius and normally `8px` horizontal padding.
+- Their interactive hit target is at least `40px` on desktop and `44px` where touch use is expected. Supply the extra area invisibly or through surrounding layout; do not enlarge the visible control, alter the compact rhythm, or allow adjacent targets to overlap.
 - Do not encode meaning through color alone.
 - Current labels remain Spanish; layouts must tolerate future English and Portuguese expansion without truncation.
 - Respect `prefers-reduced-motion`; operational state must remain understandable without animation.
@@ -92,6 +93,7 @@ Do not use generic office teamwork, abstract AI networks, fake factories, neon m
 - `design.md` is the normative design-language document.
 - `design-system/tokens.json` is the machine-readable token source.
 - `design-system/tokens.css` is the web implementation output.
+- Primitive values live under `color`, `font`, `spacing`, `radius`, and `control`; product components consume named roles under `semantic` so approved visual decisions are not copied into application code.
 - New components must reuse existing tokens before adding new values.
 - New tokens require a named semantic role and at least two justified uses.
 - Review brand consistency, accessibility, responsive behavior, localization, and all interactive states before release.

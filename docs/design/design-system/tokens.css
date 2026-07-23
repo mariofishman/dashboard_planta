@@ -26,6 +26,7 @@
   --color-chart-5: #f97316;
 
   --font-sans: Montserrat, system-ui, sans-serif;
+  --font-size-routine: 0.6875rem;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.8125rem;
   --font-size-md: 0.875rem;
@@ -33,6 +34,11 @@
   --font-size-lg: 1.25rem;
   --font-size-xl: 2rem;
   --font-size-display: 3.25rem;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -46,7 +52,40 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
-  --radius-pill: 9999px;
+  --radius-pill: 9999px; /* Circular elements only; never rectangular controls, filters, or chips. */
+
+  --control-compact-height: 28px;
+  --control-compact-padding-inline: 8px;
+  --control-accessible-hit-target: 44px;
+
+  /* Semantic product tokens. Components consume these roles, not primitive values. */
+  --semantic-color-structure: var(--color-brand-navy);
+  --semantic-color-action: var(--color-brand-cyan);
+  --semantic-color-action-hover: var(--color-brand-cyan-hover);
+  --semantic-color-canvas: var(--color-canvas);
+  --semantic-color-surface: var(--color-surface);
+  --semantic-color-selected: var(--color-surface-selected);
+  --semantic-color-border: var(--color-border);
+  --semantic-color-text-primary: var(--color-text);
+  --semantic-color-text-secondary: var(--color-text-muted);
+  --semantic-color-text-inverse: var(--color-text-inverse);
+  --semantic-color-text-inverse-muted: rgba(255, 255, 255, 0.74);
+  --semantic-color-inverse-divider: rgba(255, 255, 255, 0.12);
+  --semantic-color-inverse-skeleton: rgba(255, 255, 255, 0.18);
+  --semantic-color-lifecycle-resolved: var(--color-success);
+  --semantic-color-lifecycle-open: var(--color-danger);
+  --semantic-color-lifecycle-closed: var(--color-warning);
+
+  --semantic-type-routine: var(--font-size-routine);
+  --semantic-type-primary-data: var(--font-size-xs);
+  --semantic-type-section-title: var(--font-size-md);
+  --semantic-type-body: var(--font-size-base);
+
+  --semantic-control-visible-height: var(--control-compact-height);
+  --semantic-control-padding-inline: var(--control-compact-padding-inline);
+  --semantic-control-radius: var(--radius-sm);
+  --semantic-control-desktop-hit-target: 40px;
+  --semantic-control-touch-hit-target: var(--control-accessible-hit-target);
 
   --shadow-low: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.12);
@@ -64,4 +103,3 @@
     --motion-standard: 0ms;
   }
 }
-

@@ -4,9 +4,9 @@
 
 **System:** Monitor — Dashboard, Chats, Errors, Alerts, and Operational Responsibility Roster
 
-**Version:** 2.0
+**Version:** 2.1
 
-**Status:** Draft for review; Phases 0–4 complete locally; Phase 4A is next
+**Status:** Active; Phases 0–4 and 4A complete locally; Phase 4B is next
 
 **Roadmap date:** 2026-07-22
 
@@ -19,10 +19,10 @@
 Version One successfully guided the local foundation through Phase 4, but three facts now require a revised sequence:
 
 1. Phase 4 proved the incident lifecycle with fixtures and seeded incidents, but it did not prove that a changing source record travels through polling, evaluation, incident creation, resolution, recurrence, and the live UI.
-2. The Phase 4 dashboard is functionally connected but its visual and interaction design was not approved.
+2. The original Phase 4 dashboard was functionally connected but required a complete visual and interaction redesign.
 3. The first roadmap did not assign every remaining alert code, dynamic scenario extension, external dependency, and production-promotion gate precisely enough.
 
-Version Two preserves completed work. It adds Phase 4A for the dashboard redesign, Phase 4B for a local dynamic source laboratory, and explicit implementation and promotion gates for every active alert code.
+Version Two preserves completed work. It adds Phase 4A for the dashboard redesign, Phase 4B for a local dynamic source laboratory, and explicit implementation and promotion gates for every active alert code. Dashboard V2 completed Phase 4A and was accepted as a good first version on 2026-07-22; this approval does not start or modify Phase 4B.
 
 ## 2. Strategy
 
@@ -44,8 +44,8 @@ Monitor must detect operational problems from EmusaSoft without writing to Emusa
 
 ### Ordered actions
 
-1. Complete and approve the dashboard redesign in Phase 4A.
-2. Add the dynamic local scenario laboratory and validate the Phase 4 vertical slice in Phase 4B.
+1. Preserve the completed and approved Dashboard V2 work from Phase 4A.
+2. Next, add the dynamic local scenario laboratory and validate the Phase 4 vertical slice in Phase 4B.
 3. Build routing and the roster, then conversations, using those dynamic incidents.
 4. Implement and dynamically validate the remaining deterministic and statistical rules.
 5. Complete local acceptance and hardening.
@@ -97,14 +97,15 @@ This optimization does not require redesigning incidents, rules, APIs, WebSocket
 | 2 — Platform foundation | API, Monitor database, mock identity, authorization, observability, Redis adapter, WebSocket recovery, and application shell | `phase2/README.md` |
 | 3 — Polling and recovery | Bounded scheduler, adapters, diagnostics, safe incomplete-cycle behavior, and local query-plan checks | `phase3/README.md` |
 | 4 — Incident vertical slice | A02, A03, and A05 flow through evaluation, lifecycle, evidence, API, committed live change, and dashboard | `phase4/README.md` |
+| 4A — Dashboard redesign | Approved compact Dashboard V2 connected to the existing authorized APIs and incident lifecycle | `phase4/README.md`, `archive/dashboard_v2_design_handoff.md` |
 
-The Phase 4 functional gate was accepted on 2026-07-21. The dashboard design was explicitly not approved. Phase 5 has not started.
+The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepted as a good first version on 2026-07-22, completing Phase 4A. Phase 4B and Phase 5 have not started.
 
 ## 5. Revised implementation sequence
 
 ### Phase 4A — Dashboard redesign
 
-**Status:** Next; being explored in a separate design session
+**Status:** Complete; accepted as a good first version on 2026-07-22
 
 **Purpose:** Replace the unapproved Phase 4 visual and interaction direction while preserving the working backend and incident behavior.
 
@@ -113,14 +114,14 @@ The Phase 4 functional gate was accepted on 2026-07-21. The dashboard design was
 - an explicit dashboard information hierarchy and design direction;
 - browser-reviewable desktop, tablet, and mobile states;
 - clear open/resolved/closed-without-resolution presentation;
-- filtering, analytics, evidence access, related-alert context, loading, empty, unavailable, and recovery states;
+- filtering, grouping, analytics, authorized evidence access, loading, empty, unavailable, and recovery states;
 - Spanish product copy, keyboard use, focus order, contrast, responsive behavior, and screen-reader labels;
 - implementation connected to the existing authorized incident APIs and recovery channel; and
 - regression coverage proving the redesign does not change incident semantics.
 
-**Coordination rule:** The separate dashboard-design session owns its active prototype files. Roadmap work must not overwrite those files. Approved design decisions are incorporated only after that session provides its handoff.
+**Decision record:** Reusable visual and interaction preferences are consolidated in `design/design.md`; Monitor-specific behavior is consolidated in `ux_ui_decisions.md`; the completed research and rejected alternatives are preserved in `archive/dashboard_v2_design_handoff.md`.
 
-**Exit gate:** The user explicitly approves the dashboard design, and the connected implementation passes functional, responsive, accessibility, and recovery checks.
+**Exit gate:** Satisfied on 2026-07-22. The user approved Dashboard V2 as a good first version, and the connected implementation passed functional, responsive, token-contract, and recovery regression checks.
 
 ### Phase 4B — Dynamic local source validation
 
@@ -332,9 +333,40 @@ All rules additionally require Phase 10 read access, safe-load evidence, identit
 
 These open requests do not block Phases 4A–9. They gate only their affected Phase 10 validation or feature promotion.
 
-## 8. Decision gates
+## 8. Cross-cutting decisions before production
 
-- **Before Phase 4A exits:** explicit user approval of the dashboard design.
+### 8.1 Polling persistence and retention
+
+A frequent EmusaSoft polling interval can produce hundreds of identical observations for one unchanged condition. Those consultations are not useful incident history and must not create a new evidence row, lifecycle transition, or client change event when the condition and meaningful context have not changed. Elapsed age is derived from timestamps rather than repeated snapshots.
+
+Monitor may update the condition state's latest healthy observation metadata without appending business history. Poll-cycle diagnostics are operational telemetry, not incident evidence, and require a bounded retention or aggregation policy rather than indefinite storage. Failed, partial, invalid, truncated, timed-out, or uncommitted cycles still preserve the last known incident state and enough diagnostic information to investigate recovery.
+
+Before Phase 10 production polling:
+
+1. write an ADR defining which fields belong in incident evidence, condition state, poll diagnostics, metrics, and logs;
+2. define retention, aggregation, and deletion periods for successful and failed poll diagnostics;
+3. estimate storage volume at proposed production polling cadences and validate it against the production budget;
+4. retain regression tests proving unchanged healthy polls create no evidence row, transition, or incident-change event; and
+5. prove operational diagnostics remain bounded without weakening freshness or lifecycle safety.
+
+### 8.2 Contextual incident explanations
+
+Catalog text explains a rule, but an operator also needs the specific work order, machine, shift, elapsed condition, and responsible role that caused the current occurrence. Static catalog copy may be too generic, while unconstrained generated text could invent facts or obscure evidence.
+
+Every displayed explanation must be grounded only in the approved alert catalog, versioned rule result, and authorized incident evidence. It must distinguish unavailable facts from known facts, never infer a named person from a role or area, remain read-only, and retain a deterministic catalog-grounded fallback. Deterministic composition, an LLM, and a hybrid remain alternatives for evaluation; none is approved as the production mechanism yet.
+
+Before selecting a production mechanism:
+
+1. define a structured, versioned explanation input and output contract;
+2. compare deterministic rule-specific composition, LLM-assisted generation, and a hybrid;
+3. test representative A02, A03, and A05 cases followed by every production candidate rule;
+4. score factual grounding, omissions, invented facts, readability, latency, cost, and incomplete-evidence behavior;
+5. decide whether output is generated on read or change and whether it is cached, persisted, versioned, or regenerated; and
+6. approve an ADR covering privacy, security, latency, cost, auditability, fallback behavior, and factual acceptance thresholds before any production LLM use.
+
+## 9. Decision gates
+
+- **Phase 4A exit:** satisfied by explicit user approval of Dashboard V2 on 2026-07-22.
 - **Before Phase 5 implementation:** approval of the roster screen, workflows, permissions, effective-date behavior, and conflict presentation.
 - **Before Phase 6 implementation:** decisions on retention, attachments, moderation, message mutation, receipts, presence, search, offline behavior, and external channels.
 - **Before each Phase 10 rule promotion:** verified current schema, read-only access, bounded-query behavior, source completeness, routing, and rule-specific quality evidence.
@@ -343,14 +375,16 @@ These open requests do not block Phases 4A–9. They gate only their affected Ph
 
 No overall approval substitutes for these specific gates, and no unresolved MCP request requires local development to stop.
 
-## 9. Initial production Definition of Done
+## 10. Initial production Definition of Done
 
 The initial production implementation is complete only when:
 
 - the agreed rules run against the existing Aurora replica using technically enforced read-only credentials;
 - every enabled query is bounded, measured, observable, and safe under staging and pilot load;
 - successful complete reads drive deterministic incident state, while failed or incomplete reads preserve prior state;
+- unchanged healthy polling creates no repeated incident evidence, lifecycle transition, or client change event, and operational diagnostics follow an approved bounded retention policy;
 - incidents retain explainable evidence, lifecycle, recurrence, correlation, and audit history;
+- contextual explanations pass an approved grounding contract and deterministic fallback without requiring an unapproved generative service;
 - authorized users receive committed updates and can recover missed changes;
 - routing follows the catalog and roster without broad fallback notification;
 - conversations remain ordered, authorized, durable, and recoverable;
@@ -359,10 +393,10 @@ The initial production implementation is complete only when:
 - backup, restore, rollback, kill switches, monitoring, support, and incident-response procedures are proven; and
 - Monitor contains no EmusaSoft write path, adjustment workflow, or unsupported link or source assumption.
 
-## 10. Document control
+## 11. Document control
 
 - Version 1.2 is retained unchanged except for its archived status at `archive/monitor_architecture_and_production_roadmap_v1.md`.
-- Version 2.0 is canonical at `monitor_architecture_and_production_roadmap.md`.
+- Version 2.1 is canonical at `monitor_architecture_and_production_roadmap.md`.
 - `product_definition.md` governs product boundaries.
 - `alert_catalog.md` governs alert logic, evidence, resolution, and distribution.
 - `ux_ui_decisions.md` and approved design artifacts govern screen behavior and presentation.

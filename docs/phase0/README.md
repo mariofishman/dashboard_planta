@@ -19,7 +19,7 @@ This file is the tracked Phase 0 record. A checked item has repository evidence.
 - [x] Initial polling and load policy — `contracts/polling-and-load-limits.md`.
 - [x] Canonical incident-change schema and WebSocket protocol — `contracts/incident-change.schema.json` and `contracts/websocket-protocol.md`.
 - [x] Environment, secrets, ownership, and operating boundaries — `operations.md`.
-- [x] Audit of the design system and three current prototypes — `prototype-audit.md`.
+- [x] Audit of the design system and three prototypes that were current during Phase 0 — `prototype-audit.md`.
 - [x] Operational Responsibility Roster design brief — `roster-design-brief.md`.
 - [x] Initial threat model and browser credential boundary — `threat-model.md`.
 - [x] Navigation contract records that EmusaSoft exposes no supported frontend route patterns; Monitor shows identifiers and evidence locally — `contracts/deep-links.json`.

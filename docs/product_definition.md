@@ -1,7 +1,7 @@
 # Monitor Product Definition
 
 **Status:** Canonical current-state summary
-**Last consolidated:** 2026-07-20
+**Last consolidated:** 2026-07-22
 
 This document is the primary entry point for the current Monitor product definition. Historical discovery and exploratory prototypes must not override it. Detailed documents remain authoritative only within the domains listed below.
 
@@ -13,7 +13,7 @@ Monitor detects, explains, communicates, and analyzes operational alerts derived
 
 Monitor has four main screens:
 
-1. **Dashboard** — current and historical alert analysis, filters, reports, and drill-down. Current prototype: `prototype/chat-list-review/dashboard.html`.
+1. **Dashboard** — current and historical alert analysis, filters, reports, and drill-down. Approved local implementation: `apps/web/`.
 2. **Chat list** — conversations in which the current user participates. Current prototype: `prototype/chat-list-review/chat-list-final.html`.
 3. **Chat detail** — messages, replies, attachments, and structured alert objects. Current prototype: `prototype/chat-list-review/chat-detail.html`.
 4. **Operational Responsibility Roster** — assigns people to standardized operational positions by operation, machine, shift, and effective date. It is required for deterministic routing but remains conceptual and has no approved prototype.
@@ -52,13 +52,13 @@ If documents disagree, use this order within the relevant domain:
 
 The consolidated current integration contract is `docs/emusasoft_integration_architecture.md`. The earlier architect decision record is historical material in `docs/archive/`. `AGENTS.md` contains tooling instructions rather than product requirements.
 
-## Current product prototypes
+## Current product implementations and prototypes
 
-- `prototype/chat-list-review/dashboard.html`
+- `apps/web/` — approved Dashboard V2 local implementation;
 - `prototype/chat-list-review/chat-list-final.html`
 - `prototype/chat-list-review/chat-detail.html`
 
-The design system and the three currently prototyped product screens must continue improving as part of the engineering roadmap. The fourth screen, the Operational Responsibility Roster, must be designed and validated before implementation.
+The design system, dashboard implementation, and two currently prototyped chat screens must continue improving as part of the engineering roadmap. The fourth screen, the Operational Responsibility Roster, must be designed and validated before implementation.
 
 ## Current documentation-review interface
 
@@ -74,6 +74,7 @@ The following files remain only for history or inspiration and have no current p
 - `docs/archive/discovery.md`;
 - `docs/archive/emusasoft_architecture_decisions.md`;
 - `prototype/dashboard/`;
+- `prototype/chat-list-review/dashboard.html`;
 - `prototype/alert-catalog/v1/` through `v10/`; and
 - `prototype/chat-list-review/01-familiar.html` through `04-pinned-focus.html`.
 

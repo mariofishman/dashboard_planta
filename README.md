@@ -7,7 +7,7 @@ Monitor is a factory alert and collaboration product with four main screens: Das
 - `docs/product_definition.md` — canonical current product summary and documentation authority map.
 - `docs/archive/` — deprecated historical documents, including the former project context, rationale, discovery, and superseded architect decision record.
 - `docs/` — current product definition and specialized product documentation.
-- `docs/ux_ui_decisions.md` — canonical UX/UI decisions for the dashboard, chat list, and chat detail prototypes.
+- `docs/ux_ui_decisions.md` — canonical UX/UI decisions for the dashboard implementation and chat prototypes.
 - `docs/emusasoft_preimplementation_requests.md` — owned delivery requests for the EmusaSoft and MCP implementation teams.
 - `docs/emusasoft_integration_architecture.md` — approved read-only SQL polling contract between Monitor and EmusaSoft.
 - `docs/codex_implementation_kickoff.md` — reusable prompts and phase-gated workflow for starting implementation with Codex.
@@ -15,7 +15,7 @@ Monitor is a factory alert and collaboration product with four main screens: Das
 - `apps/web/` — Material UI mock login and approved local incident dashboard.
 - `packages/` — shared contracts, database migrations, detection, incident lifecycle, and design-system theme.
 - `docs/phase0/` through `docs/phase4/` — phase checklists and validation evidence.
-- `prototype/chat-list-review/dashboard.html` — current dashboard prototype.
+- `prototype/chat-list-review/dashboard.html` — deprecated pre-V2 dashboard prototype retained as historical design evidence.
 - `prototype/chat-list-review/chat-list-final.html` — current chat-list prototype.
 - `prototype/chat-list-review/chat-detail.html` — current chat-detail prototype.
 - Operational Responsibility Roster — fourth main screen; concept documented but not yet prototyped.
@@ -25,7 +25,7 @@ Monitor is a factory alert and collaboration product with four main screens: Das
 - `prototype/alert-catalog/v1/` through `v10/` — deprecated historical review iterations.
 - `AGENTS.md` — project-specific agent instructions.
 
-## Run the prototypes
+## Review historical prototypes
 
 From the repository root:
 
@@ -35,7 +35,7 @@ python3 -m http.server 8000
 
 Open:
 
-- Current dashboard: `http://localhost:8000/prototype/chat-list-review/dashboard.html`
+- Deprecated pre-V2 dashboard: `http://localhost:8000/prototype/chat-list-review/dashboard.html`
 - Deprecated historical dashboard: `http://localhost:8000/prototype/dashboard/`
 - Approved alert catalog: `http://localhost:8000/prototype/alert-catalog/final/`
 - Approved E05 review record: `http://localhost:8000/prototype/alert-catalog/v11/`

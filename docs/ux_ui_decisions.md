@@ -4,15 +4,15 @@
 
 This document is the canonical record of UX and UI decisions within the current product defined by `docs/product_definition.md`. It consolidates decisions that were previously distributed across review annotations, prototype code, product discovery, the alert catalog, and the design system.
 
-The current prototype surfaces are:
+The current product design surfaces are:
 
+- `apps/web/` — approved Dashboard V2 local implementation;
 - `prototype/chat-list-review/chat-list-final.html` — conversation list;
-- `prototype/chat-list-review/chat-detail.html` — conversation detail and alert attachment; and
-- `prototype/chat-list-review/dashboard.html` — historical and current alert dashboard.
+- `prototype/chat-list-review/chat-detail.html` — conversation detail and alert attachment.
 
 This document records product behavior and presentation decisions. Business rules, alert detection, and recipient routing remain governed by `docs/alert_catalog.md`. Visual tokens and component rules remain governed by `docs/design/design.md`, `docs/design/brand_guidelines.md`, and `docs/design/design-system/tokens.json`. The EmusaSoft boundary remains governed by `docs/emusasoft_integration_architecture.md`; release sequencing and wider technical scope remain governed by `docs/monitor_architecture_and_production_roadmap.md`.
 
-When a prototype and an older exploratory screen differ, the three current prototype files listed above and this document represent the current design direction. The older `01-familiar.html`, `02-role-aware.html`, `03-operations-triage.html`, and `04-pinned-focus.html` files are exploratory alternatives, not parallel product variants.
+For the dashboard, `apps/web/` and this document represent the current design direction. `prototype/chat-list-review/dashboard.html` is deprecated pre-V2 evidence and has no current product authority. For chat screens, the two current prototype files listed above and this document represent the current direction. The older `01-familiar.html`, `02-role-aware.html`, `03-operations-triage.html`, and `04-pinned-focus.html` files are exploratory alternatives, not parallel product variants.
 
 ## 2. Product model
 
@@ -114,7 +114,7 @@ Dashboard and Chats use the same bottom navigation so they feel like one applica
 - The navigation contains only **Dashboard** and **Chats**.
 - The current destination is shown through more than color alone: active color, stronger weight, and an active treatment.
 - Chat detail uses a back control to return to Chats rather than adding a third bottom-navigation item.
-- The bottom navigation remains available at the bottom of the viewport on desktop and mobile where the current prototypes show it.
+- The bottom navigation remains available at the bottom of the viewport on desktop and mobile where the current approved screen behavior specifies it.
 
 ### 3.2 Production ecosystem menu
 
@@ -181,8 +181,8 @@ Every label uses written text and a marker; meaning never depends on color alone
 
 ### 4.3 Shape, spacing, and elevation
 
-- Controls use compact rounded rectangles rather than excessive pills.
-- Full pills are reserved for compact filters, statuses, and chips.
+- Operational controls, filters, lifecycle selectors, and chips use the approved compact rounded rectangle: `28px` visible height, `6px` radius, normally `8px` horizontal padding, and `11px` text.
+- Full-pill geometry is not used for rectangular filters, statuses, chips, buttons, inputs, selects, or menu items. A circular radius is limited to genuinely circular elements such as status dots, avatars, and unread counters.
 - Dashboard cards use a maximum radius of 16px.
 - Static containers use either a border or restrained elevation, not both decoratively.
 - The 4px spacing rhythm from the design system is used throughout.
@@ -379,9 +379,9 @@ The alert object may contain:
 
 ### 7.2 Primary destinations
 
-The object has two clear actions:
+The object has two clear destinations:
 
-1. copy or inspect the related EmusaSoft work-order or operational-record identifier; and
+1. inspect or select the related EmusaSoft work-order or operational-record identifier, linking it only after a supported route contract exists; and
 2. expand a concise explanation and resolution guide.
 
 The resolution guide explains what is blocked or inconsistent and the safe steps for investigating or correcting it through the existing operational workflow.
@@ -467,7 +467,7 @@ The composer remains accessible while the message history scrolls. Sending a mes
 
 ### 10.1 Purpose
 
-The dashboard is the statistical and historical surface. It summarizes all historical and currently open alerts and supports analysis by:
+The dashboard is a compact statistical, historical, and incident-inspection surface. It summarizes historical and currently open alerts without repeating the same values in separate KPI cards. It supports analysis by:
 
 - worker;
 - work order;
@@ -478,105 +478,108 @@ The dashboard is the statistical and historical surface. It summarizes all histo
 - status; and
 - date.
 
-It complements the real-time conversation list rather than duplicating it.
+It complements the real-time conversation list rather than duplicating it. The primary chart and incident results are the focal points; controls and secondary summaries must not dominate the page.
 
 ### 10.2 Header
 
 - The header contains the production-ecosystem burger menu.
 - The centered product title is `Control de alertas`.
-- `Exportar reporte` is placed in the header.
+- Filtered CSV export is a compact, icon-only secondary action in the header with an accessible name.
 - The former top-level Dashboard/Chats navigation is removed from the header; those destinations use the shared bottom navigation.
 - A user-avatar button is not shown in the current design.
 
 ### 10.3 Filters
 
-Dashboard filters are global: every summary, chart, ranking, bucket, list, and detail row below them updates from the same filter state.
+Dashboard filters are global: the chart, incident results, open-age analysis, and detail rows update from the same state. Filters do not create a separate analytical model for each component.
 
-The current filters are:
+The available filters are:
 
 - free-text search for person, work order, machine, or error;
-- date range: last 7, 30, or 90 days;
+- date range: last 7, 30, or 90 days, or a custom range;
 - operation: all, printing, extrusion, Exlam, cutting, or sealing; and
-- status.
+- incident lifecycle; and
+- open-incident age.
 
-Status values are mutually exclusive:
+Lifecycle values are additive controls:
 
-- Todos los estados;
 - Abiertas;
 - Resueltas; and
 - Cerradas sin resolución.
 
-“Resolved and open” is not a status because an individual alert cannot be both. “Closed without resolution” is a distinct administrative outcome and must remain visible in historical analysis.
+Selecting an inactive lifecycle adds it to the filter. Selecting an active lifecycle removes only that lifecycle. With no lifecycle selected, all lifecycle states are shown. This does not imply that one incident can occupy multiple lifecycle states; it allows the result set to include multiple states.
 
-The filter panel is collapsible to recover vertical space. Its collapsed header retains a readable summary of active filters. `Restablecer` clears search, date drill-down, operation, status, and other active filter state.
+Date, operation, grouping, lifecycle, age, and search filters affect both chart values and incident results. Clicking an already-selected chart segment, age bucket, or removable filter clears that selection without requiring a permanent `Restablecer` control in the chart toolbar.
 
-### 10.4 Alerts-by-date chart
+On desktop and tablet, grouping and common chart controls occupy one compact row. Focusing search expands it left over that row; covered controls are hidden and unavailable while typing. Enter applies the query and restores the compact row. Escape or moving focus away also restores it. The expanded search provides a compact `Filtros avanzados` action that opens the same mixed-filter surface used on mobile.
 
-The main chart is a stacked bar chart by date with three series:
+The custom range uses one anchored range-calendar popover. Opening it from a preset starts with no selected dates. The first click selects a start, the second selects an end, the third starts a new range, and the fourth completes it. Reopening an applied range may show it for context, but the first new click replaces it with a new start. The calendar remains open after a pair is completed so another pair can be selected. Custom dates appear inside the fixed-width date control, which also provides an explicit clear action; they are not repeated above the toolbar.
+
+### 10.4 Primary chart
+
+The main chart is a stacked bar chart with three lifecycle series:
 
 - resolved — green;
 - open — red; and
 - closed without resolution — orange.
 
-The summary metrics are integrated immediately above the chart rather than placed in a separate large KPI band. They show the filtered:
+The grouping control changes the x-axis between date, worker, work order, machine, operation, shift, and error type. This replaces separate concentration and frequent-error cards. The subtitle reflects the selected preset or identifies a custom period without repeating the custom dates.
 
-- total alerts;
-- resolved alerts and resolution rate;
-- open alerts;
-- alerts closed without resolution; and
-- average time to resolution.
+Lifecycle colors remain green for resolved, red for open, and orange for closed without resolution. The compact legend doubles as the additive lifecycle filter. Selected states retain their semantic color; inactive states are muted. Text, tooltips, and accessible names prevent color from carrying meaning alone.
 
-The date label reflects the selected filter range or selected date; it is not permanently described as “last 30 days.”
+No standalone KPI cards, summary strip, or mobile summary sentence repeats values already communicated by the chart, lifecycle controls, or incident count.
 
 ### 10.5 Drill-down
 
-Each colored segment in the date chart is interactive.
+Each colored chart segment is interactive.
 
-- Selecting a segment filters by that exact date and that segment's status.
-- The selected date and status affect every dashboard component, including the chart itself, summaries, rankings, aging, error types, and detail table.
-- Other dates may be visually de-emphasized to preserve context.
+- Selecting a segment filters the dashboard by its category and lifecycle.
+- Selecting it again removes that segment filter.
+- Lifecycle and open-age filters change the values rendered in the chart as well as the incident results.
+- The chart retains every category position and a stable y-axis scale while filtering. Contextual bars may be dimmed, but the selected target must not move because the axes were rebuilt.
+- The y-axis reserves at least one complete grid step above the tallest stack so the value label cannot collide with the controls.
 - Segment interaction supports pointer and keyboard input.
-- `Restablecer` returns the dashboard to its default state.
 
-### 10.6 Dimension comparison
+### 10.6 Incident results
 
-`Dónde se concentran` groups the filtered alert set by one dimension at a time:
+Incident results sit directly below the chart. The header includes the filtered result count and an expand/collapse control. Results start expanded on desktop and tablet and collapsed on mobile; changing this disclosure does not change any filters.
 
-- Trabajador;
-- OT;
-- Máquina;
-- Operación;
-- Turno; or
-- Tipo de error.
+Desktop and tablet use a compact four-column table:
 
-Dimension controls use a tab model and remain horizontally scrollable on narrow screens rather than shrinking labels until unreadable.
+- relative detection time;
+- alert;
+- work order; and
+- lifecycle status.
+
+Machine, operation, shift, responsible area, and age are compact metadata inside the alert cell rather than a separate ambiguous context column. The alert target fills the complete visible cell, including title, metadata, and whitespace. Mobile presents the complete incident card as one target.
+
+Detection time uses `Ahora`, `hace N min`, `Hoy, HH:mm`, `Ayer, HH:mm`, a weekday within the recent week, or a short older date. The exact timestamp remains available as accessible or hover detail. Lifecycle uses a compact colored indicator plus an accessible name and tooltip.
+
+Work-order identifiers remain compact and selectable. Monitor does not invent an EmusaSoft link until an authoritative frontend route contract exists.
 
 ### 10.7 Open-alert age
 
-`Antigüedad de alertas abiertas` summarizes how long current open alerts have remained unresolved. It is an analytical view, not a substitute for documented priority or escalation rules.
+`Antigüedad abierta` summarizes how long current open alerts have remained unresolved. Each age row filters the chart and incident results and clears on a second selection. The same filter is available in `Filtros avanzados`. It is an analytical view, not a substitute for documented priority or escalation rules.
 
 The interface must not claim that one alert is more important than another until operational priority rules exist. If priority ordering is required later, it must be based on a documented policy, such as a future `priorities.md`, and not inferred only from visual design.
 
 ### 10.8 Error frequency
 
-`Tipos de error más frecuentes` compares recurrence across historical and pending alerts under the current filters. It uses alert codes and names from the canonical alert catalog.
+There is no separate frequent-error card. Selecting `Tipo de error` as the primary chart grouping provides this analysis without duplicating it.
 
-### 10.9 Detail table
+### 10.9 Incident detail
 
-The filtered detail table includes:
+Opening an incident preserves the Phase 4 incident API, authorization, lifecycle, live-update, and evidence-access contracts. The presentation contains:
 
-- effective incident date and time, following the same ERP-source-or-first-detection fallback;
-- error;
-- responsible person or role;
-- work order;
-- machine;
-- operation;
-- shift;
-- age;
-- status; and
-- navigation to the related conversation or detail.
+- the alert code, occurrence, label, lifecycle, and effective incident time;
+- compact operational data such as work order, machine, operation, shift, and available responsible role or area;
+- a meaningful lifecycle history; and
+- `Por qué se generó`, one concise contextual explanation of what happened, the affected operational context, and the responsible roles that are actually supported by evidence.
 
-Work-order numbers are selectable and copyable identifiers. Horizontal scrolling is permitted on small screens because hiding operational columns would remove important evidence.
+The explanation must be grounded in the canonical alert catalog and current incident evidence, use simple Spanish, and never invent a named person. Whether deterministic composition, an LLM-assisted approach, or a hybrid generates this text is an engineering/product decision governed by the production roadmap, not a UI decision.
+
+Repeated unchanged polling observations are not useful incident history. The UI presents the opening evidence and later meaningful evidence, context, or lifecycle changes. Raw technical detail remains progressively disclosed when it adds diagnostic or audit value; it is not printed as a long default list.
+
+An incident is not shown as related merely because it shares a work order. A visible relationship requires an explicit and explainable relation contract.
 
 ### 10.10 Report export
 
@@ -591,10 +594,13 @@ When filters produce no dashboard rows, the detail area explains that no errors 
 All four main screens must work on desktop and mobile. The roster's detailed responsive behavior will be defined with its future prototype.
 
 - Layouts reflow without horizontal page overflow.
-- Touch targets are at least 44px where mobile interaction is expected.
-- Dashboard filter fields stack progressively on narrow screens.
-- Dashboard summaries and chart legends wrap or reflow.
-- Wide tables scroll within their own container.
+- Touch targets are at least 44px where mobile interaction is expected, while compact controls remain visually `28px` high with a `6px` radius. The additional target area is invisible or supplied by surrounding layout and must not enlarge the visible control or overlap another target.
+- Dashboard controls do not stack into a permanent mobile filter block.
+- At mobile width, the quick-filter region occupies zero height by default. A downward pull or wheel/trackpad overscroll at the top reveals one compact search/filter row; normal upward content scrolling hides it again.
+- The persistent header filter action opens `Filtros avanzados`, preserving keyboard, assistive-technology, and non-touch access. The surface combines search, date, lifecycle, operation, grouping, and open-age filters.
+- Hidden mobile quick filters leave document flow and the accessibility tree.
+- The mobile dashboard contains no KPI-card grid or repeated summary strip.
+- The desktop/tablet table fits its container without document-level or table-level horizontal scrolling; mobile uses incident cards instead of forcing the table into the viewport.
 - Conversation rows preserve title, preview, age, time, and unread meaning at narrow widths.
 - Alert context can stack vertically on very narrow screens.
 - Chat detail uses mobile long-press actions instead of the desktop chevron.
@@ -634,7 +640,14 @@ The following explored concepts are not part of the current direction:
 - a separate oversized KPI band above the date chart;
 - top-header navigation for Dashboard and Chats;
 - an application-header user avatar with no current task value; and
-- a combined `Resueltas y abiertas` status value.
+- a combined `Resueltas y abiertas` incident state;
+- mutually exclusive dashboard lifecycle filters;
+- standalone dashboard KPI cards or a repeated summary strip;
+- permanent mobile filter rows or stacked mobile controls;
+- separate `Dónde se concentran` and `Errores frecuentes` cards after their dimensions moved to the primary chart;
+- an inline reset control that displaces compact chart controls;
+- horizontal scrolling for the Dashboard V2 incident table; and
+- treating deterministic templates or an LLM as an approved explanation-generation mechanism before the roadmap decision is completed.
 
 ## 14. Prototype-only behavior and production boundaries
 
@@ -682,6 +695,14 @@ A production implementation matches the current UX/UI direction only if:
 - Alert chips include text labels and support overflow.
 - Search and filters affect the complete surface, not an isolated component.
 - Dashboard chart drill-down updates all dependent views and can be reset.
+- Lifecycle filters are additive and each active lifecycle clears independently.
+- Lifecycle, age, date, operation, search, grouping, and advanced filters update both chart values and incident results.
+- Chart filtering preserves category positions and scale and reserves headroom above the tallest bar.
+- Dashboard controls use the canonical compact type, height, radius, and padding inside toolbars, dialogs, menus, drawers, and mobile sheets.
+- Desktop search expands over the control row; mobile quick filters occupy no space until revealed.
+- Custom date selection follows the start/end/restart cycle and remains removable.
+- Incident results are collapsible, use relative time, and open from the complete alert target.
+- The dashboard does not repeat chart information in summary cards or redundant analytical panels.
 - Open, resolved, and closed-without-resolution states remain distinct.
 - Work orders and operational objects show clear identifiers and evidence without an unsupported external navigation action.
 - Message actions are compact on desktop and long-press driven on mobile.

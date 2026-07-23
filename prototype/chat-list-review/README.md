@@ -1,10 +1,15 @@
-# Monitor screen prototypes
+# Monitor screen review surfaces
 
 Current prototypes:
 
-- `dashboard.html`
 - `chat-list-final.html`
 - `chat-detail.html`
+
+Deprecated pre-V2 dashboard evidence:
+
+- `dashboard.html`
+
+The approved local Dashboard V2 implementation is `../../apps/web/`.
 
 Deprecated exploratory chat-list concepts:
 
