@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atlas</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app" aria-live="polite">
+    <main class="loading-shell">
+      <p>Opening Atlas…</p>
+    </main>
+  </div>
+
+  <dialog id="instance-dialog" class="instance-dialog">
+    <form id="instance-form" method="dialog">
+      <div class="dialog-heading">
+        <div>
+          <p class="context-label" id="dialog-context">New research</p>
+          <h2 id="dialog-title">Create an Atlas</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-dialog aria-label="Close dialog">×</button>
+      </div>
+      <input id="instance-form-mode" type="hidden" value="create">
+      <input id="instance-form-id" type="hidden">
+      <label>Name<input id="instance-name" name="name" required maxlength="100" autocomplete="off"></label>
+      <label>Research objective<textarea id="instance-objective" name="objective" rows="3" maxlength="500" placeholder="What interface or workflow are you researching?"></textarea></label>
+      <p id="instance-form-error" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button class="button secondary" type="button" data-close-dialog>Cancel</button>
+        <button class="button primary" type="submit" id="instance-submit">Create Atlas</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
