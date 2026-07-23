@@ -61,6 +61,7 @@ import {
   type IncidentSummary,
   type MockIdentitySummary,
 } from "./api";
+import { ScenarioLab } from "./ScenarioLab";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -615,5 +616,7 @@ export default function App() {
   useEffect(() => { void currentSession().then((value) => { setSession(value); setState("ready"); }).catch(() => setState("error")); }, []);
   if (state === "loading") return <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", bgcolor: "background.default" }}><CircularProgress aria-label="Cargando Monitor"/></Box>;
   if (state === "error") return <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 3, bgcolor: "background.default" }}><Alert severity="error">No se pudo iniciar Monitor. Comprueba que la API local esté funcionando.</Alert></Box>;
-  return session ? <Dashboard session={session} onLogout={() => void logout().then(() => setSession(null))}/> : <LoginView onLogin={setSession}/>;
+  const onLogout = () => void logout().then(() => setSession(null));
+  if (!session) return <LoginView onLogin={setSession}/>;
+  return window.location.pathname === "/dev/scenarios" ? <ScenarioLab session={session} onLogout={onLogout}/> : <Dashboard session={session} onLogout={onLogout}/>;
 }

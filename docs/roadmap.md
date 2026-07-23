@@ -6,7 +6,7 @@
 
 **Version:** 2.1
 
-**Status:** Active; Phases 0–4 and 4A complete locally; Phase 4B is next
+**Status:** Active; Phases 0–4, 4A, and 4B complete locally; Phase 5 is next
 
 **Roadmap date:** 2026-07-23
 
@@ -68,7 +68,7 @@ The stable ownership, polling, authentication, incident lifecycle, failure behav
 | 4 — Incident vertical slice | A02, A03, and A05 flow through evaluation, lifecycle, evidence, API, committed live change, and dashboard | `delivery/phases/phase4/README.md` |
 | 4A — Dashboard redesign | Approved compact Dashboard V2 connected to the existing authorized APIs and incident lifecycle | `delivery/phases/phase4/README.md`, `../archive/docs/design/dashboard_v2_design_handoff.md` |
 
-The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepted as a good first version on 2026-07-22, completing Phase 4A. Phase 4B and Phase 5 have not started.
+The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepted as a good first version on 2026-07-22, completing Phase 4A. Phase 4B completed locally on 2026-07-23 with synthetic source-to-incident validation; Phase 5 has not started.
 
 ## 5. Revised implementation sequence
 
@@ -97,6 +97,8 @@ The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepte
 **Estimated effort:** 3–5 working days
 
 **Purpose:** Prove that source changes, not prewritten incident rows, drive the complete alert lifecycle.
+
+**Implementation plan:** [`delivery/phases/phase4b/implementation_plan.md`](delivery/phases/phase4b/implementation_plan.md)
 
 **Deliverables:**
 

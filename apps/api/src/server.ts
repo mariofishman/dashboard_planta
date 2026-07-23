@@ -1,7 +1,7 @@
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
-import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry } from "@monitor/detection";
+import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry } from "@monitor/detection";
 import { IncidentService, type IncidentChange, type RuleContract } from "@monitor/incidents";
 import Fastify from "fastify";
 import { readFile } from "node:fs/promises";
@@ -14,6 +14,7 @@ import { loadConfig, type MonitorConfig } from "./config.js";
 import { createMetrics, prometheusMetrics, registerObservability } from "./observability.js";
 import { attachRedis, type RedisRuntime } from "./redis.js";
 import { authRoutes } from "./routes/auth.js";
+import { scenarioRoutes } from "./routes/scenarios.js";
 
 function cookieValue(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -90,22 +91,29 @@ export async function buildMonitorServer(options: {
   const repositoryRoot = resolve(import.meta.dirname, "../../..");
   const io = new SocketIOServer(app.server, { cors: { origin: config.webOrigin, credentials: true } });
   const incidentService = new IncidentService(database, (change: IncidentChange) => io.to(`plant:${change.plantId}`).emit("incident.changed", change));
-  await seedPhase4Incidents(incidentService, repositoryRoot, database);
+  if (!config.enableScenarioLab) await seedPhase4Incidents(incidentService, repositoryRoot, database);
   const ruleDocument = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
   const incidentRules = new Map<string, RuleContract>(ruleDocument.rules.filter((rule) => ["A02", "A03", "A05"].includes(rule.code)).map((rule) => [rule.code, rule]));
   const detectionRepository = new DetectionRepository(database);
+  const scenarioSource = config.enableScenarioLab ? new ScenarioSourceRepository(database) : null;
   const detectionRunner = new DetectionRunner(detectionRepository, new FixedBackupFreshnessProvider("phase1-fixtures.v1"), undefined, async ({ cycleId, query, rows, observedAt }) => {
     const rule = incidentRules.get(query.ruleCode);
     if (!rule) return;
-    await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt, contextFor: () => ({ plantId: 1 }) });
+    await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt, contextFor: (row) => query.adapterKind === "simulator" ? scenarioContextFor(row) : ({ plantId: 1 }) });
   });
   const detectionScheduler = new DetectionScheduler(detectionRunner, 2);
-  const localDetectionSources = await loadFixtureRegistry(
+  const fixtureSources = await loadFixtureRegistry(
     resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"),
     resolve(repositoryRoot, "tests/fixtures/alerts/rule-cases.v1.json"),
   );
+  const scenarioSources = scenarioSource ? simulatorRegistry(scenarioSource) : [];
+  const localDetectionSources = scenarioSource
+    ? [...fixtureSources.filter(({ query }) => !["A02", "A03", "A05"].includes(query.ruleCode)), ...scenarioSources]
+    : fixtureSources;
   await Promise.all(localDetectionSources.map(({ query, adapter }) => detectionScheduler.runRecovery(query, adapter)));
-  localDetectionSources.forEach(({ query, adapter }) => detectionScheduler.schedule(query, adapter));
+  // Deterministic tests invoke the same runner through the development poll route.
+  // Development keeps normal scheduled polling active for source-to-screen review.
+  if (config.nodeEnv !== "test") localDetectionSources.forEach(({ query, adapter }) => detectionScheduler.schedule(query, adapter));
 
   io.use(async (socket, next) => {
     const signedCookie = cookieValue(socket.handshake.headers.cookie, "monitor_session");
@@ -165,6 +173,14 @@ export async function buildMonitorServer(options: {
     return { changes: await incidentService.changesAfter(cursor, request.principal!.plantIds) };
   });
   app.get("/api/admin/authorization-check", { preHandler: app.requireScopes(["monitor:admin"]) }, async () => ({ authorized: true }));
+  if (scenarioSource) {
+    await app.register(scenarioRoutes, {
+      database,
+      source: scenarioSource,
+      runner: detectionRunner,
+      registry: new Map(scenarioSources.map((entry) => [entry.query.ruleCode as "A02" | "A03" | "A05", entry])),
+    });
+  }
 
   const close = async () => {
     detectionScheduler.stop();

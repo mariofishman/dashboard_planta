@@ -33,6 +33,22 @@ export interface IncidentDetail extends IncidentSummary {
   related: { id: string; ruleCode: string; title: string; lifecycle: IncidentLifecycle }[];
 }
 
+export type ScenarioRuleCode = "A02" | "A03" | "A05";
+export type ScenarioFault = "timeout" | "source_error" | "partial" | "invalid_schema";
+export interface ScenarioStatus {
+  ruleCode: ScenarioRuleCode;
+  simulatedAt: string;
+  sourceRevision: string;
+  lastAction: string;
+  lastActionAt: string;
+  pendingFault: ScenarioFault | null;
+  sourceState: { rowCount: number; rows: Record<string, unknown>[] };
+  latestPoll: { status: string; complete: boolean; fullEvaluation: boolean; errorCode: string | null; finishedAt: string } | null;
+  incident: { id: string; lifecycle: IncidentLifecycle; occurrence: number; openedAt: string; resolvedAt: string | null; updatedAt: string } | null;
+  latestChangeCursor: number | null;
+  detectionDelayMilliseconds: number | null;
+}
+
 async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) throw new Error(`request_failed_${response.status}`);
   return response.json() as Promise<T>;
@@ -73,4 +89,15 @@ export async function incidents(filters: { status?: string; operation?: string; 
 
 export async function incidentDetail(id: string): Promise<IncidentDetail> {
   return responseJson<IncidentDetail>(await fetch(`/api/incidents/${id}`, { credentials: "include" }));
+}
+
+export async function scenarios(): Promise<ScenarioStatus[]> {
+  return (await responseJson<{ scenarios: ScenarioStatus[] }>(await fetch("/api/dev/scenarios", { credentials: "include" }))).scenarios;
+}
+
+export async function scenarioAction(code: ScenarioRuleCode, action: "reset" | "trigger" | "correct" | "advance-time" | "fail-next-poll" | "poll", body?: Record<string, unknown>): Promise<ScenarioStatus> {
+  const init: RequestInit = { method: "POST", credentials: "include" };
+  if (body) { init.headers = { "content-type": "application/json" }; init.body = JSON.stringify(body); }
+  const result = await responseJson<ScenarioStatus | { scenario: ScenarioStatus }>(await fetch(`/api/dev/scenarios/${code}/${action}`, init));
+  return "scenario" in result ? result.scenario : result;
 }

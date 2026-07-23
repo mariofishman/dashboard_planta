@@ -4,7 +4,7 @@ export interface DetectionQueryDefinition {
   queryId: string;
   ruleCode: string;
   queryVersion: string;
-  adapterKind: "fixture" | "backup" | "emusionsoft";
+  adapterKind: "fixture" | "backup" | "simulator" | "emusionsoft";
   keyField: string;
   requiredFields: string[];
   intervalMs: number;
