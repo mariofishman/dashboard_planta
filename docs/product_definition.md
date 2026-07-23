@@ -63,6 +63,7 @@ The design system, dashboard implementation, and two currently prototyped chat s
 ## Current documentation-review interface
 
 - `prototype/alert-catalog/final/index.html` is the approved browser publication of the alert catalog. It is not a Monitor product screen.
+- `prototype/alert-catalog/v11/index.html` records the review in which E05 was approved; the approved result is published in the final catalog.
 
 ## Deprecated historical material
 
@@ -80,8 +81,9 @@ The following files remain only for history or inspiration and have no current p
 ## Current open decisions
 
 - Design the Operational Responsibility Roster screen, workflow, permissions, conflict handling, and audit presentation.
-- Build and validate detection, authorization, freshness, and WebSocket contracts locally; integrate real EmusaSoft authentication, read-only access, current-schema validation, and replica freshness in Phase 10.
+- Redesign and approve the dashboard in Phase 4A, then validate changing source scenarios through polling and the complete alert lifecycle in Phase 4B.
+- Build and validate detection, authorization, safe incomplete-cycle behavior, and WebSocket contracts locally; integrate real EmusaSoft authentication, read-only access, current-schema validation, and replica observation behavior in Phase 10.
 - Confirm unresolved alert formulas, tolerances, data mappings, and representative live evidence identified by the alert catalog and architecture roadmap.
 - Define production policies for identity, permissions, retention, attachments, moderation, reporting, offline behavior, and external notification channels.
 
-Phases 0 and 1 are complete locally. Every active alert has a versioned executable rule contract and reproducible triggered, clear, and insufficient fixture cases under `docs/phase1/`. External EmusaSoft and MCP delivery dependencies gate the affected Phase 10 integration tests, not local product construction. EmusaSoft exposes no supported frontend-route contract, so Monitor shows ERP identifiers and evidence rather than promising deep links.
+Phases 0–4 are complete locally. Every active alert has a versioned executable rule contract and reproducible triggered, clear, and insufficient fixture cases under `docs/phase1/`; A02, A03, and A05 also have a working incident vertical slice. The Phase 4 functional gate is accepted, but the dashboard design is not approved. Phase 4A redesigns it and Phase 4B adds dynamic local source scenarios before Phase 5. External EmusaSoft and MCP delivery dependencies gate the affected Phase 10 integration tests or rule promotions, not local product construction. EmusaSoft has not yet exposed a supported frontend-route contract, so Monitor shows ERP identifiers and evidence rather than promising deep links.

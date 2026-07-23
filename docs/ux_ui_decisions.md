@@ -379,9 +379,9 @@ The alert object may contain:
 
 ### 7.2 Primary destinations
 
-The object has two clear actions:
+The object has two clear destinations:
 
-1. copy or inspect the related EmusaSoft work-order or operational-record identifier; and
+1. inspect or select the related EmusaSoft work-order or operational-record identifier, linking it only after a supported route contract exists; and
 2. expand a concise explanation and resolution guide.
 
 The resolution guide explains what is blocked or inconsistent and the safe steps for investigating or correcting it through the existing operational workflow.

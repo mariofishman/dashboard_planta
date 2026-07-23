@@ -1,6 +1,6 @@
 # Factory Alert Catalog
 
-This is the canonical source for Monitor's approved alert rules within the product defined by `docs/product_definition.md`. The final browser publication is `prototype/alert-catalog/final/index.html`.
+This is the canonical source for Monitor's approved alert rules within the product defined by `docs/product_definition.md`. The approved browser publication is `prototype/alert-catalog/final/index.html`; iteration 11 records the review in which E05 was approved.
 
 ## Catalog structure
 
@@ -68,6 +68,7 @@ For the A01 exception described during review, material may have been physically
 | E02 | Capture starting quantities or reconstruct them only from traceable records. Otherwise close without resolution and link E03/E04/D03. |
 | E03 | Correct closing/opening quantity or the missing intervening movement. If neither side is provable, close without resolution for the OT pair and preserve the difference. |
 | E04 | Correct inventory quantities, screw association, or recipe snapshot. Close an approved formulation exception without resolution with the authorizer and reason. |
+| E05 | Correct the opening inventory, recorded additions, or closing inventory that caused impossible negative calculated consumption. If the OT is locked, preserve the discrepancy for EmusaSoft follow-up outside Monitor. |
 
 ## Changes from iteration 1
 
@@ -146,6 +147,12 @@ For the A01 exception described during review, material may have been physically
 - Removed `purchasing owner`, `receiving operator`, `pause owner`, `machine-safety-warehouse stock role`, `OT opening role`, and `OT closing role` as separate positions because their responsibilities belong to standardized positions.
 - Combined process movement, scale operation, and work-in-process warehouse duties under `process-team operator`.
 - Defined a deterministic primary-action-owner mapping for every active alert code and reason; no LLM selects operational recipients.
+
+## Changes approved in iteration 11
+
+- Added E05 for a container whose declared closing inventory exceeds its opening inventory plus recorded additions, producing impossible negative calculated consumption.
+- Gave E05 precedence over derivative E04 and D03 calculations until the invalid container quantities are corrected.
+- Required E05 to enrich an existing E03 incident rather than create a duplicate notification when E03 already proves the same opening-inventory error.
 
 ## Final publication
 
@@ -466,7 +473,7 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ## E — Extrusion and Exlam resin-container alerts
 
-Every E01–E04 rule applies to both Extrusion and Exlam. Both operations use resin recipes and material containers. Operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients. Each container holds one specific resin used by the current OT. Separately, every applicable machine has a machine-specific safety warehouse holding resin for current and near-term orders. General output handling, weighing, movement, rate, and aggregate closure still use A04/A05, C06, D03, and D04. E04 is separate because resin proportions can be wrong even when total mass balances.
+Every E01–E05 rule applies to both Extrusion and Exlam. Both operations use resin recipes and material containers. Operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients. Each container holds one specific resin used by the current OT. Separately, every applicable machine has a machine-specific safety warehouse holding resin for current and near-term orders. General output handling, weighing, movement, rate, and aggregate closure still use A04/A05, C06, D03, and D04. E04 is separate because resin proportions can be wrong even when total mass balances. E05 is a hard same-OT container invariant that prevents negative calculated consumption from contaminating E04 or D03.
 
 ### E01 — Required extrusion safety inventory is incomplete
 
@@ -531,6 +538,24 @@ Every E01–E04 rule applies to both Extrusion and Exlam. Both operations use re
 **Detection indicators and algorithm:** For every resin and screw, calculate `actual consumed kg = opening kg + added kg - ending kg`. Divide each resin amount by total actual resin consumption to obtain its percentage. Compare it with the corresponding percentage in `orden_trabajo_receta_snapshot` using a separately configurable ingredient tolerance. Apply the same E04 code to extrusion and Exlam. Run D03 independently for total input-versus-output-plus-waste balance; E04 and D03 may pass or fail independently and must not become duplicate incidents.
 
 **Primary action owner:** **OT machine operator**, who owns the opening, added, ending, screw-association, and closing declarations used to calculate actual resin proportions.
+
+
+### E05 — Closing container inventory exceeds available inventory
+
+**Alert label:** Error
+
+| Field | Definition |
+|---|---|
+| When it happens | At OT closure, a resin container's declared ending kilograms exceed its declared opening kilograms plus every addition recorded during that OT beyond the configured container-measurement tolerance. |
+| Why the alert exists | The calculation would produce negative resin consumption, which is physically impossible. At least one opening, addition, or ending value is wrong or an inbound addition was not recorded. |
+| Possible causes | Opening inventory was understated, ending inventory was overstated, a resin addition was omitted, or an addition was associated with the wrong container or resin. |
+| Example | The OT opens a container with 50 kg and records a 10 kg addition. At closure the operator declares 400 kg remaining. `50 + 10 - 400 = -340 kg` calculated consumption, so E05 opens. If the real opening inventory was 500 kg and 100 kg were consumed with no addition, the correct ending inventory is 400 kg. |
+
+**Detection indicators and algorithm:** At OT closure, calculate `available kg = opening kg + recorded additions kg` and `calculated consumption kg = available kg - ending kg` for every `OT + locationId + articleId`. Open E05 when `calculated consumption kg < -container measurement tolerance`. Equality means zero consumption and does not trigger E05. Do not use a container with negative calculated consumption in E04 formulation percentages or D03 aggregate balance; mark those dependent calculations as blocked until the container data is corrected. If E03 already proves that the same current-OT opening quantity is wrong, add the E05 invariant breach as evidence and reason to E03 instead of creating a duplicate notification.
+
+**Primary action owner:** **OT machine operator**, who declares opening inventory, additions, and ending inventory for the OT.
+
+**Resolution:** Correct the opening inventory, missing or incorrect addition, container/resin association, or ending inventory in EmusaSoft. Recalculate E05 first, then resume E04 and D03 only after every affected container has nonnegative calculated consumption. If the OT is locked and the exact quantities cannot be reconstructed, close without resolution and preserve the container discrepancy for EmusaSoft follow-up outside Monitor.
 
 ## General alert distribution
 

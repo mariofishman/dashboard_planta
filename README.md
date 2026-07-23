@@ -21,6 +21,7 @@ Monitor is a factory alert and collaboration product with four main screens: Das
 - Operational Responsibility Roster — fourth main screen; concept documented but not yet prototyped.
 - `prototype/dashboard/` — deprecated historical dashboard retained only for reference or inspiration.
 - `prototype/alert-catalog/final/` — approved documentation-review publication; not a Monitor product screen.
+- `prototype/alert-catalog/v11/` — approved E05 documentation-review iteration.
 - `prototype/alert-catalog/v1/` through `v10/` — deprecated historical review iterations.
 - `AGENTS.md` — project-specific agent instructions.
 
@@ -37,6 +38,7 @@ Open:
 - Deprecated pre-V2 dashboard: `http://localhost:8000/prototype/chat-list-review/dashboard.html`
 - Deprecated historical dashboard: `http://localhost:8000/prototype/dashboard/`
 - Approved alert catalog: `http://localhost:8000/prototype/alert-catalog/final/`
+- Approved E05 review record: `http://localhost:8000/prototype/alert-catalog/v11/`
 - Deprecated review history: `http://localhost:8000/prototype/alert-catalog/v1/` through `v10/`
 
 ## EMUSA Soft MCP configuration
@@ -69,4 +71,4 @@ npm run build
 
 ## Current status
 
-Phases 0–4 are complete locally. Monitor now has a mock login, server-controlled permissions, safe local detection, an incident lifecycle with evidence and recurrence, authorized APIs, recoverable live changes, and the approved product dashboard connected to sample incidents. Phase 5 has not begun. Real authentication, Aurora access, current-schema and load validation, staging, pilot, and production deployment remain consolidated in Phase 10.
+Phases 0–4 are complete locally. Monitor now has a mock login, server-controlled permissions, safe local detection, an incident lifecycle with evidence and recurrence, authorized APIs, recoverable live changes, and a functional dashboard connected to sample incidents. The dashboard design is not approved: Version Two adds Phase 4A for its redesign and Phase 4B for dynamic local source validation before Phase 5. Real authentication, Aurora access, current-schema and load validation, staging, pilot, and production deployment remain consolidated in Phase 10.

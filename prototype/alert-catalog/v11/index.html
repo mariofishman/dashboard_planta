@@ -3,20 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EMUSA Alert Catalog · Final</title>
+    <title>EMUSA Alert Catalog Review · Iteration 11</title>
     <link rel="stylesheet" href="../shared/styles.css" />
   </head>
-  <body>
+  <body data-review-document="emusa-alert-catalog" data-review-iteration="11">
     <header class="review-header">
-      <div class="brand">EMUSA <span>Alert catalog · final</span></div>
-      <div class="header-links"><a href="../v11/">Iteration 11</a><a href="../v10/">Iteration 10</a><a href="../../dashboard/">Dashboard</a></div>
+      <div class="brand">EMUSA <span>Alert catalog · iteration 11</span></div>
+      <div class="header-links"><a href="../v10/">Iteration 10</a><a href="../final/">Approved final</a><a href="../../dashboard/">Dashboard</a></div>
     </header>
 
     <main>
       <section class="intro">
-        <p class="eyebrow">Approved product definition</p>
-        <h1>Factory alert catalog</h1>
-        <p>Final alert definitions, detection rules, resolutions, deterministic ownership, and distribution rules for Monitor.</p>
+        <p class="eyebrow">E05 review · iteration 11</p>
+        <h1>Review the new E05 alert</h1>
+        <p>Only the red-outlined E05 section is new and requires review. The approved final catalog remains unchanged until this alert is approved.</p>
+        <div class="review-legend" aria-label="Review instructions">
+          <span><i></i>Changed section</span>
+          <span id="review-progress">0 of 0 reviewed</span>
+        </div>
       </section>
 
       <section class="admin-closure">
@@ -24,14 +28,14 @@
         <h2>Administrative closure without resolution</h2>
         <p>An authorized administrator may close an alert when the historical operational record can no longer be reconstructed safely. Closure sets <strong>Closed without resolution</strong>, requires a standardized reason and comment, records the administrator and timestamp, and preserves the original evidence. It never invents historical reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT events.</p>
         <p>Before confirming, the administrator sees the incidents correlated by OT, material or reel, machine, and time window. They may close the root incident and selected consequences as one cascade, with one shared closure reference and no duplicate notifications. Later evidence may create a new incident only when it represents a new event; the same historical evidence must not reopen the closed chain automatically.</p>
-        <p><strong>Closure does not alter EmusaSoft.</strong> Monitor does not create, submit, approve, track, or apply adjustment requests. It preserves a read-only closure record with evidence and EmusaSoft references. Any later inventory, location, cost, valuation, or OT-reconciliation adjustment belongs entirely to EmusaSoft.</p>
-        <div class="closure-example"><strong>A01 example</strong><span>Material was never reserved, but the warehouse physically sent it to the machine and the operator consumed it outside EmusaSoft. Close A01 and the selected downstream incidents under reason <em>Physical operation outside ERP</em>. Do not create fake historical records. Preserve the evidence so EmusaSoft can handle any later adjustment outside Monitor.</span></div>
+        <p><strong>Closure does not directly alter EmusaSoft.</strong> When the unresolved history leaves inventory quantity, location, cost, valuation, or OT reconciliation incorrect, it creates auditable adjustment-queue items for EmusaSoft. Each item records the affected inventory item or reel, warehouse/location, OT when applicable, current and proposed quantity and cost, reason, evidence, originating incident, requester, and status: <strong>Pending review</strong>, <strong>Approved</strong>, <strong>Applied</strong>, or <strong>Rejected</strong>. An authorized EmusaSoft role applies the approved correction as an explicit present-time transaction. Monitor stores the resulting EmusaSoft transaction identifier and recalculates still-open consequential incidents.</p>
+        <div class="closure-example"><strong>A01 example</strong><span>Material was never reserved, but the warehouse physically sent it to the machine and the operator consumed it outside EmusaSoft. Close A01 and the selected downstream incidents under reason <em>Physical operation outside ERP</em>. Do not create fake historical records. Create adjustment-queue items for the required raw-material inventory reduction, location correction, finished-output inventory increase, cost allocation, valuation correction, or OT reconciliation.</span></div>
       </section>
 
       <nav class="stage-index" id="alert-index" aria-label="Alert index"><a href="#family-a">A</a><a href="#a01">A01</a><a href="#a02">A02</a><a href="#a03">A03</a><a href="#a04">A04</a><a href="#a05">A05</a><a href="#a06">A06</a><a href="#a07">A07</a><a href="#family-b">B</a><a href="#b01">B01</a><a href="#b02">B02</a><a href="#b03">B03</a><a href="#family-c">C</a><a href="#c01">C01</a><a href="#c02">C02</a><a href="#c06">C06</a><a href="#family-d">D</a><a href="#d01">D01</a><a href="#d02">D02</a><a href="#d03">D03</a><a href="#d04">D04</a><a href="#family-e">E</a><a href="#e01">E01</a><a href="#e02">E02</a><a href="#e03">E03</a><a href="#e04">E04</a><a href="#e05">E05</a><a href="#role-glossary">Roles</a></nav>
       <div class="catalog" id="catalog"><section class="family-section"><div class="family-heading" id="family-a"><span class="family-code">A</span><div><h2>Material, inventory, and production-data registration</h2><p>General material and output-registration controls.</p></div></div><article class="alert-card family-a state-upcoming" id="a01">
 
-    <div class="card-heading"><div><span class="alert-id">A01 · Readiness and dispatch</span><h2>Required material not ready before OT start</h2></div><span class="state-pill">Por vencer → Error</span></div>
+    <div class="card-heading"><div><span class="alert-id">A01 · Readiness and dispatch</span><h2>Required material not ready before OT start</h2></div><span class="state-pill">Por vencer, then Error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -59,9 +63,9 @@
 
     <h3>Recommended resolution</h3><p>Reserve the material, confirm warehouse availability, and dispatch it before the applicable checkpoint; reschedule the OT when readiness cannot be restored in time. If the material was physically sent and consumed outside EMUSA Soft and the missing historical steps can no longer be entered safely, do not invent reservations, movements, receipts, or consumption. An administrator closes A01 without resolution and closes the linked consequences for the same OT and material as one audited exception.</p>
   </section>
-  </article><article class="alert-card family-a state-upcoming" id="a02">
+  </article><article class="alert-card family-a state-error" id="a02">
 
-    <div class="card-heading"><div><span class="alert-id">A02 · Transit and receipt</span><h2>Reserved OT material not received within 30 minutes</h2></div><span class="state-pill">Alerta</span></div>
+    <div class="card-heading"><div><span class="alert-id">A02 · Transit and receipt</span><h2>Reserved OT material not received within 30 minutes</h2></div><span class="state-pill">Error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -91,7 +95,7 @@
   </section>
   </article><article class="alert-card family-a state-upcoming" id="a03">
 
-    <div class="card-heading"><div><span class="alert-id">A03 · Consumption</span><h2>Active OT without consumption after 15 minutes</h2></div><span class="state-pill">Alerta</span></div>
+    <div class="card-heading"><div><span class="alert-id">A03 · Consumption</span><h2>Active OT without consumption after 15 minutes</h2></div><span class="state-pill">Warning</span></div>
     <div class="definition-grid">
       <section>
     <h3>When it happens</h3><p>An OT has been active for 15 minutes without a first consumption declaration. This is a warning, not proof of an error, because setup may legitimately take longer.</p>
@@ -115,7 +119,7 @@
   </section>
   </article><article class="alert-card family-a state-possible" id="a04">
 
-    <div class="card-heading"><div><span class="alert-id">A04 · Production declaration</span><h2>Possible undeclared produced reel</h2></div><span class="state-pill">Error posible</span></div>
+    <div class="card-heading"><div><span class="alert-id">A04 · Production declaration</span><h2>Possible undeclared produced reel</h2></div><span class="state-pill">Possible error</span></div>
     <section class="rule-note"><h3>Remnant-reel scope</h3><p>A04 also covers an undeclared remnant, leftover, or remaining raw-material reel removed from the unwinder when an OT stops before consuming it completely. The existing missing-reel logic is unchanged: the remnant must be represented digitally so its remaining mass is accounted for.</p></section>
     <div class="definition-grid">
       <section>
@@ -146,24 +150,24 @@
   </section>
   </article><article class="alert-card family-a state-upcoming" id="a05">
 
-    <div class="card-heading"><div><span class="alert-id">A05 · Post-production handling</span><h2>Produced or remnant reel not weighed or not moved</h2></div><span class="state-pill">Por vencer → Error</span></div>
+    <div class="card-heading"><div><span class="alert-id">A05 · Post-production handling</span><h2>Produced or remnant reel not weighed or not moved</h2></div><span class="state-pill">Por vencer, then Error</span></div>
     <section class="rule-note"><h3>Remnant-reel scope</h3><p>A05 uses the same declaration, weighing, labeling, and movement logic for produced reels and remnant raw-material reels. A partially consumed input reel must be declared with its remaining kilograms, weighed, labeled or ticketed, and returned to the raw-material warehouse. The 30-minute weighing and movement checks do not change.</p></section>
     <div class="definition-grid">
       <section>
 
-    <h3>When it happens</h3><p>A declared produced or remnant reel has no recorded weight within 30 minutes, or remains at the machine for more than 30 minutes instead of being sent to its next OT or appropriate warehouse.</p>
+    <h3>When it happens</h3><p>A produced reel is unweighed after 30 minutes, or remains at a finished OT’s machine for more than 30 minutes.</p>
   </section>
       <section>
 
-    <h3>Why the alert exists</h3><p>Without weight, EMUSA Soft cannot calculate the reel’s cost or add the correct quantity to inventory. After an OT finishes, the reel must also leave the machine and enter the correct next workflow.</p>
+    <h3>Why the alert exists</h3><p>Weight is required for cost and inventory quantity; finished output must also enter its next workflow.</p>
   </section>
       <section>
 
-    <h3>Possible causes</h3><p>Process-team delay, missed weighing, missing scale record, failure to initiate the next movement, or failure to record that movement.</p>
+    <h3>Possible causes</h3><p>Missed weighing, process-team delay, or unrecorded movement.</p>
   </section>
       <section>
 
-    <h3>Example</h3><p>CU-98421 was declared at 10:00. At 10:31 it has no weight and remains at P15. The dashboard shows one incident with reasons <code>not_weighed</code> and <code>still_at_machine</code>.</p>
+    <h3>Example</h3><p>CU-98421 is unweighed and still at P15 after 30 minutes; one incident can show one or both reasons.</p>
   </section>
     </div>
     <section class="detection-rule">
@@ -177,7 +181,7 @@
   </section>
   </article><article class="alert-card family-a state-possible" id="a06">
 
-    <div class="card-heading"><div><span class="alert-id">A06 · Waste registration and weighing</span><h2>Waste missing or not weighed</h2></div><span class="state-pill">Error posible / Error</span></div>
+    <div class="card-heading"><div><span class="alert-id">A06 · Waste registration and weighing</span><h2>Waste missing or not weighed</h2></div><span class="state-pill">Possible error or Error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -206,7 +210,7 @@
     <h3>Recommended resolution</h3><p>Declare missing waste, weigh the waste, or correct its weight and category. For a statistical warning, verify the run against physical and historical evidence. If the missing bag or exact quantity can no longer be recovered, close without resolution with the known estimate and link the resulting D03 balance gap.</p>
   </section>
   </article><article class="alert-card family-a state-possible" id="a07">
-    <div class="card-heading"><div><span class="alert-id">A07 · Consumption reconciliation</span><h2>Possible raw material consumed but not declared</h2></div><span class="state-pill">Error posible → Error</span></div>
+    <div class="card-heading"><div><span class="alert-id">A07 · Consumption reconciliation</span><h2>Possible raw material consumed but not declared</h2></div><span class="state-pill">Possible error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -326,7 +330,7 @@
   </section>
   </article></section><section class="family-section"><div class="family-heading" id="family-c"><span class="family-code">C</span><div><h2>Statistical and physical plausibility</h2><p>Only conditions that the ERP can actually represent remain.</p></div></div><article class="alert-card family-c state-possible" id="c01">
 
-    <div class="card-heading"><div><span class="alert-id">C01 · Weight plausibility</span><h2>Produced reel weight outside the plausible range</h2></div><span class="state-pill">Error posible</span></div>
+    <div class="card-heading"><div><span class="alert-id">C01 · Weight plausibility</span><h2>Produced reel weight outside the plausible range</h2></div><span class="state-pill">Possible error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -356,7 +360,7 @@
   </section>
   </article><article class="alert-card family-c state-possible" id="c02">
 
-    <div class="card-heading"><div><span class="alert-id">C02 · Waste plausibility</span><h2>Waste amount outside the plausible range</h2></div><span class="state-pill">Error posible</span></div>
+    <div class="card-heading"><div><span class="alert-id">C02 · Waste plausibility</span><h2>Waste amount outside the plausible range</h2></div><span class="state-pill">Possible error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -386,7 +390,7 @@
   </section>
   </article><article class="alert-card family-c state-possible" id="c06">
 
-    <div class="card-heading"><div><span class="alert-id">C06 · Rate plausibility</span><h2>Production rate outside the machine’s plausible range</h2></div><span class="state-pill">Error posible</span></div>
+    <div class="card-heading"><div><span class="alert-id">C06 · Rate plausibility</span><h2>Production rate outside the machine’s plausible range</h2></div><span class="state-pill">Possible error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -416,7 +420,7 @@
   </section>
   </article></section><section class="family-section"><div class="family-heading" id="family-d"><span class="family-code">D</span><div><h2>Work-order closure and material balance</h2><p>Reconciles declared meters, consumed material, good output, and waste.</p></div></div><article class="alert-card family-d state-error" id="d01">
 
-    <div class="card-heading"><div><span class="alert-id">D01 · Closure meters</span><h2>Declared meters exceed consumed-reel meters</h2></div><span class="state-pill">Error · Confirmado</span></div>
+    <div class="card-heading"><div><span class="alert-id">D01 · Closure meters</span><h2>Declared meters exceed consumed-reel meters</h2></div><span class="state-pill">Error · Confirmed</span></div>
     <div class="definition-grid">
       <section>
 
@@ -446,7 +450,7 @@
   </section>
   </article><article class="alert-card family-d state-error" id="d02">
 
-    <div class="card-heading"><div><span class="alert-id">D02 · Closure material</span><h2>Completed OT has delivered reserved reels unconsumed</h2></div><span class="state-pill">Error · Confirmado</span></div>
+    <div class="card-heading"><div><span class="alert-id">D02 · Closure material</span><h2>Completed OT has delivered reserved reels unconsumed</h2></div><span class="state-pill">Error · Confirmed</span></div>
     <div class="definition-grid">
       <section>
 
@@ -476,7 +480,7 @@
   </section>
   </article><article class="alert-card family-d state-possible" id="d03">
 
-    <div class="card-heading"><div><span class="alert-id">D03 · Closure mass balance</span><h2>OT input, good production, and waste do not balance</h2></div><span class="state-pill">Error posible / Error</span></div>
+    <div class="card-heading"><div><span class="alert-id">D03 · Closure mass balance</span><h2>OT input, good production, and waste do not balance</h2></div><span class="state-pill">Possible error or Error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -514,7 +518,7 @@
     </div>
     <section class="detection-rule"><h3>Detection indicators and algorithm</h3><p>Calculate <strong>unexplained meters = consumed-reel meters − declared run meters − declared remnant-reel meters</strong>. Alert when unexplained meters exceed the configured tolerance. Estimate remnant meters from its measured kilograms, width, and grammage. Link A04 when the remnant declaration is missing and A05 when the declared remnant is not weighed or moved; do not create duplicate incidents.</p></section>
     <section class="owner-rule"><h3>Primary Action Owner</h3><p>Missing remnant declaration or incorrect run meters → <strong>OT machine operator</strong>. A declared remnant that is not weighed or moved inherits A05 and routes to the <strong>Process-team operator</strong>.</p></section>
-    <section class="resolution-rule"><h3>Recommended resolution</h3><p>Declare the remnant reel, record its remaining kilograms, weigh it, print or attach its identifying label, and return it to the raw-material warehouse. Otherwise correct run meters or reel data. If the OT is locked and the history cannot be reconstructed, close without resolution and preserve the discrepancy for EmusaSoft follow-up outside Monitor.</p></section>
+    <section class="resolution-rule"><h3>Recommended resolution</h3><p>Declare the remnant reel, record its remaining kilograms, weigh it, print or attach its identifying label, and return it to the raw-material warehouse. Otherwise correct run meters or reel data. If the OT is locked and the history cannot be reconstructed, close without resolution and create the required EmusaSoft inventory and cost adjustment-queue items.</p></section>
   </article></section><section class="family-section"><div class="family-heading" id="family-e"><span class="family-code">E</span><div><h2>Extrusion and Exlam resin-container alerts</h2><p>Shared resin safety-inventory, container-inventory, continuity, and formulation controls.</p></div></div><section class="family-review-note">
     <h3>All E01–E05 rules apply to both Extrusion and Exlam</h3><p>Both operations use resin recipes and material containers. Every E-family detection and resolution rule applies to Extrusion and Exlam; operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients.</p>
   </section><section class="family-review-note">
@@ -522,7 +526,7 @@
     <h3>Container validity, aggregate balance, and resin proportions are separate checks</h3><p>E05 first verifies that each container produces nonnegative consumption. D03 checks whether valid total input equals good output plus waste. E04 checks whether the valid resin mix matches the recipe and can fail even when D03 passes. Extrusion and Exlam share all three checks; reel declaration, handling, and rate continue to use A04/A05 and C06.</p>
   </section><article class="alert-card family-e state-upcoming" id="e01">
 
-    <div class="card-heading"><div><span class="alert-id">E01 · Safety inventory</span><h2>Required extrusion safety inventory is incomplete</h2></div><span class="state-pill">Por vencer → Error</span></div>
+    <div class="card-heading"><div><span class="alert-id">E01 · Safety inventory</span><h2>Required extrusion safety inventory is incomplete</h2></div><span class="state-pill">Por vencer, then Error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -612,7 +616,7 @@
   </section>
   </article><article class="alert-card family-e state-possible" id="e04">
 
-    <div class="card-heading"><div><span class="alert-id">E04 · Formulation proportions</span><h2>Consumed resin proportions do not match the recipe</h2></div><span class="state-pill">Error posible / Error</span></div>
+    <div class="card-heading"><div><span class="alert-id">E04 · Formulation proportions</span><h2>Consumed resin proportions do not match the recipe</h2></div><span class="state-pill">Possible error or Error</span></div>
     <div class="definition-grid">
       <section>
 
@@ -640,7 +644,8 @@
 
     <h3>Recommended resolution</h3><p>Correct the opening, added, or ending resin quantities, screw association, or recipe snapshot that caused the wrong proportions. If records are verified and production intentionally used a different approved mix, close without resolution as Approved formulation exception with the authorizing person and reason.</p>
   </section>
-  </article><article class="alert-card family-e state-error" id="e05">
+  </article><article class="alert-card family-e state-error new-alert review-change" id="e05" data-review-key="e05-new-alert">
+    <button class="review-status" type="button">Pending</button>
     <div class="card-heading"><div><span class="alert-id">E05 · Closing inventory validation</span><h2>Closing container inventory exceeds available inventory</h2></div><span class="state-pill">Error</span></div>
     <div class="definition-grid">
       <section><h3>When it happens</h3><p>At extrusion or Exlam OT closure, an operator declares ending kilograms for a resin container greater than its opening kilograms plus all recorded additions during that OT, beyond the configured container-measurement tolerance.</p></section>
@@ -654,18 +659,13 @@
   </article></section></div>
       <div id="distribution">
   <section class="distribution-review">
-    
+
     <p class="eyebrow">General alert distribution</p>
     <h2>Rules applied to every alert</h2>
-    <ol><li>Always inform the factory manager.</li><li>Always inform the affected operation’s shift supervisor and its configured technical leader.</li><li>Inform the operator assigned to the OT, machine, and shift when the exception concerns machine execution or production.</li><li>Determine the Primary Action Owner from the alert code and reason mapping documented under each alert. This routing is deterministic and configurable; an LLM never selects operational recipients.</li><li>Add only implicated supporting positions: material planner, planner, raw-material warehouse dispatcher or sender, raw-material warehouse supervisor or leader, process-team operator, or process-team supervisor.</li><li>Resolve actual people through Monitor’s Operational Responsibility Roster, supplemented by the OT and event actor. Positions define routing; personal names are runtime results, never hard-coded rules.</li><li>Deduplicate recipients and correlated incidents so each person receives one notification for the same incident chain.</li></ol>
+    <ol><li>Always inform the factory manager.</li><li>Always inform the affected operation’s shift supervisor and its configured technical leader.</li><li>Inform the operator assigned to the OT, machine, and shift when the exception concerns machine execution or production.</li><li>Determine the Primary Action Owner from the alert code and reason mapping documented under each alert. This routing is deterministic and configurable; an LLM never selects operational recipients.</li><li>Add only implicated supporting positions: material planner, planner, raw-material warehouse dispatcher or sender, raw-material warehouse supervisor or leader, process-team operator, or process-team supervisor.</li><li>Resolve actual people dynamically from the OT, shift roster, event actor, and current role assignments. Positions define routing; personal names are runtime results, never hard-coded rules.</li><li>Deduplicate recipients and correlated incidents so each person receives one notification for the same incident chain.</li></ol>
   </section>
   <section class="distribution-review">
-    <p class="eyebrow">Monitor master data</p>
-    <h2>Operational Responsibility Roster</h2>
-    <p>Monitor must provide an administration UI and master table that assigns people to standardized positions by operation, machine, shift, and effective date. It must support assignment history, temporary replacements, validity periods, and warnings for missing or conflicting assignments. Alert routing uses this table deterministically to resolve each required position to an actual recipient.</p>
-  </section>
-  <section class="distribution-review">
-    
+
     <p class="eyebrow">Distribution exceptions</p>
     <h2>Only overrides to the general rules</h2>
     <div class="distribution-table" role="table" aria-label="Alert distribution overrides">
@@ -697,5 +697,7 @@
     </div>
   </section></div>
     </main>
+
+    <script src="../shared/app.js"></script>
   </body>
 </html>
