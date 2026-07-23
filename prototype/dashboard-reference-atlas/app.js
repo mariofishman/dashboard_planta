@@ -1,12 +1,11 @@
 (() => {
   const data = window.ATLAS_DATA || { id: "atlas", title: "UI Reference Atlas", rounds: [] };
-  const storageKey = `annotatable-reference-atlas:${data.id}`;
-  const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
   const state = {
-    accepted: saved.accepted || {},
-    feedback: saved.feedback || {},
-    customRegions: saved.customRegions || {},
-    screenIndex: saved.screenIndex || {},
+    accepted: {},
+    feedback: {},
+    regionNotes: {},
+    customRegions: {},
+    screenIndex: {},
     drawingReference: null,
     activeRegion: null,
     draft: null
@@ -20,12 +19,62 @@
     "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
   })[character]);
 
-  const save = () => localStorage.setItem(storageKey, JSON.stringify({
+  let saveTimer = null;
+
+  const reviewState = () => ({
+    atlasId: data.id,
+    updatedAt: new Date().toISOString(),
     accepted: state.accepted,
     feedback: state.feedback,
+    regionNotes: state.regionNotes,
     customRegions: state.customRegions,
     screenIndex: state.screenIndex
-  }));
+  });
+
+  function setPersistenceStatus(message, status = "") {
+    const element = document.querySelector("#persistence-status");
+    element.textContent = message;
+    element.dataset.status = status;
+  }
+
+  async function persistReview() {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    setPersistenceStatus("Saving review…", "saving");
+    try {
+      const response = await fetch("api/review-state", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reviewState())
+      });
+      if (!response.ok) throw new Error(`Save failed with ${response.status}`);
+      setPersistenceStatus("Saved to review-state.json", "saved");
+    } catch (error) {
+      setPersistenceStatus("Not saved — run atlas_server.py", "error");
+      console.error(error);
+    }
+  }
+
+  function save() {
+    clearTimeout(saveTimer);
+    setPersistenceStatus("Unsaved changes", "saving");
+    saveTimer = setTimeout(persistReview, 450);
+  }
+
+  async function loadReview() {
+    try {
+      const response = await fetch("api/review-state", { cache: "no-store" });
+      if (!response.ok) throw new Error(`Load failed with ${response.status}`);
+      const saved = await response.json();
+      ["accepted", "feedback", "regionNotes", "customRegions", "screenIndex"].forEach((key) => {
+        state[key] = { ...(saved[key] || {}) };
+      });
+      setPersistenceStatus("Loaded from review-state.json", "saved");
+    } catch (error) {
+      setPersistenceStatus("Review database unavailable — run atlas_server.py", "error");
+      console.error(error);
+    }
+  }
 
   const screensFor = (reference) => Array.isArray(reference.screens) && reference.screens.length
     ? reference.screens
@@ -61,6 +110,8 @@
   }
 
   const customRegionsFor = (referenceId) => state.customRegions[referenceId] || [];
+  const noteKeyFor = (referenceId, regionId) => `${referenceId}::${regionId}`;
+  const noteFor = (referenceId, regionId) => state.regionNotes[noteKeyFor(referenceId, regionId)] || null;
 
   function renderSelection() {
     const rounds = document.querySelector("#rounds");
@@ -93,34 +144,66 @@
   }
 
   function regionButton(referenceId, region, custom = false) {
+    const savedNote = custom ? region : noteFor(referenceId, region.id);
+    const noteOrder = Number(savedNote?.order || 0);
     return `
-      <button class="region${custom ? " custom-region" : ""}" type="button"
+      <button class="region${custom ? " custom-region" : ""}${savedNote?.note ? " has-note" : ""}" type="button"
         data-region-reference="${escapeHtml(referenceId)}" data-region-id="${escapeHtml(region.id)}"
         ${custom ? "data-custom-region" : ""} aria-label="${escapeHtml(region.label)}" title="${escapeHtml(region.label)}"
         style="left:${Number(region.x)}%;top:${Number(region.y)}%;width:${Number(region.width)}%;height:${Number(region.height)}%">
-        <span>${escapeHtml(region.label)}</span>
+        <span class="region-label">${escapeHtml(region.label)}</span>
+        ${savedNote?.note ? `<b class="note-marker" aria-label="Saved annotation">${noteOrder || "•"}</b>` : ""}
       </button>`;
   }
 
-  function editorMarkup(referenceId) {
+  function editorMarkup(referenceId, predefinedRegions) {
     if (!state.activeRegion || state.activeRegion.referenceId !== referenceId) return "";
-    const region = customRegionsFor(referenceId).find((item) => item.id === state.activeRegion.regionId);
+    const customRegion = customRegionsFor(referenceId).find((item) => item.id === state.activeRegion.regionId);
+    const predefinedRegion = (predefinedRegions || []).find((item) => item.id === state.activeRegion.regionId);
+    const region = customRegion || predefinedRegion;
     if (!region) return "";
+    const savedNote = customRegion || noteFor(referenceId, region.id) || {};
+    const kind = customRegion ? "custom" : "predefined";
+    if (state.activeRegion.mode === "read") {
+      return `
+        <section class="region-summary" data-region-summary="${escapeHtml(referenceId)}" data-region-id="${escapeHtml(region.id)}" aria-label="Saved annotation">
+          <div>
+            <span>${customRegion ? "Saved custom region" : "Recovered component annotation"}</span>
+            <strong>${escapeHtml(region.label)}</strong>
+            <p>${escapeHtml(savedNote.note || "No note added.")}</p>
+          </div>
+          <div class="region-summary-actions">
+            <button type="button" class="text-button" data-edit-region="${escapeHtml(region.id)}" data-reference-id="${escapeHtml(referenceId)}">Edit note</button>
+            ${customRegion ? `<button type="button" class="text-button danger" data-delete-region="${escapeHtml(region.id)}" data-reference-id="${escapeHtml(referenceId)}">Delete region</button>` : ""}
+          </div>
+        </section>`;
+    }
     return `
-      <form class="region-editor" data-region-editor="${escapeHtml(referenceId)}" data-region-id="${escapeHtml(region.id)}">
+      <form class="region-editor" data-region-editor="${escapeHtml(referenceId)}" data-region-id="${escapeHtml(region.id)}" data-region-kind="${kind}">
         <div class="region-editor-heading">
-          <strong>Selected custom region</strong>
-          <button type="button" class="text-button danger" data-delete-region="${escapeHtml(region.id)}" data-reference-id="${escapeHtml(referenceId)}">Delete region</button>
+          <strong>${customRegion ? "Selected custom region" : escapeHtml(region.label)}</strong>
+          ${customRegion ? `<button type="button" class="text-button danger" data-delete-region="${escapeHtml(region.id)}" data-reference-id="${escapeHtml(referenceId)}">Delete region</button>` : ""}
         </div>
-        <label>Region label<input name="region-label" value="${escapeHtml(region.label)}" placeholder="For example: Compact filter bar"></label>
-        <label>What do you want to say about it?<textarea name="region-note" placeholder="Describe what works, what does not, or what should be reused.">${escapeHtml(region.note || "")}</textarea></label>
+        ${customRegion ? `<label>Region label<input name="region-label" value="${escapeHtml(region.label)}" placeholder="For example: Compact filter bar"></label>` : ""}
+        <label class="region-note-field">What do you want to say about it?<textarea name="region-note" placeholder="Describe what works, what does not, or what should be reused.">${escapeHtml(savedNote.note || "")}</textarea></label>
         <button class="save-region" type="submit">Save note</button>
       </form>`;
   }
 
   function renderAnalysis() {
     const accepted = allReferences().filter((reference) => state.accepted[reference.id]);
-    const showBoundaries = document.querySelector("#show-boundaries").checked;
+    const boundaryToggle = document.querySelector("#show-boundaries");
+    const boundaryStatus = document.querySelector("#boundary-status");
+    const currentRegionCount = accepted.reduce((total, reference) => {
+      const screen = currentScreenFor(reference);
+      return total + (screen.regions || []).length + customRegionsFor(scopeFor(reference, screen)).length;
+    }, 0);
+    const boundariesAvailable = accepted.length > 0 && currentRegionCount > 0;
+    boundaryToggle.disabled = !boundariesAvailable;
+    if (!boundariesAvailable) boundaryToggle.checked = false;
+    boundaryStatus.hidden = accepted.length === 0 || boundariesAvailable;
+    boundaryStatus.textContent = boundariesAvailable ? "" : "No regions are defined for the current accepted screens.";
+    const showBoundaries = boundaryToggle.checked;
     document.querySelector("#accepted-empty").hidden = accepted.length > 0;
     const list = document.querySelector("#analysis-list");
     list.classList.toggle("show-boundaries", showBoundaries);
@@ -128,19 +211,21 @@
       const screen = currentScreenFor(reference);
       const scopeId = scopeFor(reference, screen);
       const isDrawing = state.drawingReference === scopeId;
+      const screenRegionCount = (screen.regions || []).length + customRegionsFor(scopeId).length;
       return `
         <article class="analysis-card" data-analysis-reference="${escapeHtml(reference.id)}">
           <header><div><h3>${escapeHtml(reference.title)}</h3><p>${escapeHtml(screen.label || "Current screen")} · ${escapeHtml(state.feedback[reference.id] || "No reference-level feedback yet")}</p></div>
             <button class="draw-region-button${isDrawing ? " is-active" : ""}" type="button" data-draw-reference="${escapeHtml(scopeId)}" aria-pressed="${isDrawing}">${isDrawing ? "Cancel drawing" : "Draw region"}</button>
           </header>
           <p class="draw-help" ${isDrawing ? "" : "hidden"}>Drag over any missing component. Its position will scale with the screenshot.</p>
+          ${screenRegionCount === 0 ? `<p class="no-regions">No selectable regions are defined yet. Use Draw region or add predefined regions to the manifest.</p>` : ""}
           <div class="atlas-image${isDrawing ? " is-drawing" : ""}" data-atlas-reference="${escapeHtml(scopeId)}">
             <img src="${escapeHtml(screen.image)}" alt="Annotatable full reference: ${escapeHtml(screen.label || reference.title)}" draggable="false">
             ${(screen.regions || []).map((region) => regionButton(scopeId, region)).join("")}
             ${customRegionsFor(scopeId).map((region) => regionButton(scopeId, region, true)).join("")}
             ${screenControls(reference, "analysis")}
           </div>
-          ${editorMarkup(scopeId)}
+          ${editorMarkup(scopeId, screen.regions || [])}
         </article>`;
     }).join("");
   }
@@ -190,8 +275,10 @@
 
   document.title = data.title;
   document.querySelector("#page-title").textContent = data.title;
-  renderSelection();
-  renderAnalysis();
+  loadReview().finally(() => {
+    renderSelection();
+    renderAnalysis();
+  });
 
   document.addEventListener("click", (event) => {
     const tab = event.target.closest("[data-tab]");
@@ -227,11 +314,27 @@
       return;
     }
 
-    const customRegion = event.target.closest("[data-custom-region]");
-    if (customRegion && !state.drawingReference) {
+    const selectedRegion = event.target.closest(".region");
+    if (selectedRegion && !state.drawingReference) {
+      const isCustom = selectedRegion.hasAttribute("data-custom-region");
+      const existingNote = isCustom
+        ? customRegionsFor(selectedRegion.dataset.regionReference).find((region) => region.id === selectedRegion.dataset.regionId)?.note
+        : noteFor(selectedRegion.dataset.regionReference, selectedRegion.dataset.regionId)?.note;
       state.activeRegion = {
-        referenceId: customRegion.dataset.regionReference,
-        regionId: customRegion.dataset.regionId
+        referenceId: selectedRegion.dataset.regionReference,
+        regionId: selectedRegion.dataset.regionId,
+        mode: existingNote ? "read" : "edit"
+      };
+      renderAnalysis();
+      return;
+    }
+
+    const editButton = event.target.closest("[data-edit-region]");
+    if (editButton) {
+      state.activeRegion = {
+        referenceId: editButton.dataset.referenceId,
+        regionId: editButton.dataset.editRegion,
+        mode: "edit"
       };
       renderAnalysis();
       document.querySelector(`[data-region-editor="${CSS.escape(state.activeRegion.referenceId)}"] textarea`)?.focus();
@@ -270,17 +373,30 @@
     const editor = event.target.closest("[data-region-editor]");
     if (!editor) return;
     event.preventDefault();
-    const region = customRegionsFor(editor.dataset.regionEditor).find((item) => item.id === editor.dataset.regionId);
-    if (!region) return;
-    region.label = editor.elements["region-label"].value.trim() || "Custom region";
-    region.note = editor.elements["region-note"].value.trim();
+    if (editor.dataset.regionKind === "custom") {
+      const region = customRegionsFor(editor.dataset.regionEditor).find((item) => item.id === editor.dataset.regionId);
+      if (!region) return;
+      region.label = editor.elements["region-label"].value.trim() || "Custom region";
+      region.note = editor.elements["region-note"].value.trim();
+    } else {
+      const key = noteKeyFor(editor.dataset.regionEditor, editor.dataset.regionId);
+      state.regionNotes[key] = {
+        ...(state.regionNotes[key] || {}),
+        note: editor.elements["region-note"].value.trim()
+      };
+    }
+    state.activeRegion = {
+      referenceId: editor.dataset.regionEditor,
+      regionId: editor.dataset.regionId,
+      mode: "read"
+    };
     save();
     renderAnalysis();
   });
 
   document.addEventListener("pointerdown", (event) => {
     const atlas = event.target.closest(".atlas-image.is-drawing");
-    if (!atlas || event.target.closest(".region")) return;
+    if (!atlas || event.target.closest(".screen-arrow")) return;
     const start = pointInAtlas(event, atlas);
     const draft = document.createElement("div");
     draft.className = "draft-region";
@@ -311,5 +427,33 @@
     if (!state.draft) return;
     state.draft.element.remove();
     state.draft = null;
+  });
+
+  document.querySelector("#export-review")?.addEventListener("click", () => {
+    const blob = new Blob([`${JSON.stringify(reviewState(), null, 2)}\n`], { type: "application/json" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${data.id}-review.json`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    const status = document.querySelector("#transfer-status");
+    status.hidden = false;
+    status.textContent = "Portable review JSON exported.";
+  });
+
+  document.querySelector("#import-review")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const imported = JSON.parse(await file.text());
+    ["accepted", "feedback", "regionNotes", "customRegions", "screenIndex"].forEach((key) => {
+      state[key] = { ...(state[key] || {}), ...(imported[key] || {}) };
+    });
+    await persistReview();
+    renderSelection();
+    renderAnalysis();
+    const status = document.querySelector("#transfer-status");
+    status.hidden = false;
+    status.textContent = `Imported ${file.name}.`;
+    event.target.value = "";
   });
 })();

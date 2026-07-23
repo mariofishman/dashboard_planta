@@ -1,0 +1,120 @@
+{
+  "atlasId": "monitor-dashboard-references",
+  "updatedAt": "2026-07-22T21:22:03.435Z",
+  "accepted": {
+    "mixpanel-compact-analysis": true,
+    "amplitude-segmentation": true,
+    "better-stack-reporting": false,
+    "kajabi-pageviews": false,
+    "fibery-report-builder": false,
+    "zendesk-ticket-report": false,
+    "xero-monitor-dashboard-collection": true
+  },
+  "feedback": {
+    "mixpanel-compact-analysis": "I like the filters, which are very compact in one line, and they also have chips activated when the filter is selected. Also the graph is very compact and small and has small numbers and a y-axis. It also has a small one-line explanation of what each color is and then there's a table below that's very simple, compact, thin, that fits on one screen and doesn't need to scroll to the sides.",
+    "amplitude-segmentation": "I like the graph, mostly the fact that the filter are in the top right.",
+    "better-stack-reporting": "This is the opposite of what I'm looking even though it's use case is similar. The dense incident table may be attractive but the status metrics occupy too much space and could be better analyzed as part of the graph.",
+    "kajabi-pageviews": "It should hide filter complexity away from the main report surface. Agree with that. But the circles in the bottom occupy too much space without providing extra information",
+    "fibery-report-builder": "This is too much flexibility. I want a fixed dashboard. Don't need to add or subtract any graph or to change the configuration and view besides filtering and grouping data.",
+    "zendesk-ticket-report": "I don't understand this example or this reference. That's why I'm not picking it up and including it in the other tab.",
+    "xero-monitor-dashboard-collection": "I like the fact that the table is narrow so it fits in the viewport. I also like the fact that it has very small cards and that the filters are very thin and almost hidden at the top of the table. "
+  },
+  "regionNotes": {
+    "mixpanel-compact-analysis::mixpanel-compact-analysis-screen::compact-filter-row": {
+      "order": 1,
+      "note": "I like these flat filters that don't occupy a lot of space."
+    },
+    "mixpanel-compact-analysis::mixpanel-compact-analysis-screen::metric-configuration": {
+      "order": 2,
+      "note": "We don't need something like this."
+    },
+    "mixpanel-compact-analysis::mixpanel-compact-analysis-screen::primary-navigation": {
+      "order": 3,
+      "note": "And we don't need a menu. It occupies too much space."
+    },
+    "mixpanel-compact-analysis::mixpanel-compact-analysis-screen::results-table": {
+      "order": 4,
+      "note": "This table is a perfect width. The one we have for the alerts is too wide and we need to scroll horizontally and that's terrible. Also the size of each row is very comfortable and compact."
+    },
+    "amplitude-segmentation::amplitude-segmentation-screen::query-builder": {
+      "order": 5,
+      "note": "Even though having something like this is cool, I don't think we need it. Our information is not that configurable."
+    },
+    "amplitude-segmentation::amplitude-segmentation-screen::chart-controls": {
+      "order": 6,
+      "note": "These filters look good and don't occupy a lot of space. Clicking on chips is much nicer than a drop-down select option."
+    },
+    "amplitude-segmentation::amplitude-segmentation-screen::breakdown-table": {
+      "order": 7,
+      "note": "This export CSV button is much smaller and placed in a less important place."
+    },
+    "amplitude-segmentation::amplitude-segmentation-screen::global-navigation": {
+      "order": 8,
+      "note": "The header is not that big as the one we have in our design and it doesn't occupy a lot of space saying stuff that we don't need."
+    },
+    "xero-monitor-dashboard-collection::xero-business-health::results-table": {
+      "note": "I like that this table is narrow and it fits without having to scroll sideways. What I mean is that it is narrower than the viewport."
+    },
+    "xero-monitor-dashboard-collection::xero-business-health::compact-filter-row": {
+      "note": "These are the types of filters I'm looking for, which are compact and the export put-on is also very small and hidden."
+    },
+    "xero-monitor-dashboard-collection::xero-business-health::summary-cards": {
+      "note": "These cards are just the perfect height so they don't occupy a lot of space."
+    },
+    "xero-monitor-dashboard-collection::xero-business-health::report-header": {
+      "note": "I don't like this header. It occupies space that I don't need and that adds no value. Don't want anything like this."
+    },
+    "xero-monitor-dashboard-collection::xero-business-health::global-navigation": {
+      "note": "This is a very short header. It's preferable to having very tall headers."
+    }
+  },
+  "customRegions": {
+    "xero-monitor-dashboard-collection::xero-business-health": [
+      {
+        "id": "custom-1784754961525",
+        "label": "Space between Heather and first section Custom region",
+        "note": "I like that this is very short in height, no occupying more than you know space",
+        "x": 3.508,
+        "y": 17.78,
+        "width": 93.289,
+        "height": 3.939
+      }
+    ],
+    "xero-monitor-dashboard-collection::xero-analytics-dashboard": [
+      {
+        "id": "custom-1784755162302",
+        "label": "Full region of charts.",
+        "note": "I like that there are many charts here and I can see them all together. Maybe some space between the charts would be nicer and more organized but not a huge space that separates them.",
+        "x": 4.168,
+        "y": 13.004,
+        "width": 92.003,
+        "height": 77.819
+      }
+    ],
+    "xero-monitor-dashboard-collection::xero-bills-filter": [
+      {
+        "id": "custom-1784755211335",
+        "label": "search",
+        "note": "I don't like the fact that this search is open and taking a lot of space. I'd rather have a small icon of the magnifying glass that I can click and that would open the search box so I can search. I'd rather have things hidden when I'm not using them. For instance if I'm not using the filters, I could have just one icon to open the filters and then everything would push down so the filters are shown. Every time I can I'd rather hide stuff that I'm not using.",
+        "x": 1.516,
+        "y": 18.116,
+        "width": 50.234,
+        "height": 4.898
+      }
+    ],
+    "xero-monitor-dashboard-collection::xero-business-overview": [
+      {
+        "id": "custom-1784755280568",
+        "label": "Many charts in one page",
+        "note": "This provides one single view of many different charts, which is a great way and a compact way to have just one screen without having to scroll and all the information there. This is a great layout as well. The spaces between the charts are the spaces I like. The sizes of the things within the charts are exactly what I'm looking for.",
+        "x": 3.275,
+        "y": 1.351,
+        "width": 92.606,
+        "height": 89.648
+      }
+    ]
+  },
+  "screenIndex": {
+    "xero-monitor-dashboard-collection": 4
+  }
+}
