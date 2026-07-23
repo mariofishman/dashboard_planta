@@ -1,14 +1,16 @@
 # Dashboard Reference Atlas
 
-Run the file-backed review server from the repository root:
+This folder is the preserved legacy migration source. The active, writable study is `atlases/instances/dashboard-inspiration/` and the shared Atlas application is `atlases/`.
+
+Run the canonical file-backed Atlas server from the repository root:
 
 ```bash
-python3 prototype/dashboard-reference-atlas/atlas_server.py --port 4175
+python3 atlases/atlas_server.py --port 4175
 ```
 
-Open `http://127.0.0.1:4175/`.
+Open `http://127.0.0.1:4175/`, then choose **Dashboard inspiration review**. Do not record new review feedback in this legacy copy.
 
-The Atlas reads and writes `review-state.json`. Selections, reference feedback, predefined-region notes, and custom regions therefore follow the repository and work across browsers and Codex tasks.
+The canonical Atlas reads and writes `atlases/instances/dashboard-inspiration/review-state.json`. Selections, reference feedback, predefined-region notes, custom regions, and screen position therefore follow the repository and work across browsers and Codex tasks.
 
 Use the Atlas controls for durable feedback:
 
@@ -18,4 +20,4 @@ Use the Atlas controls for durable feedback:
 
 Codex browser-panel annotations are task comments outside the page and are not written to `review-state.json`.
 
-Do not open the Atlas through `file://` or a generic static file server when editing. Browsers cannot write repository files directly; `atlas_server.py` provides the local save endpoint.
+Do not open either Atlas through `file://` or a generic static file server when editing. Browsers cannot write repository files directly; the canonical `atlases/atlas_server.py` provides the local save endpoint.

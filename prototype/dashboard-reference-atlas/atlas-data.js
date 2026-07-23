@@ -143,6 +143,86 @@ window.ATLAS_DATA = {
           ]
         }
       ]
+    },
+    {
+      "id": "round-2",
+      "label": "Round 2 · Saved Xero references from monitor_dashboard",
+      "references": [
+        {
+          "id": "xero-monitor-dashboard-collection",
+          "title": "Compact Xero analytics and operations set",
+          "product": "Xero · Saved monitor_dashboard collection",
+          "screens": [
+            {
+              "id": "xero-business-health",
+              "label": "Business health scorecards and dense results table",
+              "sourceUrl": "https://mobbin.com/screens/eee2ad22-2a97-43d0-9c05-9fea622a0686",
+              "image": "images/xero-business-health.webp",
+              "regions": [
+                { "id": "global-navigation", "label": "Global navigation", "x": 0, "y": 0, "width": 100, "height": 6 },
+                { "id": "report-header", "label": "Report title, tabs, and actions", "x": 4, "y": 7, "width": 92, "height": 12 },
+                { "id": "summary-cards", "label": "Business health summary cards", "x": 4, "y": 28, "width": 92, "height": 12 },
+                { "id": "compact-filter-row", "label": "Compact filter and export row", "x": 4, "y": 42, "width": 92, "height": 6 },
+                { "id": "results-table", "label": "Dense scorecard results table", "x": 4, "y": 48, "width": 92, "height": 43 }
+              ]
+            },
+            {
+              "id": "xero-visualise",
+              "label": "Compact chart controls and stacked comparison",
+              "sourceUrl": "https://mobbin.com/screens/0bddb96f-24cc-4e78-ab43-5f01014e6221",
+              "image": "images/xero-visualise.jpg",
+              "regions": [
+                { "id": "global-navigation", "label": "Global navigation", "x": 0, "y": 0, "width": 100, "height": 7 },
+                { "id": "report-header", "label": "Report header and category tabs", "x": 4, "y": 7, "width": 92, "height": 13 },
+                { "id": "compact-chart-controls", "label": "Compact chart controls", "x": 4, "y": 28, "width": 92, "height": 7 },
+                { "id": "stacked-chart", "label": "Stacked comparison chart", "x": 4, "y": 35, "width": 72, "height": 48 },
+                { "id": "chart-legend", "label": "Compact chart legend", "x": 76, "y": 37, "width": 20, "height": 24 }
+              ]
+            },
+            {
+              "id": "xero-analytics-dashboard",
+              "label": "Dense analytics grid with shared controls",
+              "sourceUrl": "https://mobbin.com/screens/88ae94ed-a55e-49df-bc07-d15a00233dcb",
+              "image": "images/xero-analytics-dashboard.jpg",
+              "regions": [
+                { "id": "global-navigation", "label": "Global navigation", "x": 0, "y": 0, "width": 100, "height": 7 },
+                { "id": "dashboard-controls", "label": "Shared compact dashboard controls", "x": 4, "y": 8, "width": 92, "height": 7 },
+                { "id": "primary-trend", "label": "Primary expense trend", "x": 34, "y": 15, "width": 62, "height": 37 },
+                { "id": "secondary-metric-grid", "label": "Secondary metric grid", "x": 4, "y": 53, "width": 92, "height": 38 },
+                { "id": "circular-breakdown", "label": "Operating-expense circular breakdown", "x": 66, "y": 53, "width": 30, "height": 38 }
+              ]
+            },
+            {
+              "id": "xero-bills-filter",
+              "label": "Active filter chips and compact bills table",
+              "sourceUrl": "https://mobbin.com/screens/e2205dbe-6e99-4b94-b47c-0be070a76fe1",
+              "image": "images/xero-bills-filter.jpg",
+              "regions": [
+                { "id": "global-navigation", "label": "Global navigation", "x": 0, "y": 0, "width": 100, "height": 8 },
+                { "id": "status-tabs", "label": "Compact status tabs", "x": 1, "y": 8, "width": 95, "height": 7 },
+                { "id": "filter-controls", "label": "Search, date, and filter controls", "x": 1, "y": 16, "width": 95, "height": 12 },
+                { "id": "active-filter-chips", "label": "Active removable filter chips", "x": 1, "y": 27, "width": 69, "height": 7 },
+                { "id": "results-table", "label": "Compact bills results table", "x": 1, "y": 34, "width": 70, "height": 47 },
+                { "id": "filter-popover", "label": "Secondary filter popover", "x": 71, "y": 23, "width": 20, "height": 62 }
+              ]
+            },
+            {
+              "id": "xero-business-overview",
+              "label": "Fixed business overview card grid",
+              "sourceUrl": "https://mobbin.com/screens/13c4c8b7-213f-4ccc-b6e7-2c07c431dc94",
+              "image": "images/xero-business-overview.jpg",
+              "regions": [
+                { "id": "overview-header", "label": "Compact overview header", "x": 5, "y": 3, "width": 90, "height": 6 },
+                { "id": "summary-row", "label": "Primary financial summary row", "x": 5, "y": 9, "width": 90, "height": 30 },
+                { "id": "tasks-card", "label": "Compact task list", "x": 5, "y": 40, "width": 29, "height": 20 },
+                { "id": "chart-cards", "label": "Compact chart cards", "x": 35, "y": 40, "width": 60, "height": 51 },
+                { "id": "recent-results", "label": "Compact recent-results table", "x": 5, "y": 62, "width": 29, "height": 29 }
+              ]
+            }
+          ],
+          "rationale": "This saved Xero set reinforces the preferences already recorded in the Atlas: compact shared controls, visible active-filter chips, small chart legends, dense tables, and fixed analytical layouts. Review each screen independently. The large navigation bars, configurable widget controls, circular summary chart, and multi-card fragmentation are intentionally exposed as separate regions because earlier feedback rejects those patterns even when the surrounding screen is useful."
+        }
+      ]
     }
   ]
 };
