@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "assignments": [
+    {"id":"factory-manager","person":"María Elena Torres","position":"Gerente de fábrica","operations":[],"warehouseType":null,"scope":"factory","group":null,"validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"shift-supervisor-a","person":"Luis Vargas","position":"Supervisor de turno de operación","operations":["Impresión","Exlam"],"warehouseType":null,"scope":"operation_group","group":"C","validFrom":"2026-07-01","validTo":"2026-07-25","state":"inactive","setupComplete":true},
+    {"id":"technical-leader","person":"Rosa Paredes","position":"Líder técnico","operations":["Impresión"],"warehouseType":null,"scope":"operation","group":null,"validFrom":"2026-06-15","validTo":null,"state":"active","setupComplete":true},
+    {"id":"machine-operator-a1","person":"Jorge Acosta","position":"Operador de máquina","operations":["Impresión"],"warehouseType":null,"scope":"machine_group","group":"A","validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"machine-operator-a2","person":"Elena Chávez","position":"Operador de máquina","operations":["Impresión"],"warehouseType":null,"scope":"machine_group","group":"A","validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"machine-operator-b","person":"Paola Núñez","position":"Operador de máquina","operations":["Extrusión"],"warehouseType":null,"scope":"machine_group","group":"B","validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"machine-operator-c","person":"José Luna","position":"Operador de máquina","operations":["Sellado"],"warehouseType":null,"scope":"machine_group","group":"C","validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"material-planner","person":"Carmen Ruiz","position":"Planificador de materiales","operations":[],"warehouseType":null,"scope":"factory","group":null,"validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"planner","person":"David Vega","position":"Planificador","operations":[],"warehouseType":null,"scope":"factory","group":null,"validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"warehouse-dispatcher","person":"Carlos Mendoza","position":"Despachador de almacén","operations":[],"warehouseType":"Materias primas","scope":"warehouse_group","group":"B","validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"warehouse-supervisor","person":"Sofía Ramos","position":"Supervisor de almacén","operations":[],"warehouseType":"Materias primas","scope":"warehouse_group","group":"A","validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"process-operator","person":"Lucía Torres","position":"Operador de proceso","operations":[],"warehouseType":"Productos en proceso","scope":"warehouse_group","group":"B","validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true},
+    {"id":"process-supervisor","person":"Pedro Silva","position":"Supervisor de proceso","operations":[],"warehouseType":"Productos en proceso","scope":"warehouse_group","group":"C","validFrom":"2026-07-01","validTo":null,"state":"active","setupComplete":true}
+  ]
+}

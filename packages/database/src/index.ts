@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
-import { mkdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, open, readFile, rename, unlink, type FileHandle } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import pg from "pg";
 
 export type DatabaseMode = "pglite" | "postgres";
@@ -17,6 +17,62 @@ export interface DatabaseRuntime extends DatabaseExecutor {
   close(): Promise<void>;
 }
 
+interface PGliteLockRecord {
+  pid: number;
+  createdAt: string;
+}
+
+function processIsRunning(pid: number): boolean {
+  if (!Number.isSafeInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+async function acquirePGliteLock(dataDir: string): Promise<() => Promise<void>> {
+  const lockPath = `${dataDir}.monitor-lock`;
+  await mkdir(dirname(lockPath), { recursive: true });
+  let handle: FileHandle | undefined;
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      handle = await open(lockPath, "wx", 0o600);
+      await handle.writeFile(JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() } satisfies PGliteLockRecord));
+      break;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      let existing: Partial<PGliteLockRecord> = {};
+      try {
+        existing = JSON.parse(await readFile(lockPath, "utf8")) as Partial<PGliteLockRecord>;
+      } catch {
+        // An unreadable lock cannot identify a live owner and is treated as stale.
+      }
+      if (typeof existing.pid === "number" && processIsRunning(existing.pid)) {
+        throw new Error(`PGlite data directory is already in use by process ${existing.pid}: ${dataDir}`);
+      }
+      try {
+        await rename(lockPath, `${lockPath}.stale-${Date.now()}`);
+      } catch (renameError) {
+        if ((renameError as NodeJS.ErrnoException).code !== "ENOENT") throw renameError;
+      }
+    }
+  }
+
+  if (!handle) throw new Error(`Unable to acquire PGlite data directory lock: ${dataDir}`);
+  let released = false;
+  return async () => {
+    if (released) return;
+    released = true;
+    await handle.close();
+    await unlink(lockPath).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+  };
+}
+
 export async function createDatabaseRuntime(options: {
   mode: DatabaseMode;
   pgliteDataDir?: string;
@@ -25,8 +81,15 @@ export async function createDatabaseRuntime(options: {
   if (options.mode === "pglite") {
     const dataDir = options.pgliteDataDir ?? "memory://";
     if (dataDir !== "memory://") await mkdir(dataDir, { recursive: true });
+    const releaseLock = dataDir === "memory://" ? async () => {} : await acquirePGliteLock(dataDir);
     const database = new PGlite(dataDir);
-    await database.waitReady;
+    try {
+      await database.waitReady;
+    } catch (error) {
+      await releaseLock();
+      throw error;
+    }
+    let closed = false;
     return {
       mode: "pglite",
       async queryOne(sql, parameters = []) {
@@ -56,7 +119,13 @@ export async function createDatabaseRuntime(options: {
         }));
       },
       async close() {
-        await database.close();
+        if (closed) return;
+        closed = true;
+        try {
+          await database.close();
+        } finally {
+          await releaseLock();
+        }
       },
     };
   }
@@ -105,7 +174,7 @@ export async function createDatabaseRuntime(options: {
 }
 
 export async function migrateFoundation(database: DatabaseRuntime): Promise<void> {
-  for (const filename of ["0000_phase2_foundation.sql", "0001_phase3_detection.sql", "0002_phase4_incidents.sql", "0003_phase4b_simulator.sql"]) {
+  for (const filename of ["0000_phase2_foundation.sql", "0001_phase3_detection.sql", "0002_phase4_incidents.sql", "0003_phase4b_simulator.sql", "0004_phase5_roster_authorization.sql", "0005_phase5_roster_assignments.sql", "0006_roster_operation_catalog.sql", "0007_configurable_roster_groups.sql"]) {
     await database.execute(await readFile(resolve(import.meta.dirname, "../migrations", filename), "utf8"));
   }
 }

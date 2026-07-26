@@ -74,25 +74,56 @@ Role-based routing is a back-end and configuration responsibility. The chat list
 
 **Name:** Operational Responsibility Roster  
 **Spanish:** Matriz Maestra de Responsables Operativos  
-**Status:** To be designed.
+**Status:** First-version implementation under review.
 
-Monitor requires an administration surface that maintains which person occupies each standardized operational position by:
+Monitor requires an administration surface that maintains which person occupies each standardized operational position through the fields permitted by that position:
 
-- operation;
-- machine;
-- shift; and
+- one or more operations when applicable;
+- raw-material or work-in-process warehouse when applicable;
+- rotating group A, B, or C when applicable; and
 - effective date.
 
-Alert routing will use this master table deterministically to convert a standardized position into the actual person who must receive the alert. Standardized positions include, among others:
+Coverage is derived from the standardized position and cannot be selected independently. The position matrix in `alert_catalog.md` determines whether operation, warehouse type, and group are required, optional, fixed, or blocked. Machine and work-order assignments are runtime evidence and do not belong in this people master.
 
-- OT machine operator;
-- shift supervisor;
-- technical leader;
-- material planner;
-- warehouse dispatcher; and
-- process-team operator.
+The Responsibilities table and editor follow these interaction rules:
 
-The administration surface must support:
+- adding one person manually requires a name and a standardized position;
+- the position automatically sets the coverage and applicable fields;
+- the canonical roster operations are `Extrusión`, `Laminación`, `Corte`, `Impresión`, `Sellado`, `Exlam`, `Peletizado`, `Recuperación`, and `Triturado`;
+- operation supports multiple selection only for positions permitted by the catalog matrix;
+- warehouse positions select either `Materias primas` or `Productos en proceso`;
+- process positions are fixed to `Productos en proceso`;
+- edits save when a field loses focus or a selection changes;
+- closing the editor preserves the latest valid values, so the editor has no Save or Cancel actions;
+- `Desactivar` retains assignment history while preventing future routing;
+- an inactive person shows an `Activar` action and no message claiming that the person will receive alerts;
+- coverage filtering uses the neutral label `Ver todos`; and
+- the compact table uses `Área` to show an operation, warehouse type, or factory-wide coverage without adding separate mostly-empty columns.
+
+The admin may also bulk-import people from an `.xlsx` file. Bulk import follows these rules:
+
+- `Persona` is the only required import value. Position-dependent fields such as operation, warehouse type, and group may be omitted from Excel; the person is imported as pending setup and completed later in the UI;
+- optional columns are `Posición`, `Área`, `Cobertura`, `Vigente desde`, `Vigente hasta`, and `Estado`;
+- every value that is supplied for position, operation or warehouse area, coverage, group, lifecycle state, or date is validated against the canonical roster catalog and the position-dependent rules before any write; missing setup values do not block the import;
+- an exact match against an existing person is presented as an update; before applying it, the review shows every changed field with its current database value and proposed Excel value;
+- overwrite approval is per person, never one global checkbox: the admin explicitly chooses `Sí, sobrescribir` or `No sobrescribir` for each proposed update;
+- updates marked `No sobrescribir` leave the existing database record untouched while approved updates and valid new people may still be imported;
+- an update changes only columns containing a value in the Excel; blank optional cells preserve the existing database value;
+- exact duplicate names within the same Excel remain blocking and identify the conflicting row;
+- likely fuzzy matches do not block immediately: the import review asks whether the two names belong to the same person, identifies the database record or Excel row that produced the match, and proceeds only after every possible match is resolved; a confirmed database match becomes an update;
+- validation reports the Excel row, column, rejected value, and reason;
+- import is all-or-nothing: one invalid cell prevents every row in that file from being written, and the user must correct the Excel and retry; and
+- client validation provides immediate feedback, but the production API repeats validation and authorization inside one database transaction. The browser result is never sufficient authority for a database write.
+
+The table supports immediate bulk maintenance:
+
+- a checkbox column permits row selection and selecting all currently displayed rows;
+- when more than one row is selected, one compact bulk-edit row appears directly below the column headers;
+- changing a compatible field in that row applies it immediately to every selected person without a separate Save action;
+- fields that do not apply to a selected person's standardized position are left unchanged; and
+- an active filter preserves its current result membership while bulk changes are applied, even if edited values no longer match it. The admin explicitly refreshes the filtered results to reevaluate membership.
+
+The administration surface must also support:
 
 - assignment history;
 - temporary replacements;
@@ -101,9 +132,55 @@ The administration surface must support:
 - warnings for missing assignments; and
 - traceability of the assignment used for each routing decision.
 
-The roster must not use an LLM to choose recipients. Alert code and reason determine the required standardized position; the roster resolves that position to the valid person for the affected operation, machine, shift, and relevant ERP evidence time.
+The roster must not use an LLM to choose recipients. Alert code and reason determine the required standardized position; the roster resolves that position to the valid person using the roster assignment and relevant ERP evidence time.
 
-No information architecture, layout, workflow, permissions model, or component design has yet been approved for this administration surface.
+#### Research direction recorded 2026-07-23
+
+The first design review established four assignment scopes to investigate. These are a product direction for the next research round, not a final schema or approved layout:
+
+1. **Work-order or machine assignment.** The operator identifies themselves by scanning a QR code when starting a work order. This makes the current worker resolvable at work-order and machine granularity; shift is not required for this assignment type.
+2. **Operation-and-shift assignment.** Supervisors and other rotating workers are assigned to an operation and a shift. Attendance/sign-in data may provide the active shift membership at the start of each shift.
+3. **Operation-wide assignment.** Leaders responsible for an entire operation are assigned across all shifts, regardless of whether they are physically present in the factory.
+4. **Factory or multi-operation assignment.** Some people, including a production manager, may cover the whole factory or multiple operations independently of shift.
+
+The administration flow should also investigate reusable worker groups with a shared recurring schedule. A schedule may repeat on selected weekdays indefinitely or until an explicit end date, with a compact recurrence editor inspired by calendar products. The roster should allow one schedule to be assigned to the group rather than requiring each worker to be configured individually.
+
+This research produced the current compact Responsibilities table, position-derived editor, and rotation view. QR/work-order evidence, attendance evidence, precedence, conflict resolution, and full audit presentation remain later design work.
+
+#### Configurable group rotation
+
+- Each operation defines how many rotating groups it uses and gives every group a name. A, B, and C are the default local fixture, not a fixed product limit.
+- The pattern has one reference date and an operation-level catalog of reusable schedule types. An administrator may create any working-schedule name, such as `Tempranito`, `Mediodía`, `Tarde`, `Noche`, or `Madrugada`, and defines one start and end time for each type.
+- `Descanso` is the only fixed schedule type: it cannot be renamed or deleted and never has working hours.
+- Each group independently selects its initial schedule type and its consecutive days. The rotation advances through the configured schedule types, so hours are defined once per type rather than repeated for every group.
+- The compact pattern editor presents the aligned schedule catalog above the group count, names, initial schedule, and consecutive-day controls.
+- A future pattern block may be dragged to any different future date. The move applies to the operation's complete group pattern.
+- Moving the cycle to an earlier future date overwrites the schedule from that target date forward. Before applying it, a compact confirmation must name the source and target dates and state explicitly that the existing target schedule will be replaced.
+- Past dates and the current date are read-only and visibly distinct from editable future dates: their cells use the neutral canvas, reduced color saturation and emphasis, a non-editable cursor, and accessible read-only state. Full group color remains reserved for future dates that can still be changed.
+- Moving the cycle later creates an explicit uncovered interval between the source date and the target date. The interface must not silently infer coverage for those dates.
+- Each uncovered date is shown as `Sin patrón`. Selecting it opens a compact coverage editor where the user assigns one group to day, another group to night, and the number of consecutive uncovered dates to cover. Groups not selected for coverage rest implicitly.
+- Temporary coverage cannot extend beyond the uncovered interval, and the same group cannot cover both day and night.
+- A selected worker always shows at most one schedule state per date, including inside temporarily uncovered intervals.
+- A selected worker exposes two compact actions in the calendar header: `Cambio temporal` and permanent responsibility editing.
+- A temporary change assigns another configured group, any configured schedule type, or a one-off personalized schedule to the worker for the selected range. A personalized schedule requires a name, start time, and end time; it may cover any duration, including an overnight interval, and does not modify the operation's reusable schedule catalog. `Descanso` is the no-work and absence state; no separate absence action is shown.
+- Temporary changes use the dashboard range-selection interaction: first click anywhere in a calendar cell selects the start, second selects the end, and a third click starts a new range and clears the prior pair.
+- A worker with temporary changes shows a compact exception icon in the worker list. Activating it selects that worker and scrolls the calendar to the first changed date.
+- Every changed date has a warning-color boundary and exception icon so it remains visibly distinct from the regular group schedule.
+- The selected worker header exposes `Cambios (n)` and `Revertir todo`. `Cambios (n)` lists every temporary range and permits reverting one range; `Revertir todo` confirms and removes all temporary ranges so the worker follows their assigned group again.
+- Permanent responsibility editing opens the same person editor used by `Responsables`; Rotación does not duplicate that form.
+- In the group calendar, group identity colors serve as both legend and shift encoding. A selected person's calendar retains explicit phase labels because it has only one assignment per date.
+- In a selected person's calendar, day uses the lighter action blue, night uses the darker structural navy, and rest uses a neutral gray that communicates the worker is not scheduled. The filtered person's name is centered and emphasized in every month header; the group remains supporting text at the right.
+- Operation selection, person search, configurable group tabs, and the selected group's worker list live in a compact left-side navigator on desktop and stack above the calendar on narrow screens. The calendar stays the focal surface and is capped at a compact working width rather than expanding across the viewport.
+- Month navigation stays directly above the calendar, while pattern editing remains in the view header. A separate `Ver grupos` action is not shown; clicking the selected worker again or clearing the person filter returns to the group calendar.
+
+#### Roster permissions
+
+- `Responsables` is visible and accessible only to a user with the global `monitor:admin` permission.
+- `Rotación` may be viewed according to ordinary Monitor access, but editing requires either `monitor:admin` or an EmusaSoft-issued `roster:rotation:manage` grant for the selected operation.
+- Every operation may have one or more authorized schedule managers.
+- The operation selector in `Rotación` determines the scope of an edit. An unauthorized operation cannot open an editable schedule form.
+- Permission administration does not appear in the roster. EmusaSoft authentication is the source of truth; Monitor only enforces and audits the synchronized result.
+- The API must repeat every authorization check. Hidden tabs and disabled controls are not security enforcement.
 
 ## 3. Shared application structure
 
@@ -147,6 +224,13 @@ The product is intended for frequent operational use. Layouts should favor compa
 - Avoid oversized padding in message histories, alert summaries, filters, and cards.
 - Do not create nested cards unless the inner object has a distinct interactive meaning, such as an alert attachment inside a message.
 - Review-only explanatory sidebars and top bars are prototype scaffolding and are not part of the production application shell.
+
+### 3.5 Form-field labels
+
+- Every labeled form control uses a persistent compact floated/notched label. Its position remains identical when the field is empty, filled, focused, read-only, disabled, or in error.
+- This rule applies to text inputs, selects, autocompletes, date fields, text areas, and any other labeled control.
+- A placeholder is an optional value hint, never a substitute for the visible label. Empty fields must not move the label into the value line or let it overlap the control border.
+- Field-specific code must not override the shared label-position behavior. Misaligned, clipped, or overlapping labels in any state are interface defects.
 
 ## 4. Visual language
 

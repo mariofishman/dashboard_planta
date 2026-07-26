@@ -18,7 +18,7 @@ export async function authRoutes(app: FastifyInstance, options: {
     return options.identityAdapter.listIdentities();
   });
 
-  app.post<{ Body: { identityId: "plant-manager" | "shift-supervisor" | "machine-operator" } }>("/api/auth/mock-login", {
+  app.post<{ Body: { identityId: "monitor-admin" | "plant-manager" | "shift-supervisor" | "machine-operator" | "operation-scheduler" } }>("/api/auth/mock-login", {
     schema: { body: MockLoginRequestSchema, response: {
       200: SessionResponseSchema,
       401: Type.Object({ error: Type.String() }),

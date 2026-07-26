@@ -6,9 +6,9 @@
 
 **Version:** 2.1
 
-**Status:** Active; Phases 0–4, 4A, and 4B complete locally; Phase 5 is next
+**Status:** Active; Phases 0–4, 4A, and 4B complete locally; Phase 5 is in progress
 
-**Roadmap date:** 2026-07-23
+**Roadmap date:** 2026-07-26
 
 **Supersedes:** [Version 1.2](../archive/docs/roadmaps/monitor_architecture_and_production_roadmap_v1.md)
 
@@ -68,7 +68,7 @@ The stable ownership, polling, authentication, incident lifecycle, failure behav
 | 4 — Incident vertical slice | A02, A03, and A05 flow through evaluation, lifecycle, evidence, API, committed live change, and dashboard | `delivery/phases/phase4/README.md` |
 | 4A — Dashboard redesign | Approved compact Dashboard V2 connected to the existing authorized APIs and incident lifecycle | `delivery/phases/phase4/README.md`, `../archive/docs/design/dashboard_v2_design_handoff.md` |
 
-The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepted as a good first version on 2026-07-22, completing Phase 4A. Phase 4B completed locally on 2026-07-23 with synthetic source-to-incident validation; Phase 5 has not started.
+The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepted as a good first version on 2026-07-22, completing Phase 4A. Phase 4B completed locally on 2026-07-23 with synthetic source-to-incident validation. Phase 5 began on 2026-07-26 with durable local roster assignments, transactional Excel-import persistence, revision conflict protection, and assignment audit history; routing and notifications remain pending.
 
 ## 5. Revised implementation sequence
 
@@ -128,13 +128,19 @@ The simulator and scenario endpoints must be impossible to enable in staging or 
 
 ### Phase 5 — Operational Responsibility Roster, routing, and notifications
 
+**Status:** In progress. Current evidence: `delivery/phases/phase5/README.md`.
+
 **Estimated effort:** 2–4 weeks
 
 **Prerequisite:** Phases 4A and 4B complete. The roster screen and workflow must be designed and approved before implementation.
 
+**Already decided:** Recipient positions, general distribution rules, primary action owners, and code-specific routing exceptions are defined in `product/alert_catalog.md`. Phase 5 implements and tests those approved rules; it does not redesign them.
+
 **Deliverables:**
 
-- Monitor-owned roles and per-alert access;
+- EmusaSoft-authenticated global and operation-scoped permissions, normalized in Monitor for enforcement and audit;
+- `Responsables` access restricted to Monitor administrators;
+- one or more `Rotación` schedule managers per operation, restricted to their authorized operations;
 - roster assignments for standardized operational positions;
 - effective dates, temporary replacements, conflicts, and audit history;
 - deterministic application of all seven `General alert distribution` rules in `product/alert_catalog.md` and every code-specific override;
@@ -242,7 +248,7 @@ All Phase 9 acceptance uses mock identity, synthetic fixtures, the mutable local
 
 ES2-01 removes external approval of every individual query. Monitor still owns conservative bounded queries and must fix any safety or performance problem found in staging.
 
-ES2-03 requires a stable `sysUserId` and validation of token signature, issuer, audience, expiration, and ordinary lifetime. Monitor owns roles, per-alert access, and the roster. A validated token is trusted until its encoded expiry unless the contract later provides a stronger revocation mechanism.
+ES2-03 requires a stable `sysUserId`, global Monitor permissions, operation-scoped scheduling permissions, and validation of token signature, issuer, audience, expiration, and ordinary lifetime. EmusaSoft authentication owns those identity permissions. Monitor owns roster assignments, alert access derived from routing, and synchronized authorization enforcement and audit. A validated token is trusted until its encoded expiry unless the contract later provides a stronger revocation mechanism.
 
 #### Phase 10B — Controlled pilot
 

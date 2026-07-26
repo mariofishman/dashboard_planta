@@ -26,6 +26,14 @@ npm run dev
 
 Open `http://127.0.0.1:5173`. Local development uses mock identity and local data; it does not connect to EmusaSoft.
 
+To restore the responsibility roster to its original test data, keep the local API running and execute:
+
+```sh
+npm run db:reset-roster
+```
+
+The command first saves a backup under `local-data/monitor/roster-backups/`. Refresh the browser after it finishes.
+
 Validate the repository with:
 
 ```sh
@@ -34,6 +42,8 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+Before copying, backing up, restoring, migrating, or recovering the local PGlite database, follow the [`Local Database Operations Runbook`](docs/delivery/guides/database_operations.md). Never copy a live PGlite directory or run a migration against a directory already opened by the API.
 
 ## Environment
 

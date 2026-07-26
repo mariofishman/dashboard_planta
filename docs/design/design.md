@@ -94,6 +94,9 @@ Static panels use either a border or a shadow, not both as decoration. Nested ca
 - Use surface, text, border, compact-control, and focus roles.
 - Errors combine the danger role with written guidance.
 - Disabled fields retain readable content.
+- Keep every visible field label in the compact floated/notched position in all states: empty, filled, focused, read-only, disabled, and error.
+- Keep labels separate from placeholders and values. Never use library automatic label placement that moves an empty field's label into the value line.
+- Apply the shared label behavior to text inputs, selects, autocompletes, date fields, and text areas; do not restore default positioning in an individual component.
 
 ### Navigation
 

@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resolve } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { io as connectSocket } from "socket.io-client";
+import { createDatabaseRuntime } from "@monitor/database";
 import { loadConfig } from "./config.js";
+import { canManageResponsibilities, canManageRotation } from "./auth/authentication.js";
 import { buildMonitorServer, type MonitorServer } from "./server.js";
 
 const servers: MonitorServer[] = [];
@@ -40,6 +44,10 @@ describe("Phase 2 platform foundation", () => {
       "SELECT table_name FROM information_schema.tables WHERE table_name = 'monitor_change_event'",
     );
     assert.equal(table.table_name, "monitor_change_event");
+    const rosterPermissionTable = await instance.database.queryOne(
+      "SELECT table_name FROM information_schema.tables WHERE table_name = 'monitor_identity_operation_permission'",
+    );
+    assert.equal(rosterPermissionTable.table_name, "monitor_identity_operation_permission");
   });
 
   it("rejects unauthenticated requests", async () => {
@@ -90,6 +98,149 @@ describe("Phase 2 platform foundation", () => {
     assert.equal(manager.statusCode, 200);
   });
 
+  it("limits roster administration to Monitor admins and rotation writes to authorized operations", async () => {
+    const instance = await server();
+    const identities = await instance.app.inject("/api/auth/mock-identities");
+    const principals = new Map(identities.json().map((entry: { identityId: string; principal: unknown }) => [entry.identityId, entry.principal]));
+    const monitorAdmin = principals.get("monitor-admin") as Parameters<typeof canManageResponsibilities>[0];
+    const admin = principals.get("plant-manager") as Parameters<typeof canManageResponsibilities>[0];
+    const scheduler = principals.get("operation-scheduler") as Parameters<typeof canManageResponsibilities>[0];
+
+    assert.equal(canManageResponsibilities(monitorAdmin), true);
+    assert.equal(canManageResponsibilities(admin), true);
+    assert.equal(canManageResponsibilities(scheduler), false);
+    assert.equal(canManageRotation(admin, 999), true);
+    assert.equal(canManageRotation(scheduler, 10), true);
+    assert.equal(canManageRotation(scheduler, 20), false);
+  });
+
+  it("persists roster imports and edits transactionally with revision and audit protection", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "monitor-roster-test-"));
+    const build = async () => buildMonitorServer({
+      config: {
+        nodeEnv: "test",
+        cookieSecret: "phase-5-test-secret-with-enough-entropy",
+        allowMockAuth: true,
+        enableScenarioLab: false,
+        databaseMode: "pglite",
+        pgliteDataDir: dataDir,
+      },
+      database: await createDatabaseRuntime({ mode: "pglite", pgliteDataDir: dataDir }),
+    });
+    const headers = { authorization: "Bearer mock:plant-manager" };
+    const assignment = {
+      id: "excel-194",
+      person: "Juliana Salazar",
+      position: "Operador de máquina",
+      operations: ["Triturado"],
+      warehouseType: null,
+      scope: "machine_group",
+      group: "Equipo nocturno",
+      validFrom: "2026-07-26",
+      validTo: null,
+      state: "active",
+      setupComplete: true,
+    };
+
+    let first: MonitorServer | undefined;
+    let second: MonitorServer | undefined;
+    try {
+      first = await build();
+      assert.equal((await first.app.inject("/api/roster/assignments")).statusCode, 401);
+      assert.equal((await first.app.inject({ method: "GET", url: "/api/roster/assignments", headers: { authorization: "Bearer mock:machine-operator" } })).statusCode, 403);
+      const empty = await first.app.inject({ method: "GET", url: "/api/roster/assignments", headers });
+      assert.deepEqual(empty.json(), { revision: 0, assignments: [] });
+
+      const saved = await first.app.inject({ method: "PUT", url: "/api/roster/assignments", headers, payload: { revision: 0, assignments: [assignment] } });
+      assert.equal(saved.statusCode, 200, saved.body);
+      assert.equal(saved.json().revision, 1);
+      assert.deepEqual(saved.json().assignments, [assignment]);
+      assert.equal(Number((await first.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_roster_assignment_audit")).count), 1);
+
+      const conflict = await first.app.inject({ method: "PUT", url: "/api/roster/assignments", headers, payload: { revision: 0, assignments: [] } });
+      assert.equal(conflict.statusCode, 409);
+      assert.deepEqual(conflict.json(), { error: "roster_revision_conflict", revision: 1 });
+
+      const invalid = await first.app.inject({
+        method: "PUT",
+        url: "/api/roster/assignments",
+        headers,
+        payload: { revision: 1, assignments: [{ ...assignment, operations: [], setupComplete: true }] },
+      });
+      assert.equal(invalid.statusCode, 400);
+      assert.equal((await first.app.inject({ method: "GET", url: "/api/roster/assignments", headers })).json().assignments.length, 1);
+
+      await first.close();
+      first = undefined;
+      second = await build();
+      const afterRestart = await second.app.inject({ method: "GET", url: "/api/roster/assignments", headers });
+      assert.equal(afterRestart.statusCode, 200);
+      assert.deepEqual(afterRestart.json(), { revision: 1, assignments: [assignment] });
+    } finally {
+      await first?.close();
+      await second?.close();
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
+  it("allows confirmed distinct names with different accents but rejects exact duplicate names", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "monitor-roster-name-test-"));
+    const instance = await buildMonitorServer({
+      config: {
+        nodeEnv: "test",
+        cookieSecret: "phase-5-test-secret-with-enough-entropy",
+        allowMockAuth: true,
+        enableScenarioLab: false,
+        databaseMode: "pglite",
+        pgliteDataDir: dataDir,
+      },
+      database: await createDatabaseRuntime({ mode: "pglite", pgliteDataDir: dataDir }),
+    });
+    const headers = { authorization: "Bearer mock:plant-manager" };
+    const assignment = (id: string, person: string) => ({
+      id,
+      person,
+      position: "Operador de máquina",
+      operations: ["Impresión"],
+      warehouseType: null,
+      scope: "machine_group",
+      group: "A",
+      validFrom: "2026-07-26",
+      validTo: null,
+      state: "active",
+      setupComplete: true,
+    });
+
+    try {
+      const distinct = await instance.app.inject({
+        method: "PUT",
+        url: "/api/roster/assignments",
+        headers,
+        payload: { revision: 0, assignments: [assignment("ana-accented", "Ana Díaz"), assignment("ana-unaccented", "Ana Dias")] },
+      });
+      assert.equal(distinct.statusCode, 200);
+
+      const duplicate = await instance.app.inject({
+        method: "PUT",
+        url: "/api/roster/assignments",
+        headers,
+        payload: {
+          revision: 1,
+          assignments: [
+            assignment("ana-accented", "Ana Díaz"),
+            assignment("ana-unaccented", "Ana Dias"),
+            assignment("ana-duplicate", "  ANA   DÍAZ  "),
+          ],
+        },
+      });
+      assert.equal(duplicate.statusCode, 400);
+      assert.ok(duplicate.json().details.some((detail: string) => /repetida/.test(detail)));
+    } finally {
+      await instance.close();
+      await rm(dataDir, { recursive: true, force: true });
+    }
+  });
+
   it("accepts a replacement identity adapter without exposing mock login", async () => {
     const instance = await buildMonitorServer({
       config: {
@@ -109,6 +260,7 @@ describe("Phase 2 platform foundation", () => {
             role: "FACTORY_MANAGER",
             plantIds: [1],
             scopes: ["monitor:read", "monitor:admin"],
+            operationAuthorizations: [],
           } : null;
         },
       },

@@ -15,6 +15,7 @@ import { createMetrics, prometheusMetrics, registerObservability } from "./obser
 import { attachRedis, type RedisRuntime } from "./redis.js";
 import { authRoutes } from "./routes/auth.js";
 import { scenarioRoutes } from "./routes/scenarios.js";
+import { rosterRoutes } from "./routes/roster.js";
 
 function cookieValue(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -173,6 +174,7 @@ export async function buildMonitorServer(options: {
     return { changes: await incidentService.changesAfter(cursor, request.principal!.plantIds) };
   });
   app.get("/api/admin/authorization-check", { preHandler: app.requireScopes(["monitor:admin"]) }, async () => ({ authorized: true }));
+  await app.register(rosterRoutes, { database });
   if (scenarioSource) {
     await app.register(scenarioRoutes, {
       database,

@@ -3,6 +3,17 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 import type { IdentityAdapter } from "./identity-adapter.js";
 
+export function canManageResponsibilities(principal: Principal): boolean {
+  return principal.scopes.includes("monitor:admin");
+}
+
+export function canManageRotation(principal: Principal, operationId: number): boolean {
+  return canManageResponsibilities(principal) || principal.operationAuthorizations.some((authorization) => (
+    authorization.operationId === operationId
+    && authorization.permissions.includes("roster:rotation:manage")
+  ));
+}
+
 declare module "fastify" {
   interface FastifyRequest {
     principal: Principal | null;

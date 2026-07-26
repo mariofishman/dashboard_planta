@@ -7,9 +7,20 @@
 
 Monitor uses the EmusaSoft authentication microservice. The same authenticated person presents the same authorization token to Monitor and EmusaSoft. Monitor does not create passwords or a separate operational identity.
 
-The Monitor backend validates the token through the versioned EmusaSoft authentication contract, then calls the read-only `getUserContext` query to map the session to exactly one enabled, non-deleted `sysUserId`. The backend calculates plant and operational scope. The browser never chooses or expands its own scope.
+The Monitor backend validates the token through the versioned EmusaSoft authentication contract, then calls the read-only `getUserContext` query to map the session to exactly one enabled, non-deleted `sysUserId`. EmusaSoft authentication is the source of global Monitor permissions and operation-scoped scheduling permissions. The browser never chooses or expands its own scope.
 
-Until ES2-03 publishes issuer, audience, key-discovery or introspection details, the verifier is an adapter with a disabled production configuration. Tests use a fake verifier; production must fail closed when verification is unavailable. Tokens are redacted from logs and never stored in Monitor's relational database.
+Monitor normalizes the current grants into its own database for server-side enforcement and audit. These records retain the external identity, permission, operation, source revision, synchronization time, and effective dates; they are a synchronized authorization snapshot, not a second permission administration system. Monitor exposes no UI or API that can grant a user more access than EmusaSoft authentication provides.
+
+Roster authorization is fixed as follows:
+
+- only a principal with the global `monitor:admin` permission may open or change `Responsables`;
+- one or more principals may hold `roster:rotation:manage` for a specific operation;
+- an operation-scoped scheduler may change `Rotación` only for operations explicitly included in their current grants; and
+- a Monitor administrator may manage every operation's rotation.
+
+The API enforces these rules on every read or write route that exposes protected roster data. Hiding a tab or disabling a control in the browser is only a presentation consequence, not the security boundary.
+
+Until ES2-03 publishes issuer, audience, key-discovery or introspection details, the verifier is an adapter with a disabled production configuration. Tests use a fake verifier and synthetic grants; production must fail closed when verification or permission synchronization is unavailable. Tokens are redacted from logs and never stored in Monitor's relational database.
 
 ## Current evidence
 

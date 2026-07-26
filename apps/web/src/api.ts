@@ -1,7 +1,7 @@
-import type { SessionResponse } from "@monitor/contracts";
+import type { RosterAssignment, RosterSnapshot, SessionResponse } from "@monitor/contracts";
 
 export interface MockIdentitySummary {
-  identityId: "plant-manager" | "shift-supervisor" | "machine-operator";
+  identityId: "monitor-admin" | "plant-manager" | "shift-supervisor" | "machine-operator" | "operation-scheduler";
   principal: SessionResponse["principal"];
 }
 
@@ -49,8 +49,23 @@ export interface ScenarioStatus {
   detectionDelayMilliseconds: number | null;
 }
 
+export class ApiRequestError extends Error {
+  constructor(readonly status: number, readonly body: unknown) {
+    super(`request_failed_${status}`);
+    this.name = "ApiRequestError";
+  }
+}
+
 async function responseJson<T>(response: Response): Promise<T> {
-  if (!response.ok) throw new Error(`request_failed_${response.status}`);
+  if (!response.ok) {
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      // The status code remains useful when an upstream response has no JSON body.
+    }
+    throw new ApiRequestError(response.status, body);
+  }
   return response.json() as Promise<T>;
 }
 
@@ -89,6 +104,19 @@ export async function incidents(filters: { status?: string; operation?: string; 
 
 export async function incidentDetail(id: string): Promise<IncidentDetail> {
   return responseJson<IncidentDetail>(await fetch(`/api/incidents/${id}`, { credentials: "include" }));
+}
+
+export async function rosterAssignments(): Promise<RosterSnapshot> {
+  return responseJson<RosterSnapshot>(await fetch("/api/roster/assignments", { credentials: "include" }));
+}
+
+export async function saveRosterAssignments(revision: number, assignments: RosterAssignment[]): Promise<RosterSnapshot> {
+  return responseJson<RosterSnapshot>(await fetch("/api/roster/assignments", {
+    method: "PUT",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ revision, assignments }),
+  }));
 }
 
 export async function scenarios(): Promise<ScenarioStatus[]> {

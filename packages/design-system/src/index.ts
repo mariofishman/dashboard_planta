@@ -106,7 +106,10 @@ export const monitorTheme = createTheme({
       },
     },
     MuiInputBase: { styleOverrides: { root: { fontSize: ui.typography.routine } } },
-    MuiInputLabel: { styleOverrides: { root: { color: ui.color.textSecondary, fontSize: ui.typography.routine } } },
+    MuiInputLabel: {
+      defaultProps: { shrink: true },
+      styleOverrides: { root: { color: ui.color.textSecondary, fontSize: ui.typography.routine } },
+    },
     MuiFormLabel: { styleOverrides: { root: { fontSize: ui.typography.routine } } },
     MuiFormControlLabel: { styleOverrides: { label: { fontSize: ui.typography.routine } } },
     MuiTab: { styleOverrides: { root: { height: ui.control.visibleHeight, minHeight: ui.control.visibleHeight, minWidth: ui.control.visibleHeight, paddingBlock: 0, paddingInline: ui.control.paddingInline, borderRadius: Number.parseInt(ui.control.radius, 10), fontSize: ui.typography.routine, lineHeight: 1.4, textTransform: "none" } } },
@@ -119,6 +122,13 @@ export const monitorTheme = createTheme({
     },
     MuiChip: { styleOverrides: { root: { height: ui.control.visibleHeight, borderRadius: Number.parseInt(ui.control.radius, 10), fontSize: ui.typography.routine, fontWeight: value(tokens.font.weight.semibold) }, label: { paddingInline: ui.control.paddingInline } } },
     MuiMenuItem: { styleOverrides: { root: { minHeight: ui.control.visibleHeight, paddingBlock: 0, paddingInline: ui.control.paddingInline, fontSize: ui.typography.routine, lineHeight: 1.4 } } },
+    MuiListItemText: {
+      styleOverrides: {
+        root: { marginBlock: 0 },
+        primary: { fontSize: ui.typography.routine, lineHeight: 1.4 },
+        secondary: { fontSize: ui.typography.routine, lineHeight: 1.4 },
+      },
+    },
     MuiDialogTitle: { styleOverrides: { root: { padding: 16, fontSize: ui.typography.sectionTitle, fontWeight: value(tokens.font.weight.semibold) } } },
     MuiDialogContent: { styleOverrides: { root: { paddingInline: 16 } } },
     MuiDialogActions: { styleOverrides: { root: { padding: 16 } } },

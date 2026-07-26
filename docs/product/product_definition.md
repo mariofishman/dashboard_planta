@@ -16,7 +16,9 @@ Monitor has four main screens:
 1. **Dashboard** — current and historical alert analysis, filters, reports, and drill-down. Approved local implementation: `apps/web/`.
 2. **Chat list** — conversations in which the current user participates. Current prototype: `prototypes/current/chat/chat-list-final.html`.
 3. **Chat detail** — messages, replies, attachments, and structured alert objects. Current prototype: `prototypes/current/chat/chat-detail.html`.
-4. **Operational Responsibility Roster** — assigns people to standardized operational positions by operation, machine, shift, and effective date. It is required for deterministic routing but remains conceptual and has no approved prototype.
+4. **Operational Responsibility Roster** — maintains people, standardized positions, position-derived coverage, applicable operations or warehouse type, rotating group, and effective date. It is required for deterministic routing; its first local implementation is under design review at `apps/web/src/OperationalResponsibilityRoster.tsx`.
+
+Roster access is permissioned through EmusaSoft authentication. Only Monitor administrators can access `Responsables`. Each operation may have one or more operation-scoped schedule managers who can update `Rotación` only for their authorized operations. Monitor stores synchronized permission grants for enforcement and audit but does not administer those grants.
 
 The earlier dashboard-only product direction is superseded. Technical implementation phases are sequencing tools, not separate product releases.
 
@@ -56,10 +58,11 @@ The active external-delivery status is maintained only in `docs/integrations/emu
 ## Current product implementations and prototypes
 
 - `apps/web/` — approved Dashboard V2 local implementation;
+- `apps/web/src/OperationalResponsibilityRoster.tsx` — first roster implementation under design review;
 - `prototypes/current/chat/chat-list-final.html`
 - `prototypes/current/chat/chat-detail.html`
 
-The design system, dashboard implementation, and two currently prototyped chat screens must continue improving as part of the engineering roadmap. The fourth screen, the Operational Responsibility Roster, must be designed and validated before implementation.
+The design system, dashboard implementation, roster implementation, and two currently prototyped chat screens must continue improving as part of the engineering roadmap. The Operational Responsibility Roster must complete design validation before its routing logic is treated as implementation-ready.
 
 ## Current documentation-review interface
 

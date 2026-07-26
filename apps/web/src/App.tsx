@@ -61,6 +61,7 @@ import {
   type IncidentSummary,
   type MockIdentitySummary,
 } from "./api";
+import { OperationalResponsibilityRoster } from "./OperationalResponsibilityRoster";
 import { ScenarioLab } from "./ScenarioLab";
 
 type LoadState = "loading" | "ready" | "error";
@@ -138,7 +139,7 @@ function inputDate(date: Date) {
 
 function LoginView({ onLogin }: { onLogin: (session: SessionResponse) => void }) {
   const [identities, setIdentities] = useState<MockIdentitySummary[]>([]);
-  const [selected, setSelected] = useState<MockIdentitySummary["identityId"]>("plant-manager");
+  const [selected, setSelected] = useState<MockIdentitySummary["identityId"]>("monitor-admin");
   const [state, setState] = useState<LoadState>("loading");
   const [submitting, setSubmitting] = useState(false);
 
@@ -618,5 +619,6 @@ export default function App() {
   if (state === "error") return <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 3, bgcolor: "background.default" }}><Alert severity="error">No se pudo iniciar Monitor. Comprueba que la API local esté funcionando.</Alert></Box>;
   const onLogout = () => void logout().then(() => setSession(null));
   if (!session) return <LoginView onLogin={setSession}/>;
+  if (window.location.pathname === "/roster") return <OperationalResponsibilityRoster session={session} onLogout={onLogout}/>;
   return window.location.pathname === "/dev/scenarios" ? <ScenarioLab session={session} onLogout={onLogout}/> : <Dashboard session={session} onLogout={onLogout}/>;
 }

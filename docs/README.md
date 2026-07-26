@@ -20,6 +20,7 @@ All current documentation is written in English. User-visible product labels rem
 - `architecture/decisions/` — accepted architecture decision records.
 - `architecture/contracts/` — active human-readable integration contracts.
 - `delivery/phases/` — phase implementation plans and dated completion evidence; these records do not define current project status.
+- `delivery/guides/database_operations.md` — safe local PGlite startup, migration, backup, restore, and failure recovery.
 - `integrations/emusasoft/evidence/` — dated audit evidence supporting the integration register.
 - `design/brand_guidelines.md` — brand voice and identity.
 

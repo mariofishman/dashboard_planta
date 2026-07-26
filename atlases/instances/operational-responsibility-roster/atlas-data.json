@@ -1,0 +1,220 @@
+{
+  "id": "operational-responsibility-roster",
+  "title": "Operational Responsibility Roster",
+  "rounds": [
+    {
+      "id": "round-1",
+      "label": "Round 1 · Assignments, coverage, conflicts, and audit",
+      "references": [
+        {
+          "id": "seven-shifts-assigning-employee",
+          "title": "Assigning an existing employee",
+          "product": "7shifts",
+          "sourceUrl": "https://mobbin.com/flows/0598f4b9-3db5-4fae-96bb-c6f73711fe61",
+          "rationale": "Shows a dense schedule, scope filters, employee assignment, and a practical edit flow for placing people into operational slots.",
+          "screens": [
+            { "id": "schedule", "label": "Schedule and open assignment menu", "sourceUrl": "https://mobbin.com/flows/0598f4b9-3db5-4fae-96bb-c6f73711fe61", "image": "images/7shifts-assign-1.jpg", "regions": [
+              { "id": "scope-filters", "label": "Date and department filters", "x": 7, "y": 8, "width": 46, "height": 10 },
+              { "id": "assignment-grid", "label": "Role assignment grid", "x": 7, "y": 20, "width": 90, "height": 72 },
+              { "id": "add-employee-menu", "label": "Add or assign employee menu", "x": 7, "y": 13, "width": 18, "height": 18 }
+            ] },
+            { "id": "assign-form", "label": "Employee assignment form", "sourceUrl": "https://mobbin.com/flows/0598f4b9-3db5-4fae-96bb-c6f73711fe61", "image": "images/7shifts-assign-2.jpg", "regions": [
+              { "id": "assignment-fields", "label": "Assignment fields", "x": 25, "y": 20, "width": 65, "height": 55 },
+              { "id": "save-assignment", "label": "Save assignment action", "x": 70, "y": 78, "width": 18, "height": 10 }
+            ] },
+            { "id": "assignment-confirmation", "label": "Assignment confirmation", "sourceUrl": "https://mobbin.com/flows/0598f4b9-3db5-4fae-96bb-c6f73711fe61", "image": "images/7shifts-assign-3.jpg", "regions": [
+              { "id": "assignment-summary", "label": "Assignment summary", "x": 18, "y": 15, "width": 70, "height": 55 },
+              { "id": "confirmation-actions", "label": "Confirmation actions", "x": 60, "y": 72, "width": 30, "height": 15 }
+            ] },
+            { "id": "assignment-detail", "label": "Assignment detail", "sourceUrl": "https://mobbin.com/flows/0598f4b9-3db5-4fae-96bb-c6f73711fe61", "image": "images/7shifts-assign-4.jpg", "regions": [
+              { "id": "assignment-detail", "label": "Assignment detail and scope", "x": 18, "y": 12, "width": 72, "height": 68 },
+              { "id": "history-entry", "label": "Change or history entry", "x": 18, "y": 72, "width": 72, "height": 16 }
+            ] },
+            { "id": "assignment-result", "label": "Updated schedule result", "sourceUrl": "https://mobbin.com/flows/0598f4b9-3db5-4fae-96bb-c6f73711fe61", "image": "images/7shifts-assign-5.jpg", "regions": [
+              { "id": "updated-row", "label": "Updated assignment row", "x": 7, "y": 20, "width": 90, "height": 24 },
+              { "id": "schedule-context", "label": "Schedule context", "x": 7, "y": 8, "width": 90, "height": 12 }
+            ] }
+          ]
+        },
+        {
+          "id": "square-shift-scheduling",
+          "title": "Publishing a shift schedule",
+          "product": "Square",
+          "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b",
+          "rationale": "Useful for compact date navigation, scope filters, empty states, and publishing or committing changes without a tall control area.",
+          "screens": [
+            { "id": "schedule-empty", "label": "Empty schedule with filters", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-1.jpg", "regions": [
+              { "id": "schedule-navigation", "label": "Schedule navigation", "x": 15, "y": 10, "width": 55, "height": 12 },
+              { "id": "empty-state", "label": "Empty schedule state", "x": 30, "y": 28, "width": 55, "height": 34 },
+              { "id": "add-team-members", "label": "Add team members action", "x": 45, "y": 57, "width": 18, "height": 9 }
+            ] },
+            { "id": "schedule-setup", "label": "Schedule setup", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-2.jpg", "regions": [
+              { "id": "schedule-controls", "label": "Compact schedule controls", "x": 15, "y": 8, "width": 80, "height": 15 },
+              { "id": "schedule-content", "label": "Schedule content", "x": 15, "y": 24, "width": 80, "height": 64 }
+            ] },
+            { "id": "team-selection", "label": "Team selection", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-3.jpg", "regions": [
+              { "id": "team-filter", "label": "Team or location filter", "x": 15, "y": 8, "width": 42, "height": 12 },
+              { "id": "team-list", "label": "Team selection list", "x": 15, "y": 24, "width": 80, "height": 60 }
+            ] },
+            { "id": "shift-editor", "label": "Shift editor", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-4.jpg", "regions": [
+              { "id": "shift-fields", "label": "Shift date and time fields", "x": 25, "y": 18, "width": 58, "height": 42 },
+              { "id": "shift-assignee", "label": "Shift assignee", "x": 25, "y": 60, "width": 58, "height": 18 }
+            ] },
+            { "id": "schedule-review", "label": "Schedule review", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-5.jpg", "regions": [
+              { "id": "review-table", "label": "Schedule review table", "x": 15, "y": 20, "width": 80, "height": 62 },
+              { "id": "publish-action", "label": "Publish or commit action", "x": 80, "y": 8, "width": 15, "height": 10 }
+            ] },
+            { "id": "schedule-publish", "label": "Publish confirmation", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-6.jpg", "regions": [
+              { "id": "confirmation-dialog", "label": "Publish confirmation dialog", "x": 28, "y": 25, "width": 45, "height": 35 },
+              { "id": "confirmation-buttons", "label": "Confirmation buttons", "x": 35, "y": 56, "width": 32, "height": 12 }
+            ] },
+            { "id": "published-schedule", "label": "Published schedule", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-7.jpg", "regions": [
+              { "id": "published-status", "label": "Published status", "x": 70, "y": 8, "width": 25, "height": 12 },
+              { "id": "published-grid", "label": "Published schedule grid", "x": 15, "y": 20, "width": 80, "height": 66 }
+            ] },
+            { "id": "schedule-update", "label": "Schedule update", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-8.jpg", "regions": [
+              { "id": "update-controls", "label": "Update controls", "x": 15, "y": 8, "width": 80, "height": 14 },
+              { "id": "update-grid", "label": "Updated schedule grid", "x": 15, "y": 24, "width": 80, "height": 62 }
+            ] },
+            { "id": "schedule-final", "label": "Final schedule", "sourceUrl": "https://mobbin.com/flows/670c81b3-01da-4ff0-9781-2a9cf35de60b", "image": "images/square-shifts-9.jpg", "regions": [
+              { "id": "final-schedule", "label": "Final schedule view", "x": 15, "y": 10, "width": 80, "height": 76 }
+            ] }
+          ]
+        },
+        {
+          "id": "employment-hero-clashes",
+          "title": "View scheduling clashes",
+          "product": "Employment Hero",
+          "sourceUrl": "https://mobbin.com/flows/4fe88820-47eb-4d5d-bbb3-67ad22d7ee78",
+          "rationale": "Provides a relevant pattern for dense records, explicit clash indicators, status labels, and row-level actions.",
+          "screens": [
+            { "id": "leave-table", "label": "Records table with clashes", "sourceUrl": "https://mobbin.com/flows/4fe88820-47eb-4d5d-bbb3-67ad22d7ee78", "image": "images/employment-clashes-1.jpg", "regions": [
+              { "id": "record-filters", "label": "Record filters", "x": 10, "y": 30, "width": 84, "height": 12 },
+              { "id": "records-table", "label": "Dense records table", "x": 10, "y": 43, "width": 84, "height": 47 },
+              { "id": "clash-indicator", "label": "Clash indicator", "x": 58, "y": 50, "width": 8, "height": 30 }
+            ] },
+            { "id": "clash-detail", "label": "Clash detail", "sourceUrl": "https://mobbin.com/flows/4fe88820-47eb-4d5d-bbb3-67ad22d7ee78", "image": "images/employment-clashes-2.jpg", "regions": [
+              { "id": "clash-summary", "label": "Conflict summary", "x": 25, "y": 20, "width": 55, "height": 35 },
+              { "id": "clash-resolution", "label": "Conflict resolution actions", "x": 25, "y": 55, "width": 55, "height": 25 }
+            ] },
+            { "id": "clash-resolved", "label": "Resolved clash state", "sourceUrl": "https://mobbin.com/flows/4fe88820-47eb-4d5d-bbb3-67ad22d7ee78", "image": "images/employment-clashes-3.jpg", "regions": [
+              { "id": "resolved-state", "label": "Resolved state", "x": 10, "y": 35, "width": 84, "height": 45 },
+              { "id": "audit-context", "label": "Resolution context", "x": 10, "y": 80, "width": 84, "height": 10 }
+            ] }
+          ]
+        },
+        {
+          "id": "seven-shifts-assignment-matrix",
+          "title": "Updating employee assignments",
+          "product": "7shifts",
+          "sourceUrl": "https://mobbin.com/flows/3b77ea20-bb13-42a8-890b-71c445e6deaa",
+          "rationale": "Shows a person-centric assignment matrix that may help with reviewing role, department, and location scope without creating a large dashboard.",
+          "screens": [
+            { "id": "employee-profile", "label": "Employee profile", "sourceUrl": "https://mobbin.com/flows/3b77ea20-bb13-42a8-890b-71c445e6deaa", "image": "images/7shifts-update-1.jpg", "regions": [
+              { "id": "person-context", "label": "Person context", "x": 18, "y": 12, "width": 70, "height": 22 },
+              { "id": "profile-navigation", "label": "Profile navigation", "x": 18, "y": 35, "width": 22, "height": 40 },
+              { "id": "assignment-matrix", "label": "Assignment matrix", "x": 42, "y": 35, "width": 48, "height": 45 }
+            ] },
+            { "id": "assignment-edit", "label": "Edit assignment", "sourceUrl": "https://mobbin.com/flows/3b77ea20-bb13-42a8-890b-71c445e6deaa", "image": "images/7shifts-update-2.jpg", "regions": [
+              { "id": "assignment-edit-fields", "label": "Assignment edit fields", "x": 30, "y": 18, "width": 55, "height": 55 },
+              { "id": "assignment-save", "label": "Save assignment", "x": 65, "y": 75, "width": 20, "height": 10 }
+            ] },
+            { "id": "assignment-scope", "label": "Assignment scope", "sourceUrl": "https://mobbin.com/flows/3b77ea20-bb13-42a8-890b-71c445e6deaa", "image": "images/7shifts-update-3.jpg", "regions": [
+              { "id": "scope-columns", "label": "Scope columns", "x": 25, "y": 20, "width": 65, "height": 55 },
+              { "id": "role-selector", "label": "Role selector", "x": 65, "y": 35, "width": 23, "height": 22 }
+            ] },
+            { "id": "assignment-confirm", "label": "Assignment confirmation", "sourceUrl": "https://mobbin.com/flows/3b77ea20-bb13-42a8-890b-71c445e6deaa", "image": "images/7shifts-update-4.jpg", "regions": [
+              { "id": "confirm-message", "label": "Confirmation message", "x": 25, "y": 25, "width": 55, "height": 30 },
+              { "id": "confirm-actions", "label": "Confirmation actions", "x": 25, "y": 58, "width": 55, "height": 20 }
+            ] },
+            { "id": "assignment-history", "label": "Assignment history", "sourceUrl": "https://mobbin.com/flows/3b77ea20-bb13-42a8-890b-71c445e6deaa", "image": "images/7shifts-update-5.jpg", "regions": [
+              { "id": "history-list", "label": "Assignment history list", "x": 20, "y": 20, "width": 70, "height": 60 },
+              { "id": "history-metadata", "label": "History metadata", "x": 20, "y": 80, "width": 70, "height": 10 }
+            ] }
+          ]
+        },
+        {
+          "id": "zoho-audit-log",
+          "title": "Audit log and profiles",
+          "product": "Zoho CRM",
+          "sourceUrl": "https://mobbin.com/flows/80e5db8c-4608-444b-95e3-bc997c0af4d3",
+          "rationale": "Provides a compact administrative navigation and audit-log pattern for permissions and immutable change traceability.",
+          "screens": [
+            { "id": "profiles", "label": "Profiles administration", "sourceUrl": "https://mobbin.com/flows/80e5db8c-4608-444b-95e3-bc997c0af4d3", "image": "images/zoho-audit-1.jpg", "regions": [
+              { "id": "admin-navigation", "label": "Administration navigation", "x": 0, "y": 0, "width": 17, "height": 91 },
+              { "id": "profile-table", "label": "Profiles table", "x": 17, "y": 15, "width": 80, "height": 35 },
+              { "id": "profile-search", "label": "Profile search", "x": 20, "y": 15, "width": 22, "height": 8 }
+            ] },
+            { "id": "audit-log", "label": "Audit log", "sourceUrl": "https://mobbin.com/flows/80e5db8c-4608-444b-95e3-bc997c0af4d3", "image": "images/zoho-audit-2.jpg", "regions": [
+              { "id": "audit-filters", "label": "Audit filters", "x": 18, "y": 10, "width": 75, "height": 14 },
+              { "id": "audit-table", "label": "Audit history table", "x": 18, "y": 25, "width": 75, "height": 62 }
+            ] }
+          ]
+        }
+      ]
+    }
+    ,{
+      "id": "round-2",
+      "label": "Round 2 · scope types, recurring groups, and routing evidence",
+      "references": [
+        {
+          "id": "seven-shifts-moving-role",
+          "title": "Moving an employee to a role",
+          "product": "7shifts",
+          "sourceUrl": "https://mobbin.com/flows/877b412b-2c6a-4acc-930e-1ade19f9f69f",
+          "rationale": "Tests a person-to-role change flow that can inform operation-wide, multi-operation, and replacement assignments.",
+          "screens": [
+            {"id":"moving-1","label":"Employee role list","sourceUrl":"https://mobbin.com/flows/877b412b-2c6a-4acc-930e-1ade19f9f69f","image":"images/round-2/7shifts-moving-1.jpg","regions":[{"id":"employee-list","label":"Employee list and current role","x":5,"y":12,"width":90,"height":65},{"id":"scope-controls","label":"Location and role scope controls","x":5,"y":5,"width":90,"height":10}]},
+            {"id":"moving-2","label":"Open role-change action","sourceUrl":"https://mobbin.com/flows/877b412b-2c6a-4acc-930e-1ade19f9f69f","image":"images/round-2/7shifts-moving-2.jpg","regions":[{"id":"role-action","label":"Change role action","x":70,"y":10,"width":25,"height":20},{"id":"person-context","label":"Person and current assignment context","x":5,"y":10,"width":60,"height":25}]},
+            {"id":"moving-3","label":"Role selection form","sourceUrl":"https://mobbin.com/flows/877b412b-2c6a-4acc-930e-1ade19f9f69f","image":"images/round-2/7shifts-moving-3.jpg","regions":[{"id":"role-fields","label":"Role and scope fields","x":20,"y":15,"width":65,"height":55},{"id":"effective-date","label":"Effective date controls","x":20,"y":55,"width":65,"height":15}]},
+            {"id":"moving-4","label":"Role-change confirmation","sourceUrl":"https://mobbin.com/flows/877b412b-2c6a-4acc-930e-1ade19f9f69f","image":"images/round-2/7shifts-moving-4.jpg","regions":[{"id":"confirmation","label":"Assignment confirmation","x":20,"y":20,"width":60,"height":45},{"id":"save-action","label":"Save or confirm action","x":65,"y":75,"width":25,"height":12}]},
+            {"id":"moving-5","label":"Updated role list","sourceUrl":"https://mobbin.com/flows/877b412b-2c6a-4acc-930e-1ade19f9f69f","image":"images/round-2/7shifts-moving-5.jpg","regions":[{"id":"updated-assignment","label":"Updated role assignment row","x":5,"y":20,"width":90,"height":20},{"id":"history-context","label":"Updated assignment context","x":5,"y":40,"width":90,"height":30}]}
+          ]
+        },
+        {
+          "id": "deputy-custom-shifts",
+          "title": "Adding custom shifts",
+          "product": "Deputy",
+          "sourceUrl": "https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6",
+          "rationale": "Tests recurring custom schedules and a compact recurrence editor for reusable shift groups.",
+          "screens": [
+            {"id":"custom-1","label":"Shift schedule overview","sourceUrl":"https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6","image":"images/round-2/deputy-custom-shifts-1.jpg","regions":[{"id":"schedule-overview","label":"Schedule overview","x":5,"y":10,"width":90,"height":70},{"id":"date-navigation","label":"Date navigation","x":5,"y":5,"width":90,"height":12}]},
+            {"id":"custom-2","label":"Add custom shift","sourceUrl":"https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6","image":"images/round-2/deputy-custom-shifts-2.jpg","regions":[{"id":"shift-form","label":"Shift details form","x":20,"y":15,"width":65,"height":60},{"id":"worker-group","label":"Worker group selector","x":20,"y":25,"width":65,"height":15}]},
+            {"id":"custom-3","label":"Custom recurrence editor","sourceUrl":"https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6","image":"images/round-2/deputy-custom-shifts-3.jpg","regions":[{"id":"recurrence-pattern","label":"Repeat interval and weekdays","x":10,"y":15,"width":80,"height":35},{"id":"recurrence-end","label":"End condition","x":10,"y":50,"width":80,"height":25},{"id":"recurrence-actions","label":"Cancel and save actions","x":55,"y":80,"width":35,"height":12}]},
+            {"id":"custom-4","label":"Select workers for shift","sourceUrl":"https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6","image":"images/round-2/deputy-custom-shifts-4.jpg","regions":[{"id":"worker-selection","label":"Worker or group selection","x":10,"y":15,"width":80,"height":60},{"id":"selection-confirm","label":"Confirm selected workers","x":65,"y":80,"width":25,"height":12}]},
+            {"id":"custom-5","label":"Shift assignment review","sourceUrl":"https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6","image":"images/round-2/deputy-custom-shifts-5.jpg","regions":[{"id":"assignment-review","label":"Group schedule review","x":10,"y":15,"width":80,"height":60},{"id":"effective-range","label":"Effective date range","x":10,"y":60,"width":80,"height":15}]},
+            {"id":"custom-6","label":"Saved recurring shift","sourceUrl":"https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6","image":"images/round-2/deputy-custom-shifts-6.jpg","regions":[{"id":"saved-shift","label":"Saved shift group row","x":5,"y":20,"width":90,"height":25},{"id":"repeat-summary","label":"Recurrence summary","x":20,"y":45,"width":70,"height":20}]},
+            {"id":"custom-7","label":"Edit recurring shift","sourceUrl":"https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6","image":"images/round-2/deputy-custom-shifts-7.jpg","regions":[{"id":"edit-recurrence","label":"Edit recurrence controls","x":15,"y":15,"width":70,"height":55},{"id":"edit-actions","label":"Save or cancel changes","x":55,"y":80,"width":35,"height":12}]},
+            {"id":"custom-8","label":"Recurring shift result","sourceUrl":"https://mobbin.com/flows/cfe5f48d-1c03-4899-b880-f4129b2ba7b6","image":"images/round-2/deputy-custom-shifts-8.jpg","regions":[{"id":"recurring-result","label":"Recurring schedule on calendar","x":5,"y":15,"width":90,"height":65},{"id":"group-label","label":"Worker group label","x":5,"y":15,"width":30,"height":15}]}
+          ]
+        },
+        {
+          "id": "deputy-schedule-template",
+          "title": "Saving a schedule template",
+          "product": "Deputy",
+          "sourceUrl": "https://mobbin.com/flows/3b6d971f-b84e-4411-b5a4-ca46e0af48cd",
+          "rationale": "Tests reusable schedule templates for assigning one recurring pattern to a large worker group.",
+          "screens": [
+            {"id":"template-1","label":"Schedule template list","sourceUrl":"https://mobbin.com/flows/3b6d971f-b84e-4411-b5a4-ca46e0af48cd","image":"images/round-2/deputy-template-1.jpg","regions":[{"id":"template-list","label":"Saved schedule templates","x":5,"y":15,"width":90,"height":60},{"id":"new-template","label":"Create template action","x":75,"y":5,"width":20,"height":12}]},
+            {"id":"template-2","label":"Template builder","sourceUrl":"https://mobbin.com/flows/3b6d971f-b84e-4411-b5a4-ca46e0af48cd","image":"images/round-2/deputy-template-2.jpg","regions":[{"id":"template-builder","label":"Template schedule builder","x":5,"y":15,"width":90,"height":65},{"id":"template-scope","label":"Template scope","x":5,"y":5,"width":90,"height":12}]},
+            {"id":"template-3","label":"Template assignment","sourceUrl":"https://mobbin.com/flows/3b6d971f-b84e-4411-b5a4-ca46e0af48cd","image":"images/round-2/deputy-template-3.jpg","regions":[{"id":"template-workers","label":"Assign template to workers","x":10,"y":15,"width":80,"height":55},{"id":"template-confirm","label":"Confirm template assignment","x":65,"y":78,"width":25,"height":12}]},
+            {"id":"template-4","label":"Template saved","sourceUrl":"https://mobbin.com/flows/3b6d971f-b84e-4411-b5a4-ca46e0af48cd","image":"images/round-2/deputy-template-4.jpg","regions":[{"id":"template-result","label":"Saved template result","x":5,"y":15,"width":90,"height":65}]}
+          ]
+        },
+        {
+          "id": "seven-shifts-location-role-coverage",
+          "title": "Locations, departments, and roles",
+          "product": "7shifts",
+          "sourceUrl": "https://mobbin.com/flows/18bef6a3-f096-4e81-a3e2-77ab2bad68ef",
+          "rationale": "Tests multi-operation coverage and a person-centric matrix for people assigned across locations, departments, and roles.",
+          "screens": [
+            {"id":"coverage-1","label":"Coverage overview","sourceUrl":"https://mobbin.com/flows/18bef6a3-f096-4e81-a3e2-77ab2bad68ef","image":"images/round-2/7shifts-locations-1.jpg","regions":[{"id":"coverage-table","label":"Coverage table","x":5,"y":15,"width":90,"height":65},{"id":"coverage-filters","label":"Location and department filters","x":5,"y":5,"width":90,"height":12}]},
+            {"id":"coverage-2","label":"Location assignment","sourceUrl":"https://mobbin.com/flows/18bef6a3-f096-4e81-a3e2-77ab2bad68ef","image":"images/round-2/7shifts-locations-2.jpg","regions":[{"id":"location-fields","label":"Location assignment fields","x":15,"y":15,"width":70,"height":55},{"id":"location-role","label":"Role selection","x":15,"y":45,"width":70,"height":18}]},
+            {"id":"coverage-3","label":"Role coverage matrix","sourceUrl":"https://mobbin.com/flows/18bef6a3-f096-4e81-a3e2-77ab2bad68ef","image":"images/round-2/7shifts-locations-3.jpg","regions":[{"id":"role-matrix","label":"Role coverage matrix","x":5,"y":15,"width":90,"height":65},{"id":"multi-operation","label":"Multiple operation coverage","x":5,"y":20,"width":45,"height":45}]},
+            {"id":"coverage-4","label":"Coverage saved","sourceUrl":"https://mobbin.com/flows/18bef6a3-f096-4e81-a3e2-77ab2bad68ef","image":"images/round-2/7shifts-locations-4.jpg","regions":[{"id":"coverage-result","label":"Saved multi-operation assignment","x":5,"y":15,"width":90,"height":60},{"id":"coverage-status","label":"Assignment status","x":70,"y":15,"width":25,"height":15}]}
+          ]
+        }
+      ]
+    }
+  ]
+}

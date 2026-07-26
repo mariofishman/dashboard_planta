@@ -2,12 +2,21 @@ import type { Principal } from "@monitor/contracts";
 import type { IdentityAdapter, MockLoginIssuer } from "./identity-adapter.js";
 
 const identities: Record<string, Principal> = {
+  "monitor-admin": {
+    sysUserId: 9000,
+    displayName: "Administración de Monitor",
+    role: "MONITOR_ADMIN",
+    plantIds: [1],
+    scopes: ["monitor:read", "monitor:admin", "chat:write"],
+    operationAuthorizations: [],
+  },
   "plant-manager": {
     sysUserId: 9001,
     displayName: "Gerencia de planta",
     role: "FACTORY_MANAGER",
     plantIds: [1],
-    scopes: ["monitor:read", "monitor:admin", "chat:write", "roster:manage"],
+    scopes: ["monitor:read", "monitor:admin", "chat:write"],
+    operationAuthorizations: [],
   },
   "shift-supervisor": {
     sysUserId: 9002,
@@ -15,6 +24,7 @@ const identities: Record<string, Principal> = {
     role: "SHIFT_SUPERVISOR",
     plantIds: [1],
     scopes: ["monitor:read", "chat:write"],
+    operationAuthorizations: [],
   },
   "machine-operator": {
     sysUserId: 9003,
@@ -22,6 +32,17 @@ const identities: Record<string, Principal> = {
     role: "MACHINE_OPERATOR",
     plantIds: [1],
     scopes: ["monitor:read", "chat:write"],
+    operationAuthorizations: [],
+  },
+  "operation-scheduler": {
+    sysUserId: 9004,
+    displayName: "Programación de Impresión",
+    role: "OPERATION_SCHEDULER",
+    plantIds: [1],
+    scopes: ["monitor:read"],
+    operationAuthorizations: [
+      { operationId: 10, operationName: "Impresión", permissions: ["roster:rotation:manage"] },
+    ],
   },
 };
 

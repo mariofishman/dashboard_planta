@@ -1,0 +1,123 @@
+{
+  "atlasId": "operational-responsibility-roster",
+  "updatedAt": "2026-07-25T14:02:13.994458Z",
+  "accepted": {
+    "seven-shifts-assigning-employee": true,
+    "square-shift-scheduling": true,
+    "seven-shifts-assignment-matrix": false,
+    "deputy-custom-shifts": true,
+    "deputy-schedule-template": true
+  },
+  "feedback": {
+    "seven-shifts-assigning-employee": "I don't like that this is assuming that all workers have shifts. It is a good design though. I will keep it for detailed review. ",
+    "square-shift-scheduling": "I like the calendar view but not the fact that I have to choose every shift and create this for every week. In the case I'm creating this is something that will keep on going forever. I also like the \"Add shift\" modal.",
+    "employment-hero-clashes": "Not interested in seeing clashes. It doesn't apply to our specific functionality. ",
+    "seven-shifts-assignment-matrix": "This is a good example of a way to relate people to operations and to roles. not exactly to machines or work orders. ",
+    "zoho-audit-log": "not what I'm looking for at all.",
+    "seven-shifts-moving-role": "I have too many workers in the plant. This design would be extremely long. This is not the way I would like to manage it. I would like to have groups of workers sharing a shift and groups of workers sharing an operation. I could add these groups to a table designed like this. But not each worker.",
+    "deputy-custom-shifts": "This left side bar with worker names could also have worker groups. I like that. I could also plan weeks ahead in a simple to use calendar view. I also like the modal to add specific shift data and the repeat pattern functionality.",
+    "deputy-schedule-template": "This looks very interesting from the point of view I can build patterns, assign them to a large group and the way to schedule those templates. I don't really understand how this works so I would like some clarification to see how I can better use it. One thing I don't like is that there's too much information in the screen and it doesn't look easy to use. I would like a simpler solution.",
+    "seven-shifts-location-role-coverage": "I don't really understand what this is or how this solves the problem I'm trying to solve. You should suggests things that solves the specific problem stated in the docs."
+  },
+  "regionNotes": {
+    "seven-shifts-assigning-employee::schedule::scope-filters": {
+      "note": "You to set up Supervisors to their shifts"
+    },
+    "seven-shifts-assigning-employee::schedule::assignment-grid": {
+      "note": "This grid looks too cumbersome. It could be simpler."
+    },
+    "seven-shifts-assigning-employee::assign-form::assignment-fields": {
+      "note": "Not what I'm looking for."
+    },
+    "square-shift-scheduling::schedule-final::final-schedule": {
+      "note": "This final schedule looks simple and I like that  but it's not as compact as I like. There are many more workers and I would need more rows so shorter rows is preferable to me."
+    },
+    "square-shift-scheduling::schedule-empty::schedule-navigation": {
+      "note": "This is a good schedule navigation but I'd rather have something like the custom schedule from google calendar that I'm attaching as a picture. It allows to assign to a group of people that always move together since they are in the same shift, a single custom shift that will repeat for some time into the future."
+    },
+    "seven-shifts-assigning-employee::assignment-detail::history-entry": {
+      "note": "Doesn't apply to the problem I'm trying to solve."
+    },
+    "square-shift-scheduling::schedule-empty::empty-state": {
+      "note": "this is good."
+    },
+    "square-shift-scheduling::schedule-empty::add-team-members": {
+      "note": "Good"
+    },
+    "square-shift-scheduling::schedule-setup::schedule-controls": {
+      "note": "I like that these are compact."
+    },
+    "square-shift-scheduling::schedule-setup::schedule-content": {
+      "note": "The caledar view is something known to users. Easy to learn and use."
+    },
+    "square-shift-scheduling::shift-editor::shift-assignee": {
+      "note": "This is something good. So i can create a pattern and they make it repeat so I don't have to write it all over. The colors are a nice addition though not strictly necessary."
+    },
+    "square-shift-scheduling::shift-editor::shift-fields": {
+      "note": "Yes. This is what i'm looking for."
+    },
+    "square-shift-scheduling::published-schedule::published-grid": {
+      "note": "This looks good. Could it be made more compact? Like a summary of groups of people?"
+    },
+    "square-shift-scheduling::schedule-update::update-grid": {
+      "note": "not necessary"
+    },
+    "deputy-custom-shifts::custom-1::date-navigation": {
+      "note": "This is a great navigation. Looks compact. Has all the options we may need. Payroll is not one of the options I need. Let's analyze these options in the light of the problem we're trying to solve."
+    },
+    "deputy-custom-shifts::custom-1::schedule-overview": {
+      "note": "Good compact view with color coding to see in one view. Also like the copy option and the date navigation. I'd rather have less headers though."
+    },
+    "deputy-custom-shifts::custom-2::shift-form": {
+      "note": "This is exactly what's needed. A possibility to assign worker groups to dates. What's missing is a way to make it repeat and have custom repeated schedules, like what google calendar allows (I shared an image)"
+    },
+    "deputy-custom-shifts::custom-3::recurrence-end": {
+      "note": "This html transparent elements might be wrong or misplaced. I don't see the repeat interval and weekdays. That's a feature i like so i'm writing it here. Also having an end condition is important but I don't see that in this screen. Even if this Atlas is wrong, it's useful to point out that these are needed features."
+    },
+    "deputy-custom-shifts::custom-4::worker-selection": {
+      "note": "I don't see the worker or group selection in this Atlas screen. I think something might be wrong though I like the feature and I like it included in the design we're building."
+    },
+    "deputy-custom-shifts::custom-8::group-label": {
+      "note": "Like. Include in the design."
+    },
+    "deputy-custom-shifts::custom-8::recurring-result": {
+      "note": "Like. Build something like this."
+    },
+    "deputy-schedule-template::template-1::template-list": {
+      "note": "I like that I can save templates. Though I don't understand this screen. So include the feature but make the screen much simpler than this one. There's too much information and too hard to learn to use."
+    },
+    "deputy-schedule-template::template-2::template-builder": {
+      "note": "This looks good but the commands should be more like google calendar's"
+    }
+  },
+  "customRegions": {
+    "seven-shifts-assigning-employee::schedule": [
+      {
+        "id": "custom-1784846552334",
+        "label": "excel import",
+        "note": "This is super useful in case HR wants to upload their shift rotation in excel",
+        "x": 76.327,
+        "y": 9.155,
+        "width": 11.517,
+        "height": 4.719
+      }
+    ]
+  },
+  "screenIndex": {
+    "seven-shifts-assigning-employee": 0,
+    "square-shift-scheduling": 8,
+    "employment-hero-clashes": 2,
+    "seven-shifts-assignment-matrix": 4,
+    "zoho-audit-log": 1,
+    "deputy-custom-shifts": 7,
+    "deputy-schedule-template": 1,
+    "seven-shifts-location-role-coverage": 3
+  },
+  "researchNotes": {
+    "assignment-scopes-2026-07-23": {
+      "title": "Assignment scopes and recurring worker schedules",
+      "note": "Investigate four scopes: work-order or machine operators identified by QR scan at work-order start; operation-and-shift workers whose active shift may come from sign-in data; operation-wide leaders assigned across all shifts; and factory or multi-operation leaders. Also investigate reusable worker groups with recurring schedules that repeat on selected weekdays indefinitely or until an end date, inspired by calendar recurrence controls. Test how scope precedence, evidence traceability, temporary replacements, and group schedules work together.",
+      "status": "research-direction-not-final"
+    }
+  }
+}

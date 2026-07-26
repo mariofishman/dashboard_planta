@@ -39,6 +39,12 @@ test("enforces the approved compact Monitor scale in shared MUI defaults", () =>
   const menuItem = componentRoot("MuiMenuItem");
   assert.equal(menuItem.minHeight, monitorSemanticTokens.control.visibleHeight);
   assert.equal(menuItem.fontSize, monitorSemanticTokens.typography.routine);
+
+  const listItemPrimary = monitorTheme.components?.MuiListItemText?.styleOverrides?.primary;
+  assert.equal(typeof listItemPrimary, "object");
+  assert.equal((listItemPrimary as Record<string, unknown>).fontSize, monitorSemanticTokens.typography.routine);
+
+  assert.equal(monitorTheme.components?.MuiInputLabel?.defaultProps?.shrink, true);
 });
 
 test("resolves semantic product roles from primitive design tokens", () => {
