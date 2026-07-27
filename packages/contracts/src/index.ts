@@ -117,3 +117,126 @@ export const SaveRosterSnapshotSchema = Type.Object({
   assignments: Type.Array(RosterAssignmentSchema, { maxItems: 5000 }),
 }, { additionalProperties: false });
 export type SaveRosterSnapshot = Static<typeof SaveRosterSnapshotSchema>;
+
+export const RotationScheduleSchema = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 80 }),
+  name: Type.String({ minLength: 1, maxLength: 80 }),
+  start: Type.Union([Type.String({ pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }), Type.Null()]),
+  end: Type.Union([Type.String({ pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }), Type.Null()]),
+  isRest: Type.Boolean(),
+}, { additionalProperties: false });
+
+export const RotationPatternGroupSchema = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 40 }),
+  name: Type.String({ minLength: 1, maxLength: 80 }),
+  anchorScheduleId: Type.String({ minLength: 1, maxLength: 80 }),
+  daysPerPhase: Type.Integer({ minimum: 1, maximum: 60 }),
+}, { additionalProperties: false });
+
+export const RotationPatternSchema = Type.Object({
+  effectiveFrom: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+  schedules: Type.Array(RotationScheduleSchema, { minItems: 1, maxItems: 20 }),
+  groups: Type.Array(RotationPatternGroupSchema, { minItems: 1, maxItems: 20 }),
+}, { additionalProperties: false });
+export type RotationPattern = Static<typeof RotationPatternSchema>;
+
+export interface RotationPatternConflict {
+  dayOffset: number;
+  scheduleId: string;
+  groupIds: [string, string];
+}
+
+function greatestCommonDivisor(left: number, right: number): number {
+  let a = Math.abs(left);
+  let b = Math.abs(right);
+  while (b) [a, b] = [b, a % b];
+  return a || 1;
+}
+
+function leastCommonMultiple(left: number, right: number): number {
+  return Math.abs(left * right) / greatestCommonDivisor(left, right);
+}
+
+export function firstRotationPatternConflict(pattern: RotationPattern): RotationPatternConflict | null {
+  const restIds = new Set(pattern.schedules.filter((schedule) => schedule.isRest).map((schedule) => schedule.id));
+  const scheduleIndex = new Map(pattern.schedules.map((schedule, index) => [schedule.id, index]));
+  const scheduleCount = pattern.schedules.length;
+  for (let leftIndex = 0; leftIndex < pattern.groups.length; leftIndex += 1) {
+    const left = pattern.groups[leftIndex]!;
+    const leftAnchor = scheduleIndex.get(left.anchorScheduleId);
+    if (leftAnchor === undefined) continue;
+    for (let rightIndex = leftIndex + 1; rightIndex < pattern.groups.length; rightIndex += 1) {
+      const right = pattern.groups[rightIndex]!;
+      const rightAnchor = scheduleIndex.get(right.anchorScheduleId);
+      if (rightAnchor === undefined) continue;
+      const pairCycle = leastCommonMultiple(scheduleCount * left.daysPerPhase, scheduleCount * right.daysPerPhase);
+      for (let dayOffset = 0; dayOffset < pairCycle; dayOffset += 1) {
+        const leftSchedule = pattern.schedules[(leftAnchor + Math.floor(dayOffset / left.daysPerPhase)) % scheduleCount]!.id;
+        const rightSchedule = pattern.schedules[(rightAnchor + Math.floor(dayOffset / right.daysPerPhase)) % scheduleCount]!.id;
+        if (leftSchedule === rightSchedule && !restIds.has(leftSchedule)) {
+          return { dayOffset, scheduleId: leftSchedule, groupIds: [left.id, right.id] };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+export const RotationPatternSnapshotSchema = Type.Object({
+  operation: RosterOperationSchema,
+  revision: Type.Integer({ minimum: 0 }),
+  pattern: RotationPatternSchema,
+}, { additionalProperties: false });
+export type RotationPatternSnapshot = Static<typeof RotationPatternSnapshotSchema>;
+
+export const SaveRotationPatternSchema = Type.Object({
+  revision: Type.Integer({ minimum: 0 }),
+  pattern: RotationPatternSchema,
+}, { additionalProperties: false });
+
+export const RotationExceptionSchema = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 200 }),
+  operation: RosterOperationSchema,
+  workerId: Type.String({ minLength: 1, maxLength: 128 }),
+  kind: Type.Union([Type.Literal("group"), Type.Literal("schedule"), Type.Literal("custom")]),
+  startDate: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+  endDate: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+  groupId: Type.Union([Type.String({ minLength: 1, maxLength: 40 }), Type.Null()]),
+  groupName: Type.Union([Type.String({ minLength: 1, maxLength: 80 }), Type.Null()]),
+  scheduleId: Type.Union([Type.String({ minLength: 1, maxLength: 80 }), Type.Null()]),
+  customScheduleName: Type.Union([Type.String({ minLength: 1, maxLength: 80 }), Type.Null()]),
+  customStart: Type.Union([Type.String({ pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }), Type.Null()]),
+  customEnd: Type.Union([Type.String({ pattern: "^([01]\\d|2[0-3]):[0-5]\\d$" }), Type.Null()]),
+}, { additionalProperties: false });
+export type RotationException = Static<typeof RotationExceptionSchema>;
+
+export const RotationAdjustmentSchema = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 200 }),
+  operation: RosterOperationSchema,
+  date: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+  shiftDays: Type.Integer({ minimum: -366, maximum: 366 }),
+  createsGap: Type.Optional(Type.Boolean()),
+}, { additionalProperties: false });
+
+export const RotationGapCoverageSchema = Type.Object({
+  id: Type.String({ minLength: 1, maxLength: 200 }),
+  operation: RosterOperationSchema,
+  startDate: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+  days: Type.Integer({ minimum: 1, maximum: 366 }),
+  dayGroup: Type.String({ minLength: 1, maxLength: 40 }),
+  nightGroup: Type.String({ minLength: 1, maxLength: 40 }),
+}, { additionalProperties: false });
+
+export const RotationCalendarStateSchema = Type.Object({
+  operation: RosterOperationSchema,
+  revision: Type.Integer({ minimum: 0 }),
+  adjustments: Type.Array(RotationAdjustmentSchema, { maxItems: 5000 }),
+  coverages: Type.Array(RotationGapCoverageSchema, { maxItems: 5000 }),
+}, { additionalProperties: false });
+export type RotationCalendarState = Static<typeof RotationCalendarStateSchema>;
+
+export const SaveRotationCalendarStateSchema = Type.Object({
+  revision: Type.Integer({ minimum: 0 }),
+  adjustments: Type.Array(RotationAdjustmentSchema, { maxItems: 5000 }),
+  coverages: Type.Array(RotationGapCoverageSchema, { maxItems: 5000 }),
+}, { additionalProperties: false });

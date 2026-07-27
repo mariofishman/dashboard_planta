@@ -132,6 +132,41 @@ it("rejects an unknown scenario rule with a usable 404", async () => {
   assert.equal(response.json().error, "unknown_scenario_rule");
 });
 
+it("reroutes an open Phase 4B incident when the roster changes and protects diagnostics by user role", async () => {
+  const instance = await scenarioServer();
+  const manager = { authorization: "Bearer mock:plant-manager" };
+  const operator = { authorization: "Bearer mock:machine-operator" };
+  const assignment = (id: string, person: string, position: string, scope: string, group: string | null, operations: string[] = [], warehouseType: string | null = null) => ({
+    id, person, position, operations, warehouseType, scope, group, validFrom: "2026-07-01", validTo: null, state: "active", setupComplete: true,
+  });
+  const roster = [
+    assignment("manager", "María Torres", "Gerente de fábrica", "factory", null),
+    assignment("supervisor-a", "Luis Vargas", "Supervisor de turno de operación", "operation_group", "A", ["Impresión"]),
+    assignment("leader", "Rosa Paredes", "Líder técnico", "operation", null, ["Impresión"]),
+    assignment("operator-a", "Jorge Acosta", "Operador de máquina", "machine_group", "A", ["Impresión"]),
+    assignment("dispatcher-a", "Carlos Mendoza", "Despachador de almacén", "warehouse_group", "A", [], "Materias primas"),
+    assignment("warehouse-supervisor-a", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", "A", [], "Materias primas"),
+  ];
+  assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: roster } })).statusCode, 200);
+  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  const incident = (await instance.app.inject({ url: "/api/incidents", headers: manager })).json().incidents.find((item: { ruleCode: string }) => item.ruleCode === "A02");
+  const route = `/api/internal/routing/${incident.id}`;
+  assert.equal((await instance.app.inject({ url: route, headers: operator })).statusCode, 403);
+  const before = await instance.app.inject({ url: route, headers: manager });
+  assert.equal(before.statusCode, 200, before.body);
+  assert.ok(before.json().recipients.some((recipient: { name: string }) => recipient.name === "Carlos Mendoza"), before.body);
+
+  const replacement = assignment("dispatcher-replacement", "Carmen Ríos", "Despachador de almacén", "warehouse_group", "A", [], "Materias primas");
+  const changed = roster.filter((item) => item.id !== "dispatcher-a").concat(replacement);
+  assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 1, assignments: changed } })).statusCode, 200);
+  const after = await instance.app.inject({ url: route, headers: manager });
+  assert.ok(after.json().recipients.some((recipient: { name: string }) => recipient.name === "Carmen Ríos"));
+  assert.equal(after.json().recipients.some((recipient: { name: string }) => recipient.name === "Carlos Mendoza"), false);
+  assert.equal(Number((await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_routing_decision WHERE incident_id=$1", [incident.id])).count), 2);
+});
+
 it("keeps simulator routes unavailable when disabled", async () => {
   const instance = await buildMonitorServer({
     config: { nodeEnv: "test", cookieSecret: "phase-4b-disabled-secret-with-enough-entropy", allowMockAuth: true, enableScenarioLab: false, databaseMode: "pglite", pgliteDataDir: "memory://" },

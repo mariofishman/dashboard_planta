@@ -6,7 +6,7 @@
 
 **Version:** 2.1
 
-**Status:** Active; Phases 0–4, 4A, and 4B complete locally; Phase 5 is in progress
+**Status:** Active; Phases 0–5 complete locally; Phase 6 has not started
 
 **Roadmap date:** 2026-07-26
 
@@ -68,7 +68,7 @@ The stable ownership, polling, authentication, incident lifecycle, failure behav
 | 4 — Incident vertical slice | A02, A03, and A05 flow through evaluation, lifecycle, evidence, API, committed live change, and dashboard | `delivery/phases/phase4/README.md` |
 | 4A — Dashboard redesign | Approved compact Dashboard V2 connected to the existing authorized APIs and incident lifecycle | `delivery/phases/phase4/README.md`, `../archive/docs/design/dashboard_v2_design_handoff.md` |
 
-The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepted as a good first version on 2026-07-22, completing Phase 4A. Phase 4B completed locally on 2026-07-23 with synthetic source-to-incident validation. Phase 5 began on 2026-07-26 with durable local roster assignments, transactional Excel-import persistence, revision conflict protection, and assignment audit history; routing and notifications remain pending.
+The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepted as a good first version on 2026-07-22, completing Phase 4A. Phase 4B completed locally on 2026-07-23 with synthetic source-to-incident validation. Phase 5 completed locally on 2026-07-26 with durable roster and rotation persistence, conflict and audit protection, deterministic catalog routing, idempotent in-app delivery, retry, administrator diagnostics/email outbox, and a passing multi-user scenario.
 
 ## 5. Revised implementation sequence
 
@@ -128,7 +128,7 @@ The simulator and scenario endpoints must be impossible to enable in staging or 
 
 ### Phase 5 — Operational Responsibility Roster, routing, and notifications
 
-**Status:** In progress. Current evidence: `delivery/phases/phase5/README.md`.
+**Status:** Complete locally on 2026-07-26. Evidence: `delivery/phases/phase5/README.md`.
 
 **Estimated effort:** 2–4 weeks
 

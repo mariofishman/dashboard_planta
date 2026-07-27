@@ -16,6 +16,8 @@ import { attachRedis, type RedisRuntime } from "./redis.js";
 import { authRoutes } from "./routes/auth.js";
 import { scenarioRoutes } from "./routes/scenarios.js";
 import { rosterRoutes } from "./routes/roster.js";
+import { rotationRoutes } from "./routes/rotation.js";
+import { RoutingService } from "./routing.js";
 
 function cookieValue(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -91,7 +93,11 @@ export async function buildMonitorServer(options: {
   await migrateFoundation(database);
   const repositoryRoot = resolve(import.meta.dirname, "../../..");
   const io = new SocketIOServer(app.server, { cors: { origin: config.webOrigin, credentials: true } });
-  const incidentService = new IncidentService(database, (change: IncidentChange) => io.to(`plant:${change.plantId}`).emit("incident.changed", change));
+  const routingService = new RoutingService(database);
+  const incidentService = new IncidentService(database, async (change: IncidentChange) => {
+    io.to(`plant:${change.plantId}`).emit("incident.changed", change);
+    if (change.lifecycle === "open") await routingService.routeIncident(change.incidentId);
+  });
   if (!config.enableScenarioLab) await seedPhase4Incidents(incidentService, repositoryRoot, database);
   const ruleDocument = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
   const incidentRules = new Map<string, RuleContract>(ruleDocument.rules.filter((rule) => ["A02", "A03", "A05"].includes(rule.code)).map((rule) => [rule.code, rule]));
@@ -169,12 +175,25 @@ export async function buildMonitorServer(options: {
     const incident = await incidentService.detail((request.params as { id: string }).id, request.principal!.plantIds);
     return incident ?? reply.code(404).send({ error: "incident_not_found" });
   });
+  app.get("/api/internal/routing/:incidentId", { preHandler: app.requireScopes(["monitor:admin"]) }, async (request, reply) => {
+    const diagnostics = await routingService.diagnostics((request.params as { incidentId: string }).incidentId);
+    return diagnostics ?? reply.code(404).send({ error: "routing_decision_not_found" });
+  });
+  app.post("/api/internal/routing/retry", { preHandler: app.requireScopes(["monitor:admin"]) }, async () => ({ retried: await routingService.retryDue() }));
   app.get("/api/changes", { preHandler: app.requireScopes(["monitor:read"]) }, async (request) => {
     const cursor = Math.max(0, Number((request.query as { after?: string }).after ?? 0) || 0);
     return { changes: await incidentService.changesAfter(cursor, request.principal!.plantIds) };
   });
   app.get("/api/admin/authorization-check", { preHandler: app.requireScopes(["monitor:admin"]) }, async () => ({ authorized: true }));
-  await app.register(rosterRoutes, { database });
+  const rerouteOpen = async (plantId: number, operation?: string) => {
+    const parameters: unknown[] = [plantId];
+    const operationFilter = operation ? " AND operation_name=$2" : "";
+    if (operation) parameters.push(operation);
+    const incidents = await database.queryAll(`SELECT id FROM monitor_incident WHERE plant_id=$1 AND lifecycle='open'${operationFilter}`, parameters);
+    for (const incident of incidents) await routingService.routeIncident(String(incident.id));
+  };
+  await app.register(rosterRoutes, { database, onChanged: (plantId) => rerouteOpen(plantId) });
+  await app.register(rotationRoutes, { database, onChanged: rerouteOpen });
   if (scenarioSource) {
     await app.register(scenarioRoutes, {
       database,

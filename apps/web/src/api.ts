@@ -1,4 +1,4 @@
-import type { RosterAssignment, RosterSnapshot, SessionResponse } from "@monitor/contracts";
+import type { RotationCalendarState, RotationException, RotationPattern, RotationPatternSnapshot, RosterAssignment, RosterSnapshot, SessionResponse } from "@monitor/contracts";
 
 export interface MockIdentitySummary {
   identityId: "monitor-admin" | "plant-manager" | "shift-supervisor" | "machine-operator" | "operation-scheduler";
@@ -117,6 +117,42 @@ export async function saveRosterAssignments(revision: number, assignments: Roste
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ revision, assignments }),
   }));
+}
+
+export async function rotationPattern(operation: string): Promise<RotationPatternSnapshot> {
+  return responseJson(await fetch(`/api/roster/rotation/${encodeURIComponent(operation)}`, { credentials: "include" }));
+}
+
+export async function saveRotationPattern(operation: string, revision: number, pattern: RotationPattern): Promise<RotationPatternSnapshot> {
+  return responseJson(await fetch(`/api/roster/rotation/${encodeURIComponent(operation)}`, {
+    method: "PUT", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ revision, pattern }),
+  }));
+}
+
+export async function rotationCalendar(operation: string): Promise<RotationCalendarState> {
+  return responseJson(await fetch(`/api/roster/rotation/${encodeURIComponent(operation)}/calendar`, { credentials: "include" }));
+}
+
+export async function saveRotationCalendar(state: RotationCalendarState): Promise<RotationCalendarState> {
+  return responseJson(await fetch(`/api/roster/rotation/${encodeURIComponent(state.operation)}/calendar`, {
+    method: "PUT", credentials: "include", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ revision: state.revision, adjustments: state.adjustments, coverages: state.coverages }),
+  }));
+}
+
+export async function rotationExceptions(operation: string): Promise<RotationException[]> {
+  return (await responseJson<{ exceptions: RotationException[] }>(await fetch(`/api/roster/rotation/${encodeURIComponent(operation)}/exceptions`, { credentials: "include" }))).exceptions;
+}
+
+export async function saveRotationException(exception: RotationException): Promise<RotationException> {
+  return responseJson(await fetch(`/api/roster/rotation/${encodeURIComponent(exception.operation)}/exceptions/${encodeURIComponent(exception.id)}`, {
+    method: "PUT", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(exception),
+  }));
+}
+
+export async function deleteRotationException(operation: string, id: string): Promise<void> {
+  const response = await fetch(`/api/roster/rotation/${encodeURIComponent(operation)}/exceptions/${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" });
+  if (!response.ok) throw new ApiRequestError(response.status, null);
 }
 
 export async function scenarios(): Promise<ScenarioStatus[]> {

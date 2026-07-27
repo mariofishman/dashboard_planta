@@ -18,7 +18,8 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:migrate": "npm run migrate -w @monitor/database",
-    "db:reset-roster": "node scripts/reset-local-roster.mjs"
+    "db:reset-roster": "node scripts/reset-local-roster.mjs",
+    "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts"
   },
   "devDependencies": {
     "concurrently": "9.2.4"

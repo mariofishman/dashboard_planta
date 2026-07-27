@@ -3,6 +3,7 @@ import ArrowDownwardRounded from "@mui/icons-material/ArrowDownwardRounded";
 import ArrowDropDownRounded from "@mui/icons-material/ArrowDropDownRounded";
 import ArrowForwardRounded from "@mui/icons-material/ArrowForwardRounded";
 import ArrowUpwardRounded from "@mui/icons-material/ArrowUpwardRounded";
+import AddRounded from "@mui/icons-material/AddRounded";
 import CalendarMonthRounded from "@mui/icons-material/CalendarMonthRounded";
 import CloseRounded from "@mui/icons-material/CloseRounded";
 import DashboardRounded from "@mui/icons-material/DashboardRounded";
@@ -18,7 +19,7 @@ import PersonOutlineRounded from "@mui/icons-material/PersonOutlineRounded";
 import RefreshRounded from "@mui/icons-material/RefreshRounded";
 import RestoreRounded from "@mui/icons-material/RestoreRounded";
 import SwapHorizRounded from "@mui/icons-material/SwapHorizRounded";
-import type { RosterAssignment, SessionResponse } from "@monitor/contracts";
+import { firstRotationPatternConflict, type RosterAssignment, type SessionResponse } from "@monitor/contracts";
 import { monitorSemanticTokens, monitorTokens } from "@monitor/design-system";
 import {
   Alert,
@@ -69,7 +70,18 @@ import {
   type RotationAdjustment,
   type RotationGapCoverage,
 } from "./rotationSchedule";
-import { ApiRequestError, rosterAssignments, saveRosterAssignments } from "./api";
+import {
+  ApiRequestError,
+  deleteRotationException,
+  rosterAssignments,
+  rotationCalendar,
+  rotationExceptions as loadRotationExceptions,
+  rotationPattern as loadRotationPattern,
+  saveRosterAssignments,
+  saveRotationCalendar,
+  saveRotationException,
+  saveRotationPattern,
+} from "./api";
 import { mergeRosterAssignments } from "./rosterPersistence";
 
 type RosterView = "responsibilities" | "rotation";
@@ -168,6 +180,11 @@ interface RotationPattern {
   effectiveFrom: string;
   schedules: RotationSchedule[];
   groups: RotationPatternGroup[];
+}
+
+interface RotationGroupReassignment {
+  fromGroupId: string;
+  toGroupId: string;
 }
 
 interface WorkerScheduleException {
@@ -854,6 +871,28 @@ const phaseTone: Record<RotationPhase, { background: string; color: string; bord
 
 function scheduleFor(pattern: RotationPattern, scheduleId: RotationScheduleId) {
   return pattern.schedules.find((schedule) => schedule.id === scheduleId) ?? pattern.schedules[0]!;
+}
+
+function patternForGroupMatrix(pattern: RotationPattern): RotationPattern {
+  const usedScheduleIds = new Set<string>();
+  const schedules: RotationSchedule[] = [];
+  const groups = pattern.groups.map((group) => {
+    const source = pattern.schedules.find((schedule) => schedule.id === group.anchorScheduleId)
+      ?? { id: `schedule-${group.id.toLowerCase()}`, name: `Horario ${group.name}`, start: "07:00", end: "15:00", isRest: false };
+    let scheduleId = source.id;
+    let suffix = 1;
+    while (usedScheduleIds.has(scheduleId)) scheduleId = `${source.id}-${group.id.toLowerCase()}-${suffix++}`;
+    usedScheduleIds.add(scheduleId);
+    schedules.push({
+      ...source,
+      id: scheduleId,
+      name: source.isRest ? "Descanso" : source.name,
+      start: source.isRest ? null : source.start,
+      end: source.isRest ? null : source.end,
+    });
+    return { ...group, anchorScheduleId: scheduleId };
+  });
+  return { ...pattern, schedules, groups };
 }
 
 function scheduleForException(pattern: RotationPattern, exception: WorkerScheduleException | null) {
@@ -2092,7 +2131,10 @@ function RotationView({
                         gap={0.25}
                         sx={{
                           minHeight: { xs: 28, sm: 32 },
-                          ...(selectedPerson ? { display: "grid", gridTemplateRows: "repeat(2, minmax(0, 1fr))" } : {}),
+                          display: "grid",
+                          gridTemplateRows: "repeat(2, minmax(0, 1fr))",
+                          gridAutoFlow: "column",
+                          gridAutoColumns: "minmax(0, 1fr)",
                           opacity: isLockedDate ? 0.42 : 1,
                           filter: isLockedDate ? "grayscale(0.75)" : "none",
                           pointerEvents: isLockedDate ? "none" : "auto",
@@ -2123,7 +2165,7 @@ function RotationView({
                               px: 0.25,
                               borderRadius: ui.control.radius,
                               justifyContent: "center",
-                              gridRow: selectedPerson ? effectivePhase === "day" ? "1" : effectivePhase === "night" ? "2" : "1 / span 2" : undefined,
+                              gridRow: effectivePhase === "day" ? "1" : effectivePhase === "night" ? "2" : "1 / span 2",
                               bgcolor: selectedPerson ? phaseTone[effectivePhase].background : effectivePhase === "rest" ? phaseTone.rest.background : groupColor(item.group),
                               color: selectedPerson ? phaseTone[effectivePhase].color : effectivePhase === "rest" ? phaseTone.rest.color : ui.color.textInverse,
                               border: `1px solid ${selectedPerson ? phaseTone[effectivePhase].border : effectivePhase === "rest" ? phaseTone.rest.border : groupColor(item.group)}`,
@@ -2175,7 +2217,7 @@ function RotationView({
                                 px: 0.25,
                                 borderRadius: ui.control.radius,
                                 justifyContent: "center",
-                                gridRow: person ? scheduleLane(effectiveSchedule) : undefined,
+                                gridRow: scheduleLane(effectiveSchedule),
                                 bgcolor: tone.background,
                                 color: tone.color,
                                 border: `1px solid ${tone.border}`,
@@ -3075,78 +3117,277 @@ function GroupDrawer({ group, onClose }: { group: WorkerGroup | null; onClose: (
   );
 }
 
+function CompactIntegerField({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+  helperText,
+  centered = false,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  helperText?: string;
+  centered?: boolean;
+}) {
+  const [input, setInput] = useState(String(value));
+  useEffect(() => setInput(String(value)), [value]);
+  const apply = (raw: string) => {
+    const parsed = Number(raw);
+    const next = Number.isFinite(parsed) ? Math.max(min, Math.min(max, Math.trunc(parsed))) : min;
+    setInput(String(next));
+    onChange(next);
+  };
+  return (
+    <TextField
+      label={label}
+      type="number"
+      value={input}
+      onFocus={(event) => event.target.select()}
+      onChange={(event) => {
+        const raw = event.target.value;
+        setInput(raw);
+        if (raw !== "" && /^\d+$/.test(raw)) onChange(Math.max(min, Math.min(max, Number(raw))));
+      }}
+      onBlur={() => apply(input)}
+      inputProps={{ min, max, inputMode: "numeric", style: centered ? { textAlign: "center" } : undefined }}
+      helperText={helperText}
+      fullWidth
+    />
+  );
+}
+
+const time24Pattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function normalizeTime24(raw: string) {
+  if (time24Pattern.test(raw)) return raw;
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 3 || digits.length > 4) return null;
+  const padded = digits.padStart(4, "0");
+  const normalized = `${padded.slice(0, 2)}:${padded.slice(2)}`;
+  return time24Pattern.test(normalized) ? normalized : null;
+}
+
+function CompactTimeField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [input, setInput] = useState(value);
+  useEffect(() => setInput(value), [value]);
+  const apply = () => {
+    const normalized = normalizeTime24(input);
+    if (!normalized) {
+      setInput(value);
+      return;
+    }
+    setInput(normalized);
+    onChange(normalized);
+  };
+  return (
+    <TextField
+      label={label}
+      value={input}
+      placeholder="HH:mm"
+      onFocus={(event) => event.target.select()}
+      onChange={(event) => setInput(event.target.value.replace(/[^\d:]/g, "").slice(0, 5))}
+      onBlur={apply}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          apply();
+          event.currentTarget.querySelector("input")?.blur();
+        }
+      }}
+      inputProps={{ inputMode: "numeric", pattern: "([01]\\d|2[0-3]):[0-5]\\d", maxLength: 5 }}
+      fullWidth
+    />
+  );
+}
+
 function RotationDialog({
   open,
   operation,
   pattern,
+  responsibilities,
   onClose,
   onSave,
 }: {
   open: boolean;
   operation: string;
   pattern: RotationPattern;
+  responsibilities: Responsibility[];
   onClose: () => void;
-  onSave: (pattern: RotationPattern) => void;
+  onSave: (pattern: RotationPattern, reassignments: RotationGroupReassignment[]) => void;
 }) {
-  const [draft, setDraft] = useState(pattern);
-  useEffect(() => { if (open) setDraft(pattern); }, [open, pattern]);
+  const [draft, setDraft] = useState(() => patternForGroupMatrix(pattern));
+  const [reassignments, setReassignments] = useState<RotationGroupReassignment[]>([]);
+  const [groupRemoval, setGroupRemoval] = useState<{ groupId: string; targetCount: number } | null>(null);
+  const [groupRemovalTarget, setGroupRemovalTarget] = useState("");
+  const [replacementGroupName, setReplacementGroupName] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    setDraft(patternForGroupMatrix(pattern));
+    setReassignments([]);
+    setGroupRemoval(null);
+    setGroupRemovalTarget("");
+    setReplacementGroupName("");
+  }, [open, pattern]);
   const updateGroup = (id: string, patch: Partial<RotationPatternGroup>) => {
     setDraft((current) => ({ ...current, groups: current.groups.map((group) => group.id === id ? { ...group, ...patch } : group) }));
   };
   const setGroupCount = (count: number) => {
     const nextCount = Math.max(1, Math.min(6, count));
+    if (nextCount < draft.groups.length) {
+      setGroupRemoval({ groupId: draft.groups.at(-1)!.id, targetCount: nextCount });
+      setGroupRemovalTarget("");
+      setReplacementGroupName("");
+      return;
+    }
     setDraft((current) => {
       const nextGroups = [...current.groups];
+      const schedules = [...current.schedules];
       while (nextGroups.length < nextCount) {
         const index = nextGroups.length;
         const id = String.fromCharCode(65 + index);
+        let scheduleIndex = schedules.length;
+        let scheduleId = `schedule-${id.toLowerCase()}`;
+        while (schedules.some((schedule) => schedule.id === scheduleId)) scheduleId = `schedule-${id.toLowerCase()}-${++scheduleIndex}`;
+        const restIndex = schedules.findIndex((schedule) => schedule.isRest);
+        schedules.splice(restIndex < 0 ? schedules.length : restIndex, 0, {
+          id: scheduleId,
+          name: `Horario ${id}`,
+          start: "07:00",
+          end: "15:00",
+          isRest: false,
+        });
         nextGroups.push({
           id,
           name: id,
-          anchorScheduleId: current.schedules[index % current.schedules.length]!.id,
+          anchorScheduleId: scheduleId,
           daysPerPhase: 2,
         });
       }
-      return { ...current, groups: nextGroups.slice(0, nextCount) };
+      return { ...current, groups: nextGroups, schedules };
     });
   };
-  const updateSchedule = (id: RotationScheduleId, patch: Partial<RotationSchedule>) => {
+  const requestGroupRemoval = (groupId: string) => {
+    if (draft.groups.length <= 1) return;
+    setGroupRemoval({ groupId, targetCount: draft.groups.length - 1 });
+    setGroupRemovalTarget("");
+    setReplacementGroupName("");
+  };
+  const confirmGroupRemoval = () => {
+    if (!groupRemoval || !groupRemovalTarget) return;
+    const removed = draft.groups.find((group) => group.id === groupRemoval.groupId);
+    if (!removed) return;
+    if (groupRemovalTarget === "__new__") {
+      const name = replacementGroupName.trim();
+      if (!name) return;
+      setDraft((current) => ({
+        ...current,
+        groups: current.groups.map((group) => group.id === removed.id ? { ...group, name } : group),
+      }));
+      setGroupRemoval(null);
+      return;
+    }
+    setReassignments((current) => [
+      ...current.filter((item) => item.fromGroupId !== removed.id),
+      { fromGroupId: removed.id, toGroupId: groupRemovalTarget },
+    ]);
+    const remainingGroups = draft.groups.filter((group) => group.id !== removed.id);
     setDraft((current) => ({
       ...current,
-      schedules: current.schedules.map((schedule) => schedule.id === id ? { ...schedule, ...patch } : schedule),
+      schedules: current.schedules.filter((schedule) => schedule.id !== removed.anchorScheduleId),
+      groups: current.groups.filter((group) => group.id !== removed.id),
     }));
+    if (remainingGroups.length > groupRemoval.targetCount) {
+      setGroupRemoval({ groupId: remainingGroups.at(-1)!.id, targetCount: groupRemoval.targetCount });
+      setGroupRemovalTarget("");
+      return;
+    }
+    setGroupRemoval(null);
   };
-  const addSchedule = () => {
+  const updateGroupSchedule = (groupId: string, patch: Partial<RotationSchedule>) => {
     setDraft((current) => {
-      if (current.schedules.length >= 12) return current;
-      let index = current.schedules.length;
-      let id = `schedule-${index}`;
-      while (current.schedules.some((schedule) => schedule.id === id)) id = `schedule-${++index}`;
-      const restIndex = current.schedules.findIndex((schedule) => schedule.isRest);
+      const group = current.groups.find((item) => item.id === groupId);
+      if (!group) return current;
+      const schedule = current.schedules.find((item) => item.id === group.anchorScheduleId);
+      if (!schedule || schedule.isRest) return current;
+      const shared = current.groups.some((item) => item.id !== groupId && item.anchorScheduleId === schedule.id);
+      if (!shared) {
+        return { ...current, schedules: current.schedules.map((item) => item.id === schedule.id ? { ...item, ...patch } : item) };
+      }
+      let suffix = 1;
+      let scheduleId = `${schedule.id}-${groupId.toLowerCase()}`;
+      while (current.schedules.some((item) => item.id === scheduleId)) scheduleId = `${schedule.id}-${groupId.toLowerCase()}-${++suffix}`;
       const schedules = [...current.schedules];
-      schedules.splice(restIndex < 0 ? schedules.length : restIndex, 0, {
-        id,
-        name: `Horario ${current.schedules.filter((schedule) => !schedule.isRest).length + 1}`,
-        start: "07:00",
-        end: "15:00",
-        isRest: false,
-      });
-      return { ...current, schedules };
+      schedules.splice(schedules.findIndex((item) => item.id === schedule.id) + 1, 0, { ...schedule, ...patch, id: scheduleId });
+      return {
+        ...current,
+        schedules,
+        groups: current.groups.map((item) => item.id === groupId ? { ...item, anchorScheduleId: scheduleId } : item),
+      };
     });
   };
-  const removeSchedule = (id: RotationScheduleId) => {
-    setDraft((current) => ({ ...current, schedules: current.schedules.filter((schedule) => schedule.id !== id) }));
+  const setGroupRest = (groupId: string, rest: boolean) => {
+    setDraft((current) => {
+      const group = current.groups.find((item) => item.id === groupId);
+      if (!group) return current;
+      const currentSchedule = current.schedules.find((item) => item.id === group.anchorScheduleId);
+      if (!currentSchedule) return current;
+      if (rest) {
+        if (currentSchedule.isRest) return current;
+        return {
+          ...current,
+          schedules: current.schedules.map((item) => item.id === currentSchedule.id
+            ? { ...item, name: "Descanso", start: null, end: null, isRest: true }
+            : item),
+        };
+      }
+      if (!currentSchedule.isRest) return current;
+      return {
+        ...current,
+        schedules: current.schedules.map((item) => item.id === currentSchedule.id
+          ? { ...item, name: `Horario ${group.name}`, start: "07:00", end: "15:00", isRest: false }
+          : item),
+      };
+    });
   };
   const namesAreValid = draft.groups.every((group) => group.name.trim())
     && new Set(draft.groups.map((group) => normalizeSearchText(group.name))).size === draft.groups.length;
-  const schedulesAreValid = draft.schedules.every((schedule) => schedule.name.trim() && (schedule.isRest || (schedule.start && schedule.end)))
-    && new Set(draft.schedules.map((schedule) => normalizeSearchText(schedule.name))).size === draft.schedules.length;
+  const workingScheduleNames = draft.schedules.filter((schedule) => !schedule.isRest).map((schedule) => normalizeSearchText(schedule.name));
+  const schedulesAreValid = draft.schedules.every((schedule) => schedule.name.trim()
+    && (schedule.isRest || (schedule.start && schedule.end && time24Pattern.test(schedule.start) && time24Pattern.test(schedule.end))))
+    && new Set(workingScheduleNames).size === workingScheduleNames.length;
+  const patternConflict = firstRotationPatternConflict(draft);
+  const conflictMessage = patternConflict ? (() => {
+    const schedule = draft.schedules.find((item) => item.id === patternConflict.scheduleId)?.name ?? patternConflict.scheduleId;
+    const groups = patternConflict.groupIds.map((id) => draft.groups.find((item) => item.id === id)?.name ?? id);
+    return `${groups[0]} y ${groups[1]} coinciden en ${schedule} el ${displayDate(addDaysKey(draft.effectiveFrom, patternConflict.dayOffset))}. Cambia el horario inicial o los días consecutivos.`;
+  })() : null;
+  const removedGroup = groupRemoval ? draft.groups.find((group) => group.id === groupRemoval.groupId) ?? null : null;
+  const affectedWorkers = removedGroup
+    ? responsibilities.filter((item) => item.group === removedGroup.id && item.operations.includes(operation))
+    : [];
+  const referenceDateLabel = draft.effectiveFrom
+    ? new Intl.DateTimeFormat("es-PE", { day: "numeric", month: "long" }).format(dateFromKey(draft.effectiveFrom))
+    : "la fecha de referencia";
   return (
+    <>
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>Patrón de rotación · {operation}</DialogTitle>
       <DialogContent dividers>
         <Stack gap={1.5} sx={{ pt: 0.5 }}>
-          <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
+          <Stack direction={{ xs: "column", sm: "row" }} gap={1} alignItems={{ sm: "center" }}>
             <TextField
               label="Fecha de referencia"
               type="date"
@@ -3155,106 +3396,177 @@ function RotationDialog({
               InputLabelProps={{ shrink: true }}
               fullWidth
             />
-            <TextField
-              label="Cantidad de grupos"
-              type="number"
-              value={draft.groups.length}
-              onChange={(event) => setGroupCount(Number(event.target.value) || 1)}
-              inputProps={{ min: 1, max: 6 }}
-              fullWidth
-            />
+            <Button
+              variant="outlined"
+              startIcon={<AddRounded sx={{ fontSize: 16 }} />}
+              disabled={draft.groups.length >= 6}
+              onClick={() => setGroupCount(draft.groups.length + 1)}
+              sx={{ flex: "0 0 auto", alignSelf: { xs: "flex-start", sm: "center" } }}
+            >
+              Agregar grupo
+            </Button>
           </Stack>
           <Box>
-            <Typography variant="caption" fontWeight={700} sx={{ display: "block", mb: 0.5 }}>Nombres de los grupos</Typography>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" }, gap: 1 }}>
-              {draft.groups.map((group) => (
-                <Stack key={group.id} direction="row" gap={0.5} alignItems="center">
-                  <GroupMark group={group.id} />
-                  <TextField
-                    label={`Nombre del grupo ${group.id}`}
-                    value={group.name}
-                    onChange={(event) => updateGroup(group.id, { name: event.target.value })}
-                    fullWidth
-                  />
-                </Stack>
-              ))}
-            </Box>
-          </Box>
-          {!namesAreValid && <Alert severity="error">Cada grupo necesita un nombre distinto.</Alert>}
-          <Box>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-              <Typography variant="caption" fontWeight={700}>Tipos de horario</Typography>
-              <Button variant="outlined" onClick={addSchedule} disabled={draft.schedules.length >= 12}>Agregar horario</Button>
-            </Stack>
+            <Typography variant="caption" fontWeight={700} sx={{ display: "block", mb: 0.5 }}>Configuración de grupos</Typography>
             <Paper variant="outlined" sx={{ overflow: "hidden", borderRadius: 1.5 }}>
-              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(180px, 1fr) minmax(130px, .7fr) minmax(130px, .7fr) 32px" }, columnGap: 1, bgcolor: "background.default", px: 1, py: 0.75 }}>
-                {['Nombre', 'Inicio', 'Fin', ''].map((label, index) => <Typography key={`${label}-${index}`} variant="caption" fontWeight={700}>{label}</Typography>)}
+              <Box
+                sx={{
+                  display: { xs: "none", sm: "grid" },
+                  gridTemplateColumns: "minmax(170px, 1fr) minmax(150px, .9fr) minmax(250px, 1.35fr) 88px 32px",
+                  columnGap: 1,
+                  bgcolor: "background.default",
+                  px: 1,
+                  py: 0.75,
+                }}
+              >
+                {["Nombre del grupo", `Horario inicial al ${referenceDateLabel}`, "Rango", "Días consecutivos", ""].map((label, index) => (
+                  <Typography key={`${label}-${index}`} variant="caption" fontWeight={700} textAlign={index === 3 ? "center" : "left"}>{label}</Typography>
+                ))}
               </Box>
-              {draft.schedules.map((schedule) => {
-                const scheduleInUse = draft.groups.some((group) => group.anchorScheduleId === schedule.id);
+              {draft.groups.map((group) => {
+                const schedule = scheduleFor(draft, group.anchorScheduleId);
                 return (
-                  <Box key={schedule.id} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(180px, 1fr) minmax(130px, .7fr) minmax(130px, .7fr) 32px" }, columnGap: 1, rowGap: 1, alignItems: "center", px: 1, py: 1, borderTop: "1px solid", borderColor: "divider" }}>
+                  <Box
+                    key={group.id}
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", sm: "minmax(170px, 1fr) minmax(150px, .9fr) minmax(250px, 1.35fr) 88px 32px" },
+                      gap: 1,
+                      alignItems: "center",
+                      px: 1,
+                      py: 1,
+                      borderTop: "1px solid",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <Stack direction="row" gap={0.5} alignItems="center">
+                      <GroupMark group={group.id} />
+                      <TextField
+                        label="Nombre del grupo"
+                        value={group.name}
+                        onChange={(event) => updateGroup(group.id, { name: event.target.value })}
+                        fullWidth
+                      />
+                    </Stack>
+                    <TextField
+                      label="Horario inicial"
+                      value={schedule.name}
+                      disabled={schedule.isRest}
+                      onChange={(event) => updateGroupSchedule(group.id, { name: event.target.value })}
+                      fullWidth
+                    />
                     {schedule.isRest ? (
-                      <TextField label="Nombre" value="Descanso" slotProps={{ input: { readOnly: true } }} fullWidth />
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        sx={{ minHeight: ui.control.visibleHeight, whiteSpace: "nowrap" }}
+                      >
+                        <Checkbox
+                          checked
+                          onChange={(event) => setGroupRest(group.id, event.target.checked)}
+                          inputProps={{ "aria-label": `No trabaja el grupo ${group.name}` }}
+                          size="small"
+                        />
+                        <Typography variant="caption" fontWeight={700} color="text.secondary">No trabaja</Typography>
+                      </Stack>
                     ) : (
-                      <TextField label="Nombre" value={schedule.name} onChange={(event) => updateSchedule(schedule.id, { name: event.target.value })} fullWidth />
+                      <Stack direction="row" gap={0.5} alignItems="center">
+                        <CompactTimeField
+                          label="Inicio"
+                          value={schedule.start ?? ""}
+                          onChange={(start) => updateGroupSchedule(group.id, { start })}
+                        />
+                        <Typography variant="caption" color="text.secondary">–</Typography>
+                        <CompactTimeField
+                          label="Fin"
+                          value={schedule.end ?? ""}
+                          onChange={(end) => updateGroupSchedule(group.id, { end })}
+                        />
+                        <Stack direction="row" alignItems="center" sx={{ whiteSpace: "nowrap" }}>
+                          <Checkbox
+                            checked={false}
+                            onChange={(event) => setGroupRest(group.id, event.target.checked)}
+                            inputProps={{ "aria-label": `Marcar que no trabaja el grupo ${group.name}` }}
+                            size="small"
+                          />
+                          <Typography variant="caption" color="text.secondary">No trabaja</Typography>
+                        </Stack>
+                      </Stack>
                     )}
-                    {schedule.isRest ? (
-                      <Box sx={{ gridColumn: { sm: "2 / span 2" }, minHeight: ui.control.visibleHeight, display: "flex", alignItems: "center", px: 1, bgcolor: ui.color.canvas, border: "1px solid", borderColor: "divider", borderRadius: ui.control.radius }}>
-                        <Typography variant="caption" fontWeight={700} color="text.secondary">No trabaja · sin horario</Typography>
-                      </Box>
-                    ) : (
-                      <>
-                        <TextField label="Inicio" type="time" value={schedule.start ?? ""} onChange={(event) => updateSchedule(schedule.id, { start: event.target.value })} fullWidth />
-                        <TextField label="Fin" type="time" value={schedule.end ?? ""} onChange={(event) => updateSchedule(schedule.id, { end: event.target.value })} fullWidth />
-                      </>
-                    )}
-                    {!schedule.isRest && (
-                      <IconButton aria-label={`Eliminar horario ${schedule.name}`} disabled={scheduleInUse} onClick={() => removeSchedule(schedule.id)} sx={{ width: 32, height: 32 }}>
-                        <CloseRounded sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    )}
+                    <Box sx={{ width: 64, justifySelf: "center" }}>
+                      <CompactIntegerField
+                        label="Días"
+                        value={group.daysPerPhase}
+                        min={1}
+                        max={14}
+                        centered
+                        onChange={(daysPerPhase) => updateGroup(group.id, { daysPerPhase })}
+                      />
+                    </Box>
+                    <IconButton
+                      aria-label={`Eliminar grupo ${group.name}`}
+                      disabled={draft.groups.length <= 1}
+                      onClick={() => requestGroupRemoval(group.id)}
+                      sx={{ width: 32, height: 32 }}
+                    >
+                      <CloseRounded sx={{ fontSize: 16 }} />
+                    </IconButton>
                   </Box>
                 );
               })}
             </Paper>
           </Box>
+          {!namesAreValid && <Alert severity="error">Cada grupo necesita un nombre distinto.</Alert>}
           {!schedulesAreValid && <Alert severity="error">Cada horario necesita un nombre distinto, una hora de inicio y una hora de fin.</Alert>}
-          <Paper variant="outlined" sx={{ overflow: "hidden", borderRadius: 1.5 }}>
-            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(220px, 1fr) minmax(140px, .6fr)" }, bgcolor: "background.default" }}>
-              {["Horario inicial", "Días consecutivos"].map((label) => (
-                <Typography key={label} variant="caption" fontWeight={700} sx={{ px: 1, py: 0.75 }}>{label}</Typography>
-              ))}
-            </Box>
-            {draft.groups.map((group) => (
-              <Box key={group.id} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(220px, 1fr) minmax(140px, .6fr)" }, gap: 1, alignItems: "center", px: 1, py: 1, borderTop: "1px solid", borderColor: "divider" }}>
-                <Stack direction="row" gap={0.5} alignItems="center">
-                  <GroupMark group={group.id} />
-                  <TextField
-                    select
-                    label="Horario inicial"
-                    value={group.anchorScheduleId}
-                    onChange={(event) => updateGroup(group.id, { anchorScheduleId: event.target.value })}
-                    fullWidth
-                  >
-                    {draft.schedules.map((schedule) => <MenuItem key={schedule.id} value={schedule.id}>{schedule.name}</MenuItem>)}
-                  </TextField>
-                </Stack>
-                <TextField
-                  label="Días"
-                  type="number"
-                  value={group.daysPerPhase}
-                  onChange={(event) => updateGroup(group.id, { daysPerPhase: Math.max(1, Math.min(14, Number(event.target.value) || 1)) })}
-                  inputProps={{ min: 1, max: 14 }}
-                  fullWidth
-                />
-              </Box>
-            ))}
-          </Paper>
+          {conflictMessage && <Alert severity="error">{conflictMessage}</Alert>}
         </Stack>
       </DialogContent>
-      <DialogActions><Button onClick={onClose}>Cancelar</Button><Button variant="contained" disabled={!namesAreValid || !schedulesAreValid || !draft.effectiveFrom} onClick={() => { onSave(draft); onClose(); }}>Guardar patrón</Button></DialogActions>
+      <DialogActions><Button onClick={onClose}>Cancelar</Button><Button variant="contained" disabled={!namesAreValid || !schedulesAreValid || !draft.effectiveFrom || Boolean(patternConflict)} onClick={() => { onSave(draft, reassignments); onClose(); }}>Guardar patrón</Button></DialogActions>
     </Dialog>
+    <Dialog open={Boolean(groupRemoval && removedGroup)} onClose={() => setGroupRemoval(null)} fullWidth maxWidth="xs">
+      <DialogTitle>Eliminar grupo {removedGroup?.name}</DialogTitle>
+      <DialogContent dividers>
+        <Stack gap={1.5} sx={{ pt: 0.5 }}>
+          <Typography variant="body2">
+            {affectedWorkers.length === 1
+              ? `${affectedWorkers[0]!.person} pertenece a este grupo.`
+              : `${affectedWorkers.length} personas pertenecen a este grupo.`}
+          </Typography>
+          <Alert severity="info">Elige otro grupo o crea un grupo de reemplazo.</Alert>
+          <TextField
+            select
+            label="Destino de las personas"
+            value={groupRemovalTarget}
+            onChange={(event) => setGroupRemovalTarget(event.target.value)}
+            fullWidth
+          >
+            {draft.groups.filter((group) => group.id !== removedGroup?.id).map((group) => (
+              <MenuItem key={group.id} value={group.id}>Grupo {group.name}</MenuItem>
+            ))}
+            <MenuItem value="__new__">Crear grupo de reemplazo</MenuItem>
+          </TextField>
+          {groupRemovalTarget === "__new__" && (
+            <TextField
+              label="Nombre del grupo nuevo"
+              value={replacementGroupName}
+              onChange={(event) => setReplacementGroupName(event.target.value)}
+              fullWidth
+            />
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setGroupRemoval(null)}>Cancelar</Button>
+        <Button
+          variant="contained"
+          disabled={!groupRemovalTarget || (groupRemovalTarget === "__new__" && !replacementGroupName.trim())}
+          onClick={confirmGroupRemoval}
+        >
+          {groupRemovalTarget === "__new__" ? "Crear y conservar personas" : "Mover personas y eliminar"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 }
 
@@ -3297,12 +3609,12 @@ function RotationGapCoverageDialog({
           <TextField select label="Grupo de noche" value={nightGroup} onChange={(event) => setNightGroup(event.target.value as WorkerGroup["id"])}>
             {availableGroups.map((item) => <MenuItem key={item.id} value={item.id}>Grupo {item.name}</MenuItem>)}
           </TextField>
-          <TextField
+          <CompactIntegerField
             label="Cantidad de días"
-            type="number"
             value={days}
-            onChange={(event) => setDays(Math.max(1, Math.min(target.maxDays, Number(event.target.value) || 1)))}
-            inputProps={{ min: 1, max: target.maxDays }}
+            min={1}
+            max={target.maxDays}
+            onChange={setDays}
             helperText={`Máximo disponible desde esta fecha: ${target.maxDays} día${target.maxDays === 1 ? "" : "s"}.`}
           />
           {dayGroup === nightGroup && <Alert severity="error">Día y noche deben asignarse a grupos distintos.</Alert>}
@@ -3398,6 +3710,8 @@ export function OperationalResponsibilityRoster({ session, onLogout }: { session
   const savedPeopleRef = useRef(people);
   const rosterRevisionRef = useRef(0);
   const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const rotationRevisionRef = useRef<Record<string, number>>({});
+  const calendarRevisionRef = useRef<Record<string, number>>({});
   const [rosterReady, setRosterReady] = useState(!canManageResponsibilities);
   const [persistenceNotice, setPersistenceNotice] = useState<{ severity: "success" | "warning" | "error"; message: string } | null>(null);
   const [assignment, setAssignment] = useState<Responsibility | null>(null);
@@ -3517,6 +3831,67 @@ export function OperationalResponsibilityRoster({ session, onLogout }: { session
     return () => { cancelled = true; };
   }, [canManageResponsibilities]);
 
+  useEffect(() => {
+    if (!editableRotationOperations.length) return;
+    let cancelled = false;
+    void Promise.all(editableRotationOperations.map(async (operation) => {
+      const [pattern, calendar, exceptions] = await Promise.all([
+        loadRotationPattern(operation), rotationCalendar(operation), loadRotationExceptions(operation),
+      ]);
+      return { operation, pattern, calendar, exceptions };
+    })).then((loaded) => {
+      if (cancelled) return;
+      setRotationPatterns((current) => ({ ...current, ...Object.fromEntries(loaded.map(({ operation, pattern }) => {
+        rotationRevisionRef.current[operation] = pattern.revision;
+        return [operation, pattern.pattern as RotationPattern];
+      })) }));
+      setRotationAdjustments(loaded.flatMap(({ operation, calendar }) => {
+        calendarRevisionRef.current[operation] = calendar.revision;
+        return calendar.adjustments as RotationAdjustment[];
+      }));
+      setRotationGapCoverages(loaded.flatMap(({ calendar }) => calendar.coverages as RotationGapCoverage[]));
+      setRotationExceptions(loaded.flatMap(({ exceptions }) => exceptions as WorkerScheduleException[]));
+    }).catch(() => {
+      if (!cancelled) setPersistenceNotice({ severity: "error", message: "No se pudo cargar la rotación guardada." });
+    });
+    return () => { cancelled = true; };
+  }, [editableRotationOperations.join("|")]);
+
+  const persistPattern = async (operation: string, pattern: RotationPattern) => {
+    if (JSON.stringify(rotationPatterns[operation] ?? defaultRotationPattern()) === JSON.stringify(pattern)) return;
+    setRotationPatterns((current) => ({ ...current, [operation]: pattern }));
+    try {
+      const saved = await saveRotationPattern(operation, rotationRevisionRef.current[operation] ?? 0, pattern as Parameters<typeof saveRotationPattern>[2]);
+      rotationRevisionRef.current[operation] = saved.revision;
+      setRotationPatterns((current) => ({ ...current, [operation]: saved.pattern as RotationPattern }));
+      setPersistenceNotice({ severity: "success", message: "Patrón guardado en la base de datos." });
+    } catch (error) {
+      const current = await loadRotationPattern(operation);
+      rotationRevisionRef.current[operation] = current.revision;
+      setRotationPatterns((patterns) => ({ ...patterns, [operation]: current.pattern as RotationPattern }));
+      setPersistenceNotice({ severity: "error", message: error instanceof ApiRequestError && error.status === 409
+        ? "El patrón cambió en otra sesión. Se cargó la versión más reciente."
+        : "No se pudo guardar el patrón." });
+    }
+  };
+
+  const persistCalendar = async (operation: string, adjustments: RotationAdjustment[], coverages: RotationGapCoverage[]) => {
+    const scopedAdjustments = adjustments.filter((item) => item.operation === operation);
+    const scopedCoverages = coverages.filter((item) => item.operation === operation);
+    try {
+      const saved = await saveRotationCalendar({ operation: operation as Parameters<typeof saveRotationCalendar>[0]["operation"],
+        revision: calendarRevisionRef.current[operation] ?? 0, adjustments: scopedAdjustments as Parameters<typeof saveRotationCalendar>[0]["adjustments"],
+        coverages: scopedCoverages as Parameters<typeof saveRotationCalendar>[0]["coverages"] });
+      calendarRevisionRef.current[operation] = saved.revision;
+    } catch {
+      const current = await rotationCalendar(operation);
+      calendarRevisionRef.current[operation] = current.revision;
+      setRotationAdjustments((items) => [...items.filter((item) => item.operation !== operation), ...(current.adjustments as RotationAdjustment[])]);
+      setRotationGapCoverages((items) => [...items.filter((item) => item.operation !== operation), ...(current.coverages as RotationGapCoverage[])]);
+      setPersistenceNotice({ severity: "error", message: "No se pudo guardar el cambio de calendario. Se cargó la versión confirmada." });
+    }
+  };
+
   const savePerson = (updated: Responsibility) => {
     commitPeople(peopleRef.current.map((item) => item.id === updated.id ? updated : item), "Cambios guardados en la base de datos.");
     setAssignment(updated);
@@ -3625,18 +4000,32 @@ export function OperationalResponsibilityRoster({ session, onLogout }: { session
               adjustments={rotationAdjustments}
               coverages={rotationGapCoverages}
               exceptions={rotationExceptions}
-              onAddException={(exception) => setRotationExceptions((current) => [
-                ...current.filter((item) => item.id !== exception.id),
-                exception,
-              ])}
+              onAddException={(exception) => {
+                setRotationExceptions((current) => [...current.filter((item) => item.id !== exception.id), exception]);
+                void saveRotationException(exception as Parameters<typeof saveRotationException>[0]).catch(async () => {
+                  const confirmed = await loadRotationExceptions(exception.operation) as WorkerScheduleException[];
+                  setRotationExceptions((current) => [...current.filter((item) => item.operation !== exception.operation), ...confirmed]);
+                  setPersistenceNotice({ severity: "error", message: "No se pudo guardar el cambio temporal." });
+                });
+              }}
               onRemoveExceptions={(ids) => setRotationExceptions((current) => {
                 const removed = new Set(ids);
+                current.filter((item) => removed.has(item.id)).forEach((item) => {
+                  void deleteRotationException(item.operation, item.id).catch(async () => {
+                    const confirmed = await loadRotationExceptions(item.operation) as WorkerScheduleException[];
+                    setRotationExceptions((latest) => [...latest.filter((exception) => exception.operation !== item.operation), ...confirmed]);
+                    setPersistenceNotice({ severity: "error", message: "No se pudo revertir el cambio temporal." });
+                  });
+                });
                 return current.filter((item) => !removed.has(item.id));
               })}
               onEditPerson={setAssignment}
               onMovePattern={(operation, sourceDate, targetDate) => {
-                setRotationAdjustments((current) => moveRotationPattern(current, operation, sourceDate, targetDate));
-                setRotationGapCoverages((current) => moveRotationCoverages(current, operation, sourceDate, targetDate));
+                const adjustments = moveRotationPattern(rotationAdjustments, operation, sourceDate, targetDate);
+                const coverages = moveRotationCoverages(rotationGapCoverages, operation, sourceDate, targetDate);
+                setRotationAdjustments(adjustments);
+                setRotationGapCoverages(coverages);
+                void persistCalendar(operation, adjustments, coverages);
               }}
               onConfigureGap={(operation, date) => setGapCoverageTarget({ operation, date })}
             />
@@ -3688,8 +4077,18 @@ export function OperationalResponsibilityRoster({ session, onLogout }: { session
         open={rotationOpen}
         operation={rotationOperation}
         pattern={rotationPatterns[rotationOperation] ?? defaultRotationPattern()}
+        responsibilities={people}
         onClose={() => setRotationOpen(false)}
-        onSave={(pattern) => setRotationPatterns((current) => ({ ...current, [rotationOperation]: pattern }))}
+        onSave={(pattern, reassignments) => {
+          if (reassignments.length) {
+            const targets = new Map(reassignments.map((item) => [item.fromGroupId, item.toGroupId]));
+            commitPeople(peopleRef.current.map((person) => {
+              const target = person.group && person.operations.includes(rotationOperation) ? targets.get(person.group) : null;
+              return target ? { ...person, group: target } : person;
+            }));
+          }
+          void persistPattern(rotationOperation, pattern);
+        }}
       />
       <RotationGapCoverageDialog
         target={gapCoverageTarget && targetGap && coverageMaxDays > 0 ? {
@@ -3700,8 +4099,17 @@ export function OperationalResponsibilityRoster({ session, onLogout }: { session
         existing={existingGapCoverage}
         availableGroups={(rotationPatterns[rotationOperation] ?? defaultRotationPattern()).groups}
         onClose={() => setGapCoverageTarget(null)}
-        onSave={(coverage) => setRotationGapCoverages((current) => [...current.filter((item) => item.id !== coverage.id), coverage])}
-        onRemove={(id) => setRotationGapCoverages((current) => current.filter((item) => item.id !== id))}
+        onSave={(coverage) => {
+          const coverages = [...rotationGapCoverages.filter((item) => item.id !== coverage.id), coverage];
+          setRotationGapCoverages(coverages);
+          void persistCalendar(coverage.operation, rotationAdjustments, coverages);
+        }}
+        onRemove={(id) => {
+          const removed = rotationGapCoverages.find((item) => item.id === id);
+          const coverages = rotationGapCoverages.filter((item) => item.id !== id);
+          setRotationGapCoverages(coverages);
+          if (removed) void persistCalendar(removed.operation, rotationAdjustments, coverages);
+        }}
       />
       <Snackbar
         key={persistenceNotice?.message}

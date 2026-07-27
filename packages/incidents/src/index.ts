@@ -102,7 +102,7 @@ const presentation: Record<SupportedRuleCode, { label: string; title: string; su
 };
 
 export class IncidentService {
-  constructor(private readonly database: DatabaseRuntime, private readonly publish: (change: IncidentChange) => void = () => undefined) {}
+  constructor(private readonly database: DatabaseRuntime, private readonly publish: (change: IncidentChange) => unknown | Promise<unknown> = () => undefined) {}
 
   async reconcileHealthyCycle(input: {
     rule: RuleContract;
@@ -189,7 +189,7 @@ export class IncidentService {
       await this.addTransition(transaction, incidentId, null, "open", "condition_triggered", input.cycleId, observedAt);
       return this.addChangeEvent(transaction, incidentId, "incident.opened", "open", input.context.plantId, observedAt);
     });
-    if (change) this.publish(change);
+    if (change) await this.publish(change);
     return change;
   }
 
@@ -250,7 +250,7 @@ export class IncidentService {
       await this.addTransition(transaction, incidentId, "open", "resolved", "absent_from_healthy_cycle", cycleId, timestamp);
       return this.addChangeEvent(transaction, incidentId, "incident.resolved", "resolved", plantId, timestamp);
     });
-    if (change) this.publish(change);
+    if (change) await this.publish(change);
   }
 
   private async addTransition(transaction: DatabaseExecutor, incidentId: string, from: IncidentLifecycle | null, to: IncidentLifecycle, reason: string, cycleId: string | undefined, observedAt: string) {

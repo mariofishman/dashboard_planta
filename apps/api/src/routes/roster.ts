@@ -202,7 +202,7 @@ async function replaceSnapshot(
   return { snapshot } as const;
 }
 
-export async function rosterRoutes(app: FastifyInstance, options: { database: DatabaseRuntime }): Promise<void> {
+export async function rosterRoutes(app: FastifyInstance, options: { database: DatabaseRuntime; onChanged?: (plantId: number) => Promise<void> }): Promise<void> {
   app.get("/api/roster/assignments", {
     preHandler: app.requireScopes(["monitor:admin"]),
     schema: { response: { 200: RosterSnapshotSchema } },
@@ -227,6 +227,7 @@ export async function rosterRoutes(app: FastifyInstance, options: { database: Da
         request.body,
       );
       if ("validationErrors" in result) return reply.code(400).send({ error: "invalid_roster", details: result.validationErrors });
+      await options.onChanged?.(request.principal!.plantIds[0]!);
       return result.snapshot;
     } catch (error) {
       if (error instanceof RosterConflictError) {

@@ -131,6 +131,65 @@ export const rosterAssignmentAudit = pgTable("monitor_roster_assignment_audit", 
   index("monitor_roster_assignment_audit_assignment_idx").on(table.assignmentId, table.changedAt),
 ]);
 
+export const rotationPattern = pgTable("monitor_rotation_pattern", {
+  plantId: bigint("plant_id", { mode: "number" }).notNull(),
+  operationName: text("operation_name").notNull(),
+  revision: bigint("revision", { mode: "number" }).notNull().default(0),
+  pattern: jsonb("pattern").notNull(),
+  updatedBySysUserId: bigint("updated_by_sys_user_id", { mode: "number" }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  primaryKey({ name: "monitor_rotation_pattern_pk", columns: [table.plantId, table.operationName] }),
+]);
+
+export const rotationException = pgTable("monitor_rotation_exception", {
+  id: text("id").primaryKey(),
+  plantId: bigint("plant_id", { mode: "number" }).notNull(),
+  operationName: text("operation_name").notNull(),
+  assignmentId: text("assignment_id").notNull().references(() => rosterAssignment.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  validFrom: date("valid_from").notNull(),
+  validTo: date("valid_to").notNull(),
+  target: jsonb("target").notNull(),
+  createdBySysUserId: bigint("created_by_sys_user_id", { mode: "number" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("monitor_rotation_exception_lookup_idx").on(table.plantId, table.operationName, table.assignmentId, table.validFrom, table.validTo),
+]);
+
+export const routingDecision = pgTable("monitor_routing_decision", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  incidentId: uuid("incident_id").notNull(),
+  incidentFingerprint: text("incident_fingerprint").notNull(),
+  status: text("status").notNull(),
+  requiredRoles: jsonb("required_roles").notNull(),
+  resolvedRecipients: jsonb("resolved_recipients").notNull(),
+  diagnostics: jsonb("diagnostics").notNull(),
+  evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique("monitor_routing_decision_incident_fingerprint_uq").on(table.incidentId, table.incidentFingerprint),
+  index("monitor_routing_decision_incident_idx").on(table.incidentId, table.evaluatedAt),
+]);
+
+export const notificationDelivery = pgTable("monitor_notification_delivery", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  incidentId: uuid("incident_id").notNull(),
+  routingDecisionId: uuid("routing_decision_id").notNull(),
+  recipientKey: text("recipient_key").notNull(),
+  recipientName: text("recipient_name").notNull(),
+  channel: text("channel").notNull(),
+  state: text("state").notNull(),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  unique("monitor_notification_delivery_incident_recipient_channel_uq").on(table.incidentId, table.recipientKey, table.channel),
+]);
+
 export const featureFlag = pgTable("monitor_feature_flag", {
   key: text("key").primaryKey(),
   enabled: boolean("enabled").notNull().default(false),
