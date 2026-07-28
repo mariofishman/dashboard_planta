@@ -142,7 +142,7 @@ For each scenario, define in simple business language:
 - Exact-participant-set reuse so a new incident reuses an existing conversation with the same participant set.
 - No one-conversation-per-incident rule; one conversation may contain multiple incident cards over time.
 - Routine shift or assignment changes do not remove existing participants.
-- Administrators can access all conversations through an explicit mode and can add or remove active workers.
+- Administrators are automatically included in active conversations, see every conversation in one global chat list by default, retain access to historical conversations, and can add or remove active workers.
 - Removing a worker from the roster or making the worker inactive blocks Monitor access entirely.
 - One-hour read-only delay after the last associated incident resolves; reopening or a matching new incident restores writing.
 - Server-side authorization, duplicate-command protection, edit/delete policy, attachments, notifications, presence, typing, reconnect recovery, and audit behavior as defined in the Phase 6 business rules.

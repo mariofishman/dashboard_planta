@@ -15,7 +15,7 @@
 ## Participants and authorization
 
 - A worker who was legitimately added remains a participant despite later shift, group, operation, or routine roster-assignment changes. Newly responsible workers are added without removing existing participants from the active incident conversation.
-- Monitor administrators can access every conversation and can manually add or remove active roster workers.
+- Monitor administrators can access every conversation and can manually add or remove active roster workers. Monitor automatically includes every active administrator as a participant in every active conversation.
 - Administrative membership changes require an audit record. Removing a participant blocks future access but never removes that person's messages.
 - An inactive worker or a worker removed from the roster cannot enter Monitor at all. Existing conversations, messages, receipts, and audit records remain preserved.
 - Re-entering the roster restores product access but does not automatically restore conversation membership removed manually by an administrator.
@@ -43,4 +43,4 @@
 - Attachment interaction follows WhatsApp conventions and the approved prototype: image library, camera capture, preview, caption, reply, forward, and message actions.
 - Server authorization, file-type and size validation, content sanitization, malware-scanning integration points, and rate limits are mandatory. Local storage remains replaceable by production object storage.
 - Administrators moderate membership. Message deletion never erases the audit trail.
-- An administrator's normal chat list shows only conversations in which the administrator participates. An explicit `Todas las conversaciones` mode exposes every conversation for administrative access.
+- An administrator has one global chat list containing every conversation by default. There is no personal/global scope switch because the global list already includes the administrator's own conversations. Historical and read-only conversations remain accessible to administrators.

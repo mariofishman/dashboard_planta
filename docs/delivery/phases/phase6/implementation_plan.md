@@ -38,7 +38,7 @@ Phase 6 is not complete. The current chat UI has not been accepted against the a
 ### 3. APIs and realtime synchronization
 
 - Add paginated conversation list and message history endpoints, search, unread state, sends, edits, deletion, receipts, and admin membership endpoints.
-- Require active product access plus participant membership, except administrators who can access all conversations.
+- Require active product access plus participant membership. Automatically include every active administrator in active conversations and return every conversation in the administrator's single global chat list, including historical and read-only conversations.
 - Publish committed `conversation.updated`, `message.created`, `message.updated`, and `receipt.updated` events to server-derived rooms.
 - Recover durable events by cursor and keep typing/presence ephemeral.
 

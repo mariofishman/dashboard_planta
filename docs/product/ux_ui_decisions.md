@@ -289,7 +289,7 @@ Every label uses written text and a marker; meaning never depends on color alone
 
 The chat list shows every conversation in which the current user participates. It is optimized for recognizing the conversation, understanding its latest activity, seeing unresolved alerts, and entering the history quickly.
 
-For administrators, this remains the default personal view. A separate `Todas las conversaciones` mode exposes every conversation and identifies those opened through administrative rather than participant access.
+Administrators have one global chat list containing every conversation by default. Monitor automatically includes every active administrator in every active conversation, and administrators retain access to historical conversations. The UI does not provide separate `Mis conversaciones` and `Todas las conversaciones` views because the global list already includes the administrator's own conversations.
 
 The selected direction is the **Familiar** concept because similarity to WhatsApp and minimal training are priorities. The role-coverage, operational-triage, and pin-dominant alternatives were not retained as separate layouts.
 

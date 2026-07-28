@@ -1,7 +1,7 @@
 # Monitor Product Definition
 
 **Status:** Canonical current-state summary
-**Last consolidated:** 2026-07-23
+**Last consolidated:** 2026-07-28
 
 This document is the primary entry point for the current Monitor product definition. Historical discovery and exploratory prototypes must not override it. Detailed documents remain authoritative only within the domains listed below.
 
@@ -14,7 +14,7 @@ Monitor detects, explains, communicates, and analyzes operational alerts derived
 Monitor has four main screens:
 
 1. **Dashboard** — current and historical alert analysis, filters, reports, and drill-down. Approved local implementation: `apps/web/`.
-2. **Chat list** — conversations in which the current user participates. Administrators can deliberately switch to `Todas las conversaciones` for global access. Current prototype: `prototypes/current/chat/chat-list-final.html`.
+2. **Chat list** — conversations in which the current user participates. Administrators have one global chat list containing every conversation by default and require no personal/global scope control. Current prototype: `prototypes/current/chat/chat-list-final.html`.
 3. **Chat detail** — messages, replies, attachments, and structured alert objects. Current prototype: `prototypes/current/chat/chat-detail.html`.
 4. **Operational Responsibility Roster** — maintains people, standardized positions, position-derived coverage, applicable operations or warehouse type, rotating group, and effective date. It is required for deterministic routing; its first local implementation is under design review at `apps/web/src/OperationalResponsibilityRoster.tsx`.
 
