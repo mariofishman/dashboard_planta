@@ -289,24 +289,21 @@ Every label uses written text and a marker; meaning never depends on color alone
 
 The chat list shows every conversation in which the current user participates. It is optimized for recognizing the conversation, understanding its latest activity, seeing unresolved alerts, and entering the history quickly.
 
+For administrators, this remains the default personal view. A separate `Todas las conversaciones` mode exposes every conversation and identifies those opened through administrative rather than participant access.
+
 The selected direction is the **Familiar** concept because similarity to WhatsApp and minimal training are priorities. The role-coverage, operational-triage, and pin-dominant alternatives were not retained as separate layouts.
 
-### 5.2 Conversation types
+### 5.2 Conversation creation and reuse
 
-The list supports group conversations and direct conversations.
+Monitor creates group conversations only from incidents. Users cannot create standalone direct or group conversations, but they may communicate freely after an incident creates the group. One conversation may contain multiple incidents.
 
-For a group conversation:
+Monitor reuses an existing conversation only when the new incident's resolved recipients exactly match its current active participants. A partial or overlapping match creates a different conversation. When all linked incidents close, the conversation remains writable for one hour and then becomes read-only; a later exactly matching incident reopens it.
+
+For a conversation:
 
 - the bold title is the group name;
 - the latest-message preview begins with the sender's name and a colon; and
 - automated messages use `Monitor:` as the sender prefix.
-
-For a direct conversation:
-
-- the bold title is the other person's name; and
-- the preview contains the message without repeating a group name.
-
-When a participant forwards a group message to one individual, the resulting exchange is a direct conversation between those two people. The forwarded content should preserve enough source context to identify or return to the original group message when permissions allow.
 
 Alert names, work-order errors, or machine conditions must not replace the group or contact name in the title position.
 
@@ -506,13 +503,13 @@ The menu supports, where applicable:
 - Fijar;
 - Reenviar;
 - Copiar;
-- Responder en privado or message information;
+- message information;
 - alert details;
 - and Seleccionar mensajes.
 
 Actions depend on message type and user permissions. Destructive or moderation actions must follow authorization and audit rules.
 
-The menu follows the familiar WhatsApp visual pattern: a compact floating white surface, vertically stacked icon-and-label rows, separators between action groups, and a clearly differentiated destructive action when deletion is authorized. Reporting, deletion, private reply, contact messaging, and additional actions may appear only when the message type and permissions make them valid.
+The menu follows the familiar WhatsApp visual pattern: a compact floating white surface, vertically stacked icon-and-label rows, separators between action groups, and a clearly differentiated destructive action when deletion is authorized. Reporting, deletion, contact messaging, and additional actions may appear only when the message type and permissions make them valid. `Responder en privado` is not offered in the first version.
 
 ### 8.2 Mobile
 
@@ -755,10 +752,9 @@ The following items are not yet fully decided and should not be inferred from th
 
 - formal priority and escalation rules;
 - age thresholds that change urgency treatment;
-- exact conversation creation rules and who may create a group;
-- final participant-management permissions;
+- conversation naming and whether participants may rename an automatically created group;
 - Operational Responsibility Roster information architecture, editing workflow, permissions, conflict resolution, and audit presentation;
-- moderation, deletion, reporting, and private-reply authorization;
+- moderation, deletion, and reporting authorization;
 - read receipts, delivery receipts, typing state, and presence requirements;
 - maximum visible chips before overflow at each responsive width;
 - attachment size, file type, compression, retention, and privacy rules;

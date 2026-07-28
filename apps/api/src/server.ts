@@ -1,6 +1,7 @@
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
+import { ConversationService, type ConversationParticipant } from "@monitor/conversations";
 import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry } from "@monitor/detection";
 import { IncidentService, type IncidentChange, type RuleContract } from "@monitor/incidents";
 import Fastify from "fastify";
@@ -14,6 +15,7 @@ import { loadConfig, type MonitorConfig } from "./config.js";
 import { createMetrics, prometheusMetrics, registerObservability } from "./observability.js";
 import { attachRedis, type RedisRuntime } from "./redis.js";
 import { authRoutes } from "./routes/auth.js";
+import { conversationRoutes } from "./routes/conversations.js";
 import { scenarioRoutes } from "./routes/scenarios.js";
 import { rosterRoutes } from "./routes/roster.js";
 import { rotationRoutes } from "./routes/rotation.js";
@@ -81,22 +83,49 @@ export async function buildMonitorServer(options: {
   await app.register(cors, { origin: config.webOrigin, credentials: true });
   await app.register(cookie, { secret: config.cookieSecret, hook: "onRequest" });
 
-  const identityAdapter = options.identityAdapter ?? new MockIdentityAdapter();
-  await app.register(authenticationPlugin, { identityAdapter });
-  await app.register(authRoutes, { config, identityAdapter });
-
   const database = options.database ?? await createDatabaseRuntime({
     mode: config.databaseMode,
     pgliteDataDir: config.nodeEnv === "test" ? "memory://" : config.pgliteDataDir,
     ...(config.databaseUrl ? { databaseUrl: config.databaseUrl } : {}),
   });
   await migrateFoundation(database);
+  const identityAdapter = options.identityAdapter ?? new MockIdentityAdapter();
+  const canEnterMonitor = async (principal: { sysUserId: number; plantIds: number[] }) => {
+    const bound = await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_roster_assignment WHERE plant_id=ANY($1::bigint[]) AND sys_user_id IS NOT NULL", [principal.plantIds]);
+    if (Number(bound.count) === 0) return true;
+    const active = await database.queryOne(`SELECT 1 AS allowed FROM monitor_roster_assignment WHERE plant_id=ANY($1::bigint[])
+      AND sys_user_id=$2 AND state='active' AND setup_complete=TRUE AND valid_from<=CURRENT_DATE AND (valid_to IS NULL OR valid_to>=CURRENT_DATE) LIMIT 1`, [principal.plantIds, principal.sysUserId]);
+    return Boolean(active.allowed);
+  };
+  await app.register(authenticationPlugin, { identityAdapter, canEnter: canEnterMonitor });
+  await app.register(authRoutes, { config, identityAdapter, canEnter: canEnterMonitor });
   const repositoryRoot = resolve(import.meta.dirname, "../../..");
   const io = new SocketIOServer(app.server, { cors: { origin: config.webOrigin, credentials: true } });
   const routingService = new RoutingService(database);
+  const conversationService = new ConversationService(database, async (event) => {
+    const participantIds = await conversationService.activeParticipantIds(String(event.conversationId));
+    io.to([`conversation:${event.conversationId}`, ...participantIds.map((sysUserId) => `user:${sysUserId}`), "user:9000"]).emit(String(event.type), event);
+  });
+  const localRoleIdentity: Record<string, ConversationParticipant> = {
+    factory_manager: { sysUserId: 9001, displayName: "Gerencia de planta", sourceKey: "mock:plant-manager" },
+    operation_shift_supervisor: { sysUserId: 9002, displayName: "Supervisión de turno", sourceKey: "mock:shift-supervisor" },
+    technical_leader: { sysUserId: 9004, displayName: "Programación de Impresión", sourceKey: "mock:operation-scheduler" },
+    machine_operator: { sysUserId: 9003, displayName: "Operación de máquina", sourceKey: "mock:machine-operator" },
+  };
+  const routeAndAttachConversation = async (incidentId: string, plantId: number) => {
+    const routed = await routingService.routeIncident(incidentId);
+    const recipients = Array.isArray(routed?.recipients) ? routed.recipients as Array<{ role?: string; sysUserId?: number | null; name?: string; key?: string }> : [];
+    const participants = recipients.map((recipient) => recipient.sysUserId
+      ? { sysUserId: recipient.sysUserId, displayName: String(recipient.name), sourceKey: String(recipient.key) }
+      : localRoleIdentity[String(recipient.role)]).filter((value): value is ConversationParticipant => Boolean(value));
+    const incident = await database.queryOne(`SELECT id,rule_code AS "ruleCode",label,title,summary,work_order_code AS "workOrderCode",
+      machine_code AS "machineCode",opened_at AS "openedAt" FROM monitor_incident WHERE id=$1`, [incidentId]);
+    await conversationService.attachIncident({ incidentId, plantId, participants, alert: incident });
+  };
   const incidentService = new IncidentService(database, async (change: IncidentChange) => {
     io.to(`plant:${change.plantId}`).emit("incident.changed", change);
-    if (change.lifecycle === "open") await routingService.routeIncident(change.incidentId);
+    if (change.lifecycle === "open") await routeAndAttachConversation(change.incidentId, change.plantId);
+    else await conversationService.closeIncident(change.incidentId);
   });
   if (!config.enableScenarioLab) await seedPhase4Incidents(incidentService, repositoryRoot, database);
   const ruleDocument = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
@@ -130,14 +159,23 @@ export async function buildMonitorServer(options: {
       : null;
     const token = unsigned?.valid ? unsigned.value : explicitMockToken;
     const principal = token ? await identityAdapter.verifyToken(token) : null;
-    if (!principal) return next(new Error("authentication_required"));
+    if (!principal || !(await canEnterMonitor(principal))) return next(new Error("authentication_required"));
     socket.data.principal = principal;
     return next();
   });
   io.on("connection", (socket) => {
     metrics.websocketConnections += 1;
-    const principal = socket.data.principal as { plantIds: number[] };
+    const principal = socket.data.principal as { plantIds: number[]; sysUserId: number };
     principal.plantIds.forEach((plantId) => void socket.join(`plant:${plantId}`));
+    void socket.join(`user:${principal.sysUserId}`);
+    void database.queryAll(`SELECT conversation_id FROM monitor_conversation_participant WHERE sys_user_id=$1 AND removed_at IS NULL`, [principal.sysUserId])
+      .then(async (rows) => {
+        for (const row of rows) {
+          const room = `conversation:${row.conversation_id}`;
+          await socket.join(room);
+          socket.to(room).emit("presence", { conversationId: String(row.conversation_id), sysUserId: principal.sysUserId, online: true });
+        }
+      });
     socket.emit("session.ready", { cursor: 0, principal: socket.data.principal, features: config.features });
     socket.on("sync.resume", async (message: { cursor?: unknown }) => {
       const cursor = Number.isSafeInteger(message?.cursor) && Number(message.cursor) >= 0 ? Number(message.cursor) : 0;
@@ -145,6 +183,18 @@ export async function buildMonitorServer(options: {
       changes.forEach((change) => socket.emit("incident.changed", change));
       const latest = changes.length ? Number(changes.at(-1)?.cursor) : cursor;
       socket.emit("session.ready", { cursor: latest, principal: socket.data.principal, features: config.features });
+    });
+    socket.on("typing", async (message: { conversationId?: unknown; active?: unknown }) => {
+      if (typeof message?.conversationId !== "string" || typeof message.active !== "boolean") return;
+      const allowed = await conversationService.canAccess(message.conversationId, {
+        sysUserId: principal.sysUserId,
+        displayName: String((socket.data.principal as { displayName: string }).displayName),
+        admin: Array.isArray((socket.data.principal as { scopes: string[] }).scopes) && (socket.data.principal as { scopes: string[] }).scopes.includes("monitor:admin"),
+      });
+      if (allowed) socket.to(`conversation:${message.conversationId}`).emit("typing", { conversationId: message.conversationId, sysUserId: principal.sysUserId, active: message.active });
+    });
+    socket.on("disconnecting", () => {
+      for (const room of socket.rooms) if (room.startsWith("conversation:")) socket.to(room).emit("presence", { conversationId: room.slice("conversation:".length), sysUserId: principal.sysUserId, online: false });
     });
     socket.on("disconnect", () => { metrics.websocketConnections -= 1; });
   });
@@ -190,10 +240,11 @@ export async function buildMonitorServer(options: {
     const operationFilter = operation ? " AND operation_name=$2" : "";
     if (operation) parameters.push(operation);
     const incidents = await database.queryAll(`SELECT id FROM monitor_incident WHERE plant_id=$1 AND lifecycle='open'${operationFilter}`, parameters);
-    for (const incident of incidents) await routingService.routeIncident(String(incident.id));
+    for (const incident of incidents) await routeAndAttachConversation(String(incident.id), plantId);
   };
   await app.register(rosterRoutes, { database, onChanged: (plantId) => rerouteOpen(plantId) });
   await app.register(rotationRoutes, { database, onChanged: rerouteOpen });
+  await app.register(conversationRoutes, { service: conversationService });
   if (scenarioSource) {
     await app.register(scenarioRoutes, {
       database,

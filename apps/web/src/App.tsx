@@ -51,6 +51,7 @@ import { es } from "date-fns/locale";
 import { io, type Socket } from "socket.io-client";
 import {
   currentSession,
+  conversationForIncident,
   incidentDetail,
   incidents,
   logout,
@@ -61,6 +62,7 @@ import {
   type IncidentSummary,
   type MockIdentitySummary,
 } from "./api";
+import { ChatDetail, ChatList } from "./Chats";
 import { OperationalResponsibilityRoster } from "./OperationalResponsibilityRoster";
 import { ScenarioLab } from "./ScenarioLab";
 
@@ -200,6 +202,7 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
   const [dimension, setDimension] = useState(0);
   const [detail, setDetail] = useState<IncidentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailConversationId, setDetailConversationId] = useState<string | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileQuickFiltersOpen, setMobileQuickFiltersOpen] = useState(false);
   const [desktopSearchExpanded, setDesktopSearchExpanded] = useState(false);
@@ -307,7 +310,11 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
 
   const openDetail = async (id: string) => {
     setDetailLoading(true);
-    try { setDetail(await incidentDetail(id)); }
+    setDetailConversationId(null);
+    try {
+      const [nextDetail, conversationId] = await Promise.all([incidentDetail(id), conversationForIncident(id)]);
+      setDetail(nextDetail); setDetailConversationId(conversationId);
+    }
     catch { setFailed(true); }
     finally { setDetailLoading(false); }
   };
@@ -530,7 +537,7 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
 
     <Paper component="nav" square elevation={0} aria-label="Navegación principal" sx={{ position: "fixed", bottom: 0, left: 0, right: 0, height: 60, zIndex: 20, display: "flex", justifyContent: "center", gap: { xs: .5, sm: 3 }, borderTop: "1px solid", borderColor: "divider" }}>
       <Button startIcon={<DashboardRounded/>} sx={{ minWidth: { xs: 136, sm: 168 }, height: 60, fontWeight: 700, position: "relative", "&::before": { content: "''", position: "absolute", top: 0, left: 20, right: 20, height: 3, bgcolor: "primary.main", borderRadius: "0 0 4px 4px" } }} aria-current="page">Dashboard</Button>
-      <Tooltip title="Disponible en la Fase 6"><span><Button startIcon={<ChatBubbleOutlineRounded/>} disabled sx={{ minWidth: { xs: 136, sm: 168 }, height: 60 }}>Chats</Button></span></Tooltip>
+      <Button startIcon={<ChatBubbleOutlineRounded/>} onClick={() => { window.location.href = "/chats"; }} sx={{ minWidth: { xs: 136, sm: 168 }, height: 60 }}>Chats</Button>
     </Paper>
 
     <Drawer anchor="bottom" open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} PaperProps={{ sx: { maxHeight: "88vh", borderRadius: "16px 16px 0 0", p: 2 } }}>
@@ -566,6 +573,9 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
           <Typography variant="caption" color="text.secondary">Detectada {dateTime(detail.openedAt)}</Typography>
         </Stack>
         <Typography sx={{ mt: 2, maxWidth: "65ch" }}>{detail.summary}</Typography>
+        <Button variant="contained" startIcon={<ChatBubbleOutlineRounded/>} disabled={!detailConversationId} onClick={() => { window.location.href = `/chats/${detailConversationId}`; }} sx={{ mt: 2 }}>
+          {detailConversationId ? "Abrir conversación" : "Conversación no disponible"}
+        </Button>
 
         <Section title="Datos operativos">
           <Stack divider={<Divider flexItem/>}><Fact label="OT" value={detail.workOrderCode}/><Fact label="Máquina" value={detail.machineCode}/><Fact label="Operación" value={detail.operationName}/><Fact label="Turno" value={detail.shiftName}/><Fact label="Responsable" value={detail.responsibleName}/></Stack>
@@ -619,6 +629,8 @@ export default function App() {
   if (state === "error") return <Box sx={{ minHeight: "100vh", display: "grid", placeItems: "center", p: 3, bgcolor: "background.default" }}><Alert severity="error">No se pudo iniciar Monitor. Comprueba que la API local esté funcionando.</Alert></Box>;
   const onLogout = () => void logout().then(() => setSession(null));
   if (!session) return <LoginView onLogin={setSession}/>;
+  if (window.location.pathname === "/chats") return <ChatList session={session}/>;
+  if (window.location.pathname.startsWith("/chats/")) return <ChatDetail session={session} conversationId={window.location.pathname.slice("/chats/".length)}/>;
   if (window.location.pathname === "/roster") return <OperationalResponsibilityRoster session={session} onLogout={onLogout}/>;
   return window.location.pathname === "/dev/scenarios" ? <ScenarioLab session={session} onLogout={onLogout}/> : <Dashboard session={session} onLogout={onLogout}/>;
 }

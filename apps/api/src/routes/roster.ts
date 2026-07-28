@@ -55,9 +55,14 @@ function validateAssignments(assignments: RosterAssignment[]): string[] {
   const errors: string[] = [];
   const ids = new Set<string>();
   const names = new Set<string>();
+  const sysUserIds = new Set<number>();
   for (const assignment of assignments) {
     if (ids.has(assignment.id)) errors.push(`El identificador ${assignment.id} está repetido.`);
     ids.add(assignment.id);
+    if (assignment.sysUserId) {
+      if (sysUserIds.has(assignment.sysUserId)) errors.push(`El usuario EmusaSoft ${assignment.sysUserId} está asignado más de una vez.`);
+      sysUserIds.add(assignment.sysUserId);
+    }
     const name = normalizedName(assignment.person);
     if (names.has(name)) errors.push(`La persona ${assignment.person} está repetida.`);
     names.add(name);
@@ -95,7 +100,7 @@ async function readSnapshot(executor: DatabaseExecutor, plantId: number) {
   );
   const revisionRow = await executor.queryOne("SELECT revision FROM monitor_roster_revision WHERE plant_id=$1", [plantId]);
   const rows = await executor.queryAll(
-    `SELECT id,person_name,position,scope,warehouse_type,worker_group,valid_from,valid_to,state,setup_complete
+    `SELECT id,sys_user_id,person_name,position,scope,warehouse_type,worker_group,valid_from,valid_to,state,setup_complete
        FROM monitor_roster_assignment WHERE plant_id=$1 ORDER BY lower(person_name),id`,
     [plantId],
   );
@@ -117,6 +122,7 @@ async function readSnapshot(executor: DatabaseExecutor, plantId: number) {
     revision: Number(revisionRow.revision ?? 0),
     assignments: rows.map((row): RosterAssignment => ({
       id: String(row.id),
+      ...(row.sys_user_id ? { sysUserId: Number(row.sys_user_id) } : {}),
       person: String(row.person_name),
       position: (row.position ?? "") as RosterAssignment["position"],
       operations: operationsByAssignment.get(String(row.id)) ?? [],
@@ -181,9 +187,9 @@ async function replaceSnapshot(
     for (const assignment of assignments) {
       await transaction.execute(
         `INSERT INTO monitor_roster_assignment
-          (id,plant_id,person_name,position,scope,warehouse_type,worker_group,valid_from,valid_to,state,setup_complete)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [assignment.id, plantId, assignment.person, assignment.position || null, assignment.scope, assignment.warehouseType,
+          (id,plant_id,sys_user_id,person_name,position,scope,warehouse_type,worker_group,valid_from,valid_to,state,setup_complete)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+        [assignment.id, plantId, assignment.sysUserId ?? null, assignment.person, assignment.position || null, assignment.scope, assignment.warehouseType,
           assignment.group, assignment.validFrom, assignment.validTo, assignment.state, assignment.setupComplete],
       );
       for (const operation of assignment.operations) {

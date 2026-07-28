@@ -13,6 +13,7 @@
     "@fastify/cookie": "11.0.2",
     "@fastify/cors": "11.1.0",
     "@monitor/contracts": "0.1.0",
+    "@monitor/conversations": "0.1.0",
     "@monitor/database": "0.1.0",
     "@monitor/detection": "0.1.0",
     "@monitor/incidents": "0.1.0",

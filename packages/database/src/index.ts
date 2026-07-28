@@ -174,7 +174,7 @@ export async function createDatabaseRuntime(options: {
 }
 
 export async function migrateFoundation(database: DatabaseRuntime): Promise<void> {
-  for (const filename of ["0000_phase2_foundation.sql", "0001_phase3_detection.sql", "0002_phase4_incidents.sql", "0003_phase4b_simulator.sql", "0004_phase5_roster_authorization.sql", "0005_phase5_roster_assignments.sql", "0006_roster_operation_catalog.sql", "0007_configurable_roster_groups.sql", "0008_phase5_routing.sql"]) {
+  for (const filename of ["0000_phase2_foundation.sql", "0001_phase3_detection.sql", "0002_phase4_incidents.sql", "0003_phase4b_simulator.sql", "0004_phase5_roster_authorization.sql", "0005_phase5_roster_assignments.sql", "0006_roster_operation_catalog.sql", "0007_configurable_roster_groups.sql", "0008_phase5_routing.sql", "0009_phase6_conversations.sql"]) {
     await database.execute(await readFile(resolve(import.meta.dirname, "../migrations", filename), "utf8"));
   }
 }

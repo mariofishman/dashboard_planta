@@ -86,6 +86,7 @@ const RosterOperationSchema = Type.Union([
 
 export const RosterAssignmentSchema = Type.Object({
   id: Type.String({ minLength: 1, maxLength: 128 }),
+  sysUserId: Type.Optional(Type.Integer({ minimum: 1 })),
   person: Type.String({ minLength: 1, maxLength: 200 }),
   position: RosterPositionSchema,
   operations: Type.Array(RosterOperationSchema, { uniqueItems: true, maxItems: 9 }),

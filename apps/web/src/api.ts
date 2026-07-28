@@ -33,6 +33,16 @@ export interface IncidentDetail extends IncidentSummary {
   related: { id: string; ruleCode: string; title: string; lifecycle: IncidentLifecycle }[];
 }
 
+export interface ConversationSummary {
+  id: string; title: string; updatedAt: string; writableUntil: string | null; lastSender: string; lastBody: string;
+  lastKind: "text" | "alert" | "attachment"; openAlerts: number; unreadCount: number; isParticipant: boolean;
+}
+export interface ConversationMessage {
+  id: string; cursor: number; senderSysUserId: number | null; senderName: string; kind: "text" | "alert" | "attachment";
+  body: string; payload: Record<string, unknown>; replyToMessageId: string | null; sentAt: string; editedAt: string | null; deletedAt: string | null;
+  deliveredCount: number; readCount: number;
+}
+
 export type ScenarioRuleCode = "A02" | "A03" | "A05";
 export type ScenarioFault = "timeout" | "source_error" | "partial" | "invalid_schema";
 export interface ScenarioStatus {
@@ -104,6 +114,47 @@ export async function incidents(filters: { status?: string; operation?: string; 
 
 export async function incidentDetail(id: string): Promise<IncidentDetail> {
   return responseJson<IncidentDetail>(await fetch(`/api/incidents/${id}`, { credentials: "include" }));
+}
+
+export async function conversationForIncident(id: string): Promise<string | null> {
+  const response = await fetch(`/api/incidents/${id}/conversation`, { credentials: "include" });
+  if (response.status === 404 || response.status === 403) return null;
+  return (await responseJson<{ conversationId: string }>(response)).conversationId;
+}
+
+export async function conversations(search = "", before?: string, scope: "mine" | "all" = "mine"): Promise<{ conversations: ConversationSummary[]; nextCursor: string | null }> {
+  const query = new URLSearchParams();
+  if (search) query.set("search", search);
+  if (before) query.set("before", before);
+  if (scope === "all") query.set("scope", "all");
+  return responseJson(await fetch(`/api/conversations?${query}`, { credentials: "include" }));
+}
+
+export async function conversationMessages(id: string, before?: number): Promise<{ messages: ConversationMessage[]; nextCursor: number | null; writableUntil: string | null }> {
+  const query = before ? `?before=${before}` : "";
+  return responseJson(await fetch(`/api/conversations/${id}/messages${query}`, { credentials: "include" }));
+}
+
+export async function sendConversationMessage(id: string, body: string, clientCommandId: string, replyToMessageId?: string | null, payload?: Record<string, unknown>) {
+  return responseJson<{ id: string; cursor: number; duplicate: boolean }>(await fetch(`/api/conversations/${id}/messages`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ body, clientCommandId, replyToMessageId: replyToMessageId ?? null, ...(payload ? { payload } : {}) }),
+  }));
+}
+
+export async function markConversationRead(id: string, cursor: number) {
+  const response = await fetch(`/api/conversations/${id}/read`, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ cursor }) });
+  if (!response.ok) throw new ApiRequestError(response.status, null);
+}
+
+export async function editConversationMessage(id: string, body: string) {
+  const response = await fetch(`/api/messages/${id}`, { method: "PATCH", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ body }) });
+  if (!response.ok) throw new ApiRequestError(response.status, null);
+}
+
+export async function deleteConversationMessage(id: string) {
+  const response = await fetch(`/api/messages/${id}`, { method: "DELETE", credentials: "include" });
+  if (!response.ok) throw new ApiRequestError(response.status, null);
 }
 
 export async function rosterAssignments(): Promise<RosterSnapshot> {

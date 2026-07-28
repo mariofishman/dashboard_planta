@@ -14,7 +14,7 @@ Monitor detects, explains, communicates, and analyzes operational alerts derived
 Monitor has four main screens:
 
 1. **Dashboard** — current and historical alert analysis, filters, reports, and drill-down. Approved local implementation: `apps/web/`.
-2. **Chat list** — conversations in which the current user participates. Current prototype: `prototypes/current/chat/chat-list-final.html`.
+2. **Chat list** — conversations in which the current user participates. Administrators can deliberately switch to `Todas las conversaciones` for global access. Current prototype: `prototypes/current/chat/chat-list-final.html`.
 3. **Chat detail** — messages, replies, attachments, and structured alert objects. Current prototype: `prototypes/current/chat/chat-detail.html`.
 4. **Operational Responsibility Roster** — maintains people, standardized positions, position-derived coverage, applicable operations or warehouse type, rotating group, and effective date. It is required for deterministic routing; its first local implementation is under design review at `apps/web/src/OperationalResponsibilityRoster.tsx`.
 

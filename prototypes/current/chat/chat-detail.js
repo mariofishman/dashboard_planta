@@ -50,7 +50,6 @@ const menuIcons = {
   pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8M10 4v5l-3 3v2h10v-2l-3-3V4M12 14v7"></path></svg>',
   forward: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 8 5 4-5 4v-3h-4c-4 0-6 2-7 5 0-6 3-9 7-9h4V8Z"></path></svg>',
   copy: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="11" height="13" rx="1"></rect><path d="M15 7V4H4v13h3"></path></svg>',
-  private: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8-5 4 5 4v-3h4c4 0 6 2 7 5 0-6-3-9-7-9H9V8Z"></path><path d="M4 5h6"></path></svg>',
   info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7.5h.01"></path></svg>',
   select: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path></svg>',
   more: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8 12h.01M12 12h.01M16 12h.01"></path></svg>'
@@ -67,7 +66,7 @@ function populateMessageMenu(menu, message) {
     ? menuButton('Ver detalles de alerta', 'info', 'data-menu-command="details"')
     : isOutgoing
       ? menuButton('Información del mensaje', 'info', 'data-menu-command="info"')
-      : menuButton('Responder en privado', 'private', 'data-menu-command="private"');
+      : menuButton('Información del mensaje', 'info', 'data-menu-command="info"');
 
   menu.innerHTML = `
     ${menuButton('Responder', 'reply', 'data-message-action="reply"')}
@@ -212,7 +211,6 @@ function handleMessageAction(button) {
 
 function handleMenuCommand(button) {
   const message = button.closest('[data-message]');
-  const sender = message.querySelector('.message-sender')?.textContent || 'tu mensaje';
   const command = button.dataset.menuCommand;
 
   if (command === 'react') showToast('Elige una reacción para este mensaje');
@@ -220,12 +218,6 @@ function handleMenuCommand(button) {
   if (command === 'pin') showToast('Mensaje fijado en esta conversación');
   if (command === 'copy') showToast('Mensaje copiado');
   if (command === 'info') showToast('Información del mensaje');
-
-  if (command === 'private') {
-    replyAuthor.textContent = `${sender} en privado`;
-    replyContext.hidden = false;
-    messageInput.focus();
-  }
 
   if (command === 'details') {
     const summaryButton = message.querySelector('[data-summary-toggle]');

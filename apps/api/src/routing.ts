@@ -79,11 +79,12 @@ export function requiredRolesFor(code: string, reasons: string[] = [], evidence:
 }
 
 interface RosterRow {
-  id: string; person: string; position: string; operations: string[]; warehouseType: string | null; group: string | null;
+  id: string; sysUserId: number | null; person: string; position: string; operations: string[]; warehouseType: string | null; group: string | null;
 }
 
 interface RoutingRecipient {
   key: string;
+  sysUserId: number | null;
   name: string;
   role: RoutingRole | "recorded_actor";
   source: "roster" | "erp_evidence";
@@ -160,12 +161,12 @@ export class RoutingService {
     const prior = await this.database.queryOne("SELECT id,status,resolved_recipients AS recipients,diagnostics FROM monitor_routing_decision WHERE incident_id=$1 AND incident_fingerprint=$2", [incidentId, fingerprint]);
     if (prior.id) return { id: prior.id, status: prior.status, recipients: prior.recipients, diagnostics: prior.diagnostics, deduplicated: true };
 
-    const rosterRows = await this.database.queryAll(`SELECT a.id,a.person_name,a.position,a.warehouse_type,a.worker_group,
+    const rosterRows = await this.database.queryAll(`SELECT a.id,a.sys_user_id,a.person_name,a.position,a.warehouse_type,a.worker_group,
       COALESCE(jsonb_agg(o.operation_name) FILTER (WHERE o.operation_name IS NOT NULL),'[]'::jsonb) AS operations
       FROM monitor_roster_assignment a LEFT JOIN monitor_roster_assignment_operation o ON o.assignment_id=a.id
       WHERE a.plant_id=$1 AND a.setup_complete=TRUE AND a.state='active' AND a.valid_from<=$2
         AND (a.valid_to IS NULL OR a.valid_to>=$2) GROUP BY a.id`, [plantId, incidentDate]);
-    const roster: RosterRow[] = rosterRows.map((row) => ({ id: String(row.id), person: String(row.person_name), position: String(row.position),
+    const roster: RosterRow[] = rosterRows.map((row) => ({ id: String(row.id), sysUserId: row.sys_user_id ? Number(row.sys_user_id) : null, person: String(row.person_name), position: String(row.position),
       operations: jsonArray(row.operations), warehouseType: row.warehouse_type ? String(row.warehouse_type) : null,
       group: row.worker_group ? String(row.worker_group) : null }));
     const exceptionRows = operation ? await this.database.queryAll(`SELECT assignment_id,kind,target FROM monitor_rotation_exception
@@ -201,7 +202,7 @@ export class RoutingService {
       }
       if (!candidates.length) diagnostics.push({ code: "missing_assignment", role, detail: `No hay una asignación vigente para ${positionForRole[role]}.` });
       if (candidates.length > 1) diagnostics.push({ code: "conflicting_assignments", role, detail: `Hay ${candidates.length} asignaciones vigentes para ${positionForRole[role]}.` });
-      candidates.forEach((candidate) => recipients.push({ key: `assignment:${candidate.id}`, name: candidate.person, role, source: "roster" }));
+      candidates.forEach((candidate) => recipients.push({ key: `assignment:${candidate.id}`, sysUserId: candidate.sysUserId, name: candidate.person, role, source: "roster" }));
     }
 
     const actorNames = new Set<string>();
@@ -209,7 +210,7 @@ export class RoutingService {
       if (typeof evidence[key] === "string" && String(evidence[key]).trim()) actorNames.add(String(evidence[key]).trim());
     }
     if (typeof incident.responsible_name === "string" && incident.responsible_name.trim() && evidence.recordedActor === true) actorNames.add(incident.responsible_name.trim());
-    actorNames.forEach((name) => recipients.push({ key: `actor:${name.normalize("NFC").toLocaleLowerCase("es-PE")}`, name, role: "recorded_actor", source: "erp_evidence" }));
+    actorNames.forEach((name) => recipients.push({ key: `actor:${name.normalize("NFC").toLocaleLowerCase("es-PE")}`, sysUserId: null, name, role: "recorded_actor", source: "erp_evidence" }));
     const recipientsByName = new Map<string, RoutingRecipient>();
     recipients.forEach((recipient) => {
       const name = recipient.name.normalize("NFC").trim().toLocaleLowerCase("es-PE");

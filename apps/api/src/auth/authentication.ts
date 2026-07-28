@@ -33,13 +33,17 @@ export function tokenFromRequest(request: FastifyRequest): string | null {
   return unsigned.valid ? unsigned.value : null;
 }
 
-export const authenticationPlugin = fp(async (app, options: { identityAdapter: IdentityAdapter }) => {
+export const authenticationPlugin = fp(async (app, options: { identityAdapter: IdentityAdapter; canEnter?: (principal: Principal) => Promise<boolean> }) => {
   app.decorateRequest("principal", null);
   app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
     const token = tokenFromRequest(request);
     const principal = token ? await options.identityAdapter.verifyToken(token) : null;
     if (!principal) {
       await reply.code(401).send({ error: "authentication_required" });
+      return;
+    }
+    if (options.canEnter && !(await options.canEnter(principal))) {
+      await reply.code(403).send({ error: "monitor_access_inactive" });
       return;
     }
     request.principal = principal;

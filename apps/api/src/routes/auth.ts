@@ -7,6 +7,7 @@ import { supportsMockLogin, type IdentityAdapter } from "../auth/identity-adapte
 export async function authRoutes(app: FastifyInstance, options: {
   config: MonitorConfig;
   identityAdapter: IdentityAdapter;
+  canEnter?: (principal: import("@monitor/contracts").Principal) => Promise<boolean>;
 }): Promise<void> {
   app.get("/api/auth/mock-identities", {
     schema: { response: {
@@ -22,6 +23,7 @@ export async function authRoutes(app: FastifyInstance, options: {
     schema: { body: MockLoginRequestSchema, response: {
       200: SessionResponseSchema,
       401: Type.Object({ error: Type.String() }),
+      403: Type.Object({ error: Type.String() }),
       404: Type.Null(),
     } },
   }, async (request, reply) => {
@@ -29,6 +31,7 @@ export async function authRoutes(app: FastifyInstance, options: {
     const token = await options.identityAdapter.issueToken(request.body.identityId);
     const principal = token ? await options.identityAdapter.verifyToken(token) : null;
     if (!token || !principal) return reply.code(401).send({ error: "unknown_mock_identity" });
+    if (options.canEnter && !(await options.canEnter(principal))) return reply.code(403).send({ error: "monitor_access_inactive" });
     reply.setCookie("monitor_session", token, {
       path: "/", httpOnly: true, sameSite: "strict", secure: options.config.nodeEnv === "production", signed: true,
     });
