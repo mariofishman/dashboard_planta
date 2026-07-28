@@ -4,179 +4,179 @@
 
 **System:** Monitor — Dashboard, Chats, Errors, Alerts, and Operational Responsibility Roster
 
-**Version:** 2.1
+**Version:** 3.0
 
-**Status:** Active; Phases 0–5 complete locally; Phase 6 has not started
+**Status:** Active; Phases 0–5 complete; Phase 6 in progress; Phase 7 is blocked by the Phase 6 exit gate
 
-**Roadmap date:** 2026-07-26
+**Roadmap date:** 2026-07-27
 
-**Supersedes:** [Version 1.2](../archive/docs/roadmaps/monitor_architecture_and_production_roadmap_v1.md)
+**Supersedes:** [Version 2.1](../archive/docs/roadmaps/monitor_architecture_and_production_roadmap_v2.md)
 
 **Architecture:** [system architecture](architecture/system_architecture.md)
 
 **Open integration register:** [EmusaSoft integration register](integrations/emusasoft/integration_register.md)
 
-## 1. Why Version Two exists
+## 1. Why Version Three exists
 
-Version One successfully guided the local foundation through Phase 4, but three facts now require a revised sequence:
+Version Two guided the dynamic source laboratory, roster, routing, and initial conversation implementation. Review of that work identified three corrections that materially change the remaining sequence:
 
-1. Phase 4 proved the incident lifecycle with fixtures and seeded incidents, but it did not prove that a changing source record travels through polling, evaluation, incident creation, resolution, recurrence, and the live UI.
-2. The original Phase 4 dashboard was functionally connected but required a complete visual and interaction redesign.
-3. The first roadmap did not assign every remaining alert code, dynamic scenario extension, external dependency, and production-promotion gate precisely enough.
+1. The Phase 4B laboratory changed synthetic source tables stored inside Monitor's own local database. That proved lifecycle behavior, but it did not adequately reproduce Monitor reading a separate foreign database with the same engine, schema, indexes, collations, and SQL behavior as EmusaSoft.
+2. The development scenario screen is difficult to understand and does not yet provide the clear, business-level control and evidence required for acceptance.
+3. The initial Phase 6 chat implementation does not have accepted visual parity with the approved chat-list and chat-detail prototypes.
 
-Version Two preserves completed work. It adds Phase 4A for the dashboard redesign, Phase 4B for a local dynamic source laboratory, and explicit implementation and promotion gates for every active alert code. Dashboard V2 completed Phase 4A and was accepted as a good first version on 2026-07-22; this approval does not start or modify Phase 4B.
+Version Three preserves the completed work from Phases 0–5 and treats Phase 4B as historical. It expands Phase 6 to correct the local source boundary, rebuild the scenario laboratory, complete the conversation product, and establish the testing foundation used by Phases 7–9.
 
-## 2. Strategy
+## 2. Canonical names
+
+- **`soft_database`** — EmusaSoft's original operational database or approved read replica.
+- **`backup_database`** — the protected backup supplied in this workspace. It is evidence and seed input only and must never be modified.
+- **`test_database`** — a disposable local database reconstructed to match the verified engine, schema, version, indexes, collations, and relevant SQL settings of `soft_database`.
+- **`alertas_fake`** — the development/test-only application that changes controlled source records in `test_database`. It never creates or changes Monitor incidents directly.
+- **Monitor database** — Monitor's independent PostgreSQL database containing incidents, routing, conversations, messages, audit, and other Monitor-owned state.
+
+The project currently documents `soft_database` as Aurora MySQL. The database engine and compatibility details must be confirmed with authoritative EmusaSoft evidence before `test_database` is provisioned. PostgreSQL remains the approved Monitor-owned database.
+
+## 3. Strategy
 
 ### Diagnosis
 
-Monitor must prove the complete transition from a source change to a visible alert and back to resolution, including polling delay, failures, recurrence, routing, and multi-user updates. External dependencies are tracked only in the integration register.
+Monitor must prove that realistic changes in a separate EmusaSoft-shaped source database travel through scheduled read-only polling, evaluation, incident lifecycle, routing, conversations, and the visible product. The test interface must make that journey understandable, deterministic, resettable, and repeatable. The accepted prototypes must remain the visual baseline for the chat list, chat detail, and incident components.
 
 ### Guiding policies
 
-- Preserve the accepted Phases 0–4 foundation; do not restart the implementation.
-- Build Phases 1–9 locally with mock identities, synthetic fixtures, a disposable mutable source, and protected local/sample databases.
-- Test dynamic behavior by changing the simulated source, never by inserting directly into Monitor's incident tables.
-- Never mutate the protected EmusaSoft backup.
-- Keep scenarios deterministic, resettable, observable, and suitable for both automated tests and simple manual testing.
-- Promote rules individually. An unresolved source contract blocks only the affected rule, not unrelated local work.
-- Treat a successful complete read from the EmusaSoft replica as current truth. Failed, partial, truncated, invalid, or timed-out reads preserve existing incident state.
-- Keep the standard Phase 0 technical kit. Add no queue, broker, EmusaSoft write path, adjustment API, or EmusaSoft UI-library dependency.
-- Defer real EmusaSoft authentication, Aurora access, current-schema/load validation, staging, pilot, and deployment to Phase 10.
+- Preserve completed Phases 0–5; do not rewrite accepted roster, routing, incident, or dashboard foundations.
+- Keep the source boundary real: `alertas_fake` writes `test_database`; Monitor only reads it.
+- Keep Monitor's PostgreSQL database independent from all simulated EmusaSoft source records.
+- Never mutate `backup_database`.
+- Rebuild `test_database` through a versioned reset/import process rather than manual edits.
+- Match `soft_database` only from verified evidence. Record every unknown or approximation explicitly.
+- Use automatic scheduled polling as the normal path. A development-only “poll now” control may invoke the same poller, but it may not create, resolve, or reopen an incident directly.
+- Keep scenarios deterministic, observable, and suitable for automated and manual testing.
+- Keep UI review independent from unfinished source integration by using stable mock data where necessary. UI-only tests do not constitute backend acceptance.
+- Explain every deviation from the approved chat prototypes before asking the user to accept it.
+- Promote alert rules individually. A missing source contract blocks only the affected rule.
+- Keep production credentials, networking, live authorization, Aurora behavior where applicable, replica behavior, production load, pilot, and deployment in Phase 10.
 
 ### Ordered actions
 
-1. Preserve the completed and approved Dashboard V2 work from Phase 4A.
-2. Next, add the dynamic local scenario laboratory and validate the Phase 4 vertical slice in Phase 4B.
-3. Build routing and the roster, then conversations, using those dynamic incidents.
-4. Implement and dynamically validate the remaining deterministic and statistical rules.
-5. Complete local acceptance and hardening.
-6. Integrate with EmusaSoft staging, run a controlled pilot, and expand production gradually in Phase 10.
+1. Preserve the accepted foundation through Phase 5.
+2. Complete Phase 6 in parallel workstreams: source-database discovery, `test_database` and `alertas_fake`, and chat UI correction.
+3. Pass the complete A02, A03, and A05 source-to-dashboard-to-conversation gate.
+4. Implement and dynamically validate the Phase 7 and Phase 8 rules against the same separate test-source boundary.
+5. Complete local acceptance and hardening in Phase 9.
+6. Reconcile the local test model with the current live EmusaSoft environment, pilot safely, and expand gradually in Phase 10.
 
-## 3. Architecture dependency
+## 4. Completed foundation
 
-The stable ownership, polling, authentication, incident lifecycle, failure behavior, observation boundary, WebSocket, and future event-optimization decisions are defined only in `architecture/system_architecture.md`. This roadmap consumes those decisions without duplicating them.
-
-## 4. Completed foundation: Phases 0–4
-
-| Phase | Result | Evidence |
+| Phase | Status | Result |
 |---|---|---|
-| 0 — Contracts and technical decisions | Independent, read-only boundary and concrete technical kit proved locally | `delivery/phases/phase0/README.md` |
-| 1 — Data and rule contracts | 21 of 22 approved rules have versioned contracts and triggered, clear, and insufficient fixtures; E05 remains pending | `delivery/phases/phase1/README.md` |
-| 2 — Platform foundation | API, Monitor database, mock identity, authorization, observability, Redis adapter, WebSocket recovery, and application shell | `delivery/phases/phase2/README.md` |
-| 3 — Polling and recovery | Bounded scheduler, adapters, diagnostics, safe incomplete-cycle behavior, and local query-plan checks | `delivery/phases/phase3/README.md` |
-| 4 — Incident vertical slice | A02, A03, and A05 flow through evaluation, lifecycle, evidence, API, committed live change, and dashboard | `delivery/phases/phase4/README.md` |
-| 4A — Dashboard redesign | Approved compact Dashboard V2 connected to the existing authorized APIs and incident lifecycle | `delivery/phases/phase4/README.md`, `../archive/docs/design/dashboard_v2_design_handoff.md` |
+| 0 — Contracts and technical decisions | Complete | Independent read-only boundary and technical kit |
+| 1 — Data and rule contracts | Complete | Versioned contracts and fixtures for approved rules; E05 remains a later executable-contract item |
+| 2 — Platform foundation | Complete | API, Monitor database, mock identity, authorization, recovery, and application shell |
+| 3 — Polling and recovery | Complete | Bounded scheduler, adapters, diagnostics, and safe incomplete-cycle behavior |
+| 4 — Incident vertical slice | Complete | A02, A03, and A05 evaluator and incident lifecycle |
+| 4A — Dashboard redesign | Complete and accepted | Connected Dashboard V2 |
+| 4B — Dynamic local source validation | Historical completion | Synthetic source-to-screen lifecycle evidence; did not prove a separate source database equivalent to `soft_database` |
+| 5 — Roster, routing, and notifications | Complete and approved | Durable roster, rotation, routing, delivery, retry, diagnostics, and multi-user evidence |
 
-The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepted as a good first version on 2026-07-22, completing Phase 4A. Phase 4B completed locally on 2026-07-23 with synthetic source-to-incident validation. Phase 5 completed locally on 2026-07-26 with durable roster and rotation persistence, conflict and audit protection, deterministic catalog routing, idempotent in-app delivery, retry, administrator diagnostics/email outbox, and a passing multi-user scenario.
+Phase 5 remains complete. Its dynamic routing behavior will receive additional end-to-end coverage through the new Phase 6 environment; that coverage does not reopen Phase 5.
 
-## 5. Revised implementation sequence
+## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-### Phase 4A — Dashboard redesign
+**Status:** In progress. Conversation backend work exists locally; source-boundary correction, scenario redesign, UI acceptance, and complete integration evidence remain.
 
-**Status:** Complete; accepted as a good first version on 2026-07-22
+**Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 
-**Purpose:** Replace the unapproved Phase 4 visual and interaction direction while preserving the working backend and incident behavior.
+### 5.1 Workstream A — `soft_database` discovery
 
-**Deliverables:**
+- Confirm the database product, engine, exact version, and Aurora compatibility/version where applicable.
+- Obtain authoritative schema definitions for every table, view, and relationship needed by A02, A03, and A05.
+- Obtain column types, defaults, generated values, primary keys, foreign keys, unique/check constraints, indexes, character sets, collations, case behavior, time zone, and relevant SQL settings.
+- Identify relevant views, functions, procedures, triggers, or scheduled events that affect the source records Monitor reads.
+- Obtain safe representative query-plan evidence and source lifecycle/soft-delete conventions.
+- Prefer a sanitized schema-only dump and catalog metadata exports. Do not request production credentials or unnecessary personal or operational data.
+- Record which claims come from documentation, MCP, `backup_database`, or direct database-master confirmation.
 
-- an explicit dashboard information hierarchy and design direction;
-- browser-reviewable desktop, tablet, and mobile states;
-- clear open/resolved/closed-without-resolution presentation;
-- filtering, grouping, analytics, authorized evidence access, loading, empty, unavailable, and recovery states;
-- Spanish product copy, keyboard use, focus order, contrast, responsive behavior, and screen-reader labels;
-- implementation connected to the existing authorized incident APIs and recovery channel; and
-- regression coverage proving the redesign does not change incident semantics.
+The EmusaSoft MCP is useful for discovering entities, fields, types, relationships, GraphQL operations, and examples. It does not currently prove the live database engine/version, complete SQL DDL, indexes, collations, character sets, or server settings.
 
-**Decision record:** Reusable visual rules are in `design/design.md`; Monitor-specific behavior is in `product/ux_ui_decisions.md`; historical research is in `../archive/docs/design/dashboard_v2_design_handoff.md`.
+### 5.2 Workstream B — Build and reset `test_database`
 
-**Exit gate:** Satisfied on 2026-07-22. The user approved Dashboard V2 as a good first version, and the connected implementation passed functional, responsive, token-contract, and recovery regression checks.
+- Provision `test_database` using the verified database engine and compatibility version.
+- Reproduce the required schema, constraints, indexes, collations, and relevant settings.
+- Import the required protected source state from `backup_database` without modifying the backup.
+- Provide a deterministic script that destroys and recreates only the explicitly configured disposable `test_database`, then restores the equivalent baseline state from `backup_database`.
+- Validate row counts, keys, relationships, representative values, and checksums or equivalent reconciliation evidence after every reset.
+- Use separate credentials: a test-only writer for `alertas_fake` and a technically read-only account for Monitor.
+- Prove that the Monitor account cannot write, execute DDL, or change privileges in `test_database`.
+- Document any unavoidable difference between `test_database` and `soft_database`.
 
-### Phase 4B — Dynamic local source validation
+### 5.3 Workstream C — Redesign `alertas_fake`
 
-**Estimated effort:** 3–5 working days
+The redesign covers only A02, A03, and A05.
 
-**Purpose:** Prove that source changes, not prewritten incident rows, drive the complete alert lifecycle.
+For each scenario, define in simple business language:
 
-**Implementation plan:** [`delivery/phases/phase4b/implementation_plan.md`](delivery/phases/phase4b/implementation_plan.md)
+- the clean starting state;
+- the action performed by the tester;
+- the exact source records changed in `test_database`;
+- the expected next successful poll;
+- the expected incident, routing, dashboard, and conversation result;
+- how correction and resolution work;
+- how recurrence is created without losing history;
+- how incomplete data and failed reads preserve the prior incident state; and
+- how the scenario returns to its baseline.
 
-**Deliverables:**
+`alertas_fake` must show the source state, most recent action, last poll result, expected result, actual incident state, and measured delay clearly. It may write only to `test_database`. It must never write Monitor incidents, conversations, or messages.
 
-- a disposable mutable EmusaSoft source simulator behind the existing read-adapter boundary;
-- local scenarios for A02, A03, and A05;
-- an extremely simple development/test-only scenario UI;
-- controls to trigger a problem, correct it, reset the scenario, and advance simulated time where required;
-- visible source-action time, latest poll result, incident state, and measured detection delay;
-- deterministic automated lifecycle tests; and
-- manual browser validation of live delivery and cursor recovery.
+### 5.4 Workstream D — Remove the incorrect synthetic source boundary
 
-The scenario UI may, for example, create an opening work order without required material, move its scheduled start time, provide the missing material evidence, or create a closing mismatch. Each action changes the simulated source tables. The normal scheduler must then poll, evaluate, persist, and publish the result. The UI must never create, resolve, or reopen an incident directly.
+- Run every A02, A03, and A05 lifecycle through `test_database` and the normal polling adapter.
+- Compare the observed business outcomes with the approved rule contracts: trigger, persistence, deduplication, correction, resolution, failed-cycle preservation, and recurrence.
+- Confirm routing, dashboard publication, conversation creation/reuse, and cursor recovery.
+- Only after the replacement path passes, remove the operational simulator adapter and synthetic EmusaSoft source tables from Monitor's database.
+- Keep small deterministic unit-test fixtures where useful; they are not an operational foreign-database simulator.
 
-Every scenario must prove:
+### 5.5 Workstream E — Conversation backend and business behavior
 
-1. clean source state produces no open incident;
-2. a source change creates a problem;
-3. the next successful poll opens one incident;
-4. repeated polls do not duplicate it;
-5. a source correction resolves it on a later successful poll;
-6. an incomplete or failed poll does not resolve it; and
-7. recurrence after correction creates a new occurrence with preserved history.
+- Persistent incident conversations, messages, participants, unread counts, receipts, and cursor pagination.
+- Exact-participant-set reuse so a new incident reuses an existing conversation with the same participant set.
+- No one-conversation-per-incident rule; one conversation may contain multiple incident cards over time.
+- Routine shift or assignment changes do not remove existing participants.
+- Administrators can access all conversations through an explicit mode and can add or remove active workers.
+- Removing a worker from the roster or making the worker inactive blocks Monitor access entirely.
+- One-hour read-only delay after the last associated incident resolves; reopening or a matching new incident restores writing.
+- Server-side authorization, duplicate-command protection, edit/delete policy, attachments, notifications, presence, typing, reconnect recovery, and audit behavior as defined in the Phase 6 business rules.
 
-The simulator and scenario endpoints must be impossible to enable in staging or production. The protected backup remains read-only.
+### 5.6 Workstream F — Chat UI audit, decisions, and correction
 
-**Exit gate:** Automated and manual tests prove the full source-to-screen lifecycle for A02, A03, and A05, including failure preservation, recurrence, live updates, reconnect, and resettable scenarios.
+- Use the current `chat-list-final.html` and `chat-detail.html` prototypes as the requested visual baseline.
+- Compare every graphical and interaction difference in the implemented chat list and chat detail.
+- Include layout, density, dimensions, typography, colors, borders, shadows, spacing, controls, responsive behavior, chat rows, message bubbles, and incident components in both the list and message stream.
+- Explain each divergence with evidence. Distinguish a binding product/technical requirement from an unsupported implementation choice or mistake.
+- Present differences for user decisions before changing the design.
+- Implement only the adaptations the user approves.
+- Use stable mock data for visual testing while source integration is incomplete. Clearly label those results as UI-only evidence.
 
-### Phase 5 — Operational Responsibility Roster, routing, and notifications
+### 5.7 Phase 6 acceptance
 
-**Status:** Complete locally on 2026-07-26. Evidence: `delivery/phases/phase5/README.md`.
+A02, A03, and A05 must each prove:
 
-**Estimated effort:** 2–4 weeks
+1. a reset produces the verified baseline;
+2. an `alertas_fake` action changes only `test_database`;
+3. automatic Monitor polling reads through the read-only source adapter;
+4. the next successful complete read creates or updates exactly one incident;
+5. repeated successful polls do not duplicate evidence, incidents, routing delivery, conversations, or incident cards;
+6. dashboard, chat list, and chat detail receive the committed update;
+7. correction resolves the incident on a later successful poll;
+8. incomplete or failed reads preserve prior state;
+9. recurrence creates a new occurrence while preserving history;
+10. exact participant sets reuse the correct conversation;
+11. simultaneous users, reconnects, ordered recovery, duplicate sends, permissions, participant removal, pagination, unread counts, and receipts behave correctly; and
+12. the accepted chat UI passes desktop, tablet, mobile, keyboard, accessibility, and visual review.
 
-**Prerequisite:** Phases 4A and 4B complete. The roster screen and workflow must be designed and approved before implementation.
+**Exit gate:** Phase 6 is complete only when the source-database boundary, reset process, A02/A03/A05 lifecycle, routing, dashboard, conversations, and accepted UI all pass automated and manual evidence and the user accepts the interfaces. Phase 7 may not start before this gate.
 
-**Already decided:** Recipient positions, general distribution rules, primary action owners, and code-specific routing exceptions are defined in `product/alert_catalog.md`. Phase 5 implements and tests those approved rules; it does not redesign them.
-
-**Deliverables:**
-
-- EmusaSoft-authenticated global and operation-scoped permissions, normalized in Monitor for enforcement and audit;
-- `Responsables` access restricted to Monitor administrators;
-- one or more `Rotación` schedule managers per operation, restricted to their authorized operations;
-- roster assignments for standardized operational positions;
-- effective dates, temporary replacements, conflicts, and audit history;
-- deterministic application of all seven `General alert distribution` rules in `product/alert_catalog.md` and every code-specific override;
-- OT operator or recorded actor supplementation where required;
-- deduplication and delivery records;
-- email to authorized Monitor administrators when a required roster assignment is missing or conflicting; and
-- internal routing diagnostics without an ordinary user-facing error or broad fallback notification.
-
-Monitor notifies every valid recipient it can resolve. It does not notify unrelated users merely because an assignment is missing.
-
-**Dynamic validation:** Phase 4B scenarios must prove recipient changes, partial resolution, replacement dates, administrator email, retry, deduplication, and authorization.
-
-**Exit gate:** Every catalog routing rule has deterministic automated evidence and a manual multi-user scenario.
-
-### Phase 6 — Conversations and messages
-
-**Estimated effort:** 3–5 weeks
-
-**Deliverables:**
-
-- incident conversations, messages, participants, and unread counts;
-- committed message fan-out, cursor recovery, and multi-device consistency;
-- read receipts, presence, and typing as policy permits;
-- authorized history and server-side participant checks;
-- notification integration; and
-- dashboard, chat list, and chat detail synchronization.
-
-**Entry decisions:** Before implementation, settle retention, attachments, moderation, edit/delete behavior, receipts, presence, search, offline behavior, and external notification policy. Provisional local implementations must remain replaceable until those decisions are recorded.
-
-**Dynamic validation:** Generate conversations from Phase 4B incidents and test simultaneous users, reconnects, duplicate sends, authorization changes, and ordered recovery.
-
-**Exit gate:** Authorized users can communicate around a dynamically created incident without losing or duplicating committed messages.
-
-### Phase 7 — Deterministic closure, deadline, and balance rules
-
-**Estimated effort:** 5–7 weeks
+## 6. Phase 7 — Deterministic closure, deadline, and balance rules
 
 **Alert codes:** A01, B01, B02, B03, D01, D02, D03, and D04
 
@@ -185,186 +185,149 @@ Monitor notifies every valid recipient it can resolve. It does not notify unrela
 - production-quality evaluators for every assigned code;
 - explicit decimal, unit, tolerance, time-window, closure, correlation, and reason behavior;
 - complete evidence and subject references;
-- relevant closed-without-resolution administrator workflows and read-only reporting; and
-- a Phase 4B scenario extension for each code.
+- relevant closed-without-resolution administrator workflows and read-only reporting;
+- an approved `alertas_fake` scenario for each code that changes realistic source records in `test_database`; and
+- source-compatible query, lifecycle, routing, dashboard, and conversation evidence.
 
-**Exit gate:** Every Phase 7 code passes triggered, persistent, corrected, resolved, insufficient, failed-cycle, recurrence, correlation, routing, and browser scenarios.
+**Exit gate:** Every Phase 7 code passes triggered, persistent, corrected, resolved, insufficient, failed-cycle, recurrence, correlation, routing, dashboard, conversation, and browser scenarios through the separate `test_database` boundary.
 
-### Phase 8 — Capacity, statistical, physical, and operation-specific rules
+## 7. Phase 8 — Capacity, statistical, physical, and operation-specific rules
 
-**Estimated effort:** 5–9 weeks
-
-**Alert codes:** A04, A06, A07, C01, C02, C06, E01, E02, E03, and E04
+**Alert codes:** A04, A06, A07, C01, C02, C06, E01, E02, E03, E04, and E05
 
 **Deliverables:**
 
-- production-quality evaluators and scenario extensions;
+- production-quality evaluators and `test_database` scenario extensions;
 - versioned formulas, thresholds, model inputs, sample requirements, and explanations;
 - backtesting and simulated shadow mode;
 - false-positive, false-negative, and insufficient-evidence reporting;
 - capacity and physical-source contracts; and
 - rule-level enable, disable, rollback, and model-version controls.
 
-E02, E03, and E04 may be implemented and tested with synthetic snapshots, but they must remain disabled in staging and production until ES2-05 proves immutable opening and closing inventory at the required work-order, container, resin, quantity, unit, operator, and time granularity.
+If a rule's required source does not yet exist in `soft_database`, synthetic snapshots may be used for rule development only. They must be clearly separated from the source-compatible acceptance path and cannot satisfy a production-promotion gate.
 
-**Exit gate:** Each code passes lifecycle validation and its additional statistical, physical, model-quality, or capacity gate. No unsupported rule is promoted merely because its local fixture passes.
+E02, E03, and E04 remain disabled in staging and production until ES2-05 proves immutable opening and closing inventory at the required work-order, container, resin, quantity, unit, operator, and time granularity.
 
-### Phase 9 — Local acceptance and hardening
+**Exit gate:** Each code passes the lifecycle gate and its additional statistical, physical, model-quality, capacity, and source-compatibility requirements. Unsupported rules remain explicitly blocked.
 
-**Estimated effort:** 3–5 weeks
+## 8. Phase 9 — Local acceptance and hardening
 
 **Deliverables:**
 
 - full journeys across Dashboard, Chats, Errors and Alerts, and the Operational Responsibility Roster;
+- repeatable `test_database` reset, migration, reconciliation, and failure-recovery evidence;
 - complete rule-promotion matrix and dependency evidence;
 - cross-rule correlation, suppression, recurrence, and closed-without-resolution validation;
 - routing, authorization, privacy, audit, and external-notification validation;
-- dashboard report export in the approved format;
 - accessibility, localization, responsive, and browser coverage;
 - performance, recovery, load, fault-injection, and prolonged-downtime testing;
-- backup, restore, migration rollback, deployment rollback, and rule kill switches; and
+- Monitor database backup/restore, migration rollback, deployment rollback, and rule kill switches; and
 - operational runbooks and local acceptance evidence.
 
-All Phase 9 acceptance uses mock identity, synthetic fixtures, the mutable local simulator, and protected local/sample data. It does not require real EmusaSoft credentials.
+Phase 9 uses mock identity, `test_database`, protected `backup_database`, and clearly labeled unit fixtures. It does not require production credentials, but it must not rely on synthetic source tables inside Monitor's database.
 
-**Exit gate:** The complete local product is accepted, every rule has an explicit promotion status, and Phase 10 prerequisites are documented without hidden assumptions.
+**Exit gate:** The complete local product is accepted, the resettable source-compatible environment is proven, every rule has an explicit promotion status, and Phase 10 prerequisites contain no hidden assumptions.
 
-### Phase 10 — EmusaSoft integration, pilot, and production
+## 9. Phase 10 — EmusaSoft integration, pilot, and production
 
-**Estimated effort:** 5–9 weeks for integration and the initial pilot, followed by controlled expansion
-
-#### Phase 10A — Staging integration
+### Phase 10A — Live/staging integration
 
 - replace mock identity with the EmusaSoft token-validation adapter;
-- provision separate staging and production Monitor credentials for the existing Aurora read replica;
-- prove the Monitor database account cannot write, execute DDL/procedures, or change privileges;
-- validate current schema, soft-delete handling, time zones, stable keys, query plans, pagination, timeouts, concurrency, and observed load;
-- use successful complete replica reads as authoritative without a separate lag gate;
-- replay the dynamic scenarios through controlled staging transactions;
-- validate all seven routing rules with staging identities;
-- validate supported EmusaSoft deep links only if ES2-06 is closed; otherwise display identifiers and evidence;
+- provision separate staging and production read-only Monitor credentials;
+- confirm the current live database engine, version, schema, collations, settings, soft-delete behavior, time zones, and permitted objects;
+- automatically compare the current live source contract with `test_database` and resolve material drift;
+- prove the Monitor account cannot write, execute DDL/procedures, or change privileges;
+- validate live query plans, indexes used, pagination, timeouts, concurrency, schedule, replica behavior, and measured load;
+- replay approved scenarios through controlled staging mechanisms only where EmusaSoft authorizes them;
+- validate routing with staging identities;
 - run eligible statistical rules in shadow mode; and
-- promote rules one at a time only after their source and quality gates pass.
+- promote rules one at a time after source, quality, safety, and user-acceptance gates pass.
 
-ES2-01 removes external approval of every individual query. Monitor still owns conservative bounded queries and must fix any safety or performance problem found in staging.
+Local `test_database` evidence reduces Phase 10 uncertainty but cannot prove credentials, networking, managed-database behavior, replica freshness, production data distribution, permissions, or production load.
 
-ES2-03 requires a stable `sysUserId`, global Monitor permissions, operation-scoped scheduling permissions, and validation of token signature, issuer, audience, expiration, and ordinary lifetime. EmusaSoft authentication owns those identity permissions. Monitor owns roster assignments, alert access derived from routing, and synchronized authorization enforcement and audit. A validated token is trusted until its encoded expiry unless the contract later provides a stronger revocation mechanism.
-
-#### Phase 10B — Controlled pilot
+### Phase 10B — Controlled pilot
 
 - enable an agreed subset of low-risk, fully validated rules;
 - measure detection delay, query load, availability, routing success, false positives, false negatives, and recovery;
 - complete user acceptance, training, support ownership, and rollback rehearsal; and
 - hold the pilot for an agreed observation window before expansion.
 
-#### Phase 10C — Production expansion
+### Phase 10C — Production expansion
 
 - expand plants, operations, users, and rules gradually;
 - retain per-rule kill switches and rollback criteria;
 - review service levels and capacity after each expansion; and
-- consider the optional EmusaSoft event trigger only after the polling baseline is stable and measured.
+- consider event-driven optimization only after the polling baseline is stable and measured.
 
 **Exit gate:** The agreed production scope operates within approved safety, performance, detection, quality, and support limits, with rollback proven.
 
-## 6. Alert-code implementation and promotion matrix
+## 10. Alert-code implementation and promotion matrix
 
-| Code | Implementation phase | Current local state | Additional staging/production gate |
+| Code | Implementation phase | Current local state | Additional live gate |
 |---|---:|---|---|
-| A01 | 7 | Contract and fixtures complete | Current schema and bounded-query validation |
-| A02 | 4 / 4B | Implemented; dynamic validation pending | Current schema and bounded-query validation |
-| A03 | 4 / 4B | Implemented; dynamic validation pending | Current schema and bounded-query validation |
-| A04 | 8 | Contract and fixtures complete | Capacity contract and current-schema validation |
-| A05 | 4 / 4B | Implemented; dynamic validation pending | Current schema and bounded-query validation |
-| A06 | 8 | Contract and fixtures complete | Formula/source and current-schema validation |
-| A07 | 8 | Contract and fixtures complete | Formula/source and current-schema validation |
-| B01 | 7 | Contract and fixtures complete | Current schema and bounded-query validation |
-| B02 | 7 | Contract and fixtures complete | Current schema and bounded-query validation |
-| B03 | 7 | Contract and fixtures complete | Current schema and bounded-query validation |
+| A01 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| A02 | 4 / 6 | Evaluator implemented; `test_database` validation pending | Live source reconciliation and load validation |
+| A03 | 4 / 6 | Evaluator implemented; `test_database` validation pending | Live source reconciliation and load validation |
+| A04 | 8 | Contract and fixtures complete | Capacity contract and current-source validation |
+| A05 | 4 / 6 | Evaluator implemented; `test_database` validation pending | Live source reconciliation and load validation |
+| A06 | 8 | Contract and fixtures complete | Formula/source and current-source validation |
+| A07 | 8 | Contract and fixtures complete | Formula/source and current-source validation |
+| B01 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| B02 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| B03 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
 | C01 | 8 | Contract and fixtures complete | Model-quality, sample-size, and shadow-mode gate |
 | C02 | 8 | Contract and fixtures complete | Model-quality, sample-size, and shadow-mode gate |
 | C06 | 8 | Contract and fixtures complete | Model-quality, sample-size, and shadow-mode gate |
-| D01 | 7 | Contract and fixtures complete | Current schema and bounded-query validation |
-| D02 | 7 | Contract and fixtures complete | Current schema and bounded-query validation |
-| D03 | 7 | Contract and fixtures complete | Current schema and bounded-query validation |
-| D04 | 7 | Contract and fixtures complete | Current schema and bounded-query validation |
-| E01 | 8 | Contract and fixtures complete | Physical-source and current-schema validation |
-| E02 | 8 | Contract and synthetic fixtures complete | ES2-05 immutable snapshots and current-schema validation |
-| E03 | 8 | Contract and synthetic fixtures complete | ES2-05 immutable snapshots and current-schema validation |
-| E04 | 8 | Contract and synthetic fixtures complete | ES2-05 immutable snapshots and current-schema validation |
-| E05 | 8 | Approved catalog rule; executable contract and fixtures pending | Closure-snapshot semantics and current-schema validation |
+| D01 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| D02 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| D03 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| D04 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| E01 | 8 | Contract and fixtures complete | Physical-source and current-source validation |
+| E02 | 8 | Contract and synthetic fixtures complete | ES2-05 immutable snapshots and current-source validation |
+| E03 | 8 | Contract and synthetic fixtures complete | ES2-05 immutable snapshots and current-source validation |
+| E04 | 8 | Contract and synthetic fixtures complete | ES2-05 immutable snapshots and current-source validation |
+| E05 | 8 | Approved catalog rule; executable contract pending | Closure-snapshot semantics and current-source validation |
 
-All rules additionally require Phase 10 read access, safe-load evidence, identity/routing validation, and current MCP/schema reconciliation where relevant.
+All enabled rules additionally require live read access, safe-load evidence, identity/routing validation, and current source reconciliation.
 
-## 7. External dependencies
+## 11. External dependencies and decision gates
 
-`integrations/emusasoft/integration_register.md` is the sole current status source for EmusaSoft and MCP work. Its open items do not block Phases 4B–9; they gate only the affected Phase 10 integration or rule promotion.
+The EmusaSoft integration register remains the authority for external work.
 
-## 8. Cross-cutting decisions before production
+- Database-engine, version, DDL, index, collation, and settings evidence now gates faithful construction of `test_database`.
+- Missing source metadata does not block the parallel Phase 6 UI audit.
+- Before removing Monitor's synthetic source tables, the replacement A02/A03/A05 path must pass.
+- Before Phase 7, the complete Phase 6 exit gate must pass.
+- Before each live rule promotion, current source, read-only access, bounded-query behavior, source completeness, routing, and rule-specific quality must pass.
+- Before E02–E04 staging or production, ES2-05 must close.
+- Before supported deep links, ES2-06 must close.
 
-### 8.1 Polling persistence and retention
+No overall approval substitutes for these specific gates.
 
-A frequent EmusaSoft polling interval can produce hundreds of identical observations for one unchanged condition. Those consultations are not useful incident history and must not create a new evidence row, lifecycle transition, or client change event when the condition and meaningful context have not changed. Elapsed age is derived from timestamps rather than repeated snapshots.
-
-Monitor may update the condition state's latest healthy observation metadata without appending business history. Poll-cycle diagnostics are operational telemetry, not incident evidence, and require a bounded retention or aggregation policy rather than indefinite storage. Failed, partial, invalid, truncated, timed-out, or uncommitted cycles still preserve the last known incident state and enough diagnostic information to investigate recovery.
-
-Before Phase 10 production polling:
-
-1. write an ADR defining which fields belong in incident evidence, condition state, poll diagnostics, metrics, and logs;
-2. define retention, aggregation, and deletion periods for successful and failed poll diagnostics;
-3. estimate storage volume at proposed production polling cadences and validate it against the production budget;
-4. retain regression tests proving unchanged healthy polls create no evidence row, transition, or incident-change event; and
-5. prove operational diagnostics remain bounded without weakening freshness or lifecycle safety.
-
-### 8.2 Contextual incident explanations
-
-Catalog text explains a rule, but an operator also needs the specific work order, machine, shift, elapsed condition, and responsible role that caused the current occurrence. Static catalog copy may be too generic, while unconstrained generated text could invent facts or obscure evidence.
-
-Every displayed explanation must be grounded only in the approved alert catalog, versioned rule result, and authorized incident evidence. It must distinguish unavailable facts from known facts, never infer a named person from a role or area, remain read-only, and retain a deterministic catalog-grounded fallback. Deterministic composition, an LLM, and a hybrid remain alternatives for evaluation; none is approved as the production mechanism yet.
-
-Before selecting a production mechanism:
-
-1. define a structured, versioned explanation input and output contract;
-2. compare deterministic rule-specific composition, LLM-assisted generation, and a hybrid;
-3. test representative A02, A03, and A05 cases followed by every production candidate rule;
-4. score factual grounding, omissions, invented facts, readability, latency, cost, and incomplete-evidence behavior;
-5. decide whether output is generated on read or change and whether it is cached, persisted, versioned, or regenerated; and
-6. approve an ADR covering privacy, security, latency, cost, auditability, fallback behavior, and factual acceptance thresholds before any production LLM use.
-
-## 9. Decision gates
-
-- **Phase 4A exit:** satisfied by explicit user approval of Dashboard V2 on 2026-07-22.
-- **Before Phase 5 implementation:** approval of the roster screen, workflows, permissions, effective-date behavior, and conflict presentation.
-- **Before Phase 6 implementation:** decisions on retention, attachments, moderation, message mutation, receipts, presence, search, offline behavior, and external channels.
-- **Before each Phase 10 rule promotion:** verified current schema, read-only access, bounded-query behavior, source completeness, routing, and rule-specific quality evidence.
-- **Before E02–E04 staging or production:** ES2-05 closed with immutable opening and closing snapshot evidence.
-- **Before deep links:** ES2-06 closed with a supported, versioned navigation contract.
-
-No overall approval substitutes for these specific gates, and no unresolved MCP request requires local development to stop.
-
-## 10. Initial production Definition of Done
+## 12. Initial production Definition of Done
 
 The initial production implementation is complete only when:
 
-- the agreed rules run against the existing Aurora replica using technically enforced read-only credentials;
-- every enabled query is bounded, measured, observable, and safe under staging and pilot load;
-- successful complete reads drive deterministic incident state, while failed or incomplete reads preserve prior state;
-- unchanged healthy polling creates no repeated incident evidence, lifecycle transition, or client change event, and operational diagnostics follow an approved bounded retention policy;
-- incidents retain explainable evidence, lifecycle, recurrence, correlation, and audit history;
-- contextual explanations pass an approved grounding contract and deterministic fallback without requiring an unapproved generative service;
-- authorized users receive committed updates and can recover missed changes;
-- routing follows the catalog and roster without broad fallback notification;
-- conversations remain ordered, authorized, durable, and recoverable;
-- the four approved screens pass responsive and accessibility acceptance;
+- the agreed rules run against the approved EmusaSoft source using technically enforced read-only credentials;
+- every enabled query is source-compatible, bounded, measured, observable, and safe under staging and pilot load;
+- successful complete reads drive deterministic incident state while failed or incomplete reads preserve prior state;
+- unchanged healthy polling creates no repeated incident evidence, transition, delivery, conversation, or client event;
+- incidents retain explainable evidence, lifecycle, recurrence, correlation, routing, and audit history;
+- authorized users receive committed updates and recover missed changes;
+- conversations remain ordered, authorized, durable, paginated, and recoverable;
+- the approved screens pass responsive, accessibility, localization, and visual acceptance;
 - detection delay, availability, delivery, false-positive, and false-negative objectives are measured and accepted;
-- backup, restore, rollback, kill switches, monitoring, support, and incident-response procedures are proven; and
-- Monitor contains no EmusaSoft write path, adjustment workflow, or unsupported link or source assumption.
+- backup, restore, reset, rollback, kill switches, monitoring, support, and incident-response procedures are proven; and
+- Monitor contains no EmusaSoft write path, production simulator, adjustment workflow, unsupported link, or unsupported source assumption.
 
-## 11. Document control
+## 13. Document control
 
 - Version 1.2 is historical at `../archive/docs/roadmaps/monitor_architecture_and_production_roadmap_v1.md`.
-- Version 2.1 is canonical at `roadmap.md`.
+- Version 2.1 is historical at `../archive/docs/roadmaps/monitor_architecture_and_production_roadmap_v2.md`.
+- Version 3.0 is canonical at `roadmap.md`.
 - `product/product_definition.md` governs product boundaries.
 - `product/alert_catalog.md` governs alert logic, evidence, resolution, and distribution.
 - `product/ux_ui_decisions.md` and approved design artifacts govern screen behavior and presentation.
-- `integrations/emusasoft/integration_register.md` is the only active external dependency register.
+- `architecture/system_architecture.md` governs the stable system boundary.
+- `integrations/emusasoft/integration_register.md` governs external dependency status.
 - Material changes to architecture, phase gates, or production scope require a dated roadmap revision rather than silent reinterpretation.
