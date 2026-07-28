@@ -16,3 +16,6 @@ __pycache__/
 # Embedded local Monitor database and local-only environment overrides
 /local-data/monitor/
 .env.monitor.local
+
+# Local test inputs and generated test data
+/test_data/
