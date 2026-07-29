@@ -76,7 +76,7 @@ The chip must preserve the implementation's compact size, text scale, border rad
 - the alert code; and
 - the alert short name.
 
-Use blue text with a red border for the open-alert chip treatment. Do not include the words `Error`, `Alerta`, or `Error posible` in these list chips because they do not add value in this context. Do not include an aggregate count such as `2 alertas abiertas`.
+Use the alert's semantic color only on its code, navy for the short name, a light-gray vertical divider between them, and the neutral blue-gray control border. Do not use a dot divider or full-pill geometry; retain the implementation's compact `6px` control radius. Do not include the words `Error`, `Alerta`, or `Error posible` in these list chips because they do not add value in this context. Do not include an aggregate count such as `2 alertas abiertas`.
 
 Alert age remains separate from the chip and is written as `Más antigua` or `Sin resolver` followed by a duration. Chip size and typography do not change with age.
 

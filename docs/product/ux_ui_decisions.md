@@ -326,8 +326,10 @@ Machine-code or group-initial avatars were removed. They consumed space without 
 ### 5.4 Alert chips in rows
 
 - Chips identify unresolved alert code and short name.
-- Chips include the descriptive label configured by that alert code; examples include `Error`, `Por vencer`, `Alerta`, and `Error posible`.
-- Chips use a neutral surface compatible with the EMUSA palette; semantic color is limited to the code-specific label marker and text.
+- Chips do not repeat descriptive status words such as `Error`, `Por vencer`, `Alerta`, or `Error posible`.
+- The alert code alone carries its semantic color; the short name uses navy text.
+- A light-gray vertical divider separates the alert code from the short name. Do not use a dot as that divider.
+- Chips use a white surface, the neutral blue-gray control border, and the standard compact `6px` control radius rather than full-pill geometry.
 - Multiple alerts appear as multiple chips.
 - When the complete set does not fit, show a limited number and an explicit overflow such as `+3 más`.
 - Chip size and typography remain stable regardless of age.

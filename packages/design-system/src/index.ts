@@ -33,6 +33,7 @@ export const monitorSemanticTokens = {
     surface: resolve<string>(semantic.color.surface),
     selected: resolve<string>(semantic.color.selected),
     border: resolve<string>(semantic.color.border),
+    controlBorder: resolve<string>(semantic.color.controlBorder),
     textPrimary: resolve<string>(semantic.color.textPrimary),
     textSecondary: resolve<string>(semantic.color.textSecondary),
     textInverse: resolve<string>(semantic.color.textInverse),
