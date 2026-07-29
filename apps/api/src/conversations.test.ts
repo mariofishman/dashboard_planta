@@ -7,6 +7,12 @@ const servers: MonitorServer[] = [];
 afterEach(async () => Promise.all(servers.splice(0).map((server) => server.close())));
 
 const headers = (identity: string) => ({ authorization: `Bearer mock:${identity}` });
+const activeDayGroup = () => {
+  const day = Math.floor(Date.parse(`${new Date().toISOString().slice(0, 10)}T12:00:00Z`) / 86_400_000);
+  const start = Math.floor(Date.parse("2026-07-25T12:00:00Z") / 86_400_000);
+  const phase = Math.floor(Math.max(0, day - start) / 2);
+  return ([{ id: "A", anchor: 2 }, { id: "B", anchor: 0 }, { id: "C", anchor: 1 }].find((group) => (group.anchor + phase) % 3 === 0)?.id ?? "A");
+};
 const assignment = (id: string, person: string, position: string, scope: string, group: string | null, operations: string[] = [], warehouseType: string | null = null, sysUserId?: number) => ({
   id, ...(sysUserId ? { sysUserId } : {}), person, position, operations, warehouseType, scope, group, validFrom: "2026-07-01", validTo: null, state: "active", setupComplete: true,
 });
@@ -24,13 +30,14 @@ it("synchronizes one incident conversation across mock users, duplicates, reconn
   const manager = headers("plant-manager");
   const supervisor = headers("shift-supervisor");
   const operator = headers("machine-operator");
+  const group = activeDayGroup();
   const roster = [
     assignment("manager", "María Torres", "Gerente de fábrica", "factory", null, [], null, 9001),
-    assignment("supervisor-a", "Luis Vargas", "Supervisor de turno de operación", "operation_group", "A", ["Impresión"], null, 9002),
+    assignment("supervisor-a", "Luis Vargas", "Supervisor de turno de operación", "operation_group", group, ["Impresión"], null, 9002),
     assignment("leader", "Rosa Paredes", "Líder técnico", "operation", null, ["Impresión"], null, 9004),
-    assignment("operator-a", "Jorge Acosta", "Operador de máquina", "machine_group", "A", ["Impresión"], null, 9003),
-    assignment("dispatcher-a", "Carlos Mendoza", "Despachador de almacén", "warehouse_group", "A", [], "Materias primas"),
-    assignment("warehouse-supervisor-a", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", "A", [], "Materias primas"),
+    assignment("operator-a", "Jorge Acosta", "Operador de máquina", "machine_group", group, ["Impresión"], null, 9003),
+    assignment("dispatcher-a", "Carlos Mendoza", "Despachador de almacén", "warehouse_group", group, [], "Materias primas"),
+    assignment("warehouse-supervisor-a", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", group, [], "Materias primas"),
   ];
   assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: roster } })).statusCode, 200);
   for (const [url, payload] of [["/api/dev/scenarios/A02/trigger", undefined], ["/api/dev/scenarios/A02/advance-time", { minutes: 31 }], ["/api/dev/scenarios/A02/poll", undefined]] as const) {

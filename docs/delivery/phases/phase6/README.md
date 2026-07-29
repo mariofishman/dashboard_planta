@@ -6,6 +6,7 @@
 
 - `business_rules.md` records the approved product rules.
 - `implementation_plan.md` records the implementation and validation plan.
+- `alertas_fake_audit_and_redesign.md` records the A02/A03/A05 audit vocabulary, scenario coverage, redesign requirements, and current threshold decision.
 
 ## Existing baseline
 
