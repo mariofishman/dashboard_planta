@@ -42,6 +42,15 @@ generate_secrets() {
       echo 'port=3306'
       echo 'default-character-set=utf8mb4'
     } > "$test_db_secrets/$account.cnf"
+    {
+      echo '[client]'
+      echo "user=$user"
+      echo "password=$password"
+      echo 'protocol=TCP'
+      echo "host=$TEST_DB_HOST"
+      echo "port=$TEST_DB_PORT"
+      echo 'default-character-set=utf8mb4'
+    } > "$test_db_secrets/$account.host.cnf"
   done
   chmod 600 "$test_db_secrets"/*
 }
@@ -64,8 +73,8 @@ bootstrap_accounts() {
   monitor_password="$(<"$test_db_secrets/monitor.password")"
   mysql_in_container root <<SQL
 CREATE USER IF NOT EXISTS 'test_database_admin'@'%' IDENTIFIED BY '$reset_password';
-CREATE USER IF NOT EXISTS 'alertas_fake'@'%' IDENTIFIED BY '$writer_password';
-CREATE USER IF NOT EXISTS 'monitor_source_ro'@'%' IDENTIFIED BY '$monitor_password';
+CREATE USER IF NOT EXISTS 'alertas_fake'@'%' IDENTIFIED BY '$writer_password' ACCOUNT LOCK;
+CREATE USER IF NOT EXISTS 'monitor_source_ro'@'%' IDENTIFIED BY '$monitor_password' ACCOUNT LOCK;
 ALTER USER 'test_database_admin'@'%' IDENTIFIED BY '$reset_password';
 ALTER USER 'alertas_fake'@'%' IDENTIFIED BY '$writer_password';
 ALTER USER 'monitor_source_ro'@'%' IDENTIFIED BY '$monitor_password';
@@ -77,11 +86,16 @@ SQL
 }
 
 start_runtime() {
-  generate_secrets
   require_protected_dump
   if docker inspect "$TEST_DB_CONTAINER" >/dev/null 2>&1; then
+    [[ -s "$test_db_secrets/root.password" && -s "$test_db_secrets/root.cnf" ]] || die "existing runtime has no matching local root secret; recovery is required"
+    generate_secrets
     docker start "$TEST_DB_CONTAINER" >/dev/null
   else
+    if docker volume inspect "$TEST_DB_VOLUME" >/dev/null 2>&1 && [[ ! -s "$test_db_secrets/root.password" ]]; then
+      die "existing database volume has no matching local root secret; refusing to generate incompatible credentials"
+    fi
+    generate_secrets
     docker volume create "$TEST_DB_VOLUME" >/dev/null
     docker run --detach \
       --name "$TEST_DB_CONTAINER" \
@@ -106,6 +120,7 @@ start_runtime() {
       --transaction-isolation=REPEATABLE-READ >/dev/null
   fi
   wait_for_mysql
+  require_running_attested_runtime
   bootstrap_accounts
   mysql_query root "SELECT VERSION(), @@lower_case_table_names, @@global.time_zone, @@global.transaction_isolation, @@global.sql_mode;"
 }
@@ -115,6 +130,13 @@ case "$command_name" in
   stop) docker stop "$TEST_DB_CONTAINER" >/dev/null ;;
   status)
     docker ps --all --filter "name=^/${TEST_DB_CONTAINER}$" --format '{{.Names}}\t{{.Status}}\t{{.Ports}}'
+    if docker inspect "$TEST_DB_CONTAINER" >/dev/null 2>&1; then
+      if [[ -f "$test_db_ready" ]]; then echo 'readiness=ready'; else echo 'readiness=not-ready'; fi
+      if [[ "$(docker inspect --format '{{.State.Running}}' "$TEST_DB_CONTAINER")" == "true" ]]; then
+        require_running_attested_runtime
+        mysql_query root "SELECT user,account_locked FROM mysql.user WHERE user IN ('alertas_fake','monitor_source_ro') ORDER BY user;"
+      fi
+    fi
     ;;
   *) die "usage: $0 {start|stop|status}" ;;
 esac

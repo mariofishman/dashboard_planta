@@ -23,7 +23,9 @@
     "db:test-source:status": "./scripts/test-database-runtime.sh status",
     "db:test-source:stop": "./scripts/test-database-runtime.sh stop",
     "db:test-source:reset": "ALLOW_TEST_DATABASE_RESET=yes ./scripts/test-database-reset.sh",
-    "db:test-source:validate": "./scripts/test-database-validate.sh",
+    "db:test-source:validate": "./scripts/test-database-validate.sh health",
+    "db:test-source:validate-baseline": "./scripts/test-database-validate.sh baseline",
+    "db:test-source:query-plans": "./scripts/test-database-query-plans.sh",
     "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts"
   },
   "devDependencies": {
