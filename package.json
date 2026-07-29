@@ -19,6 +19,11 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:migrate": "npm run migrate -w @monitor/database",
     "db:reset-roster": "node scripts/reset-local-roster.mjs",
+    "db:test-source:start": "./scripts/test-database-runtime.sh start",
+    "db:test-source:status": "./scripts/test-database-runtime.sh status",
+    "db:test-source:stop": "./scripts/test-database-runtime.sh stop",
+    "db:test-source:reset": "ALLOW_TEST_DATABASE_RESET=yes ./scripts/test-database-reset.sh",
+    "db:test-source:validate": "./scripts/test-database-validate.sh",
     "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts"
   },
   "devDependencies": {
