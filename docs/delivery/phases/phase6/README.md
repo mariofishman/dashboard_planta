@@ -6,6 +6,7 @@
 
 - `business_rules.md` records the approved product rules.
 - `implementation_plan.md` records the implementation and validation plan.
+- `test_database.md` records the local MySQL runtime, deterministic reset process, safety boundary, and validation evidence.
 
 ## Existing baseline
 
