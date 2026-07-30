@@ -25,8 +25,8 @@ const machineExecutionCodes = new Set([
 
 const includesAny = (reasons: string[], values: string[]) => values.some((value) => reasons.includes(value));
 
-export function primaryRoleFor(code: string, evidence: Record<string, unknown> = {}): RoutingRole | null {
-  if (code === "A02") return evidence.physicalArrivalState === "at_machine_missing_receipt" ? "machine_operator" : "warehouse_dispatcher";
+export function primaryRoleFor(code: string, _evidence: Record<string, unknown> = {}): RoutingRole | null {
+  if (code === "A02") return "warehouse_dispatcher";
   if (code === "A03") return "machine_operator";
   if (code === "A05") return "process_operator";
   return null;
@@ -166,7 +166,7 @@ export class RoutingService {
     const rosterRevision = await this.database.queryOne("SELECT revision FROM monitor_roster_revision WHERE plant_id=$1", [plantId]);
     const exceptionRevision = await this.database.queryOne("SELECT COALESCE(MAX(updated_at),'epoch') AS updated_at FROM monitor_rotation_exception WHERE plant_id=$1", [plantId]);
     const fingerprint = [incident.updated_at, JSON.stringify(reasons), JSON.stringify(roles), primaryRole ?? "",
-      evidence.physicalArrivalState ?? "", evidence.reelKind ?? "", rosterRevision.revision ?? 0,
+      evidence.reelKind ?? "", rosterRevision.revision ?? 0,
       patternRow.revision ?? 0, calendarRow.revision ?? 0, exceptionRevision.updated_at].join("|");
     const prior = await this.database.queryOne(`SELECT id,status,primary_role AS "primaryRole",resolved_recipients AS recipients,diagnostics
       FROM monitor_routing_decision WHERE incident_id=$1 AND incident_fingerprint=$2`, [incidentId, fingerprint]);

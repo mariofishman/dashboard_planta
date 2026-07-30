@@ -657,15 +657,14 @@ The most likely V2 implementation mistakes are:
 
 ### 10.6 Authority corrections and remaining contract work
 
-- The catalog and V2 prototype now remove A02 pending-dispatch and invented physical-arrival behavior and define A02 from the destination-bound `TRANSITO` movement, missing receipt, and time since dispatch. Contracts, fixtures, routing rules, and the future adapter must be rechecked together before connected acceptance.
-- The catalog and V2 prototype now use the approved A02 comparator `current time - sent time >= 30 minutes`. The connected executable contract must be reconciled to the same convention before Stage 5.
+- The catalog, executable alert contract, existing simulator, routing rules, `/dev/scenarios` UI, tests, and V2 prototype now remove A02 pending-dispatch and invented physical-arrival behavior. A02 is defined from the destination-bound `TRANSITO` movement, missing receipt, and time since dispatch. The future `test_database` adapter must preserve the same evidence boundary.
+- The catalog, executable alert contract, existing simulator, tests, and V2 prototype now use the approved A02 comparator `current time - sent time >= 30 minutes`.
 - The A05 `Por vencer → Error` presentation remains unresolved because current authority defines no pre-threshold warning window. The catalog now marks it as pending. Either approve a specific warning window and implement it in the V2 table, or remove `Por vencer` and keep only `Error`; do not invent the window.
 - Preserve A03's exact 15-minute comparator and define real input-lock and stronger-A07 evidence mappings in the versioned source contract.
 
-Current executable-code mismatches are intentionally not corrected by this documentation task:
+Remaining executable and integration mismatches after the A02 authority reconciliation:
 
-- `config/alerts/alert-rules.v1.json` and `packages/detection/src/simulator.ts` still use A02 `> 30`, while current authority and the V2 prototype use `>= 30`.
-- the existing simulator, routing code, `/dev/scenarios` UI, and its tests still contain A02 physical-arrival variants and isolated per-rule scenario clocks rejected by V2;
+- the existing `/dev/scenarios` simulator still uses isolated per-rule scenario clocks, while V2 intentionally uses one shared factory experiment clock;
 - the A05 executable rule lists both `Por vencer` and `Error` but defines only the `>= 30` incident predicate, so it cannot produce a deterministic pre-threshold warning without the pending business decision; and
 - the browser-local V2 prototype is not yet the application `/dev/scenarios` implementation and does not exercise `test_database`, the real adapter, Monitor PostgreSQL state, routing deliveries, Dashboard cards, or conversations.
 

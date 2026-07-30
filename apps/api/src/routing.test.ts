@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
-import { requiredRolesFor, RoutingService } from "./routing.js";
+import { primaryRoleFor, requiredRolesFor, RoutingService } from "./routing.js";
 
 const databases: DatabaseRuntime[] = [];
 async function database() {
@@ -24,6 +24,7 @@ describe("Phase 5 catalog routing", () => {
     }
     assert.deepEqual(requiredRolesFor("A01", ["reserved_not_dispatched"]).filter((role) => role.includes("warehouse") || role === "machine_operator"), ["warehouse_dispatcher"]);
     assert.ok(requiredRolesFor("A02").includes("warehouse_supervisor"));
+    assert.equal(primaryRoleFor("A02", { physicalArrivalState: "at_machine_missing_receipt" }), "warehouse_dispatcher", "A02 cannot route from invented physical-arrival evidence");
     assert.ok(requiredRolesFor("A05", [], { reelKind: "remnant" }).includes("warehouse_dispatcher"));
     assert.ok(requiredRolesFor("A05", [], { reelKind: "produced" }).includes("process_supervisor"));
     assert.ok(requiredRolesFor("A06", ["not_weighed"]).includes("process_operator"));

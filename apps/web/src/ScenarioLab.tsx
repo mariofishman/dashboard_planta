@@ -23,9 +23,6 @@ const caseLabels: Record<ScenarioCase, string> = {
   at_threshold_not_weighed: "En el umbral: sin pesar",
   at_threshold_still_at_machine: "En el umbral: sigue en máquina",
   past_threshold: "Condición después del umbral",
-  past_threshold_pending_dispatch: "Después del umbral: entrega pendiente",
-  past_threshold_at_machine: "Después del umbral: llegó sin recepción digital",
-  past_threshold_unknown_arrival: "Después del umbral: ubicación desconocida",
   suppressed_by_a07: "Suprimida por evidencia A07",
   past_threshold_not_weighed: "Después del umbral: sin pesar",
   past_threshold_still_at_machine: "Después del umbral: sigue en máquina",
@@ -48,7 +45,6 @@ const reasonLabels: Record<string, string> = {
 };
 const lifecycleLabels: Record<string, string> = { open: "Abierta", resolved: "Resuelta", closed_without_resolution: "Cerrada sin resolución" };
 const primaryRoleLabels: Record<string, string> = { warehouse_dispatcher: "Despachador o remitente de almacén", machine_operator: "Operador de máquina", process_operator: "Operador de proceso" };
-const arrivalLabels: Record<string, string> = { unknown: "Ubicación desconocida", pending_after_dispatch: "Entrega física pendiente", at_machine_missing_receipt: "En máquina, sin recepción digital" };
 const reelKindLabels: Record<string, string> = { produced: "Producida", remnant: "Remanente" };
 const mismatchLabels: Record<string, string> = {
   incident_lifecycle: "estado del incidente", incident_count: "cantidad de ocurrencias", open_incident_count: "incidentes abiertos",
@@ -75,8 +71,9 @@ function PipelineStage({ title, children }: { title: string; children: ReactNode
 }
 function sourceFacts(item: ScenarioStatus): Array<[string, string]> {
   const row = item.sourceState.rows[0] ?? {};
+  const scenarioContext = row.scenarioContext && typeof row.scenarioContext === "object" ? row.scenarioContext as Record<string, unknown> : {};
   if (item.ruleCode === "A02") return [
-    ["Traslado", String(row.materialFlowDetailId ?? "—")], ["Estado", String(row.state ?? "—")], ["Minutos en traslado", String(row.elapsedMinutes ?? "—")], ["Llegada física", arrivalLabels[String(row.physicalArrivalState)] ?? String(row.physicalArrivalState ?? "—")], ["Recepción", row.receivedAt ? timestamp(String(row.receivedAt)) : "No registrada"],
+    ["Traslado", String(row.materialFlowDetailId ?? "—")], ["Estado", String(row.state ?? "—")], ["Minutos desde despacho", String(row.elapsedMinutes ?? "—")], ["Destino previsto", String(scenarioContext.machineCode ?? "—")], ["Recepción", row.receivedAt ? timestamp(String(row.receivedAt)) : "No registrada"],
   ];
   if (item.ruleCode === "A03") return [
     ["OT", String(row.workOrderId ?? "—")], ["Activa", row.active ? "Sí" : "No"], ["Minutos activa", String(row.elapsedMinutes ?? "—")], ["Consumos válidos", String(row.consumptionCount ?? "—")], ["Evidencia A07 más fuerte", row.strongerA07 ? "Sí" : "No"],

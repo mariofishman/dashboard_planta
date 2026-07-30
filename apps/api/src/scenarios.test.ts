@@ -133,13 +133,14 @@ it("exposes the threshold matrix, A05 reason variants, and isolated scenario clo
   };
 
   for (const [code, cases] of [
-    ["A02", [["before_threshold", 29, "clear"], ["at_threshold", 30, "clear"], ["past_threshold", 31, "triggered"]]],
+    ["A02", [["before_threshold", 29, "clear"], ["at_threshold", 30, "triggered"], ["past_threshold", 31, "triggered"]]],
     ["A03", [["before_threshold", 14, "clear"], ["at_threshold", 15, "triggered"], ["past_threshold", 16, "triggered"]]],
   ] as const) {
     for (const [scenario, minutes, expected] of cases) {
       const state = await prepare(code, scenario);
       assert.equal(state.sourceState.rows[0].elapsedMinutes, minutes);
       assert.equal(state.sourceState.evaluation.status, expected, `${code} ${scenario}`);
+      if (code === "A02") assert.equal(state.sourceState.rows[0].physicalArrivalState, undefined);
     }
   }
 
@@ -158,6 +159,8 @@ it("exposes the threshold matrix, A05 reason variants, and isolated scenario clo
   assert.equal(suppressed.sourceState.evaluation.status, "clear");
 
   const before = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios;
+  const a02Cases = before.find((item: { ruleCode: string }) => item.ruleCode === "A02").supportedCases;
+  assert.deepEqual(a02Cases, ["clean_baseline", "before_threshold", "at_threshold", "past_threshold"]);
   const a03Clock = before.find((item: { ruleCode: string }) => item.ruleCode === "A03").scenarioClock.currentAt;
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 1 } });
   const after = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios;
@@ -240,15 +243,17 @@ it("applies the complete persistent, duplicate, visible-integration, resolution,
   }
 });
 
-it("covers A02 location ownership, A03 suppression, A05 reel routing, and the A02 movement handoff", async () => {
+it("covers A02 transfer-end routing, A03 suppression, A05 reel routing, and the A02 movement handoff", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
 
-  for (const [scenario, primaryRole] of [["past_threshold_pending_dispatch", "warehouse_dispatcher"], ["past_threshold_at_machine", "machine_operator"], ["past_threshold_unknown_arrival", "warehouse_dispatcher"]] as const) {
-    await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare", headers: manager, payload: { scenario } });
-    const polled = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
-    assert.equal(polled.json().scenario.actualMonitor.primaryRole, primaryRole);
-  }
+  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
+  let polled = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  assert.equal(polled.json().scenario.actualMonitor.primaryRole, "warehouse_dispatcher");
+  let routing = await instance.app.inject({ method: "GET", url: `/api/internal/routing/${polled.json().scenario.actualMonitor.latestIncident.id}`, headers: manager });
+  assert.equal(routing.json().requiredRoles.includes("warehouse_dispatcher"), true);
+  assert.equal(routing.json().requiredRoles.includes("warehouse_supervisor"), true);
+  assert.equal(routing.json().requiredRoles.includes("machine_operator"), true);
 
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/prepare", headers: manager, payload: { scenario: "past_threshold" } });
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/poll", headers: manager });
@@ -257,8 +262,8 @@ it("covers A02 location ownership, A03 suppression, A05 reel routing, and the A0
   assert.equal(suppressed.json().scenario.actualMonitor.latestIncident.lifecycle, "resolved");
 
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/prepare", headers: manager, payload: { scenario: "past_threshold_produced" } });
-  let polled = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
-  let routing = await instance.app.inject({ method: "GET", url: `/api/internal/routing/${polled.json().scenario.actualMonitor.latestIncident.id}`, headers: manager });
+  polled = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
+  routing = await instance.app.inject({ method: "GET", url: `/api/internal/routing/${polled.json().scenario.actualMonitor.latestIncident.id}`, headers: manager });
   assert.equal(routing.json().primaryRole, "process_operator");
   assert.equal(routing.json().requiredRoles.includes("process_supervisor"), true);
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/correct", headers: manager });
@@ -273,7 +278,7 @@ it("covers A02 location ownership, A03 suppression, A05 reel routing, and the A0
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/prepare", headers: manager, payload: { scenario: "movement_started" } });
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold_unknown_arrival" } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
   const open = (await instance.app.inject({ method: "GET", url: "/api/incidents?status=open", headers: manager })).json().incidents;
   assert.equal(open.some((item: { ruleCode: string }) => item.ruleCode === "A02"), true);

@@ -48,7 +48,6 @@ export type ScenarioFault = "timeout" | "source_error" | "partial" | "invalid_sc
 export type ScenarioCase = "clean_baseline" | "before_threshold" | "at_threshold" | "past_threshold"
   | "before_threshold_not_weighed" | "before_threshold_still_at_machine"
   | "at_threshold_not_weighed" | "at_threshold_still_at_machine"
-  | "past_threshold_pending_dispatch" | "past_threshold_at_machine" | "past_threshold_unknown_arrival"
   | "suppressed_by_a07" | "past_threshold_not_weighed" | "past_threshold_still_at_machine" | "past_threshold_both"
   | "past_threshold_produced" | "past_threshold_remnant" | "movement_started";
 export interface ScenarioStatus {

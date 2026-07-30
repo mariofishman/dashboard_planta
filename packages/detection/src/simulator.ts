@@ -13,9 +13,6 @@ export type ScenarioCase =
   | "at_threshold_not_weighed"
   | "at_threshold_still_at_machine"
   | "past_threshold"
-  | "past_threshold_pending_dispatch"
-  | "past_threshold_at_machine"
-  | "past_threshold_unknown_arrival"
   | "suppressed_by_a07"
   | "past_threshold_not_weighed"
   | "past_threshold_still_at_machine"
@@ -54,7 +51,7 @@ export interface ScenarioStatus {
 
 const codes: ScenarioRuleCode[] = ["A02", "A03", "A05"];
 const allowedCases: Record<ScenarioRuleCode, ScenarioCase[]> = {
-  A02: ["clean_baseline", "before_threshold", "at_threshold", "past_threshold", "past_threshold_pending_dispatch", "past_threshold_at_machine", "past_threshold_unknown_arrival"],
+  A02: ["clean_baseline", "before_threshold", "at_threshold", "past_threshold"],
   A03: ["clean_baseline", "before_threshold", "at_threshold", "past_threshold", "suppressed_by_a07"],
   A05: [
     "clean_baseline", "before_threshold_not_weighed", "before_threshold_still_at_machine", "before_threshold",
@@ -91,7 +88,7 @@ function evaluateSource(code: ScenarioRuleCode, rows: Record<string, unknown>[])
   const row = rows[0];
   if (!row) return { status: "clear" as const, reasons: [] as string[] };
   if (code === "A02") {
-    const triggered = row.isWorkOrderReservation === true && row.state === "TRANSITO" && row.receivedAt === null && Number(row.elapsedMinutes) > 30;
+    const triggered = row.isWorkOrderReservation === true && row.state === "TRANSITO" && row.receivedAt === null && Number(row.elapsedMinutes) >= 30;
     return { status: triggered ? "triggered" as const : "clear" as const, reasons: triggered ? ["not_received"] : [] };
   }
   if (code === "A03") {
@@ -200,7 +197,6 @@ export class ScenarioSourceRepository {
       return { sourceRevision: `alertas_fake.${code}.v${clock.revision}`, rows: source.map((row) => ({
         materialFlowDetailId: Number(row.material_flow_detail_id), isWorkOrderReservation: Boolean(row.is_work_order_reservation),
         state: String(row.state), receivedAt: row.received_at ? String(row.received_at) : null,
-        physicalArrivalState: String(row.physical_arrival_state),
         elapsedMinutes: minutesSince(row.started_at, clock.currentAt), scenarioContext: context(row),
       })) };
     }
@@ -245,15 +241,12 @@ export class ScenarioSourceRepository {
   private async prepareA02(executor: DatabaseExecutor, currentAt: string, scenarioCase: ScenarioCase) {
     const age = scenarioCase === "before_threshold" ? 29 : scenarioCase === "at_threshold" ? 30 : 31;
     const clean = scenarioCase === "clean_baseline";
-    const physicalArrivalState = scenarioCase === "past_threshold_pending_dispatch" ? "pending_after_dispatch"
-      : scenarioCase === "past_threshold_at_machine" ? "at_machine_missing_receipt"
-        : "unknown";
     await executor.execute(`INSERT INTO monitor_sim_a02_flow
-      (material_flow_detail_id,is_work_order_reservation,state,received_at,started_at,physical_arrival_state,work_order_id,work_order_code,machine_code,operation_name,shift_name,responsible_name)
-      VALUES (4202,TRUE,$1,$2,$3,$4,'1510873','151087.3','P15','Impresión','Día','Almacén de materia prima')
+      (material_flow_detail_id,is_work_order_reservation,state,received_at,started_at,work_order_id,work_order_code,machine_code,operation_name,shift_name,responsible_name)
+      VALUES (4202,TRUE,$1,$2,$3,'1510873','151087.3','P15','Impresión','Día','Almacén de materia prima')
       ON CONFLICT (material_flow_detail_id) DO UPDATE SET state=EXCLUDED.state,received_at=EXCLUDED.received_at,started_at=EXCLUDED.started_at,
-        physical_arrival_state=EXCLUDED.physical_arrival_state`,
-    [clean ? "RECIBIDO" : "TRANSITO", clean ? currentAt : null, minutesBefore(currentAt, clean ? 10 : age), physicalArrivalState]);
+        work_order_id=EXCLUDED.work_order_id,machine_code=EXCLUDED.machine_code`,
+    [clean ? "RECIBIDO" : "TRANSITO", clean ? currentAt : null, minutesBefore(currentAt, clean ? 10 : age)]);
   }
 
   private async prepareA03(executor: DatabaseExecutor, currentAt: string, scenarioCase: ScenarioCase) {
