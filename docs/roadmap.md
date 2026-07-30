@@ -22,7 +22,7 @@ Version Two guided the dynamic source laboratory, roster, routing, and initial c
 
 1. The Phase 4B laboratory changed synthetic source tables stored inside Monitor's own local database. That proved lifecycle behavior, but it did not adequately reproduce Monitor reading a separate foreign database with the same engine, schema, indexes, collations, and SQL behavior as EmusaSoft.
 2. The development scenario screen is difficult to understand and does not yet provide the clear, business-level control and evidence required for acceptance.
-3. The initial Phase 6 chat implementation does not have accepted visual parity with the approved chat-list and chat-detail prototypes.
+3. The initial Phase 6 chat implementation did not have accepted visual parity with the approved chat-list and chat-detail prototypes; the corrective UI workstream has since been implemented and accepted.
 
 Version Three preserves the completed work from Phases 0–5 and treats Phase 4B as historical. It expands Phase 6 to correct the local source boundary, rebuild the scenario laboratory, complete the conversation product, and establish the testing foundation used by Phases 7–9.
 

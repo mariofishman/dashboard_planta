@@ -1,6 +1,6 @@
 # Phase 6 — Conversations and messages
 
-**Status:** In progress; baseline implementation prepared for parallel Phase 6 work
+**Status:** In progress; `test_database` and chat UI workstreams completed, integration pending
 
 ## Authority
 
@@ -14,18 +14,16 @@
 - Audited administrator participant addition and removal for active roster workers.
 - Persistent, cursor-paginated messages with idempotent sends, edits, deletion tombstones, receipts, unread counts, and attachment validation.
 - Server-enforced participant authorization, global roster access blocking, committed realtime updates, presence, typing, and reconnect recovery.
-- Initial dashboard, chat-list, and chat-detail connections.
+- Accepted chat-list and chat-detail corrections, including their approved element-review specifications and stable UI-only fixtures.
 - Automated conversation and API tests for the implemented baseline.
 
-This baseline is intentionally incomplete. Its chat UI has not been accepted, and its alert path still uses the historical Phase 4B simulator rather than the separate `test_database` boundary required by Roadmap V3.
+The chat UI and local `test_database` workstreams are complete and validated within their separate scopes. Phase 6 remains incomplete because `alertas_fake`, the read-only source adapter, and the complete source-to-dashboard-to-conversation path have not yet been integrated and accepted together.
 
 ## Remaining Phase 6 work
 
-1. Build the source-compatible `test_database` and its deterministic reset process from protected `backup_database` input.
-2. Audit and correct the chat UI against the approved prototypes, using stable mock data while source integration remains incomplete.
-3. Audit A02, A03, and A05 and redesign `alertas_fake` in business language.
-4. Merge those workstreams, connect `alertas_fake` to `test_database`, and validate the complete source-to-dashboard-to-conversation path.
-5. Remove Monitor's operational synthetic source tables and simulator adapter only after the replacement path passes.
+1. Audit A02, A03, and A05 and redesign `alertas_fake` in business language.
+2. Merge the completed workstreams, connect `alertas_fake` to `test_database`, and validate the complete source-to-dashboard-to-conversation path.
+3. Remove Monitor's operational synthetic source tables and simulator adapter only after the replacement path passes.
 
 ## Completion boundary
 

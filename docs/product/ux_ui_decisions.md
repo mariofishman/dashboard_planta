@@ -254,8 +254,7 @@ Alert label and alert age are separate dimensions.
 - Color communicates the kind of condition described by that alert code.
 - Written duration communicates age.
 - Age does not progressively enlarge a chip, change its typography, or change the chip's label color.
-- The interface does not invent urgency thresholds from age alone.
-- If operational escalation thresholds are documented later, a separate urgency treatment may be introduced.
+- In a structured chat alert object only, unresolved-duration text uses muted navy before two hours and deep danger from two hours onward. This restrained threshold affects the duration text only; it does not change the alert label, code, lifecycle, size, or priority.
 
 Alert labels are code-specific rather than a shared state vocabulary. Current examples include:
 
@@ -326,8 +325,10 @@ Machine-code or group-initial avatars were removed. They consumed space without 
 ### 5.4 Alert chips in rows
 
 - Chips identify unresolved alert code and short name.
-- Chips include the descriptive label configured by that alert code; examples include `Error`, `Por vencer`, `Alerta`, and `Error posible`.
-- Chips use a neutral surface compatible with the EMUSA palette; semantic color is limited to the code-specific label marker and text.
+- Chips do not repeat descriptive status words such as `Error`, `Por vencer`, `Alerta`, or `Error posible`.
+- The alert code alone carries its semantic color; the short name uses navy text.
+- A light-gray vertical divider separates the alert code from the short name. Do not use a dot as that divider.
+- Chips use a white surface, the neutral blue-gray control border, and the standard compact `6px` control radius rather than full-pill geometry.
 - Multiple alerts appear as multiple chips.
 - When the complete set does not fit, show a limited number and an explicit overflow such as `+3 más`.
 - Chip size and typography remain stable regardless of age.
@@ -340,6 +341,7 @@ Machine-code or group-initial avatars were removed. They consumed space without 
 - Unread state also has a non-numeric visual indicator and accessible label.
 - Pinned conversations use a written `Fijada` label.
 - Pinning affects conversation ordering but does not imply alert severity.
+- On desktop and with a keyboard, the conversation row exposes `Fijar conversación` or `Desfijar conversación` through its overflow menu. On mobile, pressing and holding the row for approximately half a second opens the same action. Phase 6 applies this as presentation-only local state and does not change backend authorization or API behavior.
 
 ### 5.6 Search and filters
 
@@ -362,9 +364,9 @@ Filters display result counts and use `aria-pressed` to expose their state.
 ### 5.7 Scrolling behavior
 
 - The conversation list has its own vertical scroll area.
-- Search and filter controls are visible at the top of the list.
-- When the user scrolls downward, search and filters hide to provide more room for conversations.
-- When the user scrolls upward toward the top, the controls return.
+- Search and filter controls rest immediately above the first conversation and begin outside the visible scroll area.
+- Reaching the first conversation does not reveal the controls. The user must continue pulling downward from that resting position to reveal them.
+- The controls move at the same rate as the scroll gesture: pulling down reveals them and scrolling up pushes them away without a separate timed hide/show transition.
 - Bottom navigation remains available.
 
 ### 5.8 Empty state
@@ -407,6 +409,8 @@ Selecting an alert scrolls to the corresponding alert message. The bar remains c
 - Timestamp sits in the lower message area without creating an extra row of whitespace.
 - Consecutive messages should not be separated by large empty gaps.
 
+The approved Phase 6 text-bubble specification uses a responsive `92%` mobile and `76%` desktop maximum measure, `4px 34px 4px 9px` bubble padding, `12px / 18px` message copy, a `9px / 11.7px` timestamp in the separate compact lower area, and `8px` between messages. Outgoing text uses the selected semantic blue surface.
+
 ### 6.5 Simple message bubble
 
 A simple incoming group message contains:
@@ -422,10 +426,11 @@ The bubble uses a restrained white or neutral surface and a compact radius. It d
 A reply can embed a quoted reference above the new message.
 
 - The quoted block contains the original sender and a short excerpt.
-- A colored vertical rule identifies the quoted block.
+- A short colored vertical marker identifies the quoted block.
 - The reply sender remains above the quoted block for incoming group messages.
 - Selecting the quoted block scrolls to the referenced message, even when it was sent at another time.
 - The quoted reference is compact and visually subordinate to the new reply.
+- The approved quoted block remains contained at `100%` width, uses `6px 9px 6px 12px` inset, and has a short `3px × 16px` cyan marker beside the quoted author.
 
 ### 6.7 Photo messages
 
@@ -484,7 +489,16 @@ The resolution guide explains what is blocked or inconsistent and the safe steps
 - Alert-label color appears in a compact marker and written label; lifecycle state is presented separately.
 - The unresolved duration is written explicitly at the opposite edge of the header.
 - Age does not overlap the message-action control.
-- Older alerts can receive a restrained container accent, but the text, descriptive alert label, and separate lifecycle state remain the primary explanation.
+- Before two hours unresolved, the duration uses the standard muted-navy metadata color. From two hours unresolved onward, the duration alone uses the deep-danger age token. The attachment surface, alert label, code, and lifecycle do not change with age.
+
+### 7.5 Approved alert-object composition
+
+- The alert message uses the narrower `min(92%, 440px)` measure with the implementation's compact outer radius and nearly even shell padding.
+- The alert attachment uses a soft danger border, compact radius, and low navy shadow.
+- The header keeps the status as an outlined compact rectangle with a written label and danger dot; the code retains its compact neutral rectangle; the age remains uncapsuled at the opposite edge.
+- A light divider separates the explanation from compact operational facts.
+- Work-order and explanation actions remain two equal columns at every width. Narrow layouts shorten their visible labels to `OT` and `Ver` rather than stacking them.
+- The work-order action copies the identifier until the Phase 10 navigation contract authorizes a supported EmusaSoft route.
 
 ## 8. Message actions
 
@@ -751,7 +765,6 @@ The prototypes demonstrate interaction and information architecture. They do not
 The following items are not yet fully decided and should not be inferred from the prototypes:
 
 - formal priority and escalation rules;
-- age thresholds that change urgency treatment;
 - conversation naming and whether participants may rename an automatically created group;
 - Operational Responsibility Roster information architecture, editing workflow, permissions, conflict resolution, and audit presentation;
 - moderation, deletion, and reporting authorization;
