@@ -48,7 +48,7 @@ For the A01 exception described during review, material may have been physically
 | Code | Recommended resolution |
 |---|---|
 | A01 | Reserve, confirm availability, and dispatch; otherwise reschedule. If the material was already used outside the ERP and the history cannot be reconstructed safely, close the correlated chain without resolution. |
-| A02 | Record the real receipt, or correct/cancel the movement. If the old handoff and physical location cannot be proven, close without resolution with the last known location. |
+| A02 | Record the real receipt, or correct, cancel, or reject the movement. If the old handoff cannot be reconstructed from source records, close without resolution with the last recorded movement state and destination; do not infer physical arrival or location. |
 | A03 | Close automatically when the first valid consumption is declared. Consumption remains editable while `WorkOrder.readOnlyInput = false`; after input lock, preserve an unreconstructable condition without inventing consumption. |
 | A04 | Declare missing output or correct input, output, waste, or weight. Close a verified false positive without resolution with physical evidence. |
 | A05 | Weigh and move the reel or correct the scale/barcode/movement record. If the reel is no longer traceable, close without resolution with its last known location. |
@@ -100,14 +100,14 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 | Field | Definition |
 |---|---|
-| When it happens | Material reserved for a work order remains in transit to that OT without digital receipt for more than 30 minutes. |
-| Why the alert exists | Reserved material may have arrived physically at the machine while the operator failed to record its receipt in EMUSA Soft. |
-| Possible causes | Physical delivery occurred without digital receipt, or movement to the work-order machine is delayed. |
+| When it happens | Material reserved for a work order remains in transit to that OT without digital receipt for 30 minutes or more. |
+| Why the alert exists | A destination-bound material movement has remained `TRANSITO` longer than expected and needs operational follow-up. |
+| Possible causes | The movement is delayed, or the destination has not recorded its digital receipt. Monitor cannot infer a separate physical-arrival state from EmusaSoft. |
 | Example | A reel reserved for OT 151087.3 is sent to P15 at 09:00 and remains `En tránsito` at 09:31. |
 
-**Detection indicators and algorithm:** Require a material flow linked to a work-order reservation, a sent or in-transit status, no `receivedAt`, and `current time - sent time > 30 minutes`. Exclude relocations between warehouses or storage locations when the material is not moving toward a work order. Once reserved material is received, close the incident.
+**Detection indicators and algorithm:** Require a material flow linked to a work-order reservation, `TRANSITO` state, no digital receipt, and `current time - sent time >= 30 minutes`. Exclude movements that are not destination-bound material transfers. Once the original movement is received, cancelled, or rejected, close its incident after a complete healthy poll. A cancellation or rejection may create a separately identified reverse movement with its own dispatch clock; that reverse movement is evaluated independently and is not recurrence of the original movement.
 
-**Primary action owner:** Material still physically pending after dispatch → **Warehouse dispatcher or sender**. Material physically at the machine but missing digital receipt → **machine operator**. When physical arrival is unknown, start with the dispatcher or sender and notify the machine operator as the other end of the same transfer.
+**Primary action owner:** Start with the **warehouse dispatcher or sender** and notify the **machine operator** at the recorded destination. Monitor knows the recorded movement and destination but does not claim to know the material's physical location while the movement remains `TRANSITO`.
 
 
 ### A03 — Active OT without consumption after 15 minutes
@@ -150,14 +150,14 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 ### A05 — Produced or remnant reel not weighed or not moved from the machine
 
-**Alert label:** Por vencer → Error
+**Alert label:** Presentation decision pending. The catalog previously said `Por vencer → Error`, but no pre-threshold `Por vencer` window is defined. Do not infer or implement a warning window until the pending business decision is recorded.
 **Scope:** Produced- and remnant-reel handling
 
 **Remnant-reel scope:** A05 uses the same declaration, weighing, labeling, and movement logic for produced reels and remnant raw-material reels. A partially consumed input reel must be declared with its remaining kilograms, weighed, labeled or ticketed, and returned to the raw-material warehouse. The 30-minute weighing and movement checks do not change.
 
 | Field | Definition |
 |---|---|
-| When it happens | A declared produced or remnant reel has no recorded weight within 30 minutes, or remains at the machine for more than 30 minutes instead of being sent to its next OT or appropriate warehouse. |
+| When it happens | A declared produced or remnant reel has no recorded weight when 30 minutes have elapsed, or is still at the machine when 30 minutes have elapsed instead of being sent to its next OT or appropriate warehouse. |
 | Why the alert exists | Without weight, EMUSA Soft cannot calculate the reel's cost or add the correct quantity to inventory. After an OT finishes, the reel must also leave the machine and enter the correct next workflow. |
 | Possible causes | Process-team delay, missed weighing, missing scale record, failure to initiate the next movement, or failure to record that movement. |
 | Example | CU-98421 was declared at 10:00. At 10:31 it has no weight and remains at P15. The dashboard shows one incident with reasons `not_weighed` and `still_at_machine`. |

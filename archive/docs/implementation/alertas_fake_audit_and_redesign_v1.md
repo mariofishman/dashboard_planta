@@ -1,6 +1,8 @@
-# A02, A03, and A05 audit and `alertas_fake` redesign
+# Historical V1 — A02, A03, and A05 audit and `alertas_fake` redesign
 
-**Status:** Stage 1 complete locally on 2026-07-29; Stage 2 review in progress  
+**Status:** Superseded by the active [`alertas_fake_audit_and_redesign_v2.md`](../../../docs/delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md). At supersession, Stage 1 was complete and Stage 2 review remained in progress.
+
+**Archive state:** Archived historical V1 audit record. The reconciled V2 document owns the active stage index, current redesign status, and preserved V1 summary.
 **Scope:** A02, A03, and A05 only  
 **Interface:** `/dev/scenarios`  
 **Current source:** Development-only synthetic source tables  

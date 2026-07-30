@@ -1,11 +1,21 @@
 # `alertas_fake` experiment laboratory — redesign V2
 
-**Version:** 2.0 draft  
-**Status:** Stage 2 design specification; implementation has not started  
+**Version:** 2.1 draft
+
+**Status:** Stage 2 user review and manual testing in progress; standalone V2 prototype implemented; connected `test_database` boundary pending
+
 **Scope:** A02, A03, and A05 only  
-**Interface:** `/dev/scenarios`  
-**Predecessor:** [`alertas_fake_audit_and_redesign.md`](./alertas_fake_audit_and_redesign.md)  
-**Current source:** development-only synthetic PostgreSQL tables  
+
+**Current review interface:** [`prototypes/current/alertas-fake-v2/index.html`](../../../../prototypes/current/alertas-fake-v2/index.html)
+
+**Target application interface:** `/dev/scenarios`
+
+**Historical predecessor:** archived [`alertas_fake_audit_and_redesign_v1.md`](../../../../archive/docs/implementation/alertas_fake_audit_and_redesign_v1.md), superseded by this document
+
+**Current prototype source:** browser-local synthetic records
+
+**Existing application source:** development-only synthetic PostgreSQL `monitor_sim_*` tables
+
 **Required source boundary:** `alertas_fake` writes `test_database`; Monitor reads it through normal read-only polling
 
 ## 1. Purpose
@@ -18,14 +28,31 @@ The interface must answer, without requiring code knowledge:
 2. What simulated time is it?
 3. When will Monitor poll again?
 4. What did the latest complete poll read?
-5. Which records are approaching or exceeding their threshold?
+5. Which records are below, at, or beyond their threshold?
 6. Which Monitor incidents exist, and why?
 7. Did Dashboard, routing, and conversations receive the expected result exactly once?
 8. What happened earlier in this experiment?
 
-The required path remains:
+The required connected path remains:
 
 `tester changes test_database through alertas_fake → time advances → Monitor polls read-only → Monitor evaluates → incidents and downstream results update → reports and Dashboard read Monitor history`
+
+The standalone HTML prototype demonstrates the business workflow and interface only. It does not yet execute this connected path.
+
+## Workstream stage index and current status
+
+These stages originated in the V1 audit and now live here as the current workstream index. They remain ordered unless an explicit decision changes the plan.
+
+| Stage | Status | Meaning and current evidence | Exit condition |
+| --- | --- | --- | --- |
+| 1. Stabilize the audit and redesign requirements | **Complete — 2026-07-29** | Audited A02, A03, A05, the previous `/dev/scenarios` controls, rule boundaries, lifecycle, routing, conversations, Dashboard integration, duplicate protection, and recurrence. The V1 findings were converted into the V2 blueprint. | V1 behavior and gaps are recorded; the V2 testing blueprint exists. |
+| 2. Review the redesigned laboratory with the user | **In progress** | The standalone V2 prototype is implemented and its 36-scenario browser matrix was rerun. The user is still reviewing behavior, terminology, test evidence, and report accuracy. The corrected results are in [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md). | The user finishes the one-test-at-a-time review and the standalone workflow is understandable and accepted for connected implementation. |
+| 3. Inspect the `test_database` handoff | **Not yet completed in this workstream** | Separate database work may exist, but this workstream has not yet inspected and classified its readiness. | Verify reset safeguards, source mappings, and separate writer/read-only credentials; classify the handoff as ready, ready with gaps, or unsafe to connect. |
+| 4. Connect the real testing boundary | **Not started** | The HTML prototype still uses browser-local records; the existing application still uses synthetic Monitor-side tables. | `alertas_fake` writes A02/A03/A05 source records only to `test_database`, and Monitor reads them through the normal read-only MySQL adapters. |
+| 5. Run connected acceptance scenarios | **Not started** | Standalone prototype results are UI/business-flow evidence, not connected acceptance. | Baseline, thresholds, persistence, failed/incomplete reads, correction, resolution, recurrence, reset, routing, Dashboard, conversations, and duplicate prevention pass through the connected boundary. |
+| 6. Finalize the workstream | **Pending** | Final reconciliation depends on Stages 3–5. | Record proved local behavior and Phase 10 exclusions, perform the final requirements audit, retire the synthetic operational boundary only after replacement acceptance, and present the final changes for review. |
+
+Stage 2 is correctly still in progress. Implementing the standalone prototype did not complete the stage because the user-directed review and testing are still active. It also did not start Stage 4: source integration remains a separate later boundary.
 
 ## 2. Non-negotiable boundaries
 
@@ -40,9 +67,9 @@ The required path remains:
 - Failed, incomplete, invalid, or stale reads preserve the last trustworthy Monitor state.
 - The synthetic `monitor_sim_*` boundary remains until V2 passes equivalent scenarios through `test_database`.
 
-## 3. Why V2 replaces the current interface
+## 3. Why V2 replaces the V1 interface
 
-The current page prepares one fixed source record for each rule and presents five dense technical columns. It is useful for automated integration checks but difficult for a business tester to understand. It also prevents realistic concurrency: the factory may have many material movements, active work orders, and declared reels at the same time.
+The V1 page prepared one fixed source record for each rule and presented five dense technical columns. It was useful for automated integration checks but difficult for a business tester to understand. It also prevented realistic concurrency: the factory may have many material movements, active work orders, and declared reels at the same time.
 
 V2 changes the model from **select one canned case** to **operate a small accelerated factory timeline**.
 
@@ -122,7 +149,7 @@ The snapshot is structured evidence, not merely an image. A browser screenshot o
 
 ### 4.5 Reset behavior
 
-`Nuevo experimento` requires confirmation and creates a new experiment identity. It does not delete or rewrite Monitor history. A source-only correction or receipt is never labeled reset.
+`Nuevo experimento` requires confirmation and creates a new experiment identity. It archives the current experiment inside the running laboratory so its movements, incidents, and snapshots remain queryable from history and integrity views. The standalone HTML prototype has no durable persistence, so its confirmation states plainly that reloading the page discards every browser-local experiment. The future connected application preserves the same history durably and never deletes or rewrites Monitor history. A source-only correction or receipt is never labeled reset.
 
 ## 5. Database and reporting design
 
@@ -236,6 +263,8 @@ Primary action: split button `Despachar material`.
 - Accepting the editable form dispatches the edited movement at the then-current simulated time.
 - The two paths use the same source-write function and produce the same pending-poll state.
 
+The A02 laboratory also includes `Zona de influencia del usuario` with `Solo origen`, `Solo destino`, and `Origen y destino`. This is synthetic permission context for testing which EmusaSoft source action is available; it is not a Monitor permission or a production write. Because all data is synthetic and rapid repetition is the purpose of this laboratory, `Anular envío` and `Rechazar recepción` execute immediately without a confirmation dialog; the resulting original and reverse movements provide the visible confirmation.
+
 The dispatch dialog requires:
 
 - SKU;
@@ -270,12 +299,14 @@ Columns:
 
 Row actions:
 
-- `Registrar recepción`;
-- `Cancelar/corregir movimiento`, when the source model supports it;
+- `Registrar recepción` in every permission context because the laboratory must be able to simulate the destination completing the movement;
+- `Anular envío` as the additional action when the simulated user controls only the origin zone;
+- `Rechazar recepción` as the additional action when the simulated user controls the destination zone;
+- when the user controls both zones, `Rechazar recepción` takes priority and `Anular envío` is not shown;
 - `Ver observaciones`;
-- `Ver incidente`, when an incident exists.
+- `Ver incidente`, which is the only action that opens the source, expected-result, and Monitor-result detail panel. Source actions and row clicks do not open that panel, and a second click closes it.
 
-There is no physical-arrival field. `Registrar recepción` changes only the selected source movement. The row leaves the active view only after a complete poll confirms its final state.
+There is no physical-arrival field. `Registrar recepción` changes only the selected source movement. `Anular envío` and `Rechazar recepción` close the selected source movement and create a new source movement with a new movement ID, the same material identity, reversed origin and destination, `TRANSITO` state, and a new dispatch clock starting at the action time. The original and reverse movements remain separately traceable. If the original movement already has an open A02 incident, it resolves only after a complete successful poll reads the original movement's terminal source state; the reverse movement is evaluated independently and may later create its own A02 occurrence. The original row leaves the active view only after that poll.
 
 #### Complete movement history
 
@@ -362,6 +393,8 @@ Row actions:
 
 The UI must show `Sin pesar` and `Sigue en máquina` independently. Completing only one action leaves the other reason active. Starting a destination-bound movement creates the appropriate source movement; an unreceived movement later belongs to A02 and must not remain as a duplicate A05 movement reason.
 
+The standalone V2 prototype currently shows only `Error` once an A05 condition reaches `>= 30 minutes`. The catalog previously promised `Por vencer → Error`, but no pre-threshold warning window exists in current authority. That presentation remains an explicit Stage 2 business decision; neither documentation nor implementation may invent the missing window.
+
 ### 6.6 Incident panel
 
 The selected source row opens a subordinate incident panel showing:
@@ -383,7 +416,7 @@ The selected source row opens a subordinate incident panel showing:
 
 #### Routing expectations
 
-- A02 notifies both ends of the recorded transfer: the warehouse dispatcher or sender and the machine operator, plus the applicable supervisors. V2 must not select a primary owner from an unobservable physical-arrival state. The corrected primary-owner rule must be approved in the alert catalog before implementation.
+- A02 notifies both ends of the recorded transfer: the warehouse dispatcher or sender and the machine operator, plus the applicable supervisors. V2 must not select a primary owner from an unobservable physical-arrival state. The alert catalog now records this correction; contracts, fixtures, and connected routing evidence must be reconciled before Stage 5 acceptance.
 - A03 routes to the factory manager, operation shift supervisor, technical leader, and machine operator.
 - A05 keeps the process operator as primary. Produced reels also notify the process supervisor. Remnant reels additionally notify the raw-material warehouse dispatcher or sender and its supervisor or leader.
 - Routing remains deterministic from versioned rule evidence and the Operational Responsibility Roster. An LLM never chooses recipients.
@@ -397,7 +430,7 @@ The main workflow does not expose four technical failure types. The `Integridad`
 - before/after projection and incident counts; and
 - snapshot capture;
 - downstream counts for evidence, routing deliveries, conversation links, alert messages, and visible cards; and
-- a recovery check proving that a later successful poll completes missing routing or conversation work without duplicating the committed incident.
+- in the connected implementation, a recovery check proving that a later successful poll completes missing routing or conversation work without duplicating the committed incident. The standalone prototype shows synthetic stable counts only; it does not prove repair of real downstream work.
 
 Automated tests separately exercise timeout, source error, partial results, invalid shape, stale data, unknown freshness, duplicate keys, and revision changes. Manual UI testing verifies the understandable business guarantee, not every transport failure variant.
 
@@ -449,7 +482,8 @@ Automated tests separately exercise timeout, source error, partial results, inva
 | Mixed population | Some movements received on time, one late, others still moving | Each row receives its own correct outcome |
 | Receipt before poll | Receive a movement after threshold but before Monitor polls | Result follows source truth at the complete poll; no invented historical incident unless the contract explicitly supports retrospective detection |
 | Receipt after incident | Receive selected overdue movement, then poll | Its incident resolves; unrelated movements remain unchanged |
-| Cancellation/correction | Correct or cancel selected movement | Only its projection and incident reconcile |
+| Origin cancels dispatch | With `Solo origen`, cancel the selected movement | Original movement closes; one reverse movement starts in `TRANSITO` with a new ID and clock; an open original A02 resolves after the next complete poll |
+| Destination rejects reception | With `Solo destino` or `Origen y destino`, reject the selected movement | Cancellation is unavailable when both zones apply; original movement closes; one reverse movement starts in `TRANSITO` with swapped endpoints and a new clock; an open original A02 resolves after the next complete poll |
 | Administrative closure | Close an open A02 without source correction | Source row remains based on source state; incident closes and reopening is suppressed correctly |
 | Recurrence | Condition clears, then a later qualifying condition with the same natural key occurs | New occurrence; earlier history preserved |
 
@@ -483,7 +517,7 @@ Automated tests separately exercise timeout, source error, partial results, inva
 
 ## 8. Edge-case coverage and priorities
 
-### Test now
+### Stage 2 manual prototype review
 
 - concurrent records with staggered start times;
 - speed values `1`, `2`, `3`, and `60`;
@@ -493,16 +527,16 @@ Automated tests separately exercise timeout, source error, partial results, inva
 - pause immediately before a poll becomes due;
 - changing speed or frequency while paused;
 - repeated no-op polls;
-- correction followed by failed or incomplete poll;
+- correction followed by the prototype's generic failed poll;
 - one row corrected while another remains overdue;
 - new experiment with earlier history preserved;
 - administrative closure while source condition persists;
 - source clears after administrative closure, followed by true recurrence;
-- duplicate prevention across incident, evidence, routing, conversation, message, and card;
+- synthetic duplicate-prevention counters across incident, evidence, routing, conversation, message, and card;
 - snapshot captured while paused and after a failed poll; and
 - A05 partial reasons combined with A02 handoff.
 
-### Automated only unless debugging requires UI exposure
+### Stages 4–5 automated and connected evidence
 
 - invalid result shape;
 - partial pagination;
@@ -522,7 +556,7 @@ Automated tests separately exercise timeout, source error, partial results, inva
 
 ## 9. Acceptance requirements
 
-V2 is accepted only when:
+The full V2 workstream is accepted only when the following Stage 2–5 requirements pass. Completion of the standalone prototype alone does not satisfy this gate:
 
 1. A business tester can operate each alert without reading code.
 2. A02 supports multiple material movements with mandatory SKU and optional unique item code.
@@ -543,9 +577,50 @@ V2 is accepted only when:
 17. The same scenarios pass through `test_database` and the normal read-only adapter before synthetic tables are removed.
 18. Responsive and console validation passes at mobile, tablet, and desktop widths.
 
-## 10. V1-to-V2 coverage audit
+## 10. Preserved V1 audit history and V1-to-V2 reconciliation
 
-This section criticizes V2 against the preserved original document.
+This section preserves the durable V1 audit information needed after the predecessor document was archived. V1 evidence remains historical and cannot prove V2 or the separate `test_database` boundary.
+
+### 10.1 V1 implementation audited
+
+The V1 audit covered the Phase 4B `/dev/scenarios` application, its API, synthetic source tables, A02/A03/A05 evaluators, incident lifecycle, routing, conversation integration, Dashboard visibility, and tests.
+
+- The source simulator stored EmusaSoft-like synthetic records inside Monitor's development PostgreSQL database rather than in a separate MySQL source database.
+- A02 used one fixed movement, `materialFlowDetailId = 4202`; A03 used one fixed work order, `workOrderId = 4103`; A05 used one fixed reel, `articleSerialId = 4205`.
+- A02 evaluated reservation scope, `TRANSITO`, missing receipt, and elapsed dispatch time. Its original `> 30` convention and invented physical-arrival variants were later rejected during Stage 2; current authority uses `>= 30` and no physical-arrival inference.
+- A03 evaluated active state, `>= 15` elapsed minutes, zero valid consumption, and stronger A07 evidence.
+- A05 evaluated a 30-minute threshold with independent `not_weighed` and `still_at_machine` reasons, but the V1 UI prepared and corrected both reasons together.
+- Complete successful polls owned incident reconciliation. Failed or incomplete reads preserved the last trustworthy state. Repeated unchanged polls were designed to preserve one occurrence and deduplicate evidence, routing, conversation links, messages, and cards.
+- The V1 source-query work did not complete the production-shaped adapter mapping. A02 still required complete evidence derivation; A03 lacked a versioned SQL detection contract; A05 required translation between query reason flags and evaluator booleans.
+- V1 validation reported 36 passing API tests, focused contract fixtures, type checking, production build, responsive browser checks, and synthetic Dashboard/chat visibility. That evidence proved the Monitor-side synthetic lifecycle only; it did not prove a separate EmusaSoft-shaped MySQL source boundary.
+
+### 10.2 Previous `/dev/scenarios` control audit
+
+| V1 control | What it changed | Monitor mutation boundary | V1 problem preserved for history |
+| --- | --- | --- | --- |
+| `Restablecer` | Deleted the selected alert's synthetic source row and updated scenario metadata | Did not directly write incidents | An empty table was presented as a clean business condition; a later healthy poll was still required to resolve an open incident. |
+| `Generar problema` | Inserted or rewrote one fixed source row at the current simulated time | Did not directly write incidents | The label implied detection before polling; reuse while open reset source age; A05 always combined both reasons. |
+| `Avanzar tiempo` | Advanced one global simulated clock by fixed increments | Did not directly write incidents | Advancing one alert aged all three; the fixed jump hid exact threshold boundaries. |
+| `Corregir origen` | A02 recorded receipt; A03 recorded consumption; A05 set weighed and moved together | Did not directly write incidents | A missing row could make the action a no-op; A05 could not test partial correction. |
+| Fault selection | Changed browser-local fault selection | No Monitor mutation | Selection was not scheduled until the separate next-failure action. |
+| `Fallo siguiente` | Scheduled a one-shot timeout, source error, partial result, or invalid schema | No Monitor mutation | Pending failure state was hidden and another source action could clear it. |
+| `Sondear ahora` | Invoked the ordinary detection runner and consumed a pending fault | Monitor changed only through the approved poller path | Expected and actual downstream results were not clearly separated. |
+
+No V1 source-scenario action was found to write Monitor incident, routing, conversation, or message tables directly. Its primary defects were source realism, usability, hidden state, fixed-record limitations, and the absence of the separate database boundary.
+
+### 10.3 Stage 2 decisions carried into V2
+
+- Material still awaiting warehouse dispatch belongs to A01, not A02.
+- A02 starts from a recorded destination-bound movement in `TRANSITO` and measures elapsed time from warehouse dispatch.
+- EmusaSoft does not provide a separate fact proving physical arrival without digital receipt; V2 removes that invented field and retains the known intended destination.
+- The approved A02 testing convention is `>= 30 minutes`; the user explicitly decided that the one-second distinction must not block the operational test.
+- Origin cancellation and destination rejection close the original movement and create a separately identified reverse movement with swapped endpoints and a reset dispatch clock. Rejection takes priority when the user controls both zones.
+- V2 replaces duplicate generic clock labels with alert-specific timestamps and elapsed time.
+- V2 intentionally uses one shared factory experiment clock so concurrent A02, A03, and A05 records can interact, while each record and incident remains independently identified.
+
+### 10.4 V1-to-V2 coverage audit
+
+The following table challenges V2 against the preserved V1 requirements and findings.
 
 | V1 requirement or finding | V2 result | Critique outcome |
 | --- | --- | --- |
@@ -553,7 +628,7 @@ This section criticizes V2 against the preserved original document.
 | Clean, before, at, after, persistence, correction, resolution, failed reads, recurrence, and reset | Preserved and expanded for concurrent records | `Nuevo experimento` replaces destructive history reset |
 | A05 reasons are independent OR conditions | Preserved explicitly | Partial corrections must work in either order |
 | A03 stronger-A07 suppression | Preserved as an advanced source-evidence action | Implementation must use real evidence mapping, not a fabricated boolean in the final adapter |
-| A02 physical-arrival routing variants | Rejected | V2 follows the Stage 2 decision that physical arrival is unknowable without receipt; alert catalog and routing authority require correction |
+| A02 physical-arrival routing variants | Rejected | V2 follows the Stage 2 decision that physical arrival is unknowable without receipt; the catalog is corrected and connected contracts, fixtures, and routing evidence remain to be reconciled |
 | Independent clocks per alert | Intentionally replaced by one shared experiment clock | Shared time is necessary for interacting factory records; rule state and revisions remain independent even though time is shared |
 | Failed-read variants visible in the old UI | Simplified to one understandable integrity action | All technical variants remain mandatory automated tests |
 | Exact downstream counts and `Coincide` strictness | Preserved in incident details and acceptance tests | Main UI should translate mismatches into business language |
@@ -565,7 +640,7 @@ This section criticizes V2 against the preserved original document.
 | Duplicate and recurrence protections | Preserved | Must be proven with simultaneous records, not only one natural key |
 | Previous browser and automated evidence | Historical only | V1 validation does not validate V2; V2 requires a new complete test and browser evidence set |
 
-### Blind-spot attack
+### 10.5 Blind-spot attack
 
 The most likely V2 implementation mistakes are:
 
@@ -580,31 +655,36 @@ The most likely V2 implementation mistakes are:
 - creating A05 and A02 incidents for the same unreceived movement; and
 - implementing one generic untyped table for A02, A03, and A05.
 
-### Authority corrections required before implementation
+### 10.6 Authority corrections and remaining contract work
 
-- Remove A02 pending-dispatch and invented physical-arrival cases from the catalog, routing rules, contracts, fixtures, and tests.
-- Define A02 from the recorded destination-bound movement, `TRANSITO` state, missing receipt, and time since dispatch.
-- Record one exact A02 threshold comparator in the catalog and executable contract. V2 must still test immediately before, exactly at, and immediately after the boundary; the tester must not be asked to decide an operationally immaterial one-second convention.
-- Reconcile A05's catalog presentation `Por vencer → Error` with implementation. Either specify a real pre-threshold `Por vencer` window and show it in the V2 table, or remove the unsupported presentation promise. Do not invent the window during implementation.
+- The catalog and V2 prototype now remove A02 pending-dispatch and invented physical-arrival behavior and define A02 from the destination-bound `TRANSITO` movement, missing receipt, and time since dispatch. Contracts, fixtures, routing rules, and the future adapter must be rechecked together before connected acceptance.
+- The catalog and V2 prototype now use the approved A02 comparator `current time - sent time >= 30 minutes`. The connected executable contract must be reconciled to the same convention before Stage 5.
+- The A05 `Por vencer → Error` presentation remains unresolved because current authority defines no pre-threshold warning window. The catalog now marks it as pending. Either approve a specific warning window and implement it in the V2 table, or remove `Por vencer` and keep only `Error`; do not invent the window.
 - Preserve A03's exact 15-minute comparator and define real input-lock and stronger-A07 evidence mappings in the versioned source contract.
 
-## 11. Implementation sequence
+Current executable-code mismatches are intentionally not corrected by this documentation task:
 
-1. Finish Stage 2 business review for A02, A03, and A05 and approve this V2 blueprint.
-2. Correct conflicting alert-catalog and routing authority, especially A02 physical-arrival claims.
-3. Complete Stage 3 `test_database` readiness inspection and source-field mapping.
-4. Write versioned source contracts and typed projection/observation migrations.
-5. Implement the shared experiment clock, scheduler, snapshots, and new-experiment identity.
-6. Implement the A02 tab and multi-movement source actions.
-7. Implement the A03 tab and multi-OT source actions.
-8. Implement the A05 tab and multi-reel source actions, including A02 handoff.
-9. Implement incident detail and authorized administrative closure.
-10. Implement the integrity tab and automated failure matrix.
-11. Validate through synthetic sources, then through `test_database` read-only polling.
-12. Remove the old synthetic scenario boundary only after equivalent acceptance passes.
+- `config/alerts/alert-rules.v1.json` and `packages/detection/src/simulator.ts` still use A02 `> 30`, while current authority and the V2 prototype use `>= 30`.
+- the existing simulator, routing code, `/dev/scenarios` UI, and its tests still contain A02 physical-arrival variants and isolated per-rule scenario clocks rejected by V2;
+- the A05 executable rule lists both `Por vencer` and `Error` but defines only the `>= 30` incident predicate, so it cannot produce a deterministic pre-threshold warning without the pending business decision; and
+- the browser-local V2 prototype is not yet the application `/dev/scenarios` implementation and does not exercise `test_database`, the real adapter, Monitor PostgreSQL state, routing deliveries, Dashboard cards, or conversations.
+
+## 11. Remaining stage-aligned delivery sequence
+
+The standalone implementation items previously listed here are complete in the V2 HTML prototype: shared clock, scheduler, snapshots, experiment archive, concurrent A02/A03/A05 records, incident detail, administrative closure, integrity counters, recurrence, cancellation/rejection, and A05-to-A02 handoff. The corrected prototype matrix is evidence only for that standalone scope.
+
+Remaining work follows the stage index above:
+
+1. **Finish Stage 2:** review the corrected test report one scenario at a time, resolve remaining user questions, correct any accepted UI or business-flow defects, and record user acceptance of the standalone workflow.
+2. **Execute Stage 3:** inspect the separate `test_database` work, verify guarded reset behavior and credentials, map the real A02/A03/A05 source fields, and record readiness or exact gaps.
+3. **Execute Stage 4:** reconcile versioned contracts and fixtures, implement required typed Monitor projections/observations and administrative-closure persistence, make `alertas_fake` write only `test_database`, and make Monitor read it through read-only MySQL adapters and the normal scheduler.
+4. **Execute Stage 5:** rerun the business matrix through the connected boundary and add automated incomplete-read, pagination, duplicate-key, source-revision, freshness, timeout, transport, cursor, and overlapping-poll evidence. Verify real routing, Dashboard, conversation, message, card, and idempotent repair behavior.
+5. **Execute Stage 6:** reconcile authority and implementation, document Phase 10 exclusions, complete the final requirement audit, and remove the old operational synthetic source boundary only after equivalent connected acceptance passes.
 
 ## 12. Current proof boundary
 
-This document is a blueprint, not implementation evidence. The existing V1 code and tests do not prove V2. No V2 schema, adapter, API, scheduler, UI, snapshot, or acceptance test has been implemented yet.
+This document remains the V2 blueprint. The standalone HTML laboratory now implements and demonstrates the synthetic UI, shared clock, scheduler, source actions, snapshots, incident lifecycle, recurrence, integrity counters, and browser-local experiment archive described here. Its browser verification is recorded separately in `alertas_fake_v2_edge_case_test_report_v2.md`.
 
-The original document remains the preserved record of the V1 audit, implementation, validation, and Stage 2 discoveries.
+The prototype is not evidence for the future database boundary. V2 schema migrations, the `test_database` writer, the read-only Monitor adapter, API authorization, real Dashboard and conversation integration, and production-scale behavior still require separate implementation and acceptance evidence.
+
+Section 10 now preserves the V1 audit facts, prior-control findings, validation scope, and Stage 2 decisions needed for future reference. The superseded predecessor is archived under `archive/docs/implementation/` and has no current authority.

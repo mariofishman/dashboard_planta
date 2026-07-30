@@ -1,6 +1,6 @@
 # Phase 6 — Implementation plan
 
-**Status:** In progress; conversation baseline implemented, Roadmap V3 integration pending
+**Status:** In progress; conversation baseline and standalone `alertas_fake` V2 implemented, Stage 2 laboratory review and Roadmap V3 integration pending
 
 ## Diagnosis
 
@@ -73,10 +73,10 @@ Baseline validation proves that this commit is a stable starting point. It does 
 - Explain material differences before changing the design.
 - Implement and validate only approved adaptations, using stable mock data where source integration is unavailable.
 
-### 8. Audit A02, A03, and A05 and redesign `alertas_fake`
+### 8. Finish review of the implemented A02, A03, and A05 `alertas_fake` redesign
 
-- Define each supported scenario in business language: starting state, tester action, source changes, expected poll, expected visible outcome, correction, recurrence, failure preservation, and reset.
-- Ensure `alertas_fake` changes only `test_database` and never writes Monitor incidents, conversations, or messages.
+- The standalone V2 laboratory and business-language scenario matrix are implemented. Finish the one-test-at-a-time Stage 2 user review and resolve remaining accepted UI or business-rule issues.
+- Preserve the connected boundary for the later integration step: `alertas_fake` changes only `test_database` and never writes Monitor incidents, conversations, or messages.
 
 ### 9. Integrate and validate
 
