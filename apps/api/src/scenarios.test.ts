@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, it } from "node:test";
 import { loadConfig } from "./config.js";
 import { buildMonitorServer, type MonitorServer } from "./server.js";
+import { workerGroupForIncident } from "../test/routing-fixtures.js";
 
 const servers: MonitorServer[] = [];
 
@@ -136,21 +137,26 @@ it("reroutes an open Phase 4B incident when the roster changes and protects diag
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
   const operator = { authorization: "Bearer mock:machine-operator" };
+  const trigger = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager });
+  assert.equal(trigger.statusCode, 200, trigger.body);
+  const advance = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
+  assert.equal(advance.statusCode, 200, advance.body);
+  const incidentWorkerGroup = workerGroupForIncident(advance.json().simulatedAt, "Día");
   const assignment = (id: string, person: string, position: string, scope: string, group: string | null, operations: string[] = [], warehouseType: string | null = null) => ({
     id, person, position, operations, warehouseType, scope, group, validFrom: "2026-07-01", validTo: null, state: "active", setupComplete: true,
   });
   const roster = [
     assignment("manager", "María Torres", "Gerente de fábrica", "factory", null),
-    assignment("supervisor-a", "Luis Vargas", "Supervisor de turno de operación", "operation_group", "A", ["Impresión"]),
+    assignment("supervisor-active", "Luis Vargas", "Supervisor de turno de operación", "operation_group", incidentWorkerGroup, ["Impresión"]),
     assignment("leader", "Rosa Paredes", "Líder técnico", "operation", null, ["Impresión"]),
-    assignment("operator-a", "Jorge Acosta", "Operador de máquina", "machine_group", "A", ["Impresión"]),
-    assignment("dispatcher-a", "Carlos Mendoza", "Despachador de almacén", "warehouse_group", "A", [], "Materias primas"),
-    assignment("warehouse-supervisor-a", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", "A", [], "Materias primas"),
+    assignment("operator-active", "Jorge Acosta", "Operador de máquina", "machine_group", incidentWorkerGroup, ["Impresión"]),
+    assignment("dispatcher-active", "Carlos Mendoza", "Despachador de almacén", "warehouse_group", incidentWorkerGroup, [], "Materias primas"),
+    assignment("warehouse-supervisor-active", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", incidentWorkerGroup, [], "Materias primas"),
   ];
   assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: roster } })).statusCode, 200);
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  const poll = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  assert.equal(poll.statusCode, 200, poll.body);
+  assert.equal(poll.json().scenario.simulatedAt, advance.json().simulatedAt);
   const incident = (await instance.app.inject({ url: "/api/incidents", headers: manager })).json().incidents.find((item: { ruleCode: string }) => item.ruleCode === "A02");
   const route = `/api/internal/routing/${incident.id}`;
   assert.equal((await instance.app.inject({ url: route, headers: operator })).statusCode, 403);
@@ -158,8 +164,8 @@ it("reroutes an open Phase 4B incident when the roster changes and protects diag
   assert.equal(before.statusCode, 200, before.body);
   assert.ok(before.json().recipients.some((recipient: { name: string }) => recipient.name === "Carlos Mendoza"), before.body);
 
-  const replacement = assignment("dispatcher-replacement", "Carmen Ríos", "Despachador de almacén", "warehouse_group", "A", [], "Materias primas");
-  const changed = roster.filter((item) => item.id !== "dispatcher-a").concat(replacement);
+  const replacement = assignment("dispatcher-replacement", "Carmen Ríos", "Despachador de almacén", "warehouse_group", incidentWorkerGroup, [], "Materias primas");
+  const changed = roster.filter((item) => item.id !== "dispatcher-active").concat(replacement);
   assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 1, assignments: changed } })).statusCode, 200);
   const after = await instance.app.inject({ url: route, headers: manager });
   assert.ok(after.json().recipients.some((recipient: { name: string }) => recipient.name === "Carmen Ríos"));
