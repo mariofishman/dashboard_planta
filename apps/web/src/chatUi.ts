@@ -7,6 +7,7 @@ export interface ChatAlertPresentation {
   code: string;
   shortName: string;
   age: string;
+  ageMinutes?: number;
   label: string;
   title: string;
   summary: string;
@@ -33,12 +34,25 @@ export function alertChipTone(label: string): AlertChipTone {
   return "warning";
 }
 
+export function unresolvedAgeMinutes(age: string): number | null {
+  const days = Number(age.match(/(\d+)\s*d/)?.[1] ?? 0);
+  const hours = Number(age.match(/(\d+)\s*h/)?.[1] ?? 0);
+  const minutes = Number(age.match(/(\d+)\s*min/)?.[1] ?? 0);
+  if (!days && !hours && !minutes) return null;
+  return days * 1_440 + hours * 60 + minutes;
+}
+
+export function unresolvedAgeTone(ageMinutes: number | null | undefined): "routine" | "escalated" {
+  return ageMinutes !== null && ageMinutes !== undefined && ageMinutes >= 120 ? "escalated" : "routine";
+}
+
 const alerts = {
   a05: {
     id: "alert-a05",
     code: "A05",
     shortName: "Sin pesar",
     age: "2 h 14 min",
+    ageMinutes: 134,
     label: "Error",
     title: "Bobina CU-98421 sin pesar",
     summary: "La bobina producida no tiene un peso registrado y todavía permanece asociada a P15.",
@@ -53,6 +67,7 @@ const alerts = {
     code: "A02",
     shortName: "En tránsito",
     age: "38 min",
+    ageMinutes: 38,
     label: "Error",
     title: "Movimiento de material sin recepción",
     summary: "Un flujo enviado a P15 continúa en tránsito y no tiene recepción digital.",
@@ -132,9 +147,20 @@ export function buildConversationRows(backendRows: ConversationSummary[], includ
       mockOnly: false,
     };
   });
-  if (!includeReviewFixtures) return connectedRows;
+  if (!includeReviewFixtures) return sortConversationRows(connectedRows);
   const connectedIds = new Set(connectedRows.map((row) => row.id));
-  return [...connectedRows, ...UI_ONLY_CONVERSATION_FIXTURES.filter((row) => !connectedIds.has(row.id))];
+  return sortConversationRows([...connectedRows, ...UI_ONLY_CONVERSATION_FIXTURES.filter((row) => !connectedIds.has(row.id))]);
+}
+
+export function sortConversationRows(rows: ChatConversationRow[]): ChatConversationRow[] {
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => Number(b.row.pinned) - Number(a.row.pinned) || a.index - b.index)
+    .map(({ row }) => row);
+}
+
+export function setConversationPinned(rows: ChatConversationRow[], rowId: string, pinned: boolean): ChatConversationRow[] {
+  return sortConversationRows(rows.map((row) => row.id === rowId ? { ...row, pinned } : row));
 }
 
 function normalize(value: string): string {

@@ -1,12 +1,12 @@
 # Phase 6 — Implementation plan
 
-**Status:** In progress; conversation baseline implemented, Roadmap V3 integration pending
+**Status:** In progress; conversation, `test_database`, and accepted chat UI workstreams implemented; Roadmap V3 integration pending
 
 ## Diagnosis
 
 Monitor has durable incidents, deterministic recipient routing, committed change cursors, Socket.IO recovery, mock identities, and an initial conversation implementation. That baseline includes Monitor-owned conversation persistence, participant authorization, messages, receipts, unread state, APIs, automated tests, and connected chat screens.
 
-Phase 6 is not complete. The current chat UI has not been accepted against the approved prototypes, and A02, A03, and A05 still depend on the historical Phase 4B simulator rather than a separate source-compatible `test_database`. Roadmap V3 therefore requires three parallel workstreams followed by integrated validation. Production identity binding remains a Phase 10 concern.
+Phase 6 is not complete. The chat UI has been corrected and accepted against the approved prototypes, and the separate source-compatible `test_database` has been built and locally validated. A02, A03, and A05 still depend on the historical Phase 4B simulator until `alertas_fake`, the read-only source adapter, and the completed workstreams are integrated and validated together. Production identity binding remains a Phase 10 concern.
 
 ## Guiding policies
 
@@ -58,9 +58,11 @@ Phase 6 is not complete. The current chat UI has not been accepted against the a
 
 Baseline validation proves that this commit is a stable starting point. It does not constitute Phase 6 acceptance.
 
-## Remaining Roadmap V3 actions
+## Roadmap V3 workstream status
 
 ### 6. Build and reset `test_database`
+
+**Status:** Completed and deterministically validated locally. Integration with Monitor and `alertas_fake` remains in action 9.
 
 - Confirm the required `soft_database` engine, version, schema, indexes, collations, and SQL settings from authoritative evidence.
 - Build the disposable `test_database` from protected `backup_database` input.
@@ -68,6 +70,8 @@ Baseline validation proves that this commit is a stable starting point. It does 
 - Give Monitor technically read-only access and give `alertas_fake` separate test-only write access.
 
 ### 7. Correct the chat UI
+
+**Status:** Completed, approved, and validated as UI-only evidence. Integrated source-to-screen acceptance remains in action 9.
 
 - Audit the initial chat list, chat detail, and incident components against the approved prototypes.
 - Explain material differences before changing the design.

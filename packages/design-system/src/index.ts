@@ -43,6 +43,8 @@ export const monitorSemanticTokens = {
     lifecycleResolved: resolve<string>(semantic.color.lifecycleResolved),
     lifecycleOpen: resolve<string>(semantic.color.lifecycleOpen),
     lifecycleClosed: resolve<string>(semantic.color.lifecycleClosed),
+    unresolvedAgeRoutine: resolve<string>(semantic.color.unresolvedAgeRoutine),
+    unresolvedAgeEscalated: resolve<string>(semantic.color.unresolvedAgeEscalated),
   },
   typography: {
     routine: resolve<string>(semantic.typography.routine),

@@ -51,7 +51,7 @@ import {
   Typography,
   useMediaQuery,
 } from "@mui/material";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import demoPhoto from "../../../prototypes/current/chat/assets/photo-message-sample.png";
 import {
@@ -71,6 +71,9 @@ import {
   buildUiOnlyMessages,
   conversationScope,
   filterConversationRows,
+  setConversationPinned,
+  unresolvedAgeMinutes,
+  unresolvedAgeTone,
   type ChatAlertPresentation,
   type ChatConversationRow,
   type ChatFilter,
@@ -100,17 +103,19 @@ function ConversationAlertChip({ alert }: { alert: ChatAlertPresentation }) {
     size="small"
     variant="outlined"
     label={<Box component="span" sx={{ display: "flex", alignItems: "center", minWidth: 0 }}>
-      <Box component="span" sx={{ flex: "0 0 auto", color: alertToneColor[alertChipTone(alert.label)], fontWeight: 700 }}>{alert.code}</Box>
-      <Box component="span" aria-hidden sx={{ flex: "0 0 auto", alignSelf: "stretch", width: "1px", mx: .75, bgcolor: ui.color.border }}/>
-      <Box component="span" sx={{ minWidth: 0, overflow: "hidden", color: ui.color.structure, textOverflow: "ellipsis" }}>{alert.shortName}</Box>
+      <Box component="span" className="conversation-alert-segment" sx={{ flex: "0 0 auto", color: alertToneColor[alertChipTone(alert.label)], fontWeight: 700 }}>{alert.code}</Box>
+      <Box component="span" aria-hidden sx={{ flex: "0 0 auto", alignSelf: "stretch", width: "1px", bgcolor: ui.color.border }}/>
+      <Box component="span" className="conversation-alert-segment" sx={{ minWidth: 0, overflow: "hidden", color: ui.color.structure, textOverflow: "ellipsis" }}>{alert.shortName}</Box>
     </Box>}
     sx={{
+      height: 23,
       minWidth: 0,
       maxWidth: { xs: 138, sm: 180 },
       borderColor: ui.color.controlBorder,
       borderRadius: ui.control.radius,
       bgcolor: ui.color.surface,
-      "& .MuiChip-label": { display: "block", minWidth: 0, overflow: "hidden" },
+      "& .MuiChip-label": { display: "block", minWidth: 0, p: 0, overflow: "hidden", fontSize: ".66rem", lineHeight: 1.2 },
+      "& .conversation-alert-segment": { px: "6px", py: "4px" },
     }}
   />;
 }
@@ -130,10 +135,13 @@ export function ChatList({ session }: { session: SessionResponse }) {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [showConnectionWarning, setShowConnectionWarning] = useState(false);
-  const [controlsHidden, setControlsHidden] = useState(false);
-  const previousScrollTop = useRef(0);
-  const ignoreDirectionUntil = useRef(0);
   const controlsRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const controlsPositioned = useRef(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressRowOpen = useRef(false);
+  const [rowMenu, setRowMenu] = useState<{ anchorEl: HTMLElement; rowId: string } | null>(null);
   const isNarrow = useMediaQuery("(max-width:760px)");
   const isVeryNarrow = useMediaQuery("(max-width:420px)");
   const chipLimit = alertChipLimit(isVeryNarrow ? 420 : isNarrow ? 760 : 1024);
@@ -165,50 +173,59 @@ export function ChatList({ session }: { session: SessionResponse }) {
     socket.on("receipt.updated", refresh);
     return () => { socket.disconnect(); };
   }, [refresh]);
+  useLayoutEffect(() => {
+    if (state !== "ready" || controlsPositioned.current || !controlsRef.current || !scrollRef.current) return;
+    scrollRef.current.scrollTop = controlsRef.current.offsetHeight;
+    controlsPositioned.current = true;
+  }, [state]);
 
   const visible = useMemo(() => filterConversationRows(rows, filter, search), [filter, rows, search]);
   const counts = useMemo(() => ({ all: rows.length, unread: rows.filter((row) => Number(row.unreadCount) > 0).length, pinned: rows.filter((row) => row.pinned).length }), [rows]);
 
-  const setHidden = (hidden: boolean) => {
-    setControlsHidden(hidden);
-    if (hidden && controlsRef.current?.contains(document.activeElement)) (document.activeElement as HTMLElement)?.blur();
-    ignoreDirectionUntil.current = performance.now() + 220;
-  };
-  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
-    const current = event.currentTarget.scrollTop;
-    const delta = current - previousScrollTop.current;
-    if (current < 20) setHidden(false);
-    else if (performance.now() >= ignoreDirectionUntil.current) {
-      if (delta > 6) setHidden(true);
-      else if (delta < -6) setHidden(false);
-    }
-    previousScrollTop.current = current;
-  };
   const chooseFilter = (next: ChatFilter) => {
     setFilter(next);
-    setHidden(false);
-    previousScrollTop.current = 0;
   };
   const openConversation = (row: ChatConversationRow) => {
     sessionStorage.setItem(CHAT_CONTEXT_KEY, JSON.stringify({ id: row.id, title: row.title, participants: row.participants, mockOnly: row.mockOnly }));
     go(`/chats/${row.id}`);
   };
+  const clearLongPress = () => {
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    longPressStart.current = null;
+  };
+  const openRowMenu = (anchorEl: HTMLElement, rowId: string) => setRowMenu({ anchorEl, rowId });
+  const beginLongPress = (event: React.PointerEvent<HTMLElement>, rowId: string) => {
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+    clearLongPress();
+    const anchorEl = event.currentTarget;
+    longPressStart.current = { x: event.clientX, y: event.clientY };
+    longPressTimer.current = window.setTimeout(() => {
+      suppressRowOpen.current = true;
+      openRowMenu(anchorEl, rowId);
+      longPressTimer.current = null;
+    }, 500);
+  };
+  const moveLongPress = (event: React.PointerEvent<HTMLElement>) => {
+    const start = longPressStart.current;
+    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) clearLongPress();
+  };
+  const selectedMenuRow = rowMenu ? rows.find((row) => row.id === rowMenu.rowId) : null;
 
   return <Box sx={{ height: "100dvh", minHeight: 520, bgcolor: "background.default", display: "grid", gridTemplateRows: "52px minmax(0,1fr) 60px", overflow: "hidden" }}>
     <AppBar position="static" color="secondary" elevation={0}><Toolbar sx={{ minHeight: "52px !important", gap: 2 }}><Box flex={1}><Typography variant="h2" color="inherit">Chats</Typography><Typography variant="caption" sx={{ color: ui.color.textInverseMuted }}>{session.principal.displayName}</Typography></Box></Toolbar></AppBar>
-    <Box component="main" sx={{ width: "min(100%, 760px)", height: "100%", minHeight: 0, mx: "auto", p: { xs: 1, sm: 1.5 } }}>
+    <Box component="main" sx={{ boxSizing: "border-box", width: "100%", maxWidth: 760, minWidth: 0, height: "100%", minHeight: 0, mx: "auto", p: { xs: 1, sm: 1.5 } }}>
       <Paper variant="outlined" sx={{ height: "100%", minHeight: 0, borderRadius: 1.5, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <Box ref={controlsRef} data-testid="chat-list-controls" aria-hidden={controlsHidden} inert={controlsHidden} sx={{ flex: "0 0 auto", maxHeight: controlsHidden ? 0 : 92, opacity: controlsHidden ? 0 : 1, overflow: "hidden", transition: "max-height 200ms cubic-bezier(.22,1,.36,1), opacity 150ms linear" }}>
-          <Box sx={{ p: 1 }}>
-            <TextField fullWidth size="small" value={search} onFocus={() => setHidden(false)} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar grupo, persona, máquina, OT o alerta" inputProps={{ "aria-label": "Buscar conversaciones" }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded sx={{ fontSize: 18 }}/></InputAdornment> } }}/>
-            <Stack direction="row" gap={.5} sx={{ mt: 1, overflowX: "auto" }} aria-label="Filtros de conversaciones">
-              {([ ["all", "Todas", counts.all], ["unread", "No leídas", counts.unread], ["pinned", "Fijadas", counts.pinned] ] as const).map(([value, label, count]) => <Chip key={value} label={`${label} ${count}`} clickable aria-pressed={filter === value} color={filter === value ? "primary" : "default"} variant={filter === value ? "filled" : "outlined"} onClick={() => chooseFilter(value)} sx={{ flex: "0 0 auto" }}/>) }
-            </Stack>
+        <Box ref={scrollRef} data-testid="chat-list-scroll" sx={{ minHeight: 0, flex: 1, overflowY: "auto", overscrollBehavior: "contain" }}>
+          <Box ref={controlsRef} data-testid="chat-list-controls" sx={{ scrollSnapAlign: "none" }}>
+            <Box sx={{ p: 1 }}>
+              <TextField fullWidth size="small" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar grupo, persona, máquina, OT o alerta" inputProps={{ "aria-label": "Buscar conversaciones" }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded sx={{ fontSize: 18 }}/></InputAdornment> } }}/>
+              <Stack direction="row" gap={.5} sx={{ mt: 1, overflowX: "auto" }} aria-label="Filtros de conversaciones">
+                {([ ["all", "Todas", counts.all], ["unread", "No leídas", counts.unread], ["pinned", "Fijadas", counts.pinned] ] as const).map(([value, label, count]) => <Chip key={value} label={`${label} ${count}`} clickable aria-pressed={filter === value} color={filter === value ? "primary" : "default"} variant={filter === value ? "filled" : "outlined"} onClick={() => chooseFilter(value)} sx={{ flex: "0 0 auto" }}/>) }
+              </Stack>
+            </Box>
+            <Divider/>
           </Box>
-          <Divider/>
-        </Box>
-
-        <Box data-testid="chat-list-scroll" onScroll={handleScroll} sx={{ minHeight: 0, flex: 1, overflowY: "auto", overscrollBehavior: "contain" }}>
           {showConnectionWarning && <Alert severity="warning" sx={{ borderRadius: 0 }}>No se pudo conectar con la API local. Se muestran datos estables de presentación.</Alert>}
           {state === "loading" && <Stack alignItems="center" sx={{ py: 6 }}><CircularProgress size={24}/></Stack>}
           {state === "error" && <Alert severity="error">No se pudieron cargar las conversaciones.</Alert>}
@@ -218,14 +235,18 @@ export function ChatList({ session }: { session: SessionResponse }) {
               const shownAlerts = row.alerts.slice(0, chipLimit);
               const hiddenAlerts = Math.max(0, Number(row.openAlerts) - shownAlerts.length);
               const unread = Number(row.unreadCount) > 0;
-              return <ButtonBase key={row.id} data-testid={`conversation-${row.id}`} onClick={() => openConversation(row)} aria-label={`Abrir ${row.title}${unread ? `. ${row.unreadCount} ${Number(row.unreadCount) === 1 ? "mensaje" : "mensajes"} no leídos` : ""}${row.openAlerts ? `. ${row.openAlerts} alertas abiertas` : ""}`} sx={{ width: "100%", px: { xs: 1.25, sm: 1.5 }, py: 1.1, textAlign: "left", alignItems: "stretch", gap: 1, position: "relative", "&:hover": { bgcolor: "action.hover" }, "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 } }}>
-                {unread && <Box aria-hidden sx={{ position: "absolute", top: 18, left: 4, width: 6, height: 6, borderRadius: "50%", bgcolor: "primary.main" }}/>}
+              return <Box key={row.id} sx={{ position: "relative", "&:hover .conversation-row-menu, &:focus-within .conversation-row-menu": { opacity: 1, pointerEvents: "auto" } }}>
+                <ButtonBase data-testid={`conversation-${row.id}`} onClick={(event) => { if (suppressRowOpen.current) { event.preventDefault(); suppressRowOpen.current = false; return; } openConversation(row); }} onPointerDown={(event) => beginLongPress(event, row.id)} onPointerMove={moveLongPress} onPointerUp={clearLongPress} onPointerCancel={clearLongPress} onPointerLeave={clearLongPress} onContextMenu={(event) => { event.preventDefault(); clearLongPress(); openRowMenu(event.currentTarget, row.id); }} onKeyDown={(event) => { if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) { event.preventDefault(); openRowMenu(event.currentTarget, row.id); } }} aria-label={`Abrir ${row.title}${unread ? `. ${row.unreadCount} ${Number(row.unreadCount) === 1 ? "mensaje" : "mensajes"} no leídos` : ""}${row.openAlerts ? `. ${row.openAlerts} alertas abiertas` : ""}`} sx={{ width: "100%", px: 1.5, py: 1, textAlign: "left", alignItems: "stretch", gap: 1, position: "relative", "&:hover": { bgcolor: "action.hover" }, "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 } }}>
+                {unread && <Box
+                  aria-hidden
+                  sx={{ position: "absolute", top: 17, left: 4, transform: "translateY(-50%)", width: 6, height: 6, borderRadius: "50%", bgcolor: "primary.main" }}
+                />}
                 <Box sx={{ minWidth: 0, flex: 1, pl: .25 }}>
                   <Stack direction="row" gap={.75} alignItems="center" minWidth={0}>
-                    <Typography variant="body2" fontWeight={700} noWrap>{row.title}</Typography>
-                    {row.pinned && <Typography variant="caption" color="primary.main" fontWeight={700} sx={{ flex: "0 0 auto", px: .5, py: .15, borderRadius: ui.control.radius, bgcolor: "action.selected" }}>Fijada</Typography>}
+                    <Typography fontSize="12px" lineHeight="18px" fontWeight={700} noWrap>{row.title}</Typography>
+                    {row.pinned && <Typography color="primary.main" fontWeight={700} sx={{ flex: "0 0 auto", px: "6px", py: "3px", borderRadius: ui.control.radius, bgcolor: "action.selected", fontSize: "9px", lineHeight: 1.2 }}>Fijada</Typography>}
                   </Stack>
-                  <Typography variant="caption" color="text.secondary" noWrap display="block"><Box component="span" sx={{ color: "text.primary", fontWeight: 600 }}>{row.lastSender || "Monitor"}:</Box> {row.lastKind === "alert" ? row.lastBody || "Nueva alerta operativa" : row.lastBody}</Typography>
+                  <Typography color="text.secondary" noWrap display="block" sx={{ mt: .5, fontSize: "12px", lineHeight: "17.4px" }}><Box component="span" sx={{ color: "text.primary", fontWeight: 600 }}>{row.lastSender || "Monitor"}:</Box> {row.lastKind === "alert" ? row.lastBody || "Nueva alerta operativa" : row.lastBody}</Typography>
                   {Number(row.openAlerts) > 0 && <>
                     <Stack direction="row" alignItems="center" gap={.5} sx={{ mt: .55 }}>
                       <Typography variant="caption" color="text.secondary">{Number(row.openAlerts) === 1 ? "Sin resolver" : "Más antigua"}</Typography>
@@ -237,10 +258,15 @@ export function ChatList({ session }: { session: SessionResponse }) {
                     </Stack>
                   </>}
                 </Box>
-                <Stack alignItems="flex-end" gap={.75} sx={{ flex: "0 0 auto" }}><Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{time(row.updatedAt)}</Typography>{unread && <Box aria-label={`${row.unreadCount} mensajes no leídos`} sx={{ minWidth: 20, height: 20, px: .5, borderRadius: "50%", display: "grid", placeItems: "center", bgcolor: "primary.main", color: "white", fontSize: ui.typography.routine, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{row.unreadCount}</Box>}</Stack>
-              </ButtonBase>;
+                <Stack alignItems="flex-end" gap={.75} sx={{ flex: "0 0 auto", pr: { xs: .5, sm: 0 } }}><Typography color="text.secondary" sx={{ fontSize: "10px", lineHeight: 1.4, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{time(row.updatedAt)}</Typography>{unread && <Box aria-label={`${row.unreadCount} mensajes no leídos`} sx={{ minWidth: 20, height: 20, px: .5, borderRadius: "50%", display: "grid", placeItems: "center", bgcolor: "primary.main", color: "white", fontSize: "11px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{row.unreadCount}</Box>}</Stack>
+                </ButtonBase>
+                <IconButton className="conversation-row-menu" aria-label={`Acciones de ${row.title}`} aria-haspopup="menu" aria-expanded={rowMenu?.rowId === row.id ? "true" : undefined} onClick={(event) => { event.stopPropagation(); openRowMenu(event.currentTarget, row.id); }} sx={{ display: { xs: "none", sm: "inline-flex" }, position: "absolute", top: 22, right: 4, width: 40, height: 40, opacity: rowMenu?.rowId === row.id ? 1 : 0, pointerEvents: rowMenu?.rowId === row.id ? "auto" : "none", color: "secondary.main", transition: "opacity 150ms linear", "@media (prefers-reduced-motion: reduce)": { transition: "none" }, "&::before": { content: "''", position: "absolute", inset: 6, border: "1px solid", borderColor: "divider", borderRadius: `${ui.control.radius}px`, bgcolor: "background.paper", zIndex: 0 }, "& .MuiSvgIcon-root": { position: "relative", zIndex: 1 } }}><MoreHorizRounded sx={{ fontSize: 18 }}/></IconButton>
+              </Box>;
             })}
           </Stack>
+          <Menu anchorEl={rowMenu?.anchorEl ?? null} open={Boolean(rowMenu)} onClose={() => setRowMenu(null)} anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }} MenuListProps={{ dense: true, "aria-label": "Acciones de la conversación" }}>
+            {selectedMenuRow && <MenuItem onClick={() => { setRows((current) => setConversationPinned(current, selectedMenuRow.id, !selectedMenuRow.pinned)); setRowMenu(null); }}><ListItemIcon><PushPinRounded fontSize="small"/></ListItemIcon>{selectedMenuRow.pinned ? "Desfijar conversación" : "Fijar conversación"}</MenuItem>}
+          </Menu>
           {nextCursor && filter === "all" && <Box sx={{ p: 1, textAlign: "center" }}><Button size="small" onClick={() => void conversations(search, nextCursor, scope).then((result) => { setRows((current) => [...current, ...buildConversationRows(result.conversations, false)]); setNextCursor(result.nextCursor); })}>Cargar conversaciones anteriores</Button></Box>}
         </Box>
       </Paper>
@@ -255,11 +281,15 @@ type PendingMessage = { id: string; body: string; replyToMessageId: string | nul
 
 function payloadAlert(message: ConversationMessage): ChatAlertPresentation {
   const payload = message.payload;
+  const age = String(payload.age ?? payload.unresolvedDuration ?? "Sin resolver");
+  const payloadAgeMinutes = Number(payload.ageMinutes ?? payload.unresolvedAgeMinutes);
+  const ageMinutes = Number.isFinite(payloadAgeMinutes) ? payloadAgeMinutes : unresolvedAgeMinutes(age);
   return {
     id: String(payload.id ?? `alert-${message.id}`),
     code: String(payload.ruleCode ?? payload.code ?? "Alerta"),
     shortName: String(payload.shortName ?? payload.title ?? "Alerta operativa"),
-    age: String(payload.age ?? payload.unresolvedDuration ?? "Sin resolver"),
+    age,
+    ...(ageMinutes !== null ? { ageMinutes } : {}),
     label: String(payload.label ?? payload.statusLabel ?? "Abierta"),
     title: String(payload.title ?? "Alerta operativa"),
     summary: String(payload.summary ?? "Consulta la evidencia operativa disponible."),
@@ -273,24 +303,26 @@ function payloadAlert(message: ConversationMessage): ChatAlertPresentation {
 
 function AlertAttachment({ message, expanded, highlighted, register, onToggle, onCopyIdentifier }: { message: ConversationMessage; expanded: boolean; highlighted: boolean; register: (element: HTMLElement | null) => void; onToggle: () => void; onCopyIdentifier: (value: string) => void }) {
   const alert = payloadAlert(message);
-  return <Paper ref={register} component="section" tabIndex={0} variant="outlined" aria-labelledby={`${message.id}-alert-title`} onClick={(event) => { if (!(event.target as Element).closest("button")) onToggle(); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onToggle(); } }} sx={{ mt: .25, overflow: "hidden", borderRadius: 1.25, borderColor: highlighted ? "primary.main" : "error.main", bgcolor: "background.paper", outline: highlighted ? `2px solid ${ui.color.action}` : undefined, outlineOffset: highlighted ? 2 : undefined }}>
-    <Stack direction="row" alignItems="center" gap={.5} flexWrap="wrap" sx={{ minHeight: 34, px: .75, py: .4, borderBottom: "1px solid", borderColor: "divider", bgcolor: "rgba(225,29,72,.045)" }}>
-      <Chip size="small" color="error" variant="outlined" label={alert.label}/>
-      <Chip size="small" label={alert.code}/>
-      <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ ml: "auto", fontVariantNumeric: "tabular-nums" }}>{alert.age}{alert.age === "Sin resolver" ? "" : " sin resolver"}</Typography>
+  const ageColor = unresolvedAgeTone(alert.ageMinutes) === "escalated" ? ui.color.unresolvedAgeEscalated : ui.color.unresolvedAgeRoutine;
+  const fact = (label: string, value: string) => <Box key={label} component="div" sx={{ display: "flex", alignItems: "center", gap: "5px", px: "6px", py: "3px", borderRadius: ui.control.radius, bgcolor: "background.default" }}><Box component="dt" sx={{ color: "text.secondary", fontSize: "9px" }}>{label}</Box><Box component="dd" sx={{ m: 0, fontSize: "9px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{value}</Box></Box>;
+  return <Paper ref={register} component="section" tabIndex={0} variant="outlined" aria-labelledby={`${message.id}-alert-title`} onClick={(event) => { if (!(event.target as Element).closest("button")) onToggle(); }} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onToggle(); } }} sx={{ mt: .25, overflow: "hidden", borderRadius: "7.5px", borderColor: highlighted ? "primary.main" : "rgba(225,29,72,.22)", bgcolor: "background.paper", boxShadow: "0 2px 6px rgba(0,36,107,.07)", outline: highlighted ? `2px solid ${ui.color.action}` : undefined, outlineOffset: highlighted ? 2 : undefined }}>
+    <Stack direction="row" alignItems="center" gap={1} sx={{ minHeight: 34, pl: "7px", pr: "9px", borderBottom: "1px solid", borderColor: "divider", bgcolor: "rgba(225,29,72,.045)" }}>
+      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "5px", minHeight: 28, px: 1, border: "1px solid rgba(225,29,72,.7)", borderRadius: ui.control.radius, color: "error.main", fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap" }}><Box component="span" aria-hidden sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "currentColor" }}/>{alert.label}</Box>
+      <Box component="span" sx={{ display: "inline-grid", placeItems: "center", minHeight: 28, px: 1, borderRadius: ui.control.radius, bgcolor: "rgba(0,0,0,.08)", fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap" }}>{alert.code}</Box>
+      <Typography component="span" fontWeight={700} sx={{ ml: "auto", color: ageColor, fontSize: "9px", lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{alert.age}{alert.age === "Sin resolver" ? "" : " sin resolver"}</Typography>
     </Stack>
     <Box sx={{ p: 1 }}>
       <Typography id={`${message.id}-alert-title`} variant="body2" fontWeight={700}>{alert.title}</Typography>
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: .25, maxWidth: "70ch" }}>{alert.summary}</Typography>
-      <Stack direction="row" gap={.5} flexWrap="wrap" sx={{ mt: .75 }}>
-        {alert.workOrderCode && <Chip size="small" label={`OT ${alert.workOrderCode}`}/>}
-        {alert.machineCode && <Chip size="small" label={`Máquina ${alert.machineCode}`}/>}
-        {alert.detectedAt && <Chip size="small" label={`Detectada ${alert.detectedAt}`}/>}
-      </Stack>
+      <Box component="dl" sx={{ display: "flex", flexWrap: "wrap", gap: "5px", m: 0, mt: .75, pt: "6px", borderTop: "1px solid", borderColor: "divider" }}>
+        {alert.workOrderCode && fact("OT", alert.workOrderCode)}
+        {alert.machineCode && fact("Máquina", alert.machineCode)}
+        {alert.detectedAt && fact("Detectada", alert.detectedAt)}
+      </Box>
     </Box>
-    <Stack direction={{ xs: "column", sm: "row" }} sx={{ borderTop: "1px solid", borderColor: "divider" }}>
-      {alert.workOrderCode && <Button onClick={(event) => { event.stopPropagation(); onCopyIdentifier(alert.workOrderCode!); }} sx={{ flex: 1, minHeight: 40, borderRadius: 0 }}>Copiar OT {alert.workOrderCode}</Button>}
-      <Button aria-expanded={expanded} onClick={(event) => { event.stopPropagation(); onToggle(); }} sx={{ flex: 1, minHeight: 40, borderRadius: 0, bgcolor: "rgba(0,122,204,.06)" }}>{expanded ? "Ocultar guía" : "Ver explicación y solución"}</Button>
+    <Stack direction="row" sx={{ borderTop: "1px solid", borderColor: "divider" }}>
+      {alert.workOrderCode && <Button aria-label={`Copiar OT ${alert.workOrderCode}`} onClick={(event) => { event.stopPropagation(); onCopyIdentifier(alert.workOrderCode!); }} sx={{ flex: 1, minWidth: 0, minHeight: 40, borderRadius: 0, borderRight: "1px solid", borderColor: "divider" }}><Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>Copiar OT {alert.workOrderCode}</Box><Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>OT</Box></Button>}
+      <Button aria-expanded={expanded} aria-label={expanded ? "Ocultar explicación y solución" : "Ver explicación y solución"} onClick={(event) => { event.stopPropagation(); onToggle(); }} sx={{ flex: 1, minWidth: 0, minHeight: 40, borderRadius: 0, bgcolor: "rgba(0,122,204,.06)" }}><Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>{expanded ? "Ocultar guía" : "Ver explicación y solución"}</Box><Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>Ver</Box></Button>
     </Stack>
     {expanded && <Box sx={{ p: 1, borderTop: "1px solid", borderColor: "divider", bgcolor: "background.default" }}>
       {alert.blocking && <><Typography variant="caption" fontWeight={700}>Qué está bloqueando</Typography><Typography variant="caption" color="text.secondary" display="block" sx={{ mt: .25 }}>{alert.blocking}</Typography></>}
@@ -554,7 +586,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
     {historySearchOpen && <Box sx={{ flex: "0 0 auto", p: .75, borderBottom: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}><Stack direction="row" gap={.5} sx={{ width: "min(100%, 820px)", mx: "auto" }}><TextField id="chat-history-search" fullWidth size="small" value={historySearch} onChange={(event) => setHistorySearch(event.target.value)} placeholder="Buscar en la conversación" inputProps={{ "aria-label": "Buscar en la conversación" }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded sx={{ fontSize: 17 }}/></InputAdornment> } }}/><IconButton aria-label="Cerrar búsqueda" onClick={() => { setHistorySearchOpen(false); setHistorySearch(""); }} sx={{ width: 40, height: 40 }}><CloseRounded/></IconButton></Stack></Box>}
 
     <Box ref={scrollRef} data-testid="chat-detail-scroll" component="main" sx={{ minHeight: 0, flex: 1, overflowY: "auto", px: { xs: 1, sm: 2 }, py: 1.25, overscrollBehavior: "contain" }}>
-      <Stack sx={{ width: "min(100%, 820px)", mx: "auto" }} gap={.55}>
+      <Stack sx={{ width: "min(100%, 820px)", mx: "auto" }} gap={1}>
         {state === "loading" && <Stack alignItems="center" sx={{ py: 8 }}><CircularProgress size={24}/></Stack>}
         {state === "error" && <Alert severity="error">No se pudo cargar el historial.</Alert>}
         {nextMessageCursor && <Button size="small" sx={{ alignSelf: "center" }} onClick={() => void conversationMessages(conversationId, nextMessageCursor).then((result) => { setMessages((current) => [...result.messages, ...current]); setNextMessageCursor(result.nextCursor); })}>Cargar mensajes anteriores</Button>}
@@ -563,23 +595,27 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
           const quoted = message.replyToMessageId ? messageById.get(message.replyToMessageId) : undefined;
           const isAlert = message.kind === "alert";
           const isAttachment = message.kind === "attachment";
+          const isTextBubble = !isAlert && !isAttachment;
           const active = flashMessageId === message.id || highlighted.has(message.id) || selectedMessages.has(message.id);
-          const maxWidth = isAlert ? { xs: "96%", sm: 560 } : isAttachment ? { xs: "92%", sm: 380 } : { xs: "92%", sm: "76%" };
-          return <Box key={message.id} data-testid={`message-${message.id}`} ref={(element: HTMLElement | null) => { if (element) messageRefs.current.set(message.id, element); else messageRefs.current.delete(message.id); }} component="article" tabIndex={-1} onPointerDown={(event) => startLongPress(event, message)} onPointerMove={moveLongPress} onPointerUp={clearLongPress} onPointerCancel={clearLongPress} onPointerLeave={clearLongPress} onContextMenu={(event) => { if (!isMobile || (event.target as Element).closest("button,a,input")) return; event.preventDefault(); if (Date.now() - longPressOpenedAt.current >= 1400) setMobileActionMessage(message); }} sx={{ alignSelf: outgoing ? "flex-end" : "flex-start", width: isAlert ? "min(100%, 560px)" : "fit-content", maxWidth, outline: "none" }}>
-            <Paper variant="outlined" sx={{ p: isAlert ? .5 : .75, pr: !isMobile && !message.deletedAt ? 4 : .75, borderRadius: isAlert ? 1.25 : 1.75, bgcolor: outgoing ? "action.selected" : "background.paper", position: "relative", borderColor: active ? "primary.main" : "divider", outline: active ? `1px solid ${ui.color.action}` : undefined, outlineOffset: active ? 1 : undefined, WebkitTouchCallout: "none", userSelect: isMobile ? "none" : "text" }}>
+          const maxWidth = isAlert ? "min(92%, 440px)" : isAttachment ? { xs: "92%", sm: 380 } : { xs: "92%", sm: "76%" };
+          return <Box key={message.id} data-testid={`message-${message.id}`} ref={(element: HTMLElement | null) => { if (element) messageRefs.current.set(message.id, element); else messageRefs.current.delete(message.id); }} component="article" tabIndex={-1} onPointerDown={(event) => startLongPress(event, message)} onPointerMove={moveLongPress} onPointerUp={clearLongPress} onPointerCancel={clearLongPress} onPointerLeave={clearLongPress} onContextMenu={(event) => { if (!isMobile || (event.target as Element).closest("button,a,input")) return; event.preventDefault(); if (Date.now() - longPressOpenedAt.current >= 1400) setMobileActionMessage(message); }} sx={{ alignSelf: outgoing ? "flex-end" : "flex-start", width: isAlert ? "min(92%, 440px)" : "fit-content", maxWidth, outline: "none" }}>
+            <Paper variant="outlined" sx={{ p: isAlert ? "4px 5px" : isTextBubble ? "4px 34px 4px 9px" : .75, ...(!isAlert && !isTextBubble ? { pr: !isMobile && !message.deletedAt ? 4 : .75 } : {}), borderRadius: isAlert ? "7.5px" : 1.75, bgcolor: outgoing && isTextBubble ? ui.color.selected : outgoing ? "action.selected" : "background.paper", position: "relative", borderColor: active ? "primary.main" : "divider", outline: active ? `1px solid ${ui.color.action}` : undefined, outlineOffset: active ? 1 : undefined, WebkitTouchCallout: "none", userSelect: isMobile ? "none" : "text" }}>
               {!isMobile && !message.deletedAt && <IconButton size="small" aria-label="Acciones del mensaje" aria-haspopup="menu" onClick={(event) => { setSelectedMessage(message); setMessageMenuAnchor(event.currentTarget); }} sx={{ position: "absolute", top: 1, right: 1, width: 30, height: 30 }}><ExpandMoreRounded sx={{ fontSize: 17 }}/></IconButton>}
-              {!outgoing && <Typography variant="caption" color="primary.main" fontWeight={700} display="block" sx={{ mb: .15 }}>{message.senderName || "Monitor"}</Typography>}
-              {quoted && <ButtonBase onClick={() => jumpToMessage(quoted.id)} aria-label={`Ir al mensaje citado de ${quoted.senderName}`} sx={{ display: "grid", width: "100%", textAlign: "left", justifyItems: "start", p: .6, mb: .45, borderLeft: "3px solid", borderColor: "primary.main", borderRadius: 1, bgcolor: "background.default", overflow: "hidden" }}><Typography variant="caption" color="primary.main" fontWeight={700}>{quoted.senderName}</Typography><Typography variant="caption" color="text.secondary" noWrap sx={{ width: "100%" }}>{textFromMessage(quoted)}</Typography></ButtonBase>}
+              {!outgoing && <Typography variant="caption" color={isTextBubble ? "primary.dark" : "primary.main"} fontWeight={700} display="block" sx={{ mb: isTextBubble ? "1px" : .15, mr: isAlert && !isMobile ? 4 : 0, ...(isTextBubble ? { lineHeight: 1.15 } : {}) }}>{message.senderName || "Monitor"}</Typography>}
+              {quoted && <ButtonBase onClick={() => jumpToMessage(quoted.id)} aria-label={`Ir al mensaje citado de ${quoted.senderName}`} sx={{ position: "relative", display: "grid", width: "100%", textAlign: "left", justifyItems: "start", p: "6px 9px 6px 12px", mb: .5, borderRadius: "10px", bgcolor: "background.default", overflow: "hidden", "&::before": { position: "absolute", top: 6, left: 4, width: 3, height: 16, borderRadius: 2, bgcolor: "primary.main", content: "''" } }}><Typography variant="caption" color="primary.dark" fontWeight={700} sx={{ lineHeight: 1.2 }}>{quoted.senderName}</Typography><Typography variant="caption" color="text.secondary" noWrap sx={{ width: "100%", lineHeight: 1.3 }}>{textFromMessage(quoted)}</Typography></ButtonBase>}
               {message.deletedAt ? <Typography variant="body2" color="text.secondary" fontStyle="italic">Mensaje eliminado</Typography> : isAlert ? <AlertAttachment message={message} expanded={expandedAlerts.has(message.id)} highlighted={flashMessageId === message.id} register={(element) => { if (element) alertRefs.current.set(message.id, element); else alertRefs.current.delete(message.id); }} onToggle={() => toggleSet(setExpandedAlerts, message.id)} onCopyIdentifier={(value) => void copyText(value, `OT ${value} copiada`)}/> : isAttachment ? renderAttachment(message) : <Typography variant="body2" component="span" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.body}</Typography>}
-              <Stack direction="row" justifyContent="flex-end" alignItems="center" gap={.5} sx={{ mt: .2 }}>
-                {pinnedMessages.has(message.id) && <PushPinRounded aria-label="Mensaje fijado" sx={{ fontSize: 12, color: "text.secondary" }}/>}
-                <Typography variant="caption" color="text.secondary" sx={{ fontVariantNumeric: "tabular-nums" }}>{message.editedAt ? "Editado · " : ""}{time(message.sentAt)}{outgoing ? message.readCount > 0 ? " · ✓✓" : message.deliveredCount > 0 ? " · ✓✓" : " · ✓" : ""}</Typography>
+              <Stack direction="row" justifyContent="flex-end" alignItems="center" gap={.5} sx={{ mt: "2px" }}>
+                {pinnedMessages.has(message.id) && <PushPinRounded
+                  aria-label="Mensaje fijado"
+                  sx={{ fontSize: 12, color: "text.secondary" }}
+                />}
+                <Typography color="text.secondary" sx={{ fontSize: "9px", lineHeight: 1.3, fontVariantNumeric: "tabular-nums" }}>{message.editedAt ? "Editado · " : ""}{time(message.sentAt)}{outgoing ? message.readCount > 0 ? " · ✓✓" : message.deliveredCount > 0 ? " · ✓✓" : " · ✓" : ""}</Typography>
               </Stack>
             </Paper>
             {(reactions[message.id]?.length ?? 0) > 0 && <Stack direction="row" gap={.25} sx={{ mt: -.25, px: .5, justifyContent: outgoing ? "flex-end" : "flex-start" }}>{reactions[message.id]!.map((reaction) => <Chip key={reaction} size="small" label={reaction} sx={{ minWidth: 28, "& .MuiChip-label": { px: .5 } }}/>)}</Stack>}
           </Box>;
         })}
-        {pending.map((message) => <Box key={message.id} sx={{ alignSelf: "flex-end", maxWidth: "82%" }}><Paper variant="outlined" sx={{ p: .75, borderRadius: 1.75, bgcolor: "action.selected", opacity: .72 }}><Typography variant="body2">{message.body || "Adjunto"}</Typography><Typography variant="caption" color="text.secondary">Pendiente</Typography></Paper></Box>)}
+        {pending.map((message) => <Box key={message.id} sx={{ alignSelf: "flex-end", maxWidth: "82%" }}><Paper variant="outlined" sx={{ p: "4px 34px 4px 9px", borderRadius: 1.75, bgcolor: ui.color.selected, opacity: .72 }}><Typography variant="body2">{message.body || "Adjunto"}</Typography><Typography color="text.secondary" sx={{ display: "block", mt: "2px", fontSize: "9px", lineHeight: 1.3, textAlign: "right" }}>Pendiente</Typography></Paper></Box>)}
         {state === "ready" && visibleMessages.length === 0 && <Box sx={{ py: 6, textAlign: "center" }}><Typography fontWeight={700}>No hay mensajes con este término</Typography><Typography variant="body2" color="text.secondary">Prueba otra búsqueda.</Typography></Box>}
       </Stack>
     </Box>

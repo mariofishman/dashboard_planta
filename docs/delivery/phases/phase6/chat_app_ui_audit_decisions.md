@@ -1,7 +1,7 @@
 # Phase 6 — Chat UI audit and approved adaptation decisions
 
-**Status:** Decisions recorded for the next UI implementation pass; no implementation performed.
-**Date:** 2026-07-28
+**Status:** Approved chat-list and chat-detail corrections implemented and accepted with UI-only validation.
+**Date:** 2026-07-29
 **Scope:** React chat list and chat detail presentation and interaction only.
 
 ## Purpose
@@ -84,17 +84,18 @@ Alert age remains separate from the chip and is written as `Más antigua` or `Si
 
 - Add the `Fijadas` filter alongside `Todas` and `No leídas`.
 - Preserve result counts and pressed-state semantics.
+- Provide `Fijar conversación` and `Desfijar conversación` in a row overflow menu on desktop and keyboard, with an approximately half-second row long press on mobile. In Phase 6 this is UI-only presentation state; do not change backend authorization, persistence, or API contracts.
 - Do not show separate administrator scope controls for `Mis conversaciones` and `Todas las conversaciones` in the chat-list UI.
 - Do not add a second admin filter to compensate. The search box remains the discovery mechanism for conversations in the visible list.
 - This UI decision does not change the existing administrator authorization or server-side scope rules recorded in `business_rules.md`.
 
 ### Scrolling controls
 
-Implement the prototype behavior using the implementation's styling:
+Implement the approved pull-to-reveal behavior using the implementation's styling:
 
-- search and filter controls are visible at the top;
-- scrolling downward hides the controls to provide more room for rows;
-- scrolling upward toward the top restores them; and
+- search and filter controls begin immediately above the visible first conversation;
+- reaching the first conversation does not reveal them; the user must continue pulling downward to expose them;
+- their movement remains directly linked to scroll distance, without a separate timed hide/show transition; and
 - bottom navigation remains available.
 
 The implementation must include enough stable mock conversation rows and message activity to exercise the scroll behavior during UI review. This is presentation test data only and must not be treated as backend acceptance.
@@ -134,6 +135,17 @@ Use the prototype's compact WhatsApp-like message behavior in the implementation
 
 The MUI/design-system styling remains the source for colors, typography, borders, radius, and spacing values.
 
+The text-bubble element review approved on 2026-07-29 further resolves the presentation:
+
+- retain the responsive `92%` mobile and `76%` desktop maximum measure;
+- use `4px 34px 4px 9px` text-bubble padding;
+- use the selected semantic blue surface for outgoing messages;
+- retain `12px / 18px` message copy and a separate compact lower timestamp area;
+- render timestamps at `9px / 11.7px`;
+- keep quoted references contained at `100%` width with `6px 9px 6px 12px` inset;
+- identify quoted references with the approved short `3px × 16px` cyan marker; and
+- use `8px` vertical spacing between messages.
+
 ### Structured alert attachments
 
 Use the prototype alert object without redesigning its content model. The implementation version must include:
@@ -150,6 +162,18 @@ Use the prototype alert object without redesigning its content model. The implem
 - keyboard focusability and direct targeting from the open-alert summary.
 
 The implementation must not invent an unsupported external route. Identifiers remain the fallback until the Phase 10 navigation contract is approved.
+
+The element review approved on 2026-07-29 further resolves the attachment presentation:
+
+- use the narrower `min(92%, 440px)` alert-message measure;
+- retain the implementation's compact outer radius and title typography;
+- use nearly even outer padding, a soft danger attachment border, compact attachment radius, and low navy shadow;
+- keep status and code as compact rounded rectangles, add a danger dot to the written status, and leave age as uncapsuled text;
+- use muted navy for unresolved duration before two hours and deep danger from two hours onward, without changing alert label, code, lifecycle, or priority;
+- separate the micro fact capsules from the explanation with a light divider; and
+- keep both actions in equal side-by-side columns at every width, shortening visible narrow labels to `OT` and `Ver`.
+
+The reviewed prototype's `Abrir OT` wording maps to the existing identifier-copy action until Phase 10 authorizes a supported EmusaSoft route.
 
 ### Message actions
 
@@ -179,7 +203,7 @@ Implement quoted replies with:
 
 - original sender;
 - compact excerpt;
-- colored vertical rule;
+- short colored vertical marker;
 - subordinate visual treatment;
 - navigable scroll-to-source behavior; and
 - reply context in the composer.

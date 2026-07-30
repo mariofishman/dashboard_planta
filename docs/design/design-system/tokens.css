@@ -18,6 +18,7 @@
   --color-info: #007acc;
   --color-warning: #f97316;
   --color-danger: #e11d48;
+  --color-danger-deep: #b5143a;
 
   --color-chart-1: #007acc;
   --color-chart-2: #008a49;
@@ -75,6 +76,8 @@
   --semantic-color-lifecycle-resolved: var(--color-success);
   --semantic-color-lifecycle-open: var(--color-danger);
   --semantic-color-lifecycle-closed: var(--color-warning);
+  --semantic-color-unresolved-age-routine: var(--color-text-muted);
+  --semantic-color-unresolved-age-escalated: var(--color-danger-deep);
 
   --semantic-type-routine: var(--font-size-routine);
   --semantic-type-primary-data: var(--font-size-xs);

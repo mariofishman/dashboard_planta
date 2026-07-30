@@ -7,6 +7,9 @@ import {
   buildConversationRows,
   conversationScope,
   filterConversationRows,
+  setConversationPinned,
+  unresolvedAgeMinutes,
+  unresolvedAgeTone,
 } from "./chatUi.ts";
 
 test("administrators use the existing global conversation scope without a UI switch", () => {
@@ -17,6 +20,18 @@ test("administrators use the existing global conversation scope without a UI swi
 test("chat filters keep unread and pinned meanings separate", () => {
   assert.equal(filterConversationRows(UI_ONLY_CONVERSATION_FIXTURES, "unread", "").length, 4);
   assert.equal(filterConversationRows(UI_ONLY_CONVERSATION_FIXTURES, "pinned", "").length, 2);
+});
+
+test("pinning is presentation-only, immutable, and moves pinned conversations first", () => {
+  const original = UI_ONLY_CONVERSATION_FIXTURES.slice(0, 3);
+  const updated = setConversationPinned(original, "ui-demo-supervision", true);
+  assert.notEqual(updated, original);
+  assert.equal(original[1].pinned, false);
+  assert.deepEqual(updated.map((row) => row.id), ["ui-demo-production-p15", "ui-demo-supervision", "ui-demo-close"]);
+  assert.equal(filterConversationRows(updated, "pinned", "").length, 3);
+
+  const unpinned = setConversationPinned(updated, "ui-demo-production-p15", false);
+  assert.deepEqual(unpinned.map((row) => row.id), ["ui-demo-supervision", "ui-demo-close", "ui-demo-production-p15"]);
 });
 
 test("search covers conversation, sender, alert code, machine, and work order presentation fields", () => {
@@ -48,4 +63,12 @@ test("alert chips reserve semantic color for the alert code", () => {
   assert.equal(alertChipTone("Por vencer"), "warning");
   assert.equal(alertChipTone("Alerta"), "warning");
   assert.equal(alertChipTone("Error posible"), "possible");
+});
+
+test("alert-message age color changes only at the approved two-hour threshold", () => {
+  assert.equal(unresolvedAgeMinutes("1 h 59 min"), 119);
+  assert.equal(unresolvedAgeMinutes("2 h"), 120);
+  assert.equal(unresolvedAgeMinutes("2 h 14 min"), 134);
+  assert.equal(unresolvedAgeTone(119), "routine");
+  assert.equal(unresolvedAgeTone(120), "escalated");
 });
