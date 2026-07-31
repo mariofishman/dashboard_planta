@@ -2,7 +2,7 @@
 
 **Role:** Current Phase 6 execution and stage authority
 
-**Status:** In progress; Stages 1–3 complete; Stage 4 is next
+**Status:** In progress; Stages 1–4 complete; Stage 5 is next
 
 **Project sequencing authority:** [`../../../roadmap.md`](../../../roadmap.md)
 
@@ -18,7 +18,7 @@ The three prerequisite workstreams are complete within their separate scopes:
 
 They have not yet passed as one connected system. Phase 7 remains blocked until the Phase 6 exit gate passes.
 
-The three workstreams now coexist on `main`; completed Stage 3 inspected that combined baseline, and Stage 4 begins from the recorded handoff rather than from another parallel branch.
+The three workstreams now coexist on `main`. Stage 4 connected the separate source boundary and recorded its evidence; Stage 5 now validates the complete downstream path.
 
 ## Stage plan
 
@@ -27,13 +27,13 @@ The three workstreams now coexist on `main`; completed Stage 3 inspected that co
 | 1 — Stabilize requirements | Complete — 2026-07-29 | Audit A02, A03, A05 and define the redesigned laboratory and connected boundary. | Requirements and V2 specification recorded. |
 | 2 — Approve the standalone laboratory | Complete — 2026-07-31 | Review the V2 laboratory one test at a time. | All 34 valid tests pass and are user-approved; invalid/deferred recurrence cases remain explicitly excluded. |
 | 3 — Inspect the `test_database` handoff | Complete — 2026-07-31 | Verified the merged runtime, reset safeguards, readiness contract, credentials, Node driver access, and A02/A03/A05 source mappings. | **Ready with exact gaps.** The evidence, approved mappings, corrections, and Stage 4 gaps are recorded in the Stage 3 handoff. |
-| 4 — Connect the testing boundary | **Next** | Reconcile contracts and fixtures; connect `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; implement the accepted laboratory in `/dev/scenarios`. | Source actions change only `test_database`; complete polling produces the correct Monitor-owned state. |
-| 5 — Run connected acceptance | Not started | Execute business lifecycles and technical failure cases through routing, Dashboard, conversations, messages, and Chat UI. | A02, A03, and A05 satisfy the connected acceptance matrix without duplicate or unsafe state changes. |
+| 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected `/dev/scenarios` to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. |
+| 5 — Run connected acceptance | **Next** | Execute business lifecycles and technical failure cases through routing, Dashboard, conversations, messages, and Chat UI. | A02, A03, and A05 satisfy the connected acceptance matrix without duplicate or unsafe state changes. |
 | 6 — Finalize Phase 6 | Pending | Reconcile authority and implementation, document Phase 10 exclusions, complete the final audit, and retire the old operational source simulator. | The Phase 6 exit gate passes and the user accepts the integrated local result. |
 
-## Immediate next action — Stage 4
+## Immediate next action — Stage 5
 
-Use the [Stage 3 database handoff](./test_database_stage3_handoff.md) as the source boundary for Stage 4. Implement the missing A03 query contract, require readiness in both consumers, and connect only `alertas_fake` writes and Monitor read-only polling. Do not treat the local A02/A05 query evidence as Phase 10 production approval.
+Use the [Stage 4 handoff](./test_database_stage4_handoff.md) to execute the connected acceptance matrix through routing, Dashboard, conversations, messages, and Chat UI. Keep Aurora behavior, production authorization, production plans, load, and deployment in Phase 10.
 
 ## Supporting specifications and evidence
 
@@ -43,6 +43,7 @@ These documents support execution but do not define current project or stage sta
 - [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md) — Stage 2 standalone evidence.
 - [`test_database.md`](./test_database.md) — local MySQL safety, reset, commands, and validation evidence.
 - [`test_database_stage3_handoff.md`](./test_database_stage3_handoff.md) — final Stage 3 classification, driver/access evidence, approved source mappings, corrections, and exact Stage 4 gaps.
+- [`test_database_stage4_handoff.md`](./test_database_stage4_handoff.md) — connected source-boundary implementation, safeguards, and lifecycle evidence.
 - [`../../../product/product_definition.md`](../../../product/product_definition.md) — product boundaries and conversation policy.
 - [`../../../product/alert_catalog.md`](../../../product/alert_catalog.md) — alert rules and routing.
 - [`../../../product/ux_ui_decisions.md`](../../../product/ux_ui_decisions.md) — accepted screen and interaction decisions.

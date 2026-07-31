@@ -6,10 +6,14 @@ Run the complete application from the repository root so both the API and web se
 
 ```sh
 npm install
+npm run db:test-source:start
+npm run db:test-source:validate
 npm run dev
 ```
 
 The web app runs at <http://127.0.0.1:5173> and the local API runs at <http://127.0.0.1:3000>.
+
+Development uses the separate local `test_database` for scenario writes and read-only Monitor polling. Automated tests use the deterministic in-memory simulator unless `MONITOR_SCENARIO_SOURCE=test_database` is set explicitly.
 
 Choose a local test profile when the sign-in screen appears. Opening a direct link while signed out is safe: after signing in, the app keeps the requested URL.
 

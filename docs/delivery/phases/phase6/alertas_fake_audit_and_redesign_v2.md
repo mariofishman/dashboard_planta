@@ -671,11 +671,11 @@ The most likely V2 implementation mistakes are:
 - The approved A05 presentation uses only `Error` at `>= 30 minutes`; it has no pre-threshold `Por vencer` state. The executable contract now carries only the `Error` label and matches the existing incident predicate.
 - Preserve A03's exact 15-minute comparator and define real active, closed/cancelled, and first-consumption mappings in the versioned source contract. Approved authority evaluates A03 independently: A07 does not suppress A03, and both alerts may coexist when their separate conditions are true.
 
-Remaining executable and integration mismatches after the A02 authority reconciliation:
+Stage 4 resolution of the executable and integration mismatches:
 
 - the existing `/dev/scenarios` simulator still uses isolated per-rule scenario clocks, while V2 intentionally uses one shared factory experiment clock;
-- the A03 executable contract still requires `strongerA07` and suppresses A03 when it is true; the simulator, current `/dev/scenarios` UI, and their tests still expose and assert the same rejected behavior. Stage 4 must remove that evidence field and suppression predicate from the contract, adapter/simulator path, UI, fixtures, and tests, then verify that A03 and A07 are evaluated independently; and
-- the browser-local V2 prototype is not yet the application `/dev/scenarios` implementation and does not exercise `test_database`, the real adapter, Monitor PostgreSQL state, routing deliveries, Dashboard cards, or conversations.
+- Stage 4 removed `strongerA07` from the A03 contract, simulator path, UI, fixtures, and tests. A03 now evaluates independently from A07.
+- Stage 4 connected the application `/dev/scenarios` implementation to `test_database`, the read-only adapter, and Monitor incident state. Routing deliveries, Dashboard cards, conversations, messages, and Chat UI remain the Stage 5 acceptance scope.
 
 ## 11. Implementation handoff
 
@@ -687,6 +687,6 @@ Implementation must preserve the accepted standalone behavior, the authority cor
 
 This document remains the V2 blueprint. The standalone HTML laboratory now implements and demonstrates the synthetic UI, shared clock, scheduler, source actions, snapshots, incident lifecycle, integrity counters, and browser-local experiment archive described here. It does not simulate recurrence by rewriting completed source records. Its browser verification is recorded separately in `alertas_fake_v2_edge_case_test_report_v2.md`.
 
-The prototype is not evidence for the future database boundary. V2 schema migrations, the `test_database` writer, the read-only Monitor adapter, API authorization, real Dashboard and conversation integration, and production-scale behavior still require separate implementation and acceptance evidence.
+The prototype remains standalone evidence only. Stage 4 separately implemented and validated the `test_database` writer, read-only Monitor adapter, API authorization, and incident lifecycle. Real routing, Dashboard, conversation, message, and Chat UI acceptance remains in Stage 5; production-scale behavior remains in Phase 10.
 
 Section 10 now preserves the V1 audit facts, prior-control findings, validation scope, and Stage 2 decisions needed for future reference. The superseded predecessor is archived under `archive/docs/implementation/` and has no current authority.

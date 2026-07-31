@@ -1,5 +1,5 @@
 import type { DatabaseRuntime } from "@monitor/database";
-import type { DetectionRunner, ScenarioCase, ScenarioCorrection, ScenarioFault, ScenarioSourceRepository } from "@monitor/detection";
+import type { DetectionRunner, ScenarioCase, ScenarioCorrection, ScenarioFault, ScenarioSource } from "@monitor/detection";
 import type { DetectionQueryDefinition, DetectionSourceAdapter } from "@monitor/detection";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
@@ -14,7 +14,7 @@ const scenarioCode = (value: string, reply: FastifyReply): ScenarioCode | null =
 
 export async function scenarioRoutes(app: FastifyInstance, options: {
   database: DatabaseRuntime;
-  source: ScenarioSourceRepository;
+  source: ScenarioSource;
   runner: DetectionRunner;
   registry: Map<ScenarioCode, { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
 }): Promise<void> {

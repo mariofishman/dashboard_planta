@@ -89,7 +89,7 @@ npm run db:test-source:reset
 npm run db:test-source:stop
 ```
 
-`validate` is a non-mutating operational health check and remains usable after fake alerts change records. `validate-baseline` expects pristine reset data and includes rollback-only writer and denial probes. `driver-probe` requires readiness, refuses an active reset, and verifies both host-side application accounts through pinned `mysql2` without retaining writes. Reset runs baseline validation automatically. `query-plans` executes A02/A05 as real 1,000-row keyset pages through the Monitor account and saves local plans without printing rows.
+`validate` is a non-mutating operational health check and remains usable after fake alerts change records. `validate-baseline` expects pristine reset data and includes rollback-only writer and denial probes. `driver-probe` requires readiness, refuses an active reset, and verifies both host-side application accounts through pinned `mysql2` without retaining writes. Reset runs baseline validation automatically. `query-plans` executes A02/A03/A05 as real 1,000-row keyset pages through the Monitor account and saves local plans without printing rows.
 
 Reset refuses an inexact database name, non-loopback host, wrong port or Docker context, changed input, writable backup mount, unattested/stopped runtime, concurrent reset, insufficient disk, or missing `ALLOW_TEST_DATABASE_RESET=yes`.
 
@@ -105,8 +105,8 @@ The final guarded rebuild proved:
 - table engines, row formats, defaults, generated expressions, table/column collations, indexes and visibility, constraints, key mappings, foreign-key actions, checks, comments, and view definitions/security also match the repeatability metadata digest;
 - all 382 enum columns have the source-expected restored empty-value counts, including the 163 documented coercions confined to `empresa_banco_cuentas`;
 - all 111 views compile through Monitor;
-- A02 has 1,249 unique keys in two keyset pages; A05 has 838 unique keys in one page;
-- both MySQL plans use primary-key range scans and indexed `eq_ref` joins, with no full-table scan; and
+- A02 has 1,249 unique keys in two keyset pages; A03 has 7 unique keys in one page; A05 has 838 unique keys in one page;
+- all three MySQL plans use indexed access with no full-table scan; and
 - protected compressed and uncompressed backups have the same SHA-256.
 
 Versioned reconciliation digests:
@@ -119,10 +119,10 @@ table checksums:           a5df7f866bd4aad0f253fe0b7ee86801af3cf93b145d308fbd29a
 
 Two supplied tables intentionally lack primary keys: `centro_costo_usuario` and `documento_relaciones`. Their source unique constraints are preserved; no redesign was introduced.
 
-A03 tables and relationships are present. Stage 3 approved the OT identity, actual-start, closure, deletion, and machine mappings, but did not invent the missing first-valid-consumption predicate or timestamp. The executable A03 query contract remains an exact Stage 4 gap.
+A03 uses an active, nondeleted OT whose actual start is at least 15 minutes old and has no nondeleted material row with `cantidad_consumida > 0`. Any positive consumption prevents A03; zero, null, absent, or deleted consumption does not. This approved Stage 4 predicate is versioned in the A03 query contract and does not infer a first-consumption timestamp.
 
 ## Aurora and branch boundaries
 
 Local MySQL cannot prove Aurora replication, failover, managed credentials, replica lag, production authorization, production load, or production plans. These remain Phase 10 evidence.
 
-Stage 3 did not modify Monitor PostgreSQL, connect either application to the scheduler, change the chat UI, remove the synthetic simulator, or begin integrated A02/A03/A05 lifecycle testing.
+Stage 4 connected both application accounts through readiness/reset guards and the normal scheduler, while retaining the synthetic simulator until Stage 5 replacement acceptance. It validated incident lifecycle only; routing, Dashboard, conversation, message, and Chat UI acceptance remains in Stage 5.

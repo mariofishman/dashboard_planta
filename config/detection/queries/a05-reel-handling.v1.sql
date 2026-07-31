@@ -6,6 +6,9 @@ SELECT
   s.fecha_creacion AS sourceTimestamp,
   s.id_almacen AS warehouseId,
   s.id_ubicacion AS locationId,
+  CASE WHEN scale.id IS NULL THEN 0 ELSE 1 END AS weighed,
+  CASE WHEN ot.fecha_fin_ejecucion IS NULL THEN 0 ELSE 1 END AS sourceWorkOrderFinished,
+  CASE WHEN warehouse.id_equipo = ot.id_equipo THEN 0 ELSE 1 END AS movedFromMachine,
   CASE WHEN s.estado = 'CONFIRMAR_PESO' AND scale.id IS NULL THEN 1 ELSE 0 END AS notWeighed,
   CASE
     WHEN ot.fecha_fin_ejecucion IS NOT NULL

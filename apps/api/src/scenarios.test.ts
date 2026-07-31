@@ -148,9 +148,8 @@ it("exposes the threshold matrix, A05 reason variants, and isolated scenario clo
     }
   }
 
-  const suppressed = await prepare("A03", "suppressed_by_a07");
-  assert.equal(suppressed.sourceState.rows[0].strongerA07, true);
-  assert.equal(suppressed.sourceState.evaluation.status, "clear");
+  const rejectedSuppression = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/prepare", headers: manager, payload: { scenario: "suppressed_by_a07" } });
+  assert.equal(rejectedSuppression.statusCode, 400, "A07 must not suppress A03");
 
   const before = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios;
   const a02Cases = before.find((item: { ruleCode: string }) => item.ruleCode === "A02").supportedCases;
@@ -237,7 +236,7 @@ it("applies the complete persistent, duplicate, visible-integration, resolution,
   }
 });
 
-it("covers A02 transfer-end routing, A03 suppression, A05 reel routing, and the A02 movement handoff", async () => {
+it("covers A02 transfer-end routing, independent A03 evaluation, A05 reel routing, and the A02 movement handoff", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
 
@@ -250,10 +249,9 @@ it("covers A02 transfer-end routing, A03 suppression, A05 reel routing, and the 
   assert.equal(routing.json().requiredRoles.includes("machine_operator"), true);
 
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/prepare", headers: manager, payload: { scenario: "past_threshold" } });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/poll", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/prepare", headers: manager, payload: { scenario: "suppressed_by_a07" } });
-  const suppressed = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/poll", headers: manager });
-  assert.equal(suppressed.json().scenario.actualMonitor.latestIncident.lifecycle, "resolved");
+  const a03 = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/poll", headers: manager });
+  assert.equal(a03.json().scenario.actualMonitor.latestIncident.lifecycle, "open");
+  assert.equal(a03.json().scenario.sourceState.rows[0].strongerA07, undefined);
 
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/prepare", headers: manager, payload: { scenario: "past_threshold_produced" } });
   polled = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });

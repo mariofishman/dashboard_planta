@@ -39,17 +39,17 @@
       "productionDependencies": ["ES2-01 query approval", "ES2-02 read-only staging access"]
     },
     {
-      "code": "A03", "title": "Active OT without consumption after 15 minutes", "ruleVersion": "1.0.0",
-      "queryId": "a03-active-without-consumption", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
+      "code": "A03", "title": "Active OT without consumption after 15 minutes", "ruleVersion": "1.0.1",
+      "queryId": "a03-active-without-consumption", "queryVersion": "1.0.1-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId"], "classification": ["deadline", "deterministic"],
       "labels": ["Alerta"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"ordenes_trabajo","fields":["id","fecha_inicio_ejecucion","fecha_fin_ejecucion","solo_lectura_ingreso"],"evidence":"backup-confirmed"},
         {"source":"orden_trabajo_materiales","fields":["id","id_orden_trabajo","cantidad_consumida","fecha_creacion"],"evidence":"backup-confirmed"}
       ],
-      "requiredEvidence": ["workOrderId","active","elapsedMinutes","consumptionCount","strongerA07"],
+      "requiredEvidence": ["workOrderId","active","elapsedMinutes","consumptionCount"],
       "parameters": {"firstConsumptionMinutes":{"value":15,"unit":"minutes","status":"approved"}},
-      "predicate": {"all":[{"var":"active"},{"gte":[{"var":"elapsedMinutes"},{"param":"firstConsumptionMinutes"}]},{"eq":[{"var":"consumptionCount"},0]},{"not":{"var":"strongerA07"}}]},
+      "predicate": {"all":[{"var":"active"},{"gte":[{"var":"elapsedMinutes"},{"param":"firstConsumptionMinutes"}]},{"eq":[{"var":"consumptionCount"},0]}]},
       "reasonRules": [{"code":"no_first_consumption","when":{"eq":[{"var":"consumptionCount"},0]}}],
       "resolution": "The first valid consumption is recorded in a complete healthy cycle.",
       "correlations": ["Suppress A03 when A07 provides stronger evidence."],

@@ -13,7 +13,6 @@ export type ScenarioCase =
   | "at_threshold_not_weighed"
   | "at_threshold_still_at_machine"
   | "past_threshold"
-  | "suppressed_by_a07"
   | "past_threshold_not_weighed"
   | "past_threshold_still_at_machine"
   | "past_threshold_both"
@@ -49,10 +48,24 @@ export interface ScenarioStatus {
   };
 }
 
+export interface ScenarioSource {
+  supportedCases(code: string): ScenarioCase[];
+  reset(code: string): Promise<ScenarioStatus>;
+  trigger(code: string): Promise<ScenarioStatus>;
+  prepare(code: string, scenarioCase: string, action?: ScenarioAction): Promise<ScenarioStatus>;
+  correct(code: string, correction?: ScenarioCorrection): Promise<ScenarioStatus>;
+  recur(code: string): Promise<ScenarioStatus>;
+  advanceTime(code: string, minutes: number): Promise<ScenarioStatus>;
+  failNextPoll(code: string, fault: ScenarioFault): Promise<ScenarioStatus>;
+  consumeFault(code: ScenarioRuleCode): Promise<ScenarioFault | null>;
+  rows(code: ScenarioRuleCode): Promise<{ rows: Record<string, unknown>[]; sourceRevision: string }>;
+  status(code: string): Promise<ScenarioStatus>;
+}
+
 const codes: ScenarioRuleCode[] = ["A02", "A03", "A05"];
 const allowedCases: Record<ScenarioRuleCode, ScenarioCase[]> = {
   A02: ["clean_baseline", "before_threshold", "at_threshold", "past_threshold"],
-  A03: ["clean_baseline", "before_threshold", "at_threshold", "past_threshold", "suppressed_by_a07"],
+  A03: ["clean_baseline", "before_threshold", "at_threshold", "past_threshold"],
   A05: [
     "clean_baseline", "before_threshold_not_weighed", "before_threshold_still_at_machine", "before_threshold",
     "at_threshold_not_weighed", "at_threshold_still_at_machine", "at_threshold",
@@ -92,7 +105,7 @@ function evaluateSource(code: ScenarioRuleCode, rows: Record<string, unknown>[])
     return { status: triggered ? "triggered" as const : "clear" as const, reasons: triggered ? ["not_received"] : [] };
   }
   if (code === "A03") {
-    const triggered = row.active === true && Number(row.elapsedMinutes) >= 15 && Number(row.consumptionCount) === 0 && row.strongerA07 === false;
+    const triggered = row.active === true && Number(row.elapsedMinutes) >= 15 && Number(row.consumptionCount) === 0;
     return { status: triggered ? "triggered" as const : "clear" as const, reasons: triggered ? ["no_first_consumption"] : [] };
   }
   const reasons: string[] = [];
@@ -205,7 +218,7 @@ export class ScenarioSourceRepository {
         FROM monitor_sim_a03_work_order wo LEFT JOIN monitor_sim_a03_consumption c ON c.work_order_id=wo.work_order_id ORDER BY wo.work_order_id`);
       return { sourceRevision: `alertas_fake.${code}.v${clock.revision}`, rows: source.map((row) => ({
         workOrderId: Number(row.work_order_id), active: Boolean(row.active), elapsedMinutes: minutesSince(row.started_at, clock.currentAt),
-        consumptionCount: Number(row.consumption_count), strongerA07: Boolean(row.stronger_a07), scenarioContext: context(row),
+        consumptionCount: Number(row.consumption_count), scenarioContext: context(row),
       })) };
     }
     const source = await this.database.queryAll("SELECT * FROM monitor_sim_a05_reel ORDER BY article_serial_id");
@@ -252,12 +265,11 @@ export class ScenarioSourceRepository {
   private async prepareA03(executor: DatabaseExecutor, currentAt: string, scenarioCase: ScenarioCase) {
     const age = scenarioCase === "before_threshold" ? 14 : scenarioCase === "at_threshold" ? 15 : 16;
     const clean = scenarioCase === "clean_baseline";
-    const strongerA07 = scenarioCase === "suppressed_by_a07";
     await executor.execute(`INSERT INTO monitor_sim_a03_work_order
       (work_order_id,active,started_at,stronger_a07,work_order_code,machine_code,operation_name,shift_name,responsible_name)
       VALUES (4103,TRUE,$1,$2,'151056.1','P12','Impresión','Día','Operación de máquina')
       ON CONFLICT (work_order_id) DO UPDATE SET active=TRUE,started_at=EXCLUDED.started_at,stronger_a07=EXCLUDED.stronger_a07`,
-    [minutesBefore(currentAt, clean ? 20 : age), strongerA07]);
+    [minutesBefore(currentAt, clean ? 20 : age), false]);
     await executor.execute(`INSERT INTO monitor_sim_a03_consumption (work_order_id,consumption_count,first_consumption_at)
       VALUES (4103,$1,$2) ON CONFLICT (work_order_id) DO UPDATE SET consumption_count=EXCLUDED.consumption_count,first_consumption_at=EXCLUDED.first_consumption_at`,
     [clean ? 1 : 0, clean ? minutesBefore(currentAt, 5) : null]);
@@ -319,7 +331,7 @@ const query = (ruleCode: ScenarioRuleCode, queryId: string, keyField: string, re
 export function simulatorRegistry(source: ScenarioSourceRepository) {
   const definitions = [
     query("A02", "a02-reserved-material-in-transit", "materialFlowDetailId", ["materialFlowDetailId", "isWorkOrderReservation", "state", "receivedAt", "elapsedMinutes"]),
-    query("A03", "a03-active-without-consumption", "workOrderId", ["workOrderId", "active", "elapsedMinutes", "consumptionCount", "strongerA07"]),
+    query("A03", "a03-active-without-consumption", "workOrderId", ["workOrderId", "active", "elapsedMinutes", "consumptionCount"], "1.0.1-candidate"),
     query("A05", "a05-reel-handling", "articleSerialId", ["articleSerialId", "declaredAgeMinutes", "weighed", "sourceWorkOrderFinished", "movedFromMachine"], "1.0.1-candidate"),
   ];
   return definitions.map((definition) => ({ query: definition, adapter: new SimulatorSourceAdapter(source, definition.ruleCode as ScenarioRuleCode) }));

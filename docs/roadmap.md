@@ -16,7 +16,7 @@
 
 **Open integration register:** [EmusaSoft integration register](integrations/emusasoft/integration_register.md)
 
-**Current execution:** [Phase 6 stage plan](delivery/phases/phase6/README.md) — Stage 4 is next
+**Current execution:** [Phase 6 stage plan](delivery/phases/phase6/README.md) — Stage 5 is next
 
 ## 1. Why Version Three exists
 
@@ -85,7 +85,7 @@ Phase 5 remains complete. Its dynamic routing behavior will receive additional e
 
 ## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-**Status:** In progress. The conversation backend, validated local `test_database`, accepted chat UI, and approved standalone `alertas_fake` Stage 2 laboratory are complete within their separate scopes. Source-boundary connection and complete integration evidence remain.
+**Status:** In progress. The conversation backend, validated local `test_database`, accepted chat UI, standalone laboratory, and Stage 4 source-boundary connection are complete within their scopes. Complete routing, Dashboard, conversation, message, and Chat UI acceptance remains in Stage 5.
 
 **Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 

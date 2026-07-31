@@ -8,6 +8,9 @@
   "naturalKey": ["materialFlowDetailId"],
   "output": {
     "materialFlowDetailId": "integer",
+    "isWorkOrderReservation": "boolean",
+    "state": "string",
+    "receivedAt": "nullable-timestamp",
     "workOrderId": "integer",
     "workOrderMaterialId": "integer",
     "articleSerialId": "nullable-integer",

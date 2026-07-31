@@ -5,4 +5,5 @@ export * from "./repository.js";
 export * from "./runner.js";
 export * from "./scheduler.js";
 export * from "./simulator.js";
+export * from "./test-database.js";
 export * from "./types.js";
