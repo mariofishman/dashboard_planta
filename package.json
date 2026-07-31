@@ -25,6 +25,7 @@
     "db:test-source:reset": "ALLOW_TEST_DATABASE_RESET=yes ./scripts/test-database-reset.sh",
     "db:test-source:validate": "./scripts/test-database-validate.sh health",
     "db:test-source:validate-baseline": "./scripts/test-database-validate.sh baseline",
+    "db:test-source:driver-probe": "node scripts/test-database-driver-probe.mjs",
     "db:test-source:query-plans": "./scripts/test-database-query-plans.sh",
     "validate:alert-specification": "python3 .agents/skills/monitor-alert-rule-workflow/scripts/validate_alert_specification.py",
     "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts"

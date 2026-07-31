@@ -72,7 +72,7 @@ Only one reset can run at a time. Before dropping the database, reset removes re
 
 Monitor denial tests require MySQL access-denied error codes; unrelated SQL errors do not count. Monitor was denied `INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`, `SET GLOBAL`, `CREATE USER`, and `GRANT`. The writer passed insert/update/delete inside a rolled-back transaction. All 111 views compile as the Monitor account with `SELECT ... LIMIT 0`.
 
-Container client files use port 3306. Separate ignored `*.host.cnf` files use `127.0.0.1:3307` for the later merged application branches, and the host listener is reachable. Actual `alertas_fake` and Monitor driver tests are intentionally deferred until those branches merge, as agreed.
+Container client files use port 3306. Separate ignored `*.host.cnf` files use `127.0.0.1:3307` for host-side application access. Stage 3 added pinned `mysql2` driver access and proved writer DML in a rolled-back transaction, bounded A02/A05 reads through the parameterized text-query path, and a denied Monitor write through the host listener. The final classification and mappings are in [`test_database_stage3_handoff.md`](./test_database_stage3_handoff.md).
 
 Consumers added after merge must require readiness and must not poll during reset.
 
@@ -83,12 +83,13 @@ npm run db:test-source:start
 npm run db:test-source:status
 npm run db:test-source:validate
 npm run db:test-source:validate-baseline
+npm run db:test-source:driver-probe
 npm run db:test-source:query-plans
 npm run db:test-source:reset
 npm run db:test-source:stop
 ```
 
-`validate` is a non-mutating operational health check and remains usable after fake alerts change records. `validate-baseline` expects pristine reset data and includes rollback-only writer and denial probes. Reset runs baseline validation automatically. `query-plans` executes A02/A05 as real 1,000-row keyset pages through the Monitor account and saves local plans without printing rows.
+`validate` is a non-mutating operational health check and remains usable after fake alerts change records. `validate-baseline` expects pristine reset data and includes rollback-only writer and denial probes. `driver-probe` requires readiness, refuses an active reset, and verifies both host-side application accounts through pinned `mysql2` without retaining writes. Reset runs baseline validation automatically. `query-plans` executes A02/A05 as real 1,000-row keyset pages through the Monitor account and saves local plans without printing rows.
 
 Reset refuses an inexact database name, non-loopback host, wrong port or Docker context, changed input, writable backup mount, unattested/stopped runtime, concurrent reset, insufficient disk, or missing `ALLOW_TEST_DATABASE_RESET=yes`.
 
@@ -118,10 +119,10 @@ table checksums:           a5df7f866bd4aad0f253fe0b7ee86801af3cf93b145d308fbd29a
 
 Two supplied tables intentionally lack primary keys: `centro_costo_usuario` and `documento_relaciones`. Their source unique constraints are preserved; no redesign was introduced.
 
-A03 tables and relationships are present, but no A03 candidate query was invented because its active-state and consumption-timestamp contract is not approved in this branch.
+A03 tables and relationships are present. Stage 3 approved the OT identity, actual-start, closure, deletion, and machine mappings, but did not invent the missing first-valid-consumption predicate or timestamp. The executable A03 query contract remains an exact Stage 4 gap.
 
 ## Aurora and branch boundaries
 
 Local MySQL cannot prove Aurora replication, failover, managed credentials, replica lag, production authorization, production load, or production plans. These remain Phase 10 evidence.
 
-This branch does not modify Monitor PostgreSQL, connect either application, change the chat UI, remove the synthetic simulator, or begin integrated A02/A03/A05 lifecycle testing.
+Stage 3 did not modify Monitor PostgreSQL, connect either application to the scheduler, change the chat UI, remove the synthetic simulator, or begin integrated A02/A03/A05 lifecycle testing.

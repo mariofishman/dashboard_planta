@@ -311,8 +311,8 @@ export class SimulatorSourceAdapter implements DetectionSourceAdapter {
   }
 }
 
-const query = (ruleCode: ScenarioRuleCode, queryId: string, keyField: string, requiredFields: string[]): DetectionQueryDefinition => ({
-  queryId, ruleCode, queryVersion: "1.0.0-candidate", adapterKind: "simulator", keyField, requiredFields,
+const query = (ruleCode: ScenarioRuleCode, queryId: string, keyField: string, requiredFields: string[], queryVersion = "1.0.0-candidate"): DetectionQueryDefinition => ({
+  queryId, ruleCode, queryVersion, adapterKind: "simulator", keyField, requiredFields,
   intervalMs: 1_000, timeoutMs: 500, pageSize: 100, maxRows: 1_000, maxAttempts: 1, retryBaseMs: 10, enabled: true,
 });
 
@@ -320,7 +320,7 @@ export function simulatorRegistry(source: ScenarioSourceRepository) {
   const definitions = [
     query("A02", "a02-reserved-material-in-transit", "materialFlowDetailId", ["materialFlowDetailId", "isWorkOrderReservation", "state", "receivedAt", "elapsedMinutes"]),
     query("A03", "a03-active-without-consumption", "workOrderId", ["workOrderId", "active", "elapsedMinutes", "consumptionCount", "strongerA07"]),
-    query("A05", "a05-reel-handling", "articleSerialId", ["articleSerialId", "declaredAgeMinutes", "weighed", "sourceWorkOrderFinished", "movedFromMachine"]),
+    query("A05", "a05-reel-handling", "articleSerialId", ["articleSerialId", "declaredAgeMinutes", "weighed", "sourceWorkOrderFinished", "movedFromMachine"], "1.0.1-candidate"),
   ];
   return definitions.map((definition) => ({ query: definition, adapter: new SimulatorSourceAdapter(source, definition.ruleCode as ScenarioRuleCode) }));
 }

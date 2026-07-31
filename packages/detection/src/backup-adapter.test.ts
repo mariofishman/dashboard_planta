@@ -17,9 +17,9 @@ const snapshot = JSON.parse(
   queryResults: Record<"A02" | "A05", { rows: number }>;
 };
 
-const definitions: Array<{ code: "A02" | "A05"; file: string; key: string; expectedRows: number }> = [
-  { code: "A02", file: "a02-reserved-material-in-transit.v1.sql", key: "materialFlowDetailId", expectedRows: snapshot.queryResults.A02.rows },
-  { code: "A05", file: "a05-reel-handling.v1.sql", key: "articleSerialId", expectedRows: snapshot.queryResults.A05.rows },
+const definitions: Array<{ code: "A02" | "A05"; file: string; key: string; queryVersion: string; expectedRows: number }> = [
+  { code: "A02", file: "a02-reserved-material-in-transit.v1.sql", key: "materialFlowDetailId", queryVersion: "1.0.0-candidate", expectedRows: snapshot.queryResults.A02.rows },
+  { code: "A05", file: "a05-reel-handling.v1.sql", key: "articleSerialId", queryVersion: "1.0.1-candidate", expectedRows: snapshot.queryResults.A05.rows },
 ];
 
 describe("protected local backup adapters", { skip: !backupAvailable }, () => {
@@ -27,7 +27,7 @@ describe("protected local backup adapters", { skip: !backupAvailable }, () => {
     it(`${definition.code} uses bounded keyset pages with stable unique keys`, async () => {
       const sql = await readFile(resolve(root, "config/detection/queries", definition.file), "utf8");
       const query: DetectionQueryDefinition = {
-        queryId: definition.code.toLowerCase(), ruleCode: definition.code, queryVersion: "1.0.0-candidate",
+        queryId: definition.code.toLowerCase(), ruleCode: definition.code, queryVersion: definition.queryVersion,
         adapterKind: "backup", keyField: definition.key, requiredFields: [definition.key], intervalMs: 300_000,
         timeoutMs: 3_000, pageSize: 1_000, maxRows: 10_000, maxAttempts: 1, retryBaseMs: 1, enabled: true,
       };

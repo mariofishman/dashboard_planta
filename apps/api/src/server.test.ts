@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { resolve } from "node:path";
+import { join, resolve, sep } from "node:path";
 import { afterEach, describe, it } from "node:test";
 import { io as connectSocket } from "socket.io-client";
 import { createDatabaseRuntime } from "@monitor/database";
@@ -347,14 +346,20 @@ async function sourceFiles(directory: string): Promise<string[]> {
   }))).flat();
 }
 
-it("contains no EmusaSoft database driver, credential, or write integration", async () => {
+it("keeps the EmusaSoft driver isolated to detection and contains no credential or write integration", async () => {
   const root = resolve(import.meta.dirname, "../../..");
-  const applicationTree = [...await sourceFiles(resolve(root, "apps")), ...await sourceFiles(resolve(root, "packages"))];
-  const packageFiles = [resolve(root, "package.json"), ...applicationTree.filter((path) => path.endsWith("package.json"))];
-  const packages = (await Promise.all(packageFiles.map((path) => readFile(path, "utf8")))).join("\n");
-  assert.doesNotMatch(packages, /mysql2|@prisma\/client/);
+  const appsTree = await sourceFiles(resolve(root, "apps"));
+  const packagesTree = await sourceFiles(resolve(root, "packages"));
+  const detectionRoot = `${resolve(root, "packages/detection")}${sep}`;
+  const nonDetectionFiles = [...appsTree, ...packagesTree.filter((path) => !path.startsWith(detectionRoot))]
+    .filter((path) => path.endsWith("package.json") || (/\.(ts|tsx)$/.test(path) && !path.endsWith(".test.ts")));
+  const nonDetectionSource = (await Promise.all(nonDetectionFiles.map((path) => readFile(path, "utf8")))).join("\n");
+  assert.doesNotMatch(nonDetectionSource, /mysql2|@prisma\/client/);
 
-  const applicationFiles = applicationTree.filter((path) => /\.(ts|tsx)$/.test(path) && !path.endsWith(".test.ts"));
+  const detectionPackage = JSON.parse(await readFile(resolve(root, "packages/detection/package.json"), "utf8"));
+  assert.equal(detectionPackage.dependencies.mysql2, "3.23.2");
+
+  const applicationFiles = [...appsTree, ...packagesTree].filter((path) => /\.(ts|tsx)$/.test(path) && !path.endsWith(".test.ts"));
   const source = (await Promise.all(applicationFiles.map((path) => readFile(path, "utf8")))).join("\n");
   assert.doesNotMatch(source, /MONITOR_EMUSASOFT_WRITE|\/api\/emusa(?:soft)?\/(?:create|update|delete)/i);
 });
