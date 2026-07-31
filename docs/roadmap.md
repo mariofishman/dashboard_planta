@@ -184,6 +184,8 @@ A02, A03, and A05 must each prove:
 
 **Alert codes:** A01, B01, B02, B03, D01, D02, D03, and D04
 
+**Supporting preparation:** [`delivery/phases/phase7/alertas_fake_scenario_specification.md`](delivery/phases/phase7/alertas_fake_scenario_specification.md) is an empty per-alert preparation scaffold. It is not execution authority, Phase 7 status, or acceptance evidence.
+
 **Deliverables:**
 
 - production-quality evaluators for every assigned code;

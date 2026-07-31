@@ -1,0 +1,4 @@
+interface:
+  display_name: "Monitor Alert Rule Workflow"
+  short_description: "Audit one Monitor alert on its phase branch"
+  default_prompt: "Use $monitor-alert-rule-workflow for A01."
