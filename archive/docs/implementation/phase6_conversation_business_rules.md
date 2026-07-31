@@ -1,6 +1,8 @@
 # Phase 6 — Conversation business rules
 
-**Status:** Approved for local implementation on 2026-07-27
+> Historical approval record archived on 2026-07-31 after its durable rules were reconciled into `docs/product/product_definition.md`, `docs/architecture/system_architecture.md`, and `docs/product/ux_ui_decisions.md`.
+
+**Status:** Historical approved record; current rules live in the product definition and system architecture, with presentation behavior in the UX/UI decisions
 
 ## Conversation lifecycle
 

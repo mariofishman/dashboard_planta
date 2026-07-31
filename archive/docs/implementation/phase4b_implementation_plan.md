@@ -1,6 +1,8 @@
 # Phase 4B — Dynamic Local Source Validation Implementation Plan
 
-**Status:** Completed locally on 2026-07-23  
+> Historical Roadmap V2.1 implementation plan archived on 2026-07-31. Phase 4B completion evidence remains in `docs/delivery/phases/phase4b/README.md`; current sequencing lives in `docs/roadmap.md`.
+
+**Status:** Historical completed plan; superseded by Roadmap V3  
 **Roadmap version:** 2.1  
 **Estimated effort:** 3–5 working days  
 **Scope:** Phase 4B only. Phase 5 must not start.

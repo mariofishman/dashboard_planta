@@ -6,6 +6,8 @@ Starting commit: `95164e3`
 Test surface: `prototypes/current/alertas-fake-v2/index.html`
 Review status: Stage 2 complete and user-approved on 2026-07-31
 
+**Role:** Completed standalone Stage 2 evidence. It does not define current stage status; see [`README.md`](./README.md).
+
 ## 1. Purpose
 
 This report reruns the documented V2 scenario matrix after the prototype fixes. It is intentionally concise so each test can be reviewed with the user one at a time. The [archived first report](../../../../archive/docs/implementation/alertas_fake_v2_edge_case_test_report_v1.md) remains the pre-fix record.
@@ -133,4 +135,4 @@ Durable experiment history after reloading the standalone page is also not imple
 
 ## 8. Review order
 
-Review one test at a time in this order: SH-01 through SH-11, A02-00 through A02-09, A03-00 through A03-06, then A05-00 through A05-07. Resolve questions about the current test before advancing.
+The completed review proceeded one test at a time in this order: SH-01 through SH-11, A02-00 through A02-09, A03-00 through A03-06, then A05-00 through A05-08. Questions about each test were resolved before advancing.

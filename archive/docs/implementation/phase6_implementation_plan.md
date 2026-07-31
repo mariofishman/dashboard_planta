@@ -1,6 +1,8 @@
 # Phase 6 — Implementation plan
 
-**Status:** In progress; conversation, `test_database`, accepted chat UI, and approved `alertas_fake` Stage 2 workstreams implemented; Roadmap V3 integration pending
+> Historical record archived on 2026-07-31. Current project sequencing lives in `docs/roadmap.md`; current Phase 6 execution lives in `docs/delivery/phases/phase6/README.md`.
+
+**Status:** Historical; superseded by `docs/delivery/phases/phase6/README.md`
 
 ## Diagnosis
 

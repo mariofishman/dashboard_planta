@@ -7,7 +7,8 @@ window.ELEMENT_REVIEW_CONFIG = {
     { label: "Prototype structure", path: "prototypes/current/chat/chat-detail.html", kind: "observed local prototype markup" },
     { label: "Prototype styling", path: "prototypes/current/chat/chat-detail.css", kind: "observed local prototype CSS" },
     { label: "Design tokens", path: "docs/design/design-system/tokens.css", kind: "current design authority" },
-    { label: "Chat UI audit", path: "docs/delivery/phases/phase6/chat_app_ui_audit_decisions.md", kind: "current interaction authority" },
+    { label: "UX/UI decisions", path: "docs/product/ux_ui_decisions.md", kind: "current interaction authority" },
+    { label: "Accepted Chat UI audit", path: "archive/docs/implementation/phase6_chat_app_ui_audit_decisions.md", kind: "historical approval evidence" },
     { label: "Selected element", path: "Current Codex task", kind: "explicit user-supplied review target" },
   ],
   columns: [

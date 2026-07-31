@@ -8,13 +8,15 @@
 
 **Status:** Active; Phases 0–5 complete; Phase 6 in progress; Phase 7 is blocked by the Phase 6 exit gate
 
-**Roadmap date:** 2026-07-27
+**Roadmap date:** 2026-07-31
 
 **Supersedes:** [Version 2.1](../archive/docs/roadmaps/monitor_architecture_and_production_roadmap_v2.md)
 
 **Architecture:** [system architecture](architecture/system_architecture.md)
 
 **Open integration register:** [EmusaSoft integration register](integrations/emusasoft/integration_register.md)
+
+**Current execution:** [Phase 6 stage plan](delivery/phases/phase6/README.md) — Stage 3 is next
 
 ## 1. Why Version Three exists
 
@@ -34,7 +36,7 @@ Version Three preserves the completed work from Phases 0–5 and treats Phase 4B
 - **`alertas_fake`** — the development/test-only application that changes controlled source records in `test_database`. It never creates or changes Monitor incidents directly.
 - **Monitor database** — Monitor's independent PostgreSQL database containing incidents, routing, conversations, messages, audit, and other Monitor-owned state.
 
-The project currently documents `soft_database` as Aurora MySQL. The database engine and compatibility details must be confirmed with authoritative EmusaSoft evidence before `test_database` is provisioned. PostgreSQL remains the approved Monitor-owned database.
+The local `test_database` is provisioned as MySQL 8.0.43 from the protected backup and recorded compatibility evidence. Phase 10 must still confirm the current live Aurora engine, compatibility version, and material drift before production use. PostgreSQL remains the approved Monitor-owned database.
 
 ## 3. Strategy
 
@@ -114,7 +116,7 @@ The EmusaSoft MCP is useful for discovering entities, fields, types, relationshi
 
 The redesign covers only A02, A03, and A05.
 
-The standalone V2 laboratory and its documented browser matrix are implemented. [`delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) owns this workstream's detailed stage index; Stage 2 user review was completed and approved on 2026-07-31. The prototype is UI and business-rule evidence only and remains separate from the Stage 3–5 database and Monitor integration work.
+The standalone V2 laboratory and its documented browser matrix are implemented. The [Phase 6 execution README](delivery/phases/phase6/README.md) owns the current stage plan; [`alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) remains the supporting laboratory specification. Stage 2 user review was completed and approved on 2026-07-31. The prototype is UI and business-rule evidence only and remains separate from the Stage 3–5 database and Monitor integration work.
 
 For each scenario, define in simple business language:
 

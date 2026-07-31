@@ -24,6 +24,6 @@ Sources:
 - `prototypes/current/chat/chat-detail.css`
 - `docs/design/design-system/tokens.css`
 - `docs/product/ux_ui_decisions.md`
-- `docs/delivery/phases/phase6/chat_app_ui_audit_decisions.md`
+- `archive/docs/implementation/phase6_chat_app_ui_audit_decisions.md`
 
 Scope remains UI-only. No database, API contract, authorization, routing, polling, roster, realtime, attachment-storage, or EmusaSoft behavior changed.

@@ -1,8 +1,8 @@
 # `alertas_fake` experiment laboratory — redesign V2
 
-**Version:** 2.1 draft
+**Version:** 2.1 accepted Stage 2 specification
 
-**Status:** Stage 2 complete and user-approved on 2026-07-31; connected `test_database` boundary pending Stage 3
+**Role:** Supporting laboratory specification and preserved audit record; current execution status lives in [`README.md`](./README.md)
 
 **Scope:** A02, A03, and A05 only  
 
@@ -39,20 +39,9 @@ The required connected path remains:
 
 The standalone HTML prototype demonstrates the business workflow and interface only. It does not yet execute this connected path.
 
-## Workstream stage index and current status
+## Execution status
 
-These stages originated in the V1 audit and now live here as the current workstream index. They remain ordered unless an explicit decision changes the plan.
-
-| Stage | Status | Meaning and current evidence | Exit condition |
-| --- | --- | --- | --- |
-| 1. Stabilize the audit and redesign requirements | **Complete — 2026-07-29** | Audited A02, A03, A05, the previous `/dev/scenarios` controls, rule boundaries, lifecycle, routing, conversations, Dashboard integration, duplicate protection, and recurrence. The V1 findings were converted into the V2 blueprint. | V1 behavior and gaps are recorded; the V2 testing blueprint exists. |
-| 2. Review the redesigned laboratory with the user | **Complete — 2026-07-31** | The standalone V2 prototype is implemented. All 34 valid Stage 2 tests passed and were approved; two invalid recurrence scenarios and one deferred A05 recurrence scenario are excluded from acceptance. The corrected results are in [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md). | Met: the one-test-at-a-time review is complete and the standalone workflow is accepted for connected implementation. |
-| 3. Inspect the `test_database` handoff | **Not yet completed in this workstream** | Separate database work may exist, but this workstream has not yet inspected and classified its readiness. | Verify reset safeguards, source mappings, and separate writer/read-only credentials; classify the handoff as ready, ready with gaps, or unsafe to connect. |
-| 4. Connect the real testing boundary | **Not started** | The HTML prototype still uses browser-local records; the existing application still uses synthetic Monitor-side tables. | `alertas_fake` writes A02/A03/A05 source records only to `test_database`, and Monitor reads them through the normal read-only MySQL adapters. |
-| 5. Run connected acceptance scenarios | **Not started** | Standalone prototype results are UI/business-flow evidence, not connected acceptance. | Baseline, thresholds, persistence, failed/incomplete reads, correction, resolution, recurrence, reset, routing, Dashboard, conversations, and duplicate prevention pass through the connected boundary. |
-| 6. Finalize the workstream | **Pending** | Final reconciliation depends on Stages 3–5. | Record proved local behavior and Phase 10 exclusions, perform the final requirements audit, retire the synthetic operational boundary only after replacement acceptance, and present the final changes for review. |
-
-Stage 2 is complete. This acceptance covers the standalone laboratory and the business behavior represented by its 34 valid tests. It does not prove the `test_database`, adapter, PostgreSQL, routing, Dashboard, conversation, or production boundaries; those remain assigned to Stages 3–5.
+The ordered stage plan, current stage, immediate next action, and Phase 6 exit gate are maintained only in [`README.md`](./README.md). Stage 2 acceptance evidence remains in [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md). This document defines the accepted laboratory behavior and preserves the audit findings needed for implementation; it does not advance stage status.
 
 ## 2. Non-negotiable boundaries
 
@@ -688,17 +677,11 @@ Remaining executable and integration mismatches after the A02 authority reconcil
 - the A03 executable contract still requires `strongerA07` and suppresses A03 when it is true; the simulator, current `/dev/scenarios` UI, and their tests still expose and assert the same rejected behavior. Stage 4 must remove that evidence field and suppression predicate from the contract, adapter/simulator path, UI, fixtures, and tests, then verify that A03 and A07 are evaluated independently; and
 - the browser-local V2 prototype is not yet the application `/dev/scenarios` implementation and does not exercise `test_database`, the real adapter, Monitor PostgreSQL state, routing deliveries, Dashboard cards, or conversations.
 
-## 11. Remaining stage-aligned delivery sequence
+## 11. Implementation handoff
 
 The standalone implementation items previously listed here are complete in the V2 HTML prototype: shared clock, scheduler, snapshots, experiment archive, concurrent A02/A03/A05 records, incident detail, administrative closure, integrity counters, cancellation/rejection, and A05-to-A02 handoff. Recurrence is deliberately excluded from the laboratory UI. It is invalid for one specific A02 movement and one specific A03 OT, while no valid EmusaSoft source action has yet been identified for making a completed A05 record qualify again. The corrected prototype matrix is evidence only for that standalone scope.
 
-Remaining work follows the stage index above:
-
-1. **Stage 2 complete — 2026-07-31:** the corrected report's 34 valid tests passed and were user-approved. Two invalid recurrence scenarios and one deferred A05 recurrence scenario remain excluded for the reasons recorded in that report.
-2. **Execute Stage 3:** inspect the separate `test_database` work, verify guarded reset behavior and credentials, map the real A02/A03/A05 source fields, and record readiness or exact gaps.
-3. **Execute Stage 4:** reconcile versioned contracts and fixtures, implement required typed Monitor projections/observations and administrative-closure persistence, make `alertas_fake` write only `test_database`, and make Monitor read it through read-only MySQL adapters and the normal scheduler.
-4. **Execute Stage 5:** rerun the business matrix through the connected boundary and add automated incomplete-read, pagination, duplicate-key, source-revision, freshness, timeout, transport, cursor, and overlapping-poll evidence. Verify real routing, Dashboard, conversation, message, card, and idempotent repair behavior.
-5. **Execute Stage 6:** reconcile authority and implementation, document Phase 10 exclusions, complete the final requirement audit, and remove the old operational synthetic source boundary only after equivalent connected acceptance passes.
+Implementation must preserve the accepted standalone behavior, the authority corrections in Section 10.6, and the proof boundary below. The current order and exit conditions for database inspection, connection, connected acceptance, and finalization live only in [`README.md`](./README.md).
 
 ## 12. Current proof boundary
 

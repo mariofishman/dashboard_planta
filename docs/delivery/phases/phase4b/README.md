@@ -2,6 +2,10 @@
 
 **Status:** Complete locally on 2026-07-23
 
+**Role:** Historical completion evidence. Current project status and sequencing live in [`../../../roadmap.md`](../../../roadmap.md).
+
+**Historical implementation plan:** [`../../../../archive/docs/implementation/phase4b_implementation_plan.md`](../../../../archive/docs/implementation/phase4b_implementation_plan.md)
+
 ## What was delivered
 
 - A disposable PGlite source simulator for A02, A03, and A05 in isolated `monitor_sim_*` tables.
@@ -45,4 +49,4 @@
 
 Run the local application, sign in as **Gerencia de planta**, then open `/dev/scenarios`. This development-only screen changes synthetic source records. It does not connect to, read from, or write to EmusaSoft.
 
-Phase 5 has not started.
+At the time of this evidence, Phase 5 had not started. Current phase status is maintained only in the roadmap.

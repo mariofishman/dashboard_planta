@@ -38,5 +38,5 @@
 - `packages/design-system/src/index.ts`
 - `prototypes/current/chat/chat-list-final.html`
 - `docs/product/ux_ui_decisions.md`
-- `docs/delivery/phases/phase6/chat_app_ui_audit_decisions.md`
+- `archive/docs/implementation/phase6_chat_app_ui_audit_decisions.md`
 - Browser selection captured from this review on 2026-07-29.

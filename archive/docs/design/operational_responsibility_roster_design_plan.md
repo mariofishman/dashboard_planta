@@ -1,7 +1,9 @@
 # Operational Responsibility Roster — Design Execution Plan
 
+> Historical first-prototype planning record archived on 2026-07-31. Current product and interaction authority lives in `docs/product/product_definition.md` and `docs/product/ux_ui_decisions.md`; current project sequencing lives in `docs/roadmap.md`.
+
 **Spanish name:** Matriz Maestra de Responsables Operativos  
-**Status:** Proposed execution plan for the first prototype  
+**Status:** Historical; superseded as an active execution plan  
 **Date:** 2026-07-25  
 **Authority:** This plan follows `docs/product/product_definition.md`, `docs/product/ux_ui_decisions.md`, `docs/product/alert_catalog.md`, `docs/design/design.md`, the Monitor design tokens, and the accepted Dashboard V2 implementation in `apps/web/src/App.tsx`. It is not canonical product authority until the prototype is reviewed and the accepted decisions are consolidated into `docs/product/ux_ui_decisions.md`.
 
@@ -450,25 +452,25 @@ The screenshots below are research references, not implementation specifications
 
 Useful for the three-row `Rotación` view: short controls, familiar dates, visible schedule context, and a left rail that can be reduced to groups A, B, and C.
 
-![Deputy compact schedule overview](../../atlases/instances/operational-responsibility-roster/images/round-2/deputy-custom-shifts-1.jpg)
+![Deputy compact schedule overview](../../../atlases/instances/operational-responsibility-roster/images/round-2/deputy-custom-shifts-1.jpg)
 
 #### Compact shift editor
 
 Useful for the rotation-pattern or assignment surface. Keep the temporary editor small and show only fields required by the selected assignment scope. The roster replaces individual employees and payroll fields with worker group, operation, phase, effective dates, and recurrence.
 
-![Deputy compact shift editor](../../atlases/instances/operational-responsibility-roster/images/round-2/deputy-custom-shifts-2.jpg)
+![Deputy compact shift editor](../../../atlases/instances/operational-responsibility-roster/images/round-2/deputy-custom-shifts-2.jpg)
 
 #### Recurring schedule result
 
 Useful for showing that a saved group pattern has propagated across dates. The roster must make the result denser and reduce the primary rows to A, B, and C.
 
-![Deputy recurring shift result](../../atlases/instances/operational-responsibility-roster/images/round-2/deputy-custom-shifts-8.jpg)
+![Deputy recurring shift result](../../../atlases/instances/operational-responsibility-roster/images/round-2/deputy-custom-shifts-8.jpg)
 
 #### Saving a reusable pattern
 
 Useful only as evidence that a schedule can be named and reused. The roster must not reproduce the surrounding analytics, payroll data, or full scheduling application.
 
-![Deputy save schedule as template](../../atlases/instances/operational-responsibility-roster/images/round-2/deputy-template-2.jpg)
+![Deputy save schedule as template](../../../atlases/instances/operational-responsibility-roster/images/round-2/deputy-template-2.jpg)
 
 ### 13.3 Reference-level feedback
 

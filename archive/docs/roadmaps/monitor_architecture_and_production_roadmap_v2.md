@@ -98,7 +98,7 @@ The Phase 4 functional gate was accepted on 2026-07-21. Dashboard V2 was accepte
 
 **Purpose:** Prove that source changes, not prewritten incident rows, drive the complete alert lifecycle.
 
-**Implementation plan:** [`delivery/phases/phase4b/implementation_plan.md`](delivery/phases/phase4b/implementation_plan.md)
+**Implementation plan:** [`phase4b_implementation_plan.md`](../implementation/phase4b_implementation_plan.md)
 
 **Deliverables:**
 

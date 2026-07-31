@@ -2,6 +2,8 @@
 
 **Status:** Built, rebuilt, and deterministically validated locally on 2026-07-29.
 
+**Role:** Supporting database safety, operations, and validation record. It does not define current stage status; see [`README.md`](./README.md).
+
 ## Runtime and safety decision
 
 `test_database` runs in the official Linux ARM64 MySQL Community Server 8.0.43 image, pinned as `mysql@sha256:3e646bcda0d9448ffa3d2024eef04e1bca95528ec19b9e8b76749da9d97d4a10`.

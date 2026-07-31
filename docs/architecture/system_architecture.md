@@ -1,7 +1,7 @@
-# Monitor–EmusaSoft Integration Architecture
+# Monitor System and EmusaSoft Integration Architecture
 
-**Date:** 2026-07-23
-**Status:** approved integration architecture; supersedes the SSE transport decision recorded on 2026-07-19
+**Date:** 2026-07-31
+**Status:** approved system and integration architecture; supersedes the SSE transport decision recorded on 2026-07-19
 **Owner:** Monitor project lead
 **Counterpart:** EmusaSoft architecture
 
@@ -144,11 +144,24 @@ The existing Aurora read replica is Monitor's authoritative and most current ava
 - Detection, resolution, administrative closure, suppression creation/expiry, and recurrence are audit-logged.
 - Monitor has no queue, outbox, broker, adjustment API, document-request workflow, or EmusaSoft write path.
 
-## 11. External deliveries
+## 11. Conversation persistence, authorization, and delivery
+
+- The Monitor backend derives conversation membership and every realtime room from committed routing and membership state. A client cannot name or enter an unauthorized scope.
+- Access requires an active product identity and current conversation membership. Roster deactivation blocks product access; administrative membership changes are authorized and audited.
+- Conversation lists and message histories use server-side cursor pagination. Unbounded collections are never returned as one complete response.
+- Sender-scoped `clientCommandId` provides idempotent message submission. A successful acknowledgement is returned only after commit.
+- PostgreSQL is canonical for conversations, messages, receipts, membership, revisions, audit records, and durable change events. Redis, presence, and typing are ephemeral and cannot change durable history.
+- Committed messages and change events are ordered by server cursor. Reconnect recovery ignores already-applied cursors and must never silently skip a gap.
+- Offline submission preserves distinct pending, failed, committed, delivered, and read states without treating an uncommitted send as successful.
+- Attachment commands require server authorization, file-type and size validation, sanitization, malware-scanning integration points, and rate limits. Local storage remains replaceable by production object storage.
+- The browser never receives database, object-storage, or backend service credentials.
+- Local mock identity binding remains replaceable by the Phase 10 EmusaSoft identity contract without weakening authorization tests.
+
+## 12. External deliveries
 
 The current status, remaining evidence, ownership, and closure rules for every EmusaSoft and MCP dependency are maintained only in `docs/integrations/emusasoft/integration_register.md`.
 
-## 12. Confirmed decisions and Phase 0 validation
+## 13. Confirmed decisions and Phase 0 validation
 
 Confirmed on 2026-07-20:
 

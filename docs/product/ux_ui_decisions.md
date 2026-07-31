@@ -294,9 +294,7 @@ The selected direction is the **Familiar** concept because similarity to WhatsAp
 
 ### 5.2 Conversation creation and reuse
 
-Monitor creates group conversations only from incidents. Users cannot create standalone direct or group conversations, but they may communicate freely after an incident creates the group. One conversation may contain multiple incidents.
-
-Monitor reuses an existing conversation only when the new incident's resolved recipients exactly match its current active participants. A partial or overlapping match creates a different conversation. When all linked incidents close, the conversation remains writable for one hour and then becomes read-only; a later exactly matching incident reopens it.
+The conversation product policy is defined in `docs/product/product_definition.md`. The interface does not provide a standalone conversation-creation action. It displays incident-created conversations, their current participants, and their writable or read-only state.
 
 For a conversation:
 
@@ -755,7 +753,7 @@ The prototypes demonstrate interaction and information architecture. They do not
 - Prototype toasts simulate completion of some actions.
 - Ecosystem destinations other than Control de alertas are placeholders.
 - Prototype EmusaSoft navigation actions are illustrative only. Implementation may enable them only after the Phase 10 navigation contract passes; identifiers remain the fallback.
-- Authentication, authorization, message retention, moderation, audit, reporting, and attachment policies must follow the production architecture.
+- Authentication, authorization, message retention, moderation, audit, reporting, and attachment behavior must follow the product policy and system architecture.
 - Alert detection and routing must use canonical rules and deterministic ownership mappings.
 - Engineering phases do not represent separate product releases and do not change the four-screen product definition.
 - Monitor's closed-without-resolution view remains read-only; operational adjustments belong to EmusaSoft.
@@ -767,15 +765,13 @@ The following items are not yet fully decided and should not be inferred from th
 - formal priority and escalation rules;
 - conversation naming and whether participants may rename an automatically created group;
 - Operational Responsibility Roster information architecture, editing workflow, permissions, conflict resolution, and audit presentation;
-- moderation, deletion, and reporting authorization;
-- read receipts, delivery receipts, typing state, and presence requirements;
+- reporting permissions and any moderation behavior beyond the approved membership and sender-deletion rules;
 - maximum visible chips before overflow at each responsive width;
-- attachment size, file type, compression, retention, and privacy rules;
+- exact attachment size, file-type, compression, retention, and privacy limits within the approved validation boundary;
 - report formats, fields, permissions, and audit trail;
 - whether search is local, server-backed, or hybrid at production scale;
 - loading, stale-data, offline, reconnection, and partial-failure copy;
 - pagination or virtualization thresholds for long chat and dashboard histories;
-- notification channels outside Monitor; and
 - final translated terminology in English and Portuguese.
 
 ## 16. Implementation checklist

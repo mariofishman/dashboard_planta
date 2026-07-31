@@ -1,7 +1,7 @@
 # Monitor Product Definition
 
 **Status:** Canonical current-state summary
-**Last consolidated:** 2026-07-28
+**Last consolidated:** 2026-07-31
 
 This document is the primary entry point for the current Monitor product definition. Historical discovery and exploratory prototypes must not override it. Detailed documents remain authoritative only within the domains listed below.
 
@@ -40,6 +40,19 @@ The earlier dashboard-only product direction is superseded. Technical implementa
 - Incident lifecycle is separate from the alert label and contains exactly three user-visible states: open, resolved, and closed without resolution. Suppression and invalidation are internal evaluation dispositions, not incident states.
 - Alert recipients are selected deterministically from the alert code and reason.
 - The Operational Responsibility Roster resolves standardized positions to actual people. An LLM never selects operational recipients.
+
+## Conversation product policy
+
+- Monitor creates conversations only from incidents. Users cannot create standalone direct or group conversations, but participants may communicate normally after an incident creates the group.
+- One conversation may contain multiple incidents. Monitor reuses a conversation only when the new incident's resolved recipients exactly match its current active participant set; a partial or overlapping match creates a different conversation.
+- After every linked incident reaches a terminal state, the conversation remains writable for one hour and then becomes read-only. A later incident with the exact participant set reopens it.
+- A legitimately added participant remains after routine shift, group, operation, or assignment changes. Newly responsible workers are added without removing earlier legitimate participants.
+- Active administrators are included in active conversations, have one global list including historical conversations, and may add or remove active roster workers. Membership changes are audited and never remove existing messages.
+- A worker who becomes inactive or leaves the roster loses Monitor access. Returning to the roster does not reverse a prior manual conversation removal.
+- Conversations, messages, receipts, membership history, revisions, deletion tombstones, and audit history persist indefinitely.
+- A sender may edit their own message for 15 minutes. An authorized deletion leaves a visible tombstone while restricted audit history remains preserved.
+- Ordinary unread chat messages use in-app and browser/device push-style notifications, not email. Phase 5 routing-diagnostic email remains a separate operational notification.
+- Production limits and policies for attachments, moderation, reporting, and external notification infrastructure remain explicit later decisions; they must not weaken the approved local authorization and audit behavior.
 
 ## Documentation authority
 
@@ -86,6 +99,6 @@ The following files remain only for history or inspiration and have no current p
 
 - Design the Operational Responsibility Roster screen, workflow, permissions, conflict handling, and audit presentation.
 - Confirm unresolved alert formulas, tolerances, data mappings, and representative live evidence identified by the alert catalog and architecture roadmap.
-- Define production policies for identity, permissions, retention, attachments, moderation, reporting, offline behavior, and external notification channels.
+- Define the remaining production identity integration, permission provisioning, attachment limits, moderation and reporting rules, offline operating limits, and external notification infrastructure.
 
 Current phase status belongs only in `docs/roadmap.md`. The approved catalog contains 22 alerts; 21 have executable contracts and fixtures, while E05 remains pending implementation. The MCP exposes frontend route templates, but Monitor must use identifiers as the fallback until the Phase 10 base-URL, authorization, compatibility, and browser checks pass.

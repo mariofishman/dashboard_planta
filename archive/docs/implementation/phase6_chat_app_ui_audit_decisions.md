@@ -1,6 +1,8 @@
 # Phase 6 — Chat UI audit and approved adaptation decisions
 
-**Status:** Approved chat-list and chat-detail corrections implemented and accepted with UI-only validation.
+> Historical accepted audit archived on 2026-07-31. Current interaction authority is `docs/product/ux_ui_decisions.md`.
+
+**Status:** Historical accepted audit; current decisions live in `docs/product/ux_ui_decisions.md`.
 **Date:** 2026-07-29
 **Scope:** React chat list and chat detail presentation and interaction only.
 
@@ -87,7 +89,7 @@ Alert age remains separate from the chip and is written as `Más antigua` or `Si
 - Provide `Fijar conversación` and `Desfijar conversación` in a row overflow menu on desktop and keyboard, with an approximately half-second row long press on mobile. In Phase 6 this is UI-only presentation state; do not change backend authorization, persistence, or API contracts.
 - Do not show separate administrator scope controls for `Mis conversaciones` and `Todas las conversaciones` in the chat-list UI.
 - Do not add a second admin filter to compensate. The search box remains the discovery mechanism for conversations in the visible list.
-- This UI decision does not change the existing administrator authorization or server-side scope rules recorded in `business_rules.md`.
+- This UI decision did not change the administrator product policy or server-side enforcement rules now recorded in `docs/product/product_definition.md` and `docs/architecture/system_architecture.md`.
 
 ### Scrolling controls
 
