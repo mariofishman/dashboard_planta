@@ -32,6 +32,10 @@ test("detection-query contracts validate and reference read-only SQL", async () 
     assert.match(sql, /:after_id/);
     assert.match(sql, /:result_limit/);
     assert.doesNotMatch(sql, /\b(INSERT|UPDATE|DELETE|REPLACE|ALTER|DROP|CREATE|CALL|GRANT|REVOKE)\b/i);
+    if (filename === "a05.query.json") {
+      assert.match(sql, /scale\.id IS NULL/);
+      assert.doesNotMatch(sql, /fecha_fin_ejecucion\s*<=\s*:cutoff/);
+    }
   }
 });
 

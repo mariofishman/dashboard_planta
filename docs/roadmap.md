@@ -16,7 +16,7 @@
 
 **Open integration register:** [EmusaSoft integration register](integrations/emusasoft/integration_register.md)
 
-**Current execution:** [Phase 6 stage plan](delivery/phases/phase6/README.md) — Stage 3 is next
+**Current execution:** [Phase 6 stage plan](delivery/phases/phase6/README.md) — Stage 4 is next
 
 ## 1. Why Version Three exists
 

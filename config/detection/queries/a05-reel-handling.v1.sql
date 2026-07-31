@@ -9,7 +9,6 @@ SELECT
   CASE WHEN s.estado = 'CONFIRMAR_PESO' AND scale.id IS NULL THEN 1 ELSE 0 END AS notWeighed,
   CASE
     WHEN ot.fecha_fin_ejecucion IS NOT NULL
-      AND ot.fecha_fin_ejecucion <= :cutoff
       AND warehouse.id_equipo = ot.id_equipo
     THEN 1 ELSE 0
   END AS stillAtMachine
@@ -33,7 +32,6 @@ WHERE s.fecha_eliminacion IS NULL
     (s.estado = 'CONFIRMAR_PESO' AND scale.id IS NULL)
     OR (
       ot.fecha_fin_ejecucion IS NOT NULL
-      AND ot.fecha_fin_ejecucion <= :cutoff
       AND warehouse.id_equipo = ot.id_equipo
     )
   )
