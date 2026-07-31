@@ -1,6 +1,6 @@
 # Phase 6 — Implementation plan
 
-**Status:** In progress; conversation, `test_database`, and accepted chat UI workstreams implemented; Roadmap V3 integration pending
+**Status:** In progress; conversation, `test_database`, accepted chat UI, and approved `alertas_fake` Stage 2 workstreams implemented; Roadmap V3 integration pending
 
 ## Diagnosis
 
@@ -77,10 +77,10 @@ Baseline validation proves that this commit is a stable starting point. It does 
 - Explain material differences before changing the design.
 - Implement and validate only approved adaptations, using stable mock data where source integration is unavailable.
 
-### 8. Audit A02, A03, and A05 and redesign `alertas_fake`
+### 8. Completed review of the implemented A02, A03, and A05 `alertas_fake` redesign
 
-- Define each supported scenario in business language: starting state, tester action, source changes, expected poll, expected visible outcome, correction, recurrence, failure preservation, and reset.
-- Ensure `alertas_fake` changes only `test_database` and never writes Monitor incidents, conversations, or messages.
+- The standalone V2 laboratory and business-language scenario matrix are implemented. The one-test-at-a-time Stage 2 review was completed and approved on 2026-07-31; all 34 valid acceptance tests passed.
+- Preserve the connected boundary for the later integration step: `alertas_fake` changes only `test_database` and never writes Monitor incidents, conversations, or messages.
 
 ### 9. Integrate and validate
 

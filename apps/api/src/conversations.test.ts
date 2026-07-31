@@ -29,7 +29,8 @@ it("synchronizes one incident conversation across mock users, duplicates, reconn
   assert.equal(trigger.statusCode, 200, trigger.body);
   const advance = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
   assert.equal(advance.statusCode, 200, advance.body);
-  const incidentWorkerGroup = workerGroupForIncident(advance.json().simulatedAt, "Día");
+  const incidentAt = advance.json().scenarioClock.currentAt;
+  const incidentWorkerGroup = workerGroupForIncident(incidentAt, "Día");
   const roster = [
     assignment("manager", "María Torres", "Gerente de fábrica", "factory", null, [], null, 9001),
     assignment("supervisor-active", "Luis Vargas", "Supervisor de turno de operación", "operation_group", incidentWorkerGroup, ["Impresión"], null, 9002),
@@ -41,7 +42,7 @@ it("synchronizes one incident conversation across mock users, duplicates, reconn
   assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: roster } })).statusCode, 200);
   const poll = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
   assert.equal(poll.statusCode, 200, poll.body);
-  assert.equal(poll.json().scenario.simulatedAt, advance.json().simulatedAt);
+  assert.equal(poll.json().scenario.scenarioClock.currentAt, incidentAt);
   const managerList = (await instance.app.inject({ url: "/api/conversations", headers: manager })).json();
   assert.equal(managerList.conversations.length, 1);
   const conversationId = managerList.conversations[0].id as string;

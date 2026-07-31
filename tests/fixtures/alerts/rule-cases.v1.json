@@ -17,7 +17,7 @@
     {"id":"A04-clear","ruleCode":"A04","input":{"workOrderId":104,"consumedInputKg":1000,"declaredOutputKg":400,"declaredWasteKg":100,"rewinderCapacityKg":500,"toleranceKg":20},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"A04-insufficient","ruleCode":"A04","input":{"workOrderId":104,"consumedInputKg":1000,"declaredOutputKg":300,"declaredWasteKg":100,"toleranceKg":20},"expectedStatus":"insufficient","expectedReasons":[]},
 
-    {"id":"A05-trigger","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":31,"weighed":false,"sourceWorkOrderFinished":true,"movedFromMachine":false},"expectedStatus":"triggered","expectedReasons":["not_weighed","still_at_machine"]},
+    {"id":"A05-trigger-at-threshold","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":30,"weighed":false,"sourceWorkOrderFinished":true,"movedFromMachine":false},"expectedStatus":"triggered","expectedReasons":["not_weighed","still_at_machine"]},
     {"id":"A05-clear","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":31,"weighed":true,"sourceWorkOrderFinished":true,"movedFromMachine":true},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"A05-insufficient","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":31,"weighed":false,"sourceWorkOrderFinished":true},"expectedStatus":"insufficient","expectedReasons":[]},
 

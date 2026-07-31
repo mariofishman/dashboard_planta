@@ -1,6 +1,6 @@
 {
   "contractVersion": "1.0.0",
-  "catalogRevision": "2026-07-20",
+  "catalogRevision": "2026-07-31",
   "rules": [
     {
       "code": "A01", "title": "Required material not ready before OT start", "ruleVersion": "1.0.0",
@@ -25,14 +25,14 @@
       "productionDependencies": ["ES2-01 availability and dispatch mapping", "ES2-04 routing evidence"]
     },
     {
-      "code": "A02", "title": "Reserved OT material not received within 30 minutes", "ruleVersion": "1.0.0",
+      "code": "A02", "title": "Reserved OT material not received within 30 minutes", "ruleVersion": "1.0.1",
       "queryId": "a02-reserved-material-in-transit", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["materialFlowDetailId"], "classification": ["deadline", "deterministic"],
       "labels": ["Alerta"], "productionReadiness": "local-query-proven",
       "sourceMappings": [{"source":"flujo_materiales_detalles","fields":["id","id_orden_trabajo","id_orden_trabajo_material","estado","fecha_recepcion","fecha_creacion"],"evidence":"backup-confirmed"}],
       "requiredEvidence": ["materialFlowDetailId","isWorkOrderReservation","state","receivedAt","elapsedMinutes"],
       "parameters": {"transitMinutes":{"value":30,"unit":"minutes","status":"approved"}},
-      "predicate": {"all":[{"var":"isWorkOrderReservation"},{"eq":[{"var":"state"},"TRANSITO"]},{"eq":[{"var":"receivedAt"},null]},{"gt":[{"var":"elapsedMinutes"},{"param":"transitMinutes"}]}]},
+      "predicate": {"all":[{"var":"isWorkOrderReservation"},{"eq":[{"var":"state"},"TRANSITO"]},{"eq":[{"var":"receivedAt"},null]},{"gte":[{"var":"elapsedMinutes"},{"param":"transitMinutes"}]}]},
       "reasonRules": [{"code":"not_received","when":{"eq":[{"var":"receivedAt"},null]}}],
       "resolution": "A complete healthy cycle observes receipt, correction, or cancellation.",
       "correlations": ["Movement already in transit belongs to A02 rather than A05."],
@@ -75,10 +75,10 @@
       "productionDependencies": ["Rewinder capacity source and statistical tolerance confirmation"]
     },
     {
-      "code": "A05", "title": "Produced or remnant reel not weighed or moved", "ruleVersion": "1.0.0",
+      "code": "A05", "title": "Produced or remnant reel not weighed or moved", "ruleVersion": "1.0.2",
       "queryId": "a05-reel-handling", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["articleSerialId"], "classification": ["deadline", "deterministic"],
-      "labels": ["Por vencer", "Error"], "productionReadiness": "local-query-proven",
+      "labels": ["Error"], "productionReadiness": "local-query-proven",
       "sourceMappings": [
         {"source":"articulo_serial","fields":["id","fecha_creacion","id_orden_trabajo_origen","id_almacen","id_ubicacion","tipo"],"evidence":"backup-confirmed"},
         {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_neto"],"evidence":"backup-confirmed"},
@@ -87,10 +87,10 @@
       ],
       "requiredEvidence": ["articleSerialId","declaredAgeMinutes","weighed","sourceWorkOrderFinished","movedFromMachine"],
       "parameters": {"handlingMinutes":{"value":30,"unit":"minutes","status":"approved"}},
-      "predicate": {"any":[{"all":[{"gt":[{"var":"declaredAgeMinutes"},{"param":"handlingMinutes"}]},{"not":{"var":"weighed"}}]},{"all":[{"var":"sourceWorkOrderFinished"},{"gt":[{"var":"declaredAgeMinutes"},{"param":"handlingMinutes"}]},{"not":{"var":"movedFromMachine"}}]}]},
+      "predicate": {"any":[{"all":[{"gte":[{"var":"declaredAgeMinutes"},{"param":"handlingMinutes"}]},{"not":{"var":"weighed"}}]},{"all":[{"var":"sourceWorkOrderFinished"},{"gte":[{"var":"declaredAgeMinutes"},{"param":"handlingMinutes"}]},{"not":{"var":"movedFromMachine"}}]}]},
       "reasonRules": [
-        {"code":"not_weighed","when":{"all":[{"gt":[{"var":"declaredAgeMinutes"},{"param":"handlingMinutes"}]},{"not":{"var":"weighed"}}]}},
-        {"code":"still_at_machine","when":{"all":[{"var":"sourceWorkOrderFinished"},{"gt":[{"var":"declaredAgeMinutes"},{"param":"handlingMinutes"}]},{"not":{"var":"movedFromMachine"}}]}}
+        {"code":"not_weighed","when":{"all":[{"gte":[{"var":"declaredAgeMinutes"},{"param":"handlingMinutes"}]},{"not":{"var":"weighed"}}]}},
+        {"code":"still_at_machine","when":{"all":[{"var":"sourceWorkOrderFinished"},{"gte":[{"var":"declaredAgeMinutes"},{"param":"handlingMinutes"}]},{"not":{"var":"movedFromMachine"}}]}}
       ],
       "resolution": "Both weighing and required movement conditions pass in a complete healthy cycle.",
       "correlations": ["Use A02 once a movement has begun but remains unreceived."],

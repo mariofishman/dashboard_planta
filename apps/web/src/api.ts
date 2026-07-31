@@ -45,16 +45,31 @@ export interface ConversationMessage {
 
 export type ScenarioRuleCode = "A02" | "A03" | "A05";
 export type ScenarioFault = "timeout" | "source_error" | "partial" | "invalid_schema";
+export type ScenarioCase = "clean_baseline" | "before_threshold" | "at_threshold" | "past_threshold"
+  | "before_threshold_not_weighed" | "before_threshold_still_at_machine"
+  | "at_threshold_not_weighed" | "at_threshold_still_at_machine"
+  | "suppressed_by_a07" | "past_threshold_not_weighed" | "past_threshold_still_at_machine" | "past_threshold_both"
+  | "past_threshold_produced" | "past_threshold_remnant" | "movement_started";
 export interface ScenarioStatus {
   ruleCode: ScenarioRuleCode;
-  simulatedAt: string;
+  scenarioClock: { currentAt: string };
   sourceRevision: string;
+  selectedCase: string;
+  supportedCases: ScenarioCase[];
   lastAction: string;
   lastActionAt: string;
+  lastActionRecordedAt: string;
+  sourceChangedAt: string;
   pendingFault: ScenarioFault | null;
-  sourceState: { rowCount: number; rows: Record<string, unknown>[] };
-  latestPoll: { status: string; complete: boolean; fullEvaluation: boolean; errorCode: string | null; finishedAt: string } | null;
-  incident: { id: string; lifecycle: IncidentLifecycle; occurrence: number; openedAt: string; resolvedAt: string | null; updatedAt: string } | null;
+  sourceState: { rowCount: number; rows: Record<string, unknown>[]; evaluation: { status: "clear" | "triggered"; reasons: string[] } };
+  pollerState: { pendingFault: ScenarioFault | null; latestPoll: { status: string; sourceRevision: string | null; complete: boolean; fullEvaluation: boolean; errorCode: string | null; finishedAt: string } | null };
+  expectedResult: { sourceCondition: "clear" | "triggered"; reasons: string[]; awaitingPoll: boolean; nextPoll: string; incidentLifecycle: string | null; occurrence: number | null; expectedCounts: { incidents: number; openIncidents: number; conversationLinks: number; alertMessages: number }; dashboard: string; conversation: string };
+  actualMonitor: {
+    latestIncident: { id: string; lifecycle: IncidentLifecycle; occurrence: number; openedAt: string; resolvedAt: string | null; updatedAt: string } | null;
+    incidentCount: number; openIncidentCount: number; evidenceCount: number; routingDecisionCount: number; routingDeliveryCount: number;
+    conversationLinkCount: number; alertMessageCount: number; primaryRole: string | null;
+  };
+  comparison: { matches: boolean; mismatches: string[] };
   latestChangeCursor: number | null;
   detectionDelayMilliseconds: number | null;
 }
@@ -210,7 +225,7 @@ export async function scenarios(): Promise<ScenarioStatus[]> {
   return (await responseJson<{ scenarios: ScenarioStatus[] }>(await fetch("/api/dev/scenarios", { credentials: "include" }))).scenarios;
 }
 
-export async function scenarioAction(code: ScenarioRuleCode, action: "reset" | "trigger" | "correct" | "advance-time" | "fail-next-poll" | "poll", body?: Record<string, unknown>): Promise<ScenarioStatus> {
+export async function scenarioAction(code: ScenarioRuleCode, action: "reset" | "trigger" | "prepare" | "correct" | "advance-time" | "fail-next-poll" | "poll" | "recur", body?: Record<string, unknown>): Promise<ScenarioStatus> {
   const init: RequestInit = { method: "POST", credentials: "include" };
   if (body) { init.headers = { "content-type": "application/json" }; init.body = JSON.stringify(body); }
   const result = await responseJson<ScenarioStatus | { scenario: ScenarioStatus }>(await fetch(`/api/dev/scenarios/${code}/${action}`, init));

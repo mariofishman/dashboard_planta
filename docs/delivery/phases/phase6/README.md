@@ -1,11 +1,14 @@
 # Phase 6 — Conversations and messages
 
-**Status:** In progress; `test_database` and chat UI workstreams completed, integration pending
+**Status:** In progress; `alertas_fake` Stage 2, `test_database`, and chat UI workstreams completed; integration pending
 
 ## Authority
 
 - `business_rules.md` records the approved product rules.
 - `implementation_plan.md` records the implementation and validation plan.
+- [`alertas_fake_audit_and_redesign_v2.md`](./alertas_fake_audit_and_redesign_v2.md) owns the A02/A03/A05 workstream stages, preserved V1 audit summary, redesigned laboratory and architecture blueprint, and current stage status.
+- [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md) is the current standalone-prototype test report. It distinguishes passing prototype behavior from requirements deferred to the connected `test_database` and Monitor stack.
+- The [archived first test report](../../../../archive/docs/implementation/alertas_fake_v2_edge_case_test_report_v1.md) is historical pre-fix evidence only. Its failures and review gate are not current instructions.
 - `test_database.md` records the local MySQL runtime, deterministic reset process, safety boundary, and validation evidence.
 
 ## Existing baseline
@@ -21,9 +24,10 @@ The chat UI and local `test_database` workstreams are complete and validated wit
 
 ## Remaining Phase 6 work
 
-1. Audit A02, A03, and A05 and redesign `alertas_fake` in business language.
-2. Merge the completed workstreams, connect `alertas_fake` to `test_database`, and validate the complete source-to-dashboard-to-conversation path.
-3. Remove Monitor's operational synthetic source tables and simulator adapter only after the replacement path passes.
+1. In Stage 3, inspect the `test_database` handoff, guarded reset process, source mappings, and separate writer/read-only credentials.
+2. In Stage 4, connect `alertas_fake` to `test_database` and Monitor's normal read-only polling path.
+3. In Stage 5, validate A02, A03, and A05 through the complete source-to-dashboard-to-conversation path, including the accepted chat UI.
+4. Remove Monitor's operational synthetic source tables and simulator adapter only after the replacement path passes.
 
 ## Completion boundary
 

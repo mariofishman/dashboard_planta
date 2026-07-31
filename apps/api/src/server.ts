@@ -136,6 +136,17 @@ export async function buildMonitorServer(options: {
     const rule = incidentRules.get(query.ruleCode);
     if (!rule) return;
     await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt, contextFor: (row) => query.adapterKind === "simulator" ? scenarioContextFor(row) : ({ plantId: 1 }) });
+    const downstream = await database.queryAll(`SELECT i.id,i.lifecycle,i.plant_id AS "plantId"
+      FROM monitor_incident i
+      LEFT JOIN monitor_conversation_incident ci ON ci.incident_id=i.id
+      WHERE i.rule_code=$1 AND (
+        i.lifecycle='open'
+        OR (i.lifecycle<>'open' AND ci.incident_id IS NOT NULL AND ci.closed_at IS NULL)
+      )`, [query.ruleCode]);
+    for (const incident of downstream) {
+      if (incident.lifecycle === "open") await routeAndAttachConversation(String(incident.id), Number(incident.plantId));
+      else await conversationService.closeIncident(String(incident.id), observedAt);
+    }
   });
   const detectionScheduler = new DetectionScheduler(detectionRunner, 2);
   const fixtureSources = await loadFixtureRegistry(

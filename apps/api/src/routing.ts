@@ -25,6 +25,13 @@ const machineExecutionCodes = new Set([
 
 const includesAny = (reasons: string[], values: string[]) => values.some((value) => reasons.includes(value));
 
+export function primaryRoleFor(code: string, _evidence: Record<string, unknown> = {}): RoutingRole | null {
+  if (code === "A02") return "warehouse_dispatcher";
+  if (code === "A03") return "machine_operator";
+  if (code === "A05") return "process_operator";
+  return null;
+}
+
 /** Approved deterministic catalog mapping. Names are runtime roster results, never routing rules. */
 export function requiredRolesFor(code: string, reasons: string[] = [], evidence: Record<string, unknown> = {}): RoutingRole[] {
   const roles = new Set<RoutingRole>(["factory_manager", "operation_shift_supervisor", "technical_leader"]);
@@ -147,6 +154,7 @@ export class RoutingService {
     const evidence = jsonObject(evidenceRow.evidence);
     const reasons = jsonArray(incident.reasons);
     const roles = requiredRolesFor(String(incident.rule_code), reasons, evidence);
+    const primaryRole = primaryRoleFor(String(incident.rule_code), evidence);
     const plantId = Number(incident.plant_id);
     const operation = incident.operation_name ? String(incident.operation_name) : null;
     const incidentDate = dateKey(incident.opened_at);
@@ -157,9 +165,12 @@ export class RoutingService {
     const activeGroups = pattern ? groupsForShift(pattern, incidentDate, incident.shift_name ? String(incident.shift_name) : null, adjustments) : [];
     const rosterRevision = await this.database.queryOne("SELECT revision FROM monitor_roster_revision WHERE plant_id=$1", [plantId]);
     const exceptionRevision = await this.database.queryOne("SELECT COALESCE(MAX(updated_at),'epoch') AS updated_at FROM monitor_rotation_exception WHERE plant_id=$1", [plantId]);
-    const fingerprint = [incident.updated_at, rosterRevision.revision ?? 0, patternRow.revision ?? 0, calendarRow.revision ?? 0, exceptionRevision.updated_at].join("|");
-    const prior = await this.database.queryOne("SELECT id,status,resolved_recipients AS recipients,diagnostics FROM monitor_routing_decision WHERE incident_id=$1 AND incident_fingerprint=$2", [incidentId, fingerprint]);
-    if (prior.id) return { id: prior.id, status: prior.status, recipients: prior.recipients, diagnostics: prior.diagnostics, deduplicated: true };
+    const fingerprint = [incident.updated_at, JSON.stringify(reasons), JSON.stringify(roles), primaryRole ?? "",
+      evidence.reelKind ?? "", rosterRevision.revision ?? 0,
+      patternRow.revision ?? 0, calendarRow.revision ?? 0, exceptionRevision.updated_at].join("|");
+    const prior = await this.database.queryOne(`SELECT id,status,primary_role AS "primaryRole",resolved_recipients AS recipients,diagnostics
+      FROM monitor_routing_decision WHERE incident_id=$1 AND incident_fingerprint=$2`, [incidentId, fingerprint]);
+    if (prior.id) return { id: prior.id, status: prior.status, primaryRole: prior.primaryRole, recipients: prior.recipients, diagnostics: prior.diagnostics, deduplicated: true };
 
     const rosterRows = await this.database.queryAll(`SELECT a.id,a.sys_user_id,a.person_name,a.position,a.warehouse_type,a.worker_group,
       COALESCE(jsonb_agg(o.operation_name) FILTER (WHERE o.operation_name IS NOT NULL),'[]'::jsonb) AS operations
@@ -220,9 +231,9 @@ export class RoutingService {
     const status = diagnostics.some((item) => item.code === "conflicting_assignments") ? "conflict" : diagnostics.length ? "partial" : "complete";
 
     const decision = await this.database.queryOne(`INSERT INTO monitor_routing_decision
-      (incident_id,incident_fingerprint,status,required_roles,resolved_recipients,diagnostics)
-      VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb) RETURNING id`,
-    [incidentId, fingerprint, status, JSON.stringify(roles), JSON.stringify(deduplicated), JSON.stringify(diagnostics)]);
+      (incident_id,incident_fingerprint,status,primary_role,required_roles,resolved_recipients,diagnostics,evaluated_at)
+      VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,clock_timestamp()) RETURNING id`,
+    [incidentId, fingerprint, status, primaryRole, JSON.stringify(roles), JSON.stringify(deduplicated), JSON.stringify(diagnostics)]);
     for (const recipient of deduplicated) {
       await this.database.execute(`INSERT INTO monitor_notification_delivery
         (incident_id,routing_decision_id,recipient_key,recipient_name,channel,state,attempt_count,sent_at)
@@ -242,7 +253,7 @@ export class RoutingService {
           diagnostics.map((item) => item.detail).join(" ")]);
       }
     }
-    return { id: decision.id, status, recipients: deduplicated, diagnostics, deduplicated: false };
+    return { id: decision.id, status, primaryRole, recipients: deduplicated, diagnostics, deduplicated: false };
   }
 
   async markDeliveryFailed(incidentId: string, recipientKey: string, error: string) {
@@ -259,7 +270,7 @@ export class RoutingService {
   }
 
   async diagnostics(incidentId: string) {
-    const decision = await this.database.queryOne(`SELECT id,status,required_roles AS "requiredRoles",resolved_recipients AS recipients,
+    const decision = await this.database.queryOne(`SELECT id,status,primary_role AS "primaryRole",required_roles AS "requiredRoles",resolved_recipients AS recipients,
       diagnostics,evaluated_at AS "evaluatedAt" FROM monitor_routing_decision WHERE incident_id=$1 ORDER BY evaluated_at DESC LIMIT 1`, [incidentId]);
     if (!decision.id) return null;
     const deliveries = await this.database.queryAll(`SELECT recipient_key AS "recipientKey",recipient_name AS "recipientName",channel,state,
