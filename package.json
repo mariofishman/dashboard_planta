@@ -26,6 +26,7 @@
     "db:test-source:validate": "./scripts/test-database-validate.sh health",
     "db:test-source:validate-baseline": "./scripts/test-database-validate.sh baseline",
     "db:test-source:query-plans": "./scripts/test-database-query-plans.sh",
+    "validate:alert-specification": "python3 .agents/skills/monitor-alert-rule-workflow/scripts/validate_alert_specification.py",
     "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts"
   },
   "devDependencies": {
