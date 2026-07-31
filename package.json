@@ -28,7 +28,8 @@
     "db:test-source:driver-probe": "node scripts/test-database-driver-probe.mjs",
     "db:test-source:query-plans": "./scripts/test-database-query-plans.sh",
     "validate:alert-specification": "python3 .agents/skills/monitor-alert-rule-workflow/scripts/validate_alert_specification.py",
-    "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts"
+    "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts",
+    "validate:phase6-stage4": "tsx scripts/validate-phase6-stage4.ts"
   },
   "devDependencies": {
     "concurrently": "9.2.4"

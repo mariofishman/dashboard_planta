@@ -2,7 +2,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
 import { ConversationService, type ConversationParticipant } from "@monitor/conversations";
-import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry } from "@monitor/detection";
+import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry, TestDatabaseConnections, TestDatabaseScenarioRepository, testDatabaseContextFor, testDatabaseRegistry, type ScenarioSource } from "@monitor/detection";
 import { IncidentService, type IncidentChange, type RuleContract } from "@monitor/incidents";
 import Fastify from "fastify";
 import { readFile } from "node:fs/promises";
@@ -53,12 +53,12 @@ async function seedPhase4Incidents(service: IncidentService, repositoryRoot: str
     { plantId: 1, workOrderId: "1510873", workOrderCode: "151087.3", machineCode: "P15", operationName: "Impresión", shiftName: "Día", responsibleName: "Equipo de procesos" }, 134);
   await apply("A02", { materialFlowDetailId: 202, isWorkOrderReservation: true, state: "TRANSITO", receivedAt: null, elapsedMinutes: 38 },
     { plantId: 1, workOrderId: "1510873", workOrderCode: "151087.3", machineCode: "P15", operationName: "Impresión", shiftName: "Día", responsibleName: "Almacén de materia prima" }, 38);
-  await apply("A03", { workOrderId: 103, active: true, elapsedMinutes: 79, consumptionCount: 0, strongerA07: false },
+  await apply("A03", { workOrderId: 103, active: true, elapsedMinutes: 79, consumptionCount: 0 },
     { plantId: 1, workOrderId: "1510561", workOrderCode: "151056.1", machineCode: "P12", operationName: "Impresión", shiftName: "Día", responsibleName: "Operación de máquina" }, 79);
   if (!databaseWasEmpty) return;
-  await apply("A03", { workOrderId: 1510211, active: true, elapsedMinutes: 16, consumptionCount: 0, strongerA07: false },
+  await apply("A03", { workOrderId: 1510211, active: true, elapsedMinutes: 16, consumptionCount: 0 },
     { plantId: 1, workOrderId: "1510211", workOrderCode: "151021.1", machineCode: "CT04", operationName: "Corte", shiftName: "Tarde", responsibleName: "Operación de máquina" }, 1620);
-  await apply("A03", { workOrderId: 1510211, active: true, elapsedMinutes: 27, consumptionCount: 1, strongerA07: false },
+  await apply("A03", { workOrderId: 1510211, active: true, elapsedMinutes: 27, consumptionCount: 1 },
     { plantId: 1, workOrderId: "1510211", workOrderCode: "151021.1", machineCode: "CT04", operationName: "Corte", shiftName: "Tarde", responsibleName: "Operación de máquina" }, 1609);
   await apply("A02", { materialFlowDetailId: 688, isWorkOrderReservation: true, state: "TRANSITO", receivedAt: null, elapsedMinutes: 41 },
     { plantId: 1, workOrderId: "1510392", workOrderCode: "151039.2", machineCode: "CT04", operationName: "Corte", shiftName: "Día", responsibleName: "Almacén de materia prima" }, 3100);
@@ -131,11 +131,20 @@ export async function buildMonitorServer(options: {
   const ruleDocument = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
   const incidentRules = new Map<string, RuleContract>(ruleDocument.rules.filter((rule) => ["A02", "A03", "A05"].includes(rule.code)).map((rule) => [rule.code, rule]));
   const detectionRepository = new DetectionRepository(database);
-  const scenarioSource = config.enableScenarioLab ? new ScenarioSourceRepository(database) : null;
+  let testDatabaseConnections: TestDatabaseConnections | null = null;
+  let scenarioSource: ScenarioSource | null = null;
+  if (config.enableScenarioLab && config.scenarioSource === "test_database") {
+    testDatabaseConnections = await TestDatabaseConnections.create(repositoryRoot);
+    scenarioSource = await TestDatabaseScenarioRepository.create(testDatabaseConnections, database, repositoryRoot);
+  } else if (config.enableScenarioLab) {
+    scenarioSource = new ScenarioSourceRepository(database);
+  }
   const detectionRunner = new DetectionRunner(detectionRepository, new FixedBackupFreshnessProvider("phase1-fixtures.v1"), undefined, async ({ cycleId, query, rows, observedAt }) => {
     const rule = incidentRules.get(query.ruleCode);
     if (!rule) return;
-    await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt, contextFor: (row) => query.adapterKind === "simulator" ? scenarioContextFor(row) : ({ plantId: 1 }) });
+    await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt, contextFor: (row) => query.adapterKind === "simulator"
+      ? scenarioContextFor(row)
+      : query.adapterKind === "test_database" ? testDatabaseContextFor(row) : ({ plantId: 1 }) });
     const downstream = await database.queryAll(`SELECT i.id,i.lifecycle,i.plant_id AS "plantId"
       FROM monitor_incident i
       LEFT JOIN monitor_conversation_incident ci ON ci.incident_id=i.id
@@ -153,7 +162,11 @@ export async function buildMonitorServer(options: {
     resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"),
     resolve(repositoryRoot, "tests/fixtures/alerts/rule-cases.v1.json"),
   );
-  const scenarioSources = scenarioSource ? simulatorRegistry(scenarioSource) : [];
+  const scenarioSources = scenarioSource
+    ? config.scenarioSource === "test_database"
+      ? await testDatabaseRegistry(repositoryRoot, testDatabaseConnections!, scenarioSource as TestDatabaseScenarioRepository)
+      : simulatorRegistry(scenarioSource as ScenarioSourceRepository)
+    : [];
   const localDetectionSources = scenarioSource
     ? [...fixtureSources.filter(({ query }) => !["A02", "A03", "A05"].includes(query.ruleCode)), ...scenarioSources]
     : fixtureSources;
@@ -224,7 +237,7 @@ export async function buildMonitorServer(options: {
   app.get("/metrics", async (_request, reply) => reply.type("text/plain; version=0.0.4").send(prometheusMetrics(metrics)));
   app.get("/api/features", { preHandler: app.requireScopes(["monitor:read"]) }, async () => config.features);
   app.get("/api/diagnostics/source", { preHandler: app.requireScopes(["monitor:read"]) }, async () => ({
-    environment: "local-fixtures",
+    environment: config.scenarioSource === "test_database" ? "local-test-database" : "local-fixtures",
     productionConnected: false,
     sources: await detectionRepository.diagnostics(),
   }));
@@ -271,6 +284,7 @@ export async function buildMonitorServer(options: {
     io.close();
     await app.close();
     await database.close();
+    if (testDatabaseConnections) await testDatabaseConnections.close();
   };
   return { app, io, database, redis, config, close };
 }

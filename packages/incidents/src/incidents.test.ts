@@ -5,12 +5,12 @@ import { evaluateRule, IncidentService, type IncidentChange, type RuleContract }
 
 const a03: RuleContract = {
   code: "A03", title: "Active OT without consumption", naturalKey: ["workOrderId"],
-  requiredEvidence: ["workOrderId", "active", "elapsedMinutes", "consumptionCount", "strongerA07"],
+  requiredEvidence: ["workOrderId", "active", "elapsedMinutes", "consumptionCount"],
   parameters: { firstConsumptionMinutes: { value: 15 } },
-  predicate: { all: [{ var: "active" }, { gte: [{ var: "elapsedMinutes" }, { param: "firstConsumptionMinutes" }] }, { eq: [{ var: "consumptionCount" }, 0] }, { not: { var: "strongerA07" } }] },
+  predicate: { all: [{ var: "active" }, { gte: [{ var: "elapsedMinutes" }, { param: "firstConsumptionMinutes" }] }, { eq: [{ var: "consumptionCount" }, 0] }] },
   reasonRules: [{ code: "no_first_consumption", when: { eq: [{ var: "consumptionCount" }, 0] } }],
 };
-const triggered = { workOrderId: 103, active: true, elapsedMinutes: 15, consumptionCount: 0, strongerA07: false };
+const triggered = { workOrderId: 103, active: true, elapsedMinutes: 15, consumptionCount: 0 };
 const clear = { ...triggered, elapsedMinutes: 27, consumptionCount: 1 };
 const context = { plantId: 1, workOrderId: "103", workOrderCode: "151087.3", machineCode: "P15", operationName: "Impresión" };
 
@@ -18,7 +18,7 @@ describe("Phase 4 rule evaluation", () => {
   it("distinguishes triggered, clear, and insufficient evidence", () => {
     assert.deepEqual(evaluateRule(a03, triggered), { status: "triggered", reasons: ["no_first_consumption"], conditionKey: "A03:v1:103" });
     assert.equal(evaluateRule(a03, clear).status, "clear");
-    assert.equal(evaluateRule(a03, { ...triggered, strongerA07: undefined }).status, "insufficient");
+    assert.equal(evaluateRule(a03, { ...triggered, consumptionCount: undefined }).status, "insufficient");
   });
 });
 
@@ -60,7 +60,7 @@ describe("Phase 4 incident lifecycle", () => {
   });
 
   it("does nothing when evidence is insufficient", async () => {
-    const change = await service.apply({ rule: a03, evidence: { ...triggered, strongerA07: undefined }, context });
+    const change = await service.apply({ rule: a03, evidence: { ...triggered, consumptionCount: undefined }, context });
     assert.equal(change, null);
     assert.equal(Number((await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident")).count), 0);
   });

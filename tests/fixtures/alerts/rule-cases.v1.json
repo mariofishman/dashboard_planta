@@ -9,9 +9,9 @@
     {"id":"A02-clear","ruleCode":"A02","input":{"materialFlowDetailId":202,"isWorkOrderReservation":true,"state":"RECIBIDO","receivedAt":"2026-07-20T10:20:00Z","elapsedMinutes":20},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"A02-insufficient","ruleCode":"A02","input":{"materialFlowDetailId":202,"isWorkOrderReservation":true,"state":"TRANSITO","receivedAt":null},"expectedStatus":"insufficient","expectedReasons":[]},
 
-    {"id":"A03-trigger","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":15,"consumptionCount":0,"strongerA07":false},"expectedStatus":"triggered","expectedReasons":["no_first_consumption"]},
-    {"id":"A03-clear","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":27,"consumptionCount":1,"strongerA07":false},"expectedStatus":"clear","expectedReasons":[]},
-    {"id":"A03-insufficient","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":15,"consumptionCount":0},"expectedStatus":"insufficient","expectedReasons":[]},
+    {"id":"A03-trigger","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":15,"consumptionCount":0},"expectedStatus":"triggered","expectedReasons":["no_first_consumption"]},
+    {"id":"A03-clear","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":27,"consumptionCount":1},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A03-insufficient","ruleCode":"A03","input":{"workOrderId":103,"active":true,"elapsedMinutes":15},"expectedStatus":"insufficient","expectedReasons":[]},
 
     {"id":"A04-trigger","ruleCode":"A04","input":{"workOrderId":104,"consumedInputKg":1000,"declaredOutputKg":300,"declaredWasteKg":100,"rewinderCapacityKg":500,"toleranceKg":20},"expectedStatus":"triggered","expectedReasons":["capacity_exceeded"]},
     {"id":"A04-clear","ruleCode":"A04","input":{"workOrderId":104,"consumedInputKg":1000,"declaredOutputKg":400,"declaredWasteKg":100,"rewinderCapacityKg":500,"toleranceKg":20},"expectedStatus":"clear","expectedReasons":[]},

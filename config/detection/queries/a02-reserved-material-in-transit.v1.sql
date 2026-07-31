@@ -1,5 +1,8 @@
 SELECT
   f.id AS materialFlowDetailId,
+  1 AS isWorkOrderReservation,
+  f.estado AS state,
+  f.fecha_recepcion AS receivedAt,
   f.id_orden_trabajo AS workOrderId,
   f.id_orden_trabajo_material AS workOrderMaterialId,
   f.id_articulo_serial AS articleSerialId,

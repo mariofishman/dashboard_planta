@@ -23,7 +23,6 @@ const caseLabels: Record<ScenarioCase, string> = {
   at_threshold_not_weighed: "En el umbral: sin pesar",
   at_threshold_still_at_machine: "En el umbral: sigue en máquina",
   past_threshold: "Condición después del umbral",
-  suppressed_by_a07: "Suprimida por evidencia A07",
   past_threshold_not_weighed: "Después del umbral: sin pesar",
   past_threshold_still_at_machine: "Después del umbral: sigue en máquina",
   past_threshold_both: "Después del umbral: ambos motivos",
@@ -76,7 +75,7 @@ function sourceFacts(item: ScenarioStatus): Array<[string, string]> {
     ["Traslado", String(row.materialFlowDetailId ?? "—")], ["Estado", String(row.state ?? "—")], ["Minutos desde despacho", String(row.elapsedMinutes ?? "—")], ["Destino previsto", String(scenarioContext.machineCode ?? "—")], ["Recepción", row.receivedAt ? timestamp(String(row.receivedAt)) : "No registrada"],
   ];
   if (item.ruleCode === "A03") return [
-    ["OT", String(row.workOrderId ?? "—")], ["Activa", row.active ? "Sí" : "No"], ["Minutos activa", String(row.elapsedMinutes ?? "—")], ["Consumos válidos", String(row.consumptionCount ?? "—")], ["Evidencia A07 más fuerte", row.strongerA07 ? "Sí" : "No"],
+    ["OT", String(row.workOrderId ?? "—")], ["Activa", row.active ? "Sí" : "No"], ["Minutos activa", String(row.elapsedMinutes ?? "—")], ["Consumos válidos", String(row.consumptionCount ?? "—")],
   ];
   return [
     ["Bobina", String(row.articleSerialId ?? "—")], ["Tipo", reelKindLabels[String(row.reelKind)] ?? String(row.reelKind ?? "—")], ["Minutos declarada", String(row.declaredAgeMinutes ?? "—")], ["Pesada", row.weighed ? "Sí" : "No"], ["Fuera de máquina", row.movedFromMachine ? "Sí" : "No"],
@@ -135,7 +134,7 @@ export function ScenarioLab({ session, onLogout }: { session: SessionResponse; o
         <Box><Typography variant="h1">Escenarios A02, A03 y A05</Typography><Typography variant="body2" color="text.secondary">Cambia el origen, ejecuta el sondeo normal y compara el resultado esperado con Monitor.</Typography></Box>
         <Button size="small" startIcon={<RefreshRounded/>} onClick={() => void refresh()} disabled={loading}>Actualizar</Button>
       </Stack>
-      <Alert severity="warning" sx={{ mb: 1.5 }}>Solo desarrollo. Actualmente usa tablas fuente sintéticas; la frontera futura conserva este flujo y reemplaza esas tablas por test_database. Nunca modifica incidentes, rutas, conversaciones ni mensajes directamente.</Alert>
+      <Alert severity="warning" sx={{ mb: 1.5 }}>Solo desarrollo. Las acciones fuente cambian únicamente test_database; el sondeador normal de Monitor lee con una cuenta separada de solo lectura. Nunca modifica incidentes, rutas, conversaciones ni mensajes directamente.</Alert>
       {!canAdmin && <Alert severity="error">Este perfil no puede ejecutar escenarios. Inicia sesión como Gerencia de planta.</Alert>}
       {error && <Alert severity="error" sx={{ mb: 1.5 }}>{error}</Alert>}
       {loading && <Stack alignItems="center" sx={{ py: 4 }}><CircularProgress size={24}/></Stack>}
