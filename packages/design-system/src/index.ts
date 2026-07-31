@@ -33,6 +33,7 @@ export const monitorSemanticTokens = {
     surface: resolve<string>(semantic.color.surface),
     selected: resolve<string>(semantic.color.selected),
     border: resolve<string>(semantic.color.border),
+    controlBorder: resolve<string>(semantic.color.controlBorder),
     textPrimary: resolve<string>(semantic.color.textPrimary),
     textSecondary: resolve<string>(semantic.color.textSecondary),
     textInverse: resolve<string>(semantic.color.textInverse),
@@ -42,6 +43,8 @@ export const monitorSemanticTokens = {
     lifecycleResolved: resolve<string>(semantic.color.lifecycleResolved),
     lifecycleOpen: resolve<string>(semantic.color.lifecycleOpen),
     lifecycleClosed: resolve<string>(semantic.color.lifecycleClosed),
+    unresolvedAgeRoutine: resolve<string>(semantic.color.unresolvedAgeRoutine),
+    unresolvedAgeEscalated: resolve<string>(semantic.color.unresolvedAgeEscalated),
   },
   typography: {
     routine: resolve<string>(semantic.typography.routine),

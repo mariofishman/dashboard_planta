@@ -2,6 +2,8 @@
 
 This runbook applies to Monitor's disposable local PGlite database at `local-data/monitor/pglite`. It does not apply to the protected EmusaSoft backup, PostgreSQL staging, or production.
 
+The separate EmusaSoft-shaped MySQL source database is operated through the [Phase 6 `test_database` runbook](../phases/phase6/test_database.md).
+
 ## Safety rules
 
 1. Never copy, archive, synchronize, move, or restore a PGlite data directory while the API, a migration, a test, or any other process has it open.

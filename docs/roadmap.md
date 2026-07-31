@@ -22,7 +22,7 @@ Version Two guided the dynamic source laboratory, roster, routing, and initial c
 
 1. The Phase 4B laboratory changed synthetic source tables stored inside Monitor's own local database. That proved lifecycle behavior, but it did not adequately reproduce Monitor reading a separate foreign database with the same engine, schema, indexes, collations, and SQL behavior as EmusaSoft.
 2. The development scenario screen then in use was difficult to understand and did not provide the clear, business-level control and evidence required for acceptance. The standalone V2 laboratory has since been implemented and its Stage 2 user review was completed and approved on 2026-07-31. This acceptance does not prove the connected source boundary.
-3. The initial Phase 6 chat implementation does not have accepted visual parity with the approved chat-list and chat-detail prototypes.
+3. The initial Phase 6 chat implementation did not have accepted visual parity with the approved chat-list and chat-detail prototypes; the corrective UI workstream has since been implemented and accepted.
 
 Version Three preserves the completed work from Phases 0–5 and treats Phase 4B as historical. It expands Phase 6 to correct the local source boundary, rebuild the scenario laboratory, complete the conversation product, and establish the testing foundation used by Phases 7–9.
 
@@ -83,7 +83,7 @@ Phase 5 remains complete. Its dynamic routing behavior will receive additional e
 
 ## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-**Status:** In progress. Conversation backend work and the standalone `alertas_fake` V2 laboratory exist locally. Stage 2 laboratory acceptance was completed on 2026-07-31; source-boundary connection, chat UI acceptance, and complete integration evidence remain.
+**Status:** In progress. The conversation backend, validated local `test_database`, accepted chat UI, and approved standalone `alertas_fake` Stage 2 laboratory are complete within their separate scopes. Source-boundary connection and complete integration evidence remain.
 
 **Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 

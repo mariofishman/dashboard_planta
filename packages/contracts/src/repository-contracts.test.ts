@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import test from "node:test";
 import Ajv2020Module from "ajv/dist/2020.js";
@@ -102,13 +103,20 @@ test("implemented alert contracts validate and reproduce all fixtures", async ()
   );
 });
 
-test("backup-confirmed fields match the protected local schema", async () => {
+test("backup-confirmed fields match the protected local schema", async (context) => {
   const snapshot = await json("config/integrations/emusasoft-local-snapshot.json") as { dumpFile: string };
+  const dumpPath = resolve(root, snapshot.dumpFile);
+  try {
+    await access(dumpPath, constants.R_OK);
+  } catch {
+    context.skip(`Protected local backup is unavailable: ${snapshot.dumpFile}`);
+    return;
+  }
   const output = execFileSync(
     "python3",
     [
       resolve(root, "scripts/phase1/validate-source-mappings.py"),
-      "--dump", resolve(root, snapshot.dumpFile),
+      "--dump", dumpPath,
       "--contracts", resolve(root, "config/alerts/alert-rules.v1.json"),
     ],
     { cwd: root, encoding: "utf8" },
