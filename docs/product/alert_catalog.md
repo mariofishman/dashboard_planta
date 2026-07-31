@@ -49,7 +49,7 @@ For the A01 exception described during review, material may have been physically
 |---|---|
 | A01 | Reserve, confirm availability, and dispatch; otherwise reschedule. If the material was already used outside the ERP and the history cannot be reconstructed safely, close the correlated chain without resolution. |
 | A02 | Record the real receipt, or correct, cancel, or reject the movement. If the old handoff cannot be reconstructed from source records, close without resolution with the last recorded movement state and destination; do not infer physical arrival or location. |
-| A03 | Close automatically when the first valid consumption is declared. Consumption remains editable while `WorkOrder.readOnlyInput = false`; after input lock, preserve an unreconstructable condition without inventing consumption. |
+| A03 | Close automatically when the first valid consumption is declared or when the OT closes or is cancelled without consumption. An open OT permits consumption input; closing the OT blocks further input. Preserve an unreconstructable condition without inventing consumption. |
 | A04 | Declare missing output or correct input, output, waste, or weight. Close a verified false positive without resolution with physical evidence. |
 | A05 | Weigh and move the reel or correct the scale/barcode/movement record. If the reel is no longer traceable, close without resolution with its last known location. |
 | A06 | Declare or weigh waste and correct its category. If the missing quantity cannot be recovered, close without resolution and link the resulting D03 gap. |
@@ -122,11 +122,11 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 | Possible causes | Machine setup took longer than expected, or the operator has not yet declared the first reel. |
 | Example | OT 151087.3 starts at 09:00 and still has zero consumption at 09:15. Its first valid consumption is declared at 09:27, so the warning closes automatically. |
 
-**Detection indicators and algorithm:** Open the warning when `OT active`, `current time - actual start >= 15 minutes`, and `consumption count = 0`. Close it immediately when the first valid consumption is recorded, even after 20 or 30 minutes. Do not open or retain A03 when stronger A07 evidence shows that produced output requires more input than has been declared.
+**Detection indicators and algorithm:** Open the warning when `OT active`, `current time - actual start >= 15 minutes`, and `consumption count = 0`. Close it immediately when the first valid consumption is recorded, even after 20 or 30 minutes, or when the OT closes or is cancelled without consumption. A03 is evaluated from OT activity and first-consumption state; another alert does not suppress it. EmusaSoft permits only one active OT per machine at a time, so concurrent A03 records must belong to different machines.
 
 **Primary action owner:** **machine operator**.
 
-**Resolution:** Close automatically when the first valid consumption is declared. A consumption correction is permitted while `WorkOrder.readOnlyInput = false`. Once `readOnlyInput = true`—normally after OT closure or finalization—the input is locked. The ERP catalog exposes this flag but does not identify the exact backend transition that sets it. If locked history cannot be reconstructed, close without resolution and link A07, D01, or D03 rather than inventing consumption.
+**Resolution:** Close automatically when the first valid consumption is declared or when the OT closes or is cancelled without consumption. EmusaSoft permits consumption declarations while the OT is open; closing or finalizing the OT blocks further input. The technical mapping to `WorkOrder.readOnlyInput` must be verified against the deployed system in Phase 10, but the business rule is not optional in the laboratory: an active, open OT must not be presented as independently blocked. If closed history cannot be reconstructed, close without resolution rather than inventing consumption.
 
 
 ### A04 — Possible undeclared produced reel
@@ -150,8 +150,12 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 ### A05 — Produced or remnant reel not weighed or not moved from the machine
 
-**Alert label:** Presentation decision pending. The catalog previously said `Por vencer → Error`, but no pre-threshold `Por vencer` window is defined. Do not infer or implement a warning window until the pending business decision is recorded.
+**Alert label:** Error
 **Scope:** Produced- and remnant-reel handling
+
+**Presentation decision — 2026-07-31:** A05 has no pre-threshold `Por vencer` state. Before 30 minutes the condition is normal. At 30 elapsed minutes, an unmet weighing or movement condition becomes `Error` and creates or updates the A05 incident.
+
+**Product decision — 2026-07-31:** Keep A05 as one incident per reel rather than splitting weighing and movement into separate alerts. Present `not_weighed` and `still_at_machine` as two independently clearing checklist items; resolve A05 only when neither reason remains. Reconsider splitting only if the reasons later acquire different owners, thresholds, escalation paths, or closure rules.
 
 **Remnant-reel scope:** A05 uses the same declaration, weighing, labeling, and movement logic for produced reels and remnant raw-material reels. A partially consumed input reel must be declared with its remaining kilograms, weighed, labeled or ticketed, and returned to the raw-material warehouse. The 30-minute weighing and movement checks do not change.
 
@@ -162,7 +166,7 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 | Possible causes | Process-team delay, missed weighing, missing scale record, failure to initiate the next movement, or failure to record that movement. |
 | Example | CU-98421 was declared at 10:00. At 10:31 it has no weight and remains at P15. The dashboard shows one incident with reasons `not_weighed` and `still_at_machine`. |
 
-**Detection indicators and algorithm:** Maintain one incident per produced or remnant reel. These are **OR conditions**, not AND conditions. Add `not_weighed` when 30 minutes have elapsed since the reel declaration and no scale record exists. Independently add `still_at_machine` when the source OT is finished, 30 minutes have elapsed, and no movement to the required warehouse or next OT exists. The incident may contain either reason or both. If movement has begun but is not received within 30 minutes, use `A02` rather than creating another incident.
+**Detection indicators and algorithm:** Maintain one incident per produced or remnant reel. These are **OR conditions**, not AND conditions. Add `not_weighed` when 30 minutes have elapsed since the reel declaration and no scale record exists. Independently add `still_at_machine` when the source OT is finished, 30 minutes have elapsed, and no movement to the required warehouse or next OT exists. The incident may contain either reason or both. Closing the source OT does not resolve A05 and does not prevent a later valid weighing or movement; A05 resolves only when neither reason remains. If movement has begun but is not received within 30 minutes, use `A02` rather than creating another incident.
 
 **Primary action owner:** **Process operator** for both `not_weighed` and `still_at_machine`. For a remnant reel, the warehouse dispatcher or sender is additionally notified as its receiving position.
 
@@ -195,7 +199,7 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 | Possible causes | Missing consumption declaration, incorrect output weight or estimate, incorrect waste amount, or output associated with the wrong OT. |
 | Example | Two produced reels are estimated at 350 kg each, or about 700 kg total, while the OT records only 500 kg of raw-material consumption. The unexplained 200 kg indicates possible undeclared consumption. |
 
-**Detection indicators and algorithm:** Calculate `required input evidence = actual or estimated good-output mass + actual or estimated waste mass` and `consumption gap = required input evidence - declared input consumption`. Open A07 when the gap exceeds the configured tolerance. Prefer actual scale weights. For unweighed reels, estimate mass from meters, width, basis weight, and comparable weighed reels. Statistical evidence creates a possible error; actual verified weights can confirm an error. Suppress A03 when A07 supplies the stronger explanation. At OT closure, link or merge A07 with D03 instead of creating duplicate incidents.
+**Detection indicators and algorithm:** Calculate `required input evidence = actual or estimated good-output mass + actual or estimated waste mass` and `consumption gap = required input evidence - declared input consumption`. Open A07 when the gap exceeds the configured tolerance. Prefer actual scale weights. For unweighed reels, estimate mass from meters, width, basis weight, and comparable weighed reels. Statistical evidence creates a possible error; actual verified weights can confirm an error. A07 is evaluated independently from A03. At OT closure, link or merge A07 with D03 instead of creating duplicate incidents.
 
 **Primary action owner:** **machine operator**.
 

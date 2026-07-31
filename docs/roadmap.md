@@ -21,7 +21,7 @@
 Version Two guided the dynamic source laboratory, roster, routing, and initial conversation implementation. Review of that work identified three corrections that materially change the remaining sequence:
 
 1. The Phase 4B laboratory changed synthetic source tables stored inside Monitor's own local database. That proved lifecycle behavior, but it did not adequately reproduce Monitor reading a separate foreign database with the same engine, schema, indexes, collations, and SQL behavior as EmusaSoft.
-2. The development scenario screen then in use was difficult to understand and did not provide the clear, business-level control and evidence required for acceptance. The standalone V2 laboratory has since been implemented; its Stage 2 user review is still in progress, and it does not prove the connected source boundary.
+2. The development scenario screen then in use was difficult to understand and did not provide the clear, business-level control and evidence required for acceptance. The standalone V2 laboratory has since been implemented and its Stage 2 user review was completed and approved on 2026-07-31. This acceptance does not prove the connected source boundary.
 3. The initial Phase 6 chat implementation does not have accepted visual parity with the approved chat-list and chat-detail prototypes.
 
 Version Three preserves the completed work from Phases 0–5 and treats Phase 4B as historical. It expands Phase 6 to correct the local source boundary, rebuild the scenario laboratory, complete the conversation product, and establish the testing foundation used by Phases 7–9.
@@ -83,7 +83,7 @@ Phase 5 remains complete. Its dynamic routing behavior will receive additional e
 
 ## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-**Status:** In progress. Conversation backend work and the standalone `alertas_fake` V2 laboratory exist locally. Stage 2 laboratory acceptance, source-boundary connection, chat UI acceptance, and complete integration evidence remain.
+**Status:** In progress. Conversation backend work and the standalone `alertas_fake` V2 laboratory exist locally. Stage 2 laboratory acceptance was completed on 2026-07-31; source-boundary connection, chat UI acceptance, and complete integration evidence remain.
 
 **Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 
@@ -114,7 +114,7 @@ The EmusaSoft MCP is useful for discovering entities, fields, types, relationshi
 
 The redesign covers only A02, A03, and A05.
 
-The standalone V2 laboratory and its documented browser matrix are implemented. [`delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) owns this workstream's detailed stage index; Stage 2 user review is in progress. The prototype is UI and business-rule evidence only and remains separate from the Stage 3–5 database and Monitor integration work.
+The standalone V2 laboratory and its documented browser matrix are implemented. [`delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) owns this workstream's detailed stage index; Stage 2 user review was completed and approved on 2026-07-31. The prototype is UI and business-rule evidence only and remains separate from the Stage 3–5 database and Monitor integration work.
 
 For each scenario, define in simple business language:
 

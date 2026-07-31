@@ -7,7 +7,7 @@
   "required": ["contractVersion", "catalogRevision", "rules"],
   "properties": {
     "contractVersion": { "const": "1.0.0" },
-    "catalogRevision": { "const": "2026-07-20" },
+    "catalogRevision": { "const": "2026-07-31" },
     "rules": {
       "type": "array",
       "minItems": 21,

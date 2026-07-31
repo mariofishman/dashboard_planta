@@ -2,7 +2,7 @@
 
 **Version:** 2.1 draft
 
-**Status:** Stage 2 user review and manual testing in progress; standalone V2 prototype implemented; connected `test_database` boundary pending
+**Status:** Stage 2 complete and user-approved on 2026-07-31; connected `test_database` boundary pending Stage 3
 
 **Scope:** A02, A03, and A05 only  
 
@@ -46,13 +46,13 @@ These stages originated in the V1 audit and now live here as the current workstr
 | Stage | Status | Meaning and current evidence | Exit condition |
 | --- | --- | --- | --- |
 | 1. Stabilize the audit and redesign requirements | **Complete — 2026-07-29** | Audited A02, A03, A05, the previous `/dev/scenarios` controls, rule boundaries, lifecycle, routing, conversations, Dashboard integration, duplicate protection, and recurrence. The V1 findings were converted into the V2 blueprint. | V1 behavior and gaps are recorded; the V2 testing blueprint exists. |
-| 2. Review the redesigned laboratory with the user | **In progress** | The standalone V2 prototype is implemented and its 36-scenario browser matrix was rerun. The user is still reviewing behavior, terminology, test evidence, and report accuracy. The corrected results are in [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md). | The user finishes the one-test-at-a-time review and the standalone workflow is understandable and accepted for connected implementation. |
+| 2. Review the redesigned laboratory with the user | **Complete — 2026-07-31** | The standalone V2 prototype is implemented. All 34 valid Stage 2 tests passed and were approved; two invalid recurrence scenarios and one deferred A05 recurrence scenario are excluded from acceptance. The corrected results are in [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md). | Met: the one-test-at-a-time review is complete and the standalone workflow is accepted for connected implementation. |
 | 3. Inspect the `test_database` handoff | **Not yet completed in this workstream** | Separate database work may exist, but this workstream has not yet inspected and classified its readiness. | Verify reset safeguards, source mappings, and separate writer/read-only credentials; classify the handoff as ready, ready with gaps, or unsafe to connect. |
 | 4. Connect the real testing boundary | **Not started** | The HTML prototype still uses browser-local records; the existing application still uses synthetic Monitor-side tables. | `alertas_fake` writes A02/A03/A05 source records only to `test_database`, and Monitor reads them through the normal read-only MySQL adapters. |
 | 5. Run connected acceptance scenarios | **Not started** | Standalone prototype results are UI/business-flow evidence, not connected acceptance. | Baseline, thresholds, persistence, failed/incomplete reads, correction, resolution, recurrence, reset, routing, Dashboard, conversations, and duplicate prevention pass through the connected boundary. |
 | 6. Finalize the workstream | **Pending** | Final reconciliation depends on Stages 3–5. | Record proved local behavior and Phase 10 exclusions, perform the final requirements audit, retire the synthetic operational boundary only after replacement acceptance, and present the final changes for review. |
 
-Stage 2 is correctly still in progress. Implementing the standalone prototype did not complete the stage because the user-directed review and testing are still active. It also did not start Stage 4: source integration remains a separate later boundary.
+Stage 2 is complete. This acceptance covers the standalone laboratory and the business behavior represented by its 34 valid tests. It does not prove the `test_database`, adapter, PostgreSQL, routing, Dashboard, conversation, or production boundaries; those remain assigned to Stages 3–5.
 
 ## 2. Non-negotiable boundaries
 
@@ -104,9 +104,9 @@ The experiment has one shared simulated factory clock so A02, A03, and A05 recor
 Controls:
 
 - `Inicio del experimento`: editable date and time before the experiment starts.
-- `Hora simulada actual`: read-only current simulated date and time.
-- `Segundos reales por minuto simulado`: integer from `1` through `60`.
-- `Frecuencia de sondeo`: editable positive integer measured in simulated minutes.
+- `Hora simulada`: prominent read-only value beside the experiment ID rather than an input.
+- `Velocidad (s/min)`: integer from `1` through `60`.
+- `Sondeo (min)`: integer from `1` through `99`, measured in simulated minutes.
 - `Iniciar`: starts the clock and automatic polling schedule.
 - `Pausar`: stops the clock and automatic polls.
 - `+1`, `+5`, `+10`, `+15`, `+20`, `+29`, `+30`, `+31 min`: add that many simulated minutes.
@@ -222,9 +222,12 @@ This section is the implementation blueprint for the `/dev/scenarios` HTML/React
 ```text
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Laboratorio alertas_fake                 Experimento EXP-…           │
-│ [Inicio] [Hora actual] [Velocidad] [Frecuencia] [Iniciar/Pausar]    │
-│ [+1] [+5] [+10] [+15] [+20] [+29] [+30] [+31]                    │
-│ Próximo sondeo …  Último sondeo …  [Capturar estado] [Nuevo exper.] │
+│                         [Capturar estado] [Nuevo experimento]         │
+│ Experimento EXP-…   Hora simulada …      [Estado] [Iniciar/Pausar]  │
+│ [Inicio] [Velocidad] [Frecuencia] │       espacio reservado         │
+│ Avanzar: [+1] [+5] [+10] [+15]                                     │
+│          [+20] [+29] [+30] [+31]                                   │
+│ Próximo sondeo …                  Último sondeo …                    │
 ├──────────────────────────────────────────────────────────────────────┤
 │ [A02 Movimientos] [A03 Consumo OT] [A05 Bobinas] [Integridad]       │
 ├──────────────────────────────────────────────────────────────────────┤
@@ -234,23 +237,23 @@ This section is the implementation blueprint for the `/dev/scenarios` HTML/React
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-The experiment controls remain visible while switching alert tabs. Each alert tab uses its own correctly named entities and actions. Only the current operational table remains inline. `Ver historial`, immediately to the left of the source-creation action, opens the alert's complete history in a wide dialog. This applies consistently to A02, A03, and A05.
+The experiment controls remain visible while switching alert tabs. `Capturar estado` and `Nuevo experimento` sit in the page-title header. The experiment header presents the experiment ID and current simulated time as status, not editable fields, and owns the `Iniciar`/`Pausar` action. On desktop, the compact setup fields share the same right alignment as the two-row time-jump controls; the remaining right side stays visibly reserved for a later control or summary. The setup row retains the editable start time because it makes timestamp scenarios reproducible, but only before the experiment starts or creates records. The eight time-jump controls always occupy a four-by-two grid. Each alert tab uses its own correctly named entities and actions. Only the current operational table remains inline. `Ver historial`, immediately to the left of the source-creation action, opens the alert's complete history in a wide dialog. This applies consistently to A02, A03, and A05.
 
 ### 6.2 Shared header controls
 
 Exact labels:
 
 - `Inicio del experimento`
-- `Hora simulada actual`
-- `Segundos reales por minuto simulado`
-- `Frecuencia de sondeo (minutos simulados)`
+- `Hora simulada`
+- `Velocidad (s/min)`
+- `Sondeo (min)`
 - `Iniciar` / `Pausar`
 - `Próximo sondeo`
-- `Último sondeo completo`
+- `Último`
 - `Capturar estado`
 - `Nuevo experimento`
 
-The header always states the conversion, for example: `2 segundos reales = 1 minuto simulado · sondeo cada 3 minutos simulados = 6 segundos reales`.
+The conversion sentence is omitted because the speed and polling-frequency fields already provide those inputs. The lower experiment strip is reserved for `Próximo sondeo` and `Último sondeo`.
 
 Every laboratory dialog treats a click on the surrounding backdrop exactly like `Cancelar`: it closes without saving or changing source or Monitor state. Clicking inside the dialog does not dismiss it.
 
@@ -263,7 +266,7 @@ Primary action: split button `Despachar material`.
 - Accepting the editable form dispatches the edited movement at the then-current simulated time.
 - The two paths use the same source-write function and produce the same pending-poll state.
 
-The A02 laboratory also includes `Zona de influencia del usuario` with `Solo origen`, `Solo destino`, and `Origen y destino`. This is synthetic permission context for testing which EmusaSoft source action is available; it is not a Monitor permission or a production write. Because all data is synthetic and rapid repetition is the purpose of this laboratory, `Anular envío` and `Rechazar recepción` execute immediately without a confirmation dialog; the resulting original and reverse movements provide the visible confirmation.
+The A02 laboratory also includes `Zona de influencia del usuario` with `Solo origen`, `Solo destino`, and `Origen y destino`. This is synthetic permission context for testing which EmusaSoft source action is available; it is not a Monitor permission or a production write. Because all data is synthetic and rapid repetition is the purpose of this laboratory, the `Anular` and `Rechazar` buttons simulate the EmusaSoft `Anular envío` and `Rechazar recepción` workflows immediately without a confirmation dialog; the resulting original and reverse movements provide the visible confirmation.
 
 The dispatch dialog requires:
 
@@ -295,36 +298,46 @@ Columns:
 - Próximo umbral;
 - Último sondeo;
 - Estado A02;
+- Compact inspection and status controls at the far left: eye control, pending-poll indicator, and incident-state indicator.
 - Acciones.
 
 Row actions:
 
-- `Registrar recepción` in every permission context because the laboratory must be able to simulate the destination completing the movement;
-- `Anular envío` as the additional action when the simulated user controls only the origin zone;
-- `Rechazar recepción` as the additional action when the simulated user controls the destination zone;
-- when the user controls both zones, `Rechazar recepción` takes priority and `Anular envío` is not shown;
+- `Recibir` in every permission context because the laboratory must be able to simulate the destination completing the movement;
+- `Anular` below `Recibir` when the simulated user controls only the origin zone;
+- `Rechazar` as the additional action below `Recibir` when the simulated user controls the destination zone;
+- when the user controls both zones, `Rechazar` takes priority and `Anular` is not shown;
 - `Ver observaciones`;
-- `Ver incidente`, which is the only action that opens the source, expected-result, and Monitor-result detail panel. Source actions and row clicks do not open that panel, and a second click closes it.
+- an eye control at the far left, which is the only action that opens the source, expected-result, and Monitor-result detail panel. It changes to the closed-eye form while the panel is open; source actions and row clicks do not open that panel, and a second click closes it.
 
-There is no physical-arrival field. `Registrar recepción` changes only the selected source movement. `Anular envío` and `Rechazar recepción` close the selected source movement and create a new source movement with a new movement ID, the same material identity, reversed origin and destination, `TRANSITO` state, and a new dispatch clock starting at the action time. The original and reverse movements remain separately traceable. If the original movement already has an open A02 incident, it resolves only after a complete successful poll reads the original movement's terminal source state; the reverse movement is evaluated independently and may later create its own A02 occurrence. The original row leaves the active view only after that poll.
+There is no physical-arrival field. `Recibir` changes only the selected source movement. `Anular` and `Rechazar` close the selected source movement and create a new source movement with a new movement ID, the same material identity, reversed origin and destination, `TRANSITO` state, and a new dispatch clock starting at the action time. The original and reverse movements remain separately traceable. If the original movement already has an open A02 incident, it resolves only after a complete successful poll reads the original movement's terminal source state; the reverse movement is evaluated independently and may later create its own A02 occurrence. The original row leaves the active view only after that poll.
 
 #### Complete movement history
 
 `Ver historial` opens this information in a wide dialog instead of placing a second large table under the active movements. The history includes active and completed movements. Filters include experiment, time, SKU, optional unique code, destination, source state, on-time/late outcome, and incident outcome.
 
-Additional columns:
+The open history dialog is not rebuilt during ordinary simulated-clock ticks. A completed poll may update its records, but must preserve the tester's exact horizontal and vertical scroll positions so the inspected columns and rows do not move.
 
-- receipt/cancellation time;
-- total transit duration;
-- `Recibido a tiempo`, `Recibido tarde`, `Cancelado`, or `Aún en tránsito`;
-- A02 occurrence count; and
-- incident terminal state.
+The history is a compact fixed event-and-outcome report, not a copy of the active table or a database export. At normal desktop and tablet dialog widths it must fit without horizontal scrolling. It groups related facts vertically instead of giving every field its own column:
+
+- `Registro`: movement, material, quantity, SKU, and optional unique code;
+- `Ruta`: origin above destination;
+- `Fechas`: dispatch above receipt, cancellation, or rejection;
+- fixed final transit duration after closure, or `—` while still active;
+- `A02`: concise occurrence count and lifecycle; and
+- a compact eye control with an accessible name and explanatory tooltip.
+
+The operational result is conveyed by the accessible leading status icon rather than a repeated text column: green check means completed on time without an alert; red alert means currently open; warning means late, previously alerted, or closed without resolution; blue means still active, pending a poll, cancelled, rejected, or otherwise terminal without an alert. A movement that produced an alert and was later corrected keeps a warning-colored historical marker and a tooltip that says `Problema detectado y resuelto`; it must not look equivalent to an always-clean movement.
+
+The history does not expose a `Preparar recurrencia` shortcut. A02 recurrence is invalid for one specific movement: after receipt, cancellation, or rejection, that movement cannot become unreceived or return to `TRANSITO`; any reverse shipment has a new movement ID and is evaluated independently. A03 recurrence is also invalid for one specific OT: a valid first consumption cannot disappear and a closed OT cannot become active again; another OT is a new case. Reverting completed A05 source records is not a documented EmusaSoft workflow, so A05 recurrence remains deferred until a source-valid workflow is identified.
 
 ### 6.4 A03 tab — OTs activas sin primer consumo
 
-Primary action: `Iniciar OT`.
+Primary action: split button `Iniciar OT`.
 
-The start dialog requires OT, operation, machine, and start confirmation at the current simulated time.
+Clicking the main button immediately creates an active OT with realistic mock OT, operation, and machine data at the current simulated time. Clicking the narrow arrow opens the same prefilled data in a dialog so the tester can edit it before saving. An OT created in this active table is open and therefore accepts consumption declarations; the laboratory does not offer an invented editable/blocked choice.
+
+The laboratory enforces the EmusaSoft invariant that one machine cannot have two active OTs simultaneously. Concurrent A03 testing therefore uses different machines; attempting to start another OT on an occupied machine is rejected.
 
 Current table columns:
 
@@ -335,8 +348,7 @@ Current table columns:
 - tiempo activa;
 - consumos válidos;
 - primer consumo;
-- entrada de OT editable o bloqueada;
-- evidencia A07 superior;
+- estado de la OT (`Activa` or `Cerrada`);
 - último sondeo;
 - estado A03;
 - acciones.
@@ -344,17 +356,23 @@ Current table columns:
 Row actions:
 
 - `Registrar primer consumo`;
-- `Aplicar evidencia A07`, available only in advanced testing and never fabricating consumption;
+- `Cerrar OT`, which ends the active source condition without inventing consumption;
 - `Ver observaciones`;
-- `Ver incidente`.
+- the same compact eye control at the far left for showing or hiding incident detail.
 
-`Ver historial` opens the complete OT history in the same wide-dialog pattern used by A02. History outcomes include first consumption on time, first consumption late, suppressed by stronger A07, resolved, open, and closed without resolution.
+`Ver historial` opens the complete OT history in the same compact dialog pattern used by A02. It groups OT and operation under `Registro`, machine under `Contexto`, and start and closure under `Fechas`. It reports fixed duration after first consumption or OT closure and a concise A03 occurrence/lifecycle summary. The accessible leading icon conveys the operational result, so there is no repeated result column. It does not repeat the live `Tiempo activa` field. History outcomes include first consumption on time, first consumption late, OT closed without consumption, resolved, open, and closed without resolution.
 
-If OT input remains editable, the source correction is a real valid consumption. If input is locked and the missing history cannot be reconstructed safely, V2 must preserve the evidence and use authorized administrative closure rather than invent consumption.
+While an OT is open, EmusaSoft permits its material consumption declarations. Closing or cancelling the OT ends the A03 condition and blocks further consumption input. Therefore the active A03 laboratory offers both a real first-consumption correction and OT closure; it does not simulate an open but blocked OT.
 
 ### 6.5 A05 tab — Bobinas producidas o remanentes
 
-Primary action: `Declarar bobina`.
+A05 remains one alert per bobina. Its UI presents `Sin pesar` and `Sigue en máquina` as two independently clearing checklist items; the incident resolves only after both reasons are absent. This avoids duplicate cards, conversations, and notifications for the same physical bobina.
+
+Closing the source OT does not end A05. The bobina may legally be weighed or moved afterward, and those later source actions clear their corresponding checklist items. The Stage 2 matrix includes a dedicated test for this lifecycle boundary.
+
+Primary action: split button `Declarar bobina`.
+
+Clicking the main button immediately creates a bobina with realistic mock data. Clicking the narrow arrow opens the same prefilled data in a dialog so the tester can edit it before saving.
 
 The declaration dialog requires:
 
@@ -387,13 +405,13 @@ Row actions:
 - `Registrar pesaje`;
 - `Registrar salida de máquina`;
 - `Ver observaciones`;
-- `Ver incidente`.
+- the same compact eye control at the far left for showing or hiding incident detail.
 
-`Ver historial` opens the complete bobina history in the same wide-dialog pattern used by A02 and A03.
+`Ver historial` opens the complete bobina history in the same compact dialog pattern used by A02 and A03. It groups bobina identity under `Registro`, OT, machine, destination, and any generated A02 movement under `Contexto`, and declaration, weighing, and departure vertically under `Fechas`. It reports fixed final duration and a concise A05 occurrence/lifecycle summary. The accessible leading icon conveys the operational result, so there is no repeated result column. It does not repeat the live `Tiempo` or `Razones actuales` fields.
 
 The UI must show `Sin pesar` and `Sigue en máquina` independently. Completing only one action leaves the other reason active. Starting a destination-bound movement creates the appropriate source movement; an unreceived movement later belongs to A02 and must not remain as a duplicate A05 movement reason.
 
-The standalone V2 prototype currently shows only `Error` once an A05 condition reaches `>= 30 minutes`. The catalog previously promised `Por vencer → Error`, but no pre-threshold warning window exists in current authority. That presentation remains an explicit Stage 2 business decision; neither documentation nor implementation may invent the missing window.
+The standalone V2 prototype shows only `Error` once an A05 condition reaches `>= 30 minutes`. The approved presentation decision of 2026-07-31 defines no pre-threshold `Por vencer` state: the condition remains normal before 30 minutes and becomes `Error` at the threshold.
 
 ### 6.6 Incident panel
 
@@ -410,9 +428,9 @@ The selected source row opens a subordinate incident panel showing:
 - latest committed change cursor; and
 - real source-action-to-detection delay, explicitly separated from simulated business time.
 
-`Ver incidente` is a reversible row control. It opens the subordinate panel for that row, changes its label to `Ocultar incidente`, and closes the panel when selected again. The row action controls remain vertically centered with the operational data in the same table row.
+The far-left eye is a reversible row control. It opens the subordinate incident panel, changes to the closed-eye icon while that panel is visible, and closes the panel when selected again. Its accessible label changes between `Ver incidente` and `Ocultar incidente`. The remaining row actions stay vertically centered with the operational data.
 
-`Cerrar sin resolución` appears only for an open incident and an authorized administrator. It opens a confirmation dialog requiring reason and comment and shows correlated incidents before confirmation. It never changes the EmusaSoft source state. If the source still reports the condition, the operational row remains visible with the incident badge `Cerrada sin resolución` and Monitor suppresses reopening until a complete healthy poll proves the source condition cleared.
+`Cerrar sin resolución` appears only for an open incident and an authorized administrator. It opens a confirmation dialog requiring reason and comment and shows correlated incidents before confirmation. It never changes the EmusaSoft source state. After confirmation, the incident panel closes and the row leaves the current-work table for the complete history, where its source truth and `Cerrada sin resolución` state remain visible. If the source still reports the condition, Monitor suppresses reopening until a complete healthy poll proves the source condition cleared. Every history table is read-only: it permits inspection through the eye control but exposes no source-changing actions.
 
 #### Routing expectations
 
@@ -429,7 +447,8 @@ The main workflow does not expose four technical failure types. The `Integridad`
 - an explanation that trustworthy Monitor state must remain unchanged;
 - before/after projection and incident counts; and
 - snapshot capture;
-- downstream counts for evidence, routing deliveries, conversation links, alert messages, and visible cards; and
+- downstream counts for evidence, routing deliveries, conversation links, alert messages, and visible cards;
+- clickable evidence, delivery, and conversation counts. Their compact viewers identify the alert, source record, timestamp, captured source facts, delivery recipient and status, or linked conversation and message count. These records remain explicitly simulated in the standalone prototype; and
 - in the connected implementation, a recovery check proving that a later successful poll completes missing routing or conversation work without duplicating the committed incident. The standalone prototype shows synthetic stable counts only; it does not prove repair of real downstream work.
 
 Automated tests separately exercise timeout, source error, partial results, invalid shape, stale data, unknown freshness, duplicate keys, and revision changes. Manual UI testing verifies the understandable business guarantee, not every transport failure variant.
@@ -444,7 +463,8 @@ Automated tests separately exercise timeout, source error, partial results, inva
 - Paused: visible `Pausado`; row actions and snapshot capture remain enabled, while time-jump buttons remain disabled.
 - Polling: `Sondeando…`; prevent overlapping polls.
 - Failed poll: state-preservation message; do not clear tables.
-- Source action pending poll: badge `Cambio pendiente de sondeo`.
+- Source action pending poll: compact blue icon at the far left with accessible label `Cambio pendiente de sondeo`; it disappears after a complete successful poll. The shared explanatory notice floats above the page instead of changing the position of tab content, tables, or scroll state in A02, A03, A05, or Integrity.
+- Incident state: compact green check when no incident is open, red exclamation for an open incident, and an accessible text label and tooltip for every state.
 - Expected and actual mismatch: name the business difference; never show only a technical code.
 
 ### 6.9 Responsive behavior
@@ -484,21 +504,21 @@ Automated tests separately exercise timeout, source error, partial results, inva
 | Receipt after incident | Receive selected overdue movement, then poll | Its incident resolves; unrelated movements remain unchanged |
 | Origin cancels dispatch | With `Solo origen`, cancel the selected movement | Original movement closes; one reverse movement starts in `TRANSITO` with a new ID and clock; an open original A02 resolves after the next complete poll |
 | Destination rejects reception | With `Solo destino` or `Origen y destino`, reject the selected movement | Cancellation is unavailable when both zones apply; original movement closes; one reverse movement starts in `TRANSITO` with swapped endpoints and a new clock; an open original A02 resolves after the next complete poll |
-| Administrative closure | Close an open A02 without source correction | Source row remains based on source state; incident closes and reopening is suppressed correctly |
-| Recurrence | Condition clears, then a later qualifying condition with the same natural key occurs | New occurrence; earlier history preserved |
+| Administrative closure | Close an open A02 without source correction | Row moves from current work to history; source truth is preserved, incident detail closes, and reopening is suppressed correctly |
+| Recurrence | Not applicable to one specific A02 movement | Invalid scenario: a terminal movement cannot become unreceived; a reverse shipment has a new movement ID |
 
 ### 7.3 A03 scenarios
 
 | Scenario | Source timeline | Required result |
 | --- | --- | --- |
-| Several concurrent OTs | Start OTs minutes apart | One independently tracked row per OT |
+| Several concurrent OTs | Start OTs minutes apart on different machines | One independently tracked row per OT; a second active OT on the same machine is rejected |
 | First consumption before 15 | Register valid consumption before threshold | No A03 incident |
 | Exactly 15 and after | Leave selected OT without consumption | Contract comparator determines opening; one occurrence only |
-| Mixed population | Some OTs consume, one remains empty, another gains A07 evidence | Each OT reconciles independently |
+| Mixed population | Some OTs consume, one remains empty, another closes without consumption | Each OT reconciles independently |
 | Consumption after incident | Register first valid consumption, then poll | Selected A03 resolves |
-| Stronger A07 | Apply proven stronger evidence | A03 suppresses or resolves without inventing consumption |
+| OT closes without consumption | Close or cancel the active OT | A03 resolves because the OT is no longer active; no consumption is invented |
 | Failed read after correction | Correct source, fail poll | Existing Monitor state remains until later complete poll |
-| Administrative closure and recurrence | Close unreconstructable history, later prove clear, later recur | Suppression and next occurrence behave correctly |
+| Administrative closure | Close an unreconstructable A03 while the source remains unchanged | Row moves to read-only history; source truth is preserved and unchanged polls do not reopen it |
 
 ### 7.4 A05 scenarios
 
@@ -588,7 +608,7 @@ The V1 audit covered the Phase 4B `/dev/scenarios` application, its API, synthet
 - The source simulator stored EmusaSoft-like synthetic records inside Monitor's development PostgreSQL database rather than in a separate MySQL source database.
 - A02 used one fixed movement, `materialFlowDetailId = 4202`; A03 used one fixed work order, `workOrderId = 4103`; A05 used one fixed reel, `articleSerialId = 4205`.
 - A02 evaluated reservation scope, `TRANSITO`, missing receipt, and elapsed dispatch time. Its original `> 30` convention and invented physical-arrival variants were later rejected during Stage 2; current authority uses `>= 30` and no physical-arrival inference.
-- A03 evaluated active state, `>= 15` elapsed minutes, zero valid consumption, and stronger A07 evidence.
+- Historical V1 A03 behavior evaluated active state, `>= 15` elapsed minutes, zero valid consumption, and a stronger-A07 suppression flag; Stage 2 later rejected that suppression rule.
 - A05 evaluated a 30-minute threshold with independent `not_weighed` and `still_at_machine` reasons, but the V1 UI prepared and corrected both reasons together.
 - Complete successful polls owned incident reconciliation. Failed or incomplete reads preserved the last trustworthy state. Repeated unchanged polls were designed to preserve one occurrence and deduplicate evidence, routing, conversation links, messages, and cards.
 - The V1 source-query work did not complete the production-shaped adapter mapping. A02 still required complete evidence derivation; A03 lacked a versioned SQL detection contract; A05 required translation between query reason flags and evaluator booleans.
@@ -625,9 +645,9 @@ The following table challenges V2 against the preserved V1 requirements and find
 | V1 requirement or finding | V2 result | Critique outcome |
 | --- | --- | --- |
 | Source, clock, poller, expected, and actual state must be distinguishable | Preserved through shared controls, operational tables, poll summary, and incident panel | V2 must not hide expected-versus-actual comparison inside technical details |
-| Clean, before, at, after, persistence, correction, resolution, failed reads, recurrence, and reset | Preserved and expanded for concurrent records | `Nuevo experimento` replaces destructive history reset |
+| Clean, before, at, after, persistence, correction, resolution, failed reads, and reset | Preserved and expanded for concurrent records | A02 and A03 recurrence are invalid for the same source record; A05 recurrence is deferred until a source-valid workflow exists; `Nuevo experimento` replaces destructive history reset |
 | A05 reasons are independent OR conditions | Preserved explicitly | Partial corrections must work in either order |
-| A03 stronger-A07 suppression | Preserved as an advanced source-evidence action | Implementation must use real evidence mapping, not a fabricated boolean in the final adapter |
+| A03/A07 precedence | Rejected during Stage 2 business review | A03 follows only OT activity and first consumption; A07 is evaluated independently and does not suppress A03 |
 | A02 physical-arrival routing variants | Rejected | V2 follows the Stage 2 decision that physical arrival is unknowable without receipt; the catalog is corrected and connected contracts, fixtures, and routing evidence remain to be reconciled |
 | Independent clocks per alert | Intentionally replaced by one shared experiment clock | Shared time is necessary for interacting factory records; rule state and revisions remain independent even though time is shared |
 | Failed-read variants visible in the old UI | Simplified to one understandable integrity action | All technical variants remain mandatory automated tests |
@@ -637,7 +657,7 @@ The following table challenges V2 against the preserved V1 requirements and find
 | `test_database` replacement boundary | Preserved | Synthetic source tables remain until replacement acceptance |
 | A02/A03/A05 fixed single records | Replaced | Concurrency is a core V2 acceptance requirement |
 | Simulated and real timestamps remain separate | Preserved | UI shows simulated business time; audit records retain real server timestamps without confusing the tester |
-| Duplicate and recurrence protections | Preserved | Must be proven with simultaneous records, not only one natural key |
+| Duplicate protections | Preserved | Repeated polls must not duplicate incidents. A02 recurrence is invalid; recurrence protection for alerts with a valid recurring source condition moves to connected or controlled automated testing. |
 | Previous browser and automated evidence | Historical only | V1 validation does not validate V2; V2 requires a new complete test and browser evidence set |
 
 ### 10.5 Blind-spot attack
@@ -659,22 +679,22 @@ The most likely V2 implementation mistakes are:
 
 - The catalog, executable alert contract, existing simulator, routing rules, `/dev/scenarios` UI, tests, and V2 prototype now remove A02 pending-dispatch and invented physical-arrival behavior. A02 is defined from the destination-bound `TRANSITO` movement, missing receipt, and time since dispatch. The future `test_database` adapter must preserve the same evidence boundary.
 - The catalog, executable alert contract, existing simulator, tests, and V2 prototype now use the approved A02 comparator `current time - sent time >= 30 minutes`.
-- The A05 `Por vencer → Error` presentation remains unresolved because current authority defines no pre-threshold warning window. The catalog now marks it as pending. Either approve a specific warning window and implement it in the V2 table, or remove `Por vencer` and keep only `Error`; do not invent the window.
-- Preserve A03's exact 15-minute comparator and define real input-lock and stronger-A07 evidence mappings in the versioned source contract.
+- The approved A05 presentation uses only `Error` at `>= 30 minutes`; it has no pre-threshold `Por vencer` state. The executable contract now carries only the `Error` label and matches the existing incident predicate.
+- Preserve A03's exact 15-minute comparator and define real active, closed/cancelled, and first-consumption mappings in the versioned source contract. Approved authority evaluates A03 independently: A07 does not suppress A03, and both alerts may coexist when their separate conditions are true.
 
 Remaining executable and integration mismatches after the A02 authority reconciliation:
 
 - the existing `/dev/scenarios` simulator still uses isolated per-rule scenario clocks, while V2 intentionally uses one shared factory experiment clock;
-- the A05 executable rule lists both `Por vencer` and `Error` but defines only the `>= 30` incident predicate, so it cannot produce a deterministic pre-threshold warning without the pending business decision; and
+- the A03 executable contract still requires `strongerA07` and suppresses A03 when it is true; the simulator, current `/dev/scenarios` UI, and their tests still expose and assert the same rejected behavior. Stage 4 must remove that evidence field and suppression predicate from the contract, adapter/simulator path, UI, fixtures, and tests, then verify that A03 and A07 are evaluated independently; and
 - the browser-local V2 prototype is not yet the application `/dev/scenarios` implementation and does not exercise `test_database`, the real adapter, Monitor PostgreSQL state, routing deliveries, Dashboard cards, or conversations.
 
 ## 11. Remaining stage-aligned delivery sequence
 
-The standalone implementation items previously listed here are complete in the V2 HTML prototype: shared clock, scheduler, snapshots, experiment archive, concurrent A02/A03/A05 records, incident detail, administrative closure, integrity counters, recurrence, cancellation/rejection, and A05-to-A02 handoff. The corrected prototype matrix is evidence only for that standalone scope.
+The standalone implementation items previously listed here are complete in the V2 HTML prototype: shared clock, scheduler, snapshots, experiment archive, concurrent A02/A03/A05 records, incident detail, administrative closure, integrity counters, cancellation/rejection, and A05-to-A02 handoff. Recurrence is deliberately excluded from the laboratory UI. It is invalid for one specific A02 movement and one specific A03 OT, while no valid EmusaSoft source action has yet been identified for making a completed A05 record qualify again. The corrected prototype matrix is evidence only for that standalone scope.
 
 Remaining work follows the stage index above:
 
-1. **Finish Stage 2:** review the corrected test report one scenario at a time, resolve remaining user questions, correct any accepted UI or business-flow defects, and record user acceptance of the standalone workflow.
+1. **Stage 2 complete — 2026-07-31:** the corrected report's 34 valid tests passed and were user-approved. Two invalid recurrence scenarios and one deferred A05 recurrence scenario remain excluded for the reasons recorded in that report.
 2. **Execute Stage 3:** inspect the separate `test_database` work, verify guarded reset behavior and credentials, map the real A02/A03/A05 source fields, and record readiness or exact gaps.
 3. **Execute Stage 4:** reconcile versioned contracts and fixtures, implement required typed Monitor projections/observations and administrative-closure persistence, make `alertas_fake` write only `test_database`, and make Monitor read it through read-only MySQL adapters and the normal scheduler.
 4. **Execute Stage 5:** rerun the business matrix through the connected boundary and add automated incomplete-read, pagination, duplicate-key, source-revision, freshness, timeout, transport, cursor, and overlapping-poll evidence. Verify real routing, Dashboard, conversation, message, card, and idempotent repair behavior.
@@ -682,7 +702,7 @@ Remaining work follows the stage index above:
 
 ## 12. Current proof boundary
 
-This document remains the V2 blueprint. The standalone HTML laboratory now implements and demonstrates the synthetic UI, shared clock, scheduler, source actions, snapshots, incident lifecycle, recurrence, integrity counters, and browser-local experiment archive described here. Its browser verification is recorded separately in `alertas_fake_v2_edge_case_test_report_v2.md`.
+This document remains the V2 blueprint. The standalone HTML laboratory now implements and demonstrates the synthetic UI, shared clock, scheduler, source actions, snapshots, incident lifecycle, integrity counters, and browser-local experiment archive described here. It does not simulate recurrence by rewriting completed source records. Its browser verification is recorded separately in `alertas_fake_v2_edge_case_test_report_v2.md`.
 
 The prototype is not evidence for the future database boundary. V2 schema migrations, the `test_database` writer, the read-only Monitor adapter, API authorization, real Dashboard and conversation integration, and production-scale behavior still require separate implementation and acceptance evidence.
 

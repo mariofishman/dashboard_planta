@@ -107,11 +107,11 @@
   </section>
     </div>
     <section class="detection-rule">
-    <h3>Detection indicators and algorithm</h3><p>Open the warning when the OT is active for at least 15 minutes and consumption count is zero. Close it immediately when the first valid consumption is recorded, even after 20 or 30 minutes. Do not open or keep A03 when stronger A07 evidence shows produced output exceeds declared consumption.</p>
+    <h3>Detection indicators and algorithm</h3><p>Open the warning when the OT is active for at least 15 minutes and consumption count is zero. Close it immediately when the first valid consumption is recorded, even after 20 or 30 minutes, or when the OT closes or is cancelled without consumption. A03 depends only on OT activity and first-consumption state; another alert does not suppress it. EmusaSoft permits only one active OT per machine at a time, so concurrent A03 records must belong to different machines.</p>
   </section>
     <section class="owner-rule"><h3>Primary Action Owner</h3><p><strong>machine operator</strong>.</p></section>
     <section class="resolution-rule">
-    <h3>Recommended resolution</h3><p>Close the warning automatically as soon as the first valid consumption is declared, even when that happens 20 or 30 minutes after OT start. A consumption correction is permitted while WorkOrder.readOnlyInput is false. Once readOnlyInput is true—normally after closure or finalization—the OT input is locked; if the exact consumption cannot be reconstructed, close without resolution and link A07, D01, or D03 instead of fabricating consumption. The ERP catalog exposes the lock flag but does not identify the exact backend transition that sets it.</p>
+    <h3>Recommended resolution</h3><p>Close the warning automatically when the first valid consumption is declared or when the OT closes or is cancelled without consumption. An open OT permits consumption declarations; closing or finalizing it blocks further input. If closed history cannot be reconstructed, close without resolution rather than fabricating consumption.</p>
   </section>
   </article><article class="alert-card family-a state-possible" id="a04">
 
@@ -144,14 +144,15 @@
 
     <h3>Recommended resolution</h3><p>Declare the missing produced reel or correct the input, output, waste, or weight record that created the excess remainder. If physical verification shows no undeclared reel and the estimate was a false positive, an administrator closes without resolution using reason Verified physical exception and attaches the supporting observation.</p>
   </section>
-  </article><article class="alert-card family-a state-upcoming" id="a05">
+  </article><article class="alert-card family-a state-error" id="a05">
 
-    <div class="card-heading"><div><span class="alert-id">A05 · Post-production handling</span><h2>Produced or remnant reel not weighed or not moved</h2></div><span class="state-pill">Por vencer → Error</span></div>
+    <div class="card-heading"><div><span class="alert-id">A05 · Post-production handling</span><h2>Produced or remnant reel not weighed or not moved</h2></div><span class="state-pill">Error</span></div>
+    <section class="rule-note"><h3>Presentation rule</h3><p>A05 has no pre-threshold warning state. Before 30 minutes the condition is normal. At 30 elapsed minutes, an unmet weighing or movement condition becomes Error.</p></section>
     <section class="rule-note"><h3>Remnant-reel scope</h3><p>A05 uses the same declaration, weighing, labeling, and movement logic for produced reels and remnant raw-material reels. A partially consumed input reel must be declared with its remaining kilograms, weighed, labeled or ticketed, and returned to the raw-material warehouse. The 30-minute weighing and movement checks do not change.</p></section>
     <div class="definition-grid">
       <section>
 
-    <h3>When it happens</h3><p>A declared produced or remnant reel has no recorded weight within 30 minutes, or remains at the machine for more than 30 minutes instead of being sent to its next OT or appropriate warehouse.</p>
+    <h3>When it happens</h3><p>A declared produced or remnant reel has no recorded weight when 30 minutes have elapsed, or is still at the machine when 30 minutes have elapsed instead of being sent to its next OT or appropriate warehouse.</p>
   </section>
       <section>
 
@@ -168,7 +169,7 @@
     </div>
     <section class="detection-rule">
 
-    <h3>Detection indicators and algorithm</h3><p>These are OR conditions. Add not_weighed after 30 minutes without a scale record. Independently add still_at_machine after OT finish plus 30 minutes without movement. The incident may contain either reason or both. Once movement begins, an unreceived flow uses A02.</p>
+    <h3>Detection indicators and algorithm</h3><p>These are OR conditions. Add not_weighed when 30 minutes have elapsed without a scale record. Independently add still_at_machine after OT finish when 30 minutes have elapsed without movement. The incident may contain either reason or both. Once movement begins, an unreceived flow uses A02.</p>
   </section>
     <section class="owner-rule"><h3>Primary Action Owner</h3><p><strong>Process operator</strong> for both <code>not_weighed</code> and <code>still_at_machine</code>. For a remnant reel, additionally notify the warehouse dispatcher or sender as its receiving position.</p></section>
     <section class="resolution-rule">
@@ -227,7 +228,7 @@
     </div>
     <section class="detection-rule">
 
-    <h3>Detection indicators and algorithm</h3><p>Calculate required input evidence = actual or estimated good-output mass + actual or estimated waste mass. Calculate consumption gap = required input evidence − declared input consumption. Open A07 when the gap exceeds the configured tolerance. Prefer scale weights; estimate unweighed reels from meters, width, basis weight, and comparable weighed reels. Statistical evidence creates a possible error; verified weights can confirm an error. Suppress A03 when A07 provides the stronger explanation and link or merge A07 with D03 at closure.</p>
+    <h3>Detection indicators and algorithm</h3><p>Calculate required input evidence = actual or estimated good-output mass + actual or estimated waste mass. Calculate consumption gap = required input evidence − declared input consumption. Open A07 when the gap exceeds the configured tolerance. Prefer scale weights; estimate unweighed reels from meters, width, basis weight, and comparable weighed reels. Statistical evidence creates a possible error; verified weights can confirm an error. A07 is evaluated independently from A03. Link or merge A07 with D03 at closure.</p>
   </section>
     <section class="owner-rule"><h3>Primary Action Owner</h3><p><strong>machine operator</strong>.</p></section>
     <section class="resolution-rule">
