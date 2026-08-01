@@ -76,21 +76,21 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 ### A01 — Required material not ready before OT start
 
-**Alert label:** Por vencer → Error
+**Alert label:** Error
 **Scope:** Printing, lamination, adhesive lamination, and cutting
 
 | Field | Definition |
 |---|---|
-| When it happens | At 60 minutes before planned OT start, required material is unavailable in the warehouse or has not been reserved. At 30 minutes before start, the same incident is updated if the material has not been dispatched. |
+| When it happens | At 60 minutes before planned OT start, the full required quantity is not allocable from warehouse stock or has not been fully reserved. At 30 minutes before start, the same incident is updated if the full required quantity has not been dispatched. |
 | Why the alert exists | The OT is at risk of starting without the required material at the machine. |
-| Possible causes | The material planner did not reserve the material or secure its short-term availability; a supplier has not delivered; or the material was reserved but warehouse dispatch is late. |
+| Possible causes | Allocable warehouse stock is insufficient, the material planner did not reserve the full quantity, or warehouse dispatch of the fully reserved quantity is incomplete. |
 | Example | OT 151200.1 starts at 10:00. At 09:00, one substrate is not reserved because it is not in stock. At 09:30, the user-visible incident states: `No despachado porque el material no está reservado ni disponible en almacén`. |
 
-**Detection indicators and algorithm:** At `planned start - 60 minutes`, evaluate required materials, reservation records, warehouse availability, and open purchase or supplier-delivery status. At `planned start - 30 minutes`, add dispatch status. Maintain one incident per OT and required material. Use reason codes such as `not_reserved_stock_available`, `material_not_in_warehouse`, `purchase_or_supplier_pending`, and `reserved_not_dispatched`.
+**Detection indicators and algorithm:** At and after `planned start - 60 minutes`, evaluate each required material against the full remaining required quantity. Warehouse stock is allocated first to OTs with recorded material reservations, then to unreserved OTs by earliest planned start; equal planned starts use the permanent EmusaSoft OT ID as a deterministic tie-breaker. Stock committed to another OT is not available. `materialAvailable` is true only when the resulting allocable quantity covers the full requirement. A partial reservation is not reserved readiness. At and after `planned start - 30 minutes`, require the full quantity to be dispatched; partial dispatch does not pass. Maintain one incident per OT and material requirement, always labeled `Error`. Use `material_not_in_warehouse` when allocable stock is insufficient, `not_reserved_stock_available` when full stock is allocable but the full quantity is not reserved, and `reserved_not_dispatched` when the full quantity is reserved but has not been fully dispatched. Do not infer purchase or supplier-delivery status from unavailable evidence.
 
-**Primary action owner:** `not_reserved_stock_available`, `material_not_in_warehouse`, or `purchase_or_supplier_pending` → **Material planner**. `reserved_not_dispatched` → **Warehouse dispatcher or sender**.
+**Primary action owner:** `not_reserved_stock_available` or `material_not_in_warehouse` → **Material planner**. `reserved_not_dispatched` → **Warehouse dispatcher or sender**.
 
-**Resolution:** Keep one incident open until every condition required at the current checkpoint is satisfied. At the 60-minute checkpoint, the material must be available and reserved; at the 30-minute checkpoint it must also be sent. Rescheduling closes the current deadlines and creates new checkpoints. If the material was already physically sent and consumed outside EMUSA Soft and the missing historical transactions cannot be proven, an administrator closes A01 and selected correlated consequences without resolution; the system must not fabricate reservations, movements, receipts, or consumption.
+**Resolution:** Keep the same incident open, including after actual OT start, until every full-quantity condition required at the current checkpoint is satisfied. Cancellation resolves it on the next healthy evaluation. Rescheduling resolves the current occurrence, reevaluates only against the new 60- and 30-minute checkpoints, and creates a new occurrence only if the rescheduled OT breaches a new checkpoint. If the material was already physically sent and consumed outside EMUSA Soft and the missing historical transactions cannot be proven, an administrator closes A01 and selected correlated consequences without resolution; the system must not fabricate reservations, movements, receipts, or consumption.
 
 
 ### A02 — Reserved OT material not received within 30 minutes
@@ -510,7 +510,7 @@ Codes not listed use the seven general rules without modification.
 
 | Code | Override or exception |
 |---|---|
-| A01 | Do not notify the machine operator. Short-term availability, reservation, and supplier follow-up route to the material planner; ready reserved material awaiting dispatch routes to the warehouse dispatcher or sender. The operation shift supervisor and technical leader still receive the alert. |
+| A01 | Do not notify the machine operator. Insufficient allocable stock or incomplete reservation routes to the material planner; ready reserved material awaiting full dispatch routes to the warehouse dispatcher or sender. The operation shift supervisor and technical leader still receive the alert. |
 | A02 | The material has already been sent. Notify both the warehouse dispatcher or sender and the machine operator, plus their applicable shift supervisors. The reason determines which position is primary. |
 | A05 | The process operator owns both weighing and movement. A produced reel also notifies the process supervisor. A remnant raw-material reel additionally notifies the warehouse dispatcher or sender and its supervisor or leader. |
 | A06 | The machine operator owns waste declaration. When weighing is implicated, also notify the process operator and process supervisor. |

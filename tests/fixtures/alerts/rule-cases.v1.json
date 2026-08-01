@@ -1,9 +1,9 @@
 {
   "fixtureVersion": "1.0.0",
   "cases": [
-    {"id":"A01-trigger","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":45,"materialAvailable":false,"reserved":false,"dispatched":false},"expectedStatus":"triggered","expectedReasons":["material_not_in_warehouse"]},
-    {"id":"A01-clear","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":20,"materialAvailable":true,"reserved":true,"dispatched":true},"expectedStatus":"clear","expectedReasons":[]},
-    {"id":"A01-insufficient","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":20,"materialAvailable":true,"reserved":true},"expectedStatus":"insufficient","expectedReasons":[]},
+    {"id":"A01-trigger","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":60,"requiredQuantityKg":500,"allocatedQuantityKg":500,"reservedQuantityKg":0,"dispatchedQuantityKg":0,"canceled":false},"expectedStatus":"triggered","expectedReasons":["not_reserved_stock_available"]},
+    {"id":"A01-clear","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":20,"requiredQuantityKg":500,"allocatedQuantityKg":500,"reservedQuantityKg":500,"dispatchedQuantityKg":500,"canceled":false},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A01-insufficient","ruleCode":"A01","input":{"workOrderId":101,"materialRequirementId":11,"minutesToPlannedStart":20,"requiredQuantityKg":500,"allocatedQuantityKg":500,"reservedQuantityKg":500,"canceled":false},"expectedStatus":"insufficient","expectedReasons":[]},
 
     {"id":"A02-trigger","ruleCode":"A02","input":{"materialFlowDetailId":202,"isWorkOrderReservation":true,"state":"TRANSITO","receivedAt":null,"elapsedMinutes":31},"expectedStatus":"triggered","expectedReasons":["not_received"]},
     {"id":"A02-clear","ruleCode":"A02","input":{"materialFlowDetailId":202,"isWorkOrderReservation":true,"state":"RECIBIDO","receivedAt":"2026-07-20T10:20:00Z","elapsedMinutes":20},"expectedStatus":"clear","expectedReasons":[]},
