@@ -114,13 +114,19 @@ export class ConversationService {
     const params: unknown[] = [principal.sysUserId, includeAll, options.before ?? null, options.search?.trim() || null, limit + 1];
     const rows = await this.database.queryAll(`SELECT c.id,c.title,c.updated_at AS "updatedAt",c.writable_until AS "writableUntil",
       COALESCE(last.sender_name,'') AS "lastSender",COALESCE(last.body,'') AS "lastBody",last.kind AS "lastKind",
-      COALESCE(open_alerts.count,0)::int AS "openAlerts",
+      COALESCE(open_alerts.count,0)::int AS "openAlerts",COALESCE(open_alerts.items,'[]'::jsonb) AS "openAlertItems",
+      COALESCE(participants.count,0)::int AS "participantCount",COALESCE(participants.names,'') AS "participantNames",
       CASE WHEN p.sys_user_id IS NULL THEN 0 ELSE COALESCE(unread.count,0) END::int AS "unreadCount",
       (p.sys_user_id IS NOT NULL) AS "isParticipant"
       FROM monitor_conversation c
       LEFT JOIN monitor_conversation_participant p ON p.conversation_id=c.id AND p.sys_user_id=$1 AND p.removed_at IS NULL
       LEFT JOIN LATERAL (SELECT sender_name,body,kind FROM monitor_message WHERE conversation_id=c.id ORDER BY cursor DESC LIMIT 1) last ON TRUE
-      LEFT JOIN LATERAL (SELECT COUNT(*) AS count FROM monitor_conversation_incident ci JOIN monitor_incident i ON i.id=ci.incident_id WHERE ci.conversation_id=c.id AND i.lifecycle='open') open_alerts ON TRUE
+      LEFT JOIN LATERAL (SELECT COUNT(*) AS count,jsonb_agg(jsonb_build_object(
+        'id',i.id,'code',i.rule_code,'title',i.title,'summary',i.summary,'workOrderCode',i.work_order_code,
+        'machineCode',i.machine_code,'openedAt',i.opened_at) ORDER BY i.opened_at) AS items
+        FROM monitor_conversation_incident ci JOIN monitor_incident i ON i.id=ci.incident_id WHERE ci.conversation_id=c.id AND i.lifecycle='open') open_alerts ON TRUE
+      LEFT JOIN LATERAL (SELECT COUNT(*) AS count,string_agg(cp.display_name,', ' ORDER BY cp.display_name) AS names
+        FROM monitor_conversation_participant cp WHERE cp.conversation_id=c.id AND cp.removed_at IS NULL) participants ON TRUE
       LEFT JOIN LATERAL (SELECT COUNT(*) AS count FROM monitor_message m LEFT JOIN monitor_conversation_user_state s ON s.conversation_id=c.id AND s.sys_user_id=$1 WHERE m.conversation_id=c.id AND m.cursor>COALESCE(s.last_read_cursor,0) AND m.sender_sys_user_id IS DISTINCT FROM $1) unread ON TRUE
       WHERE ($2 OR p.sys_user_id IS NOT NULL) AND ($3::timestamptz IS NULL OR c.updated_at<$3::timestamptz)
         AND ($4::text IS NULL OR c.title ILIKE '%'||$4||'%'

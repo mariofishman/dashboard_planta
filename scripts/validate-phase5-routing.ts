@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { buildMonitorServer } from "../apps/api/src/server.ts";
+import { workerGroupForIncident } from "../apps/api/test/routing-fixtures.ts";
 
 const instance = await buildMonitorServer({
   config: {
@@ -20,18 +21,21 @@ const assignment = (id: string, person: string, position: string, scope: string,
 });
 
 try {
+  const trigger = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager });
+  assert.equal(trigger.statusCode, 200);
+  const advance = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
+  assert.equal(advance.statusCode, 200);
+  const workerGroup = workerGroupForIncident(advance.json().scenarioClock.currentAt, "Día");
   const roster = [
     assignment("manager", "María Torres", "Gerente de fábrica", "factory", null),
-    assignment("supervisor-a", "Luis Vargas", "Supervisor de turno de operación", "operation_group", "A", ["Impresión"]),
+    assignment("supervisor-a", "Luis Vargas", "Supervisor de turno de operación", "operation_group", workerGroup, ["Impresión"]),
     assignment("leader", "Rosa Paredes", "Líder técnico", "operation", null, ["Impresión"]),
-    assignment("operator-a", "Jorge Acosta", "Operador de máquina", "machine_group", "A", ["Impresión"]),
-    assignment("dispatcher-a", "Carlos Mendoza", "Despachador de almacén", "warehouse_group", "A", [], "Materias primas"),
-    assignment("warehouse-supervisor-a", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", "A", [], "Materias primas"),
+    assignment("operator-a", "Jorge Acosta", "Operador de máquina", "machine_group", workerGroup, ["Impresión"]),
+    assignment("dispatcher-a", "Carlos Mendoza", "Despachador de almacén", "warehouse_group", workerGroup, [], "Materias primas"),
+    assignment("warehouse-supervisor-a", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", workerGroup, [], "Materias primas"),
   ];
   assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: roster } })).statusCode, 200);
   for (const [url, payload] of [
-    ["/api/dev/scenarios/A02/trigger", undefined],
-    ["/api/dev/scenarios/A02/advance-time", { minutes: 31 }],
     ["/api/dev/scenarios/A02/poll", undefined],
   ] as const) {
     assert.equal((await instance.app.inject({ method: "POST", url, headers: manager, payload })).statusCode, 200);
@@ -43,7 +47,7 @@ try {
   const before = (await instance.app.inject({ url: route, headers: manager })).json();
   assert.ok(before.recipients.some((recipient: { name: string }) => recipient.name === "Carlos Mendoza"));
 
-  const replacement = assignment("dispatcher-b", "Carmen Ríos", "Despachador de almacén", "warehouse_group", "A", [], "Materias primas");
+  const replacement = assignment("dispatcher-b", "Carmen Ríos", "Despachador de almacén", "warehouse_group", workerGroup, [], "Materias primas");
   assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 1, assignments: roster.filter((item) => item.id !== "dispatcher-a").concat(replacement) } })).statusCode, 200);
   const after = (await instance.app.inject({ url: route, headers: manager })).json();
   assert.ok(after.recipients.some((recipient: { name: string }) => recipient.name === "Carmen Ríos"));

@@ -45,7 +45,14 @@ require_docker_context() {
 
 require_running_attested_runtime() {
   require_docker_context
-  [[ "$(docker inspect --format '{{.State.Running}}' "$TEST_DB_CONTAINER" 2>/dev/null)" == "true" ]] || die "runtime container is not running"
+  local running
+  if ! running="$(docker inspect --format '{{.State.Running}}' "$TEST_DB_CONTAINER" 2>&1)"; then
+    case "$running" in
+      *"No such object"*) die "runtime container is not running" ;;
+      *) die "unable to inspect runtime container: $running" ;;
+    esac
+  fi
+  [[ "$running" == "true" ]] || die "runtime container is not running"
   [[ "$(docker inspect --format '{{.Config.Image}}' "$TEST_DB_CONTAINER")" == "$TEST_DB_IMAGE" ]] || die "container image reference differs from the pinned image"
   [[ "$(docker inspect --format '{{(index (index .NetworkSettings.Ports "3306/tcp") 0).HostIp}}:{{(index (index .NetworkSettings.Ports "3306/tcp") 0).HostPort}}' "$TEST_DB_CONTAINER")" == "$TEST_DB_HOST:$TEST_DB_PORT" ]] || die "container is not published only on $TEST_DB_HOST:$TEST_DB_PORT"
   [[ "$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/mysql"}}{{.Name}}:{{.RW}}{{end}}{{end}}' "$TEST_DB_CONTAINER")" == "$TEST_DB_VOLUME:true" ]] || die "database volume attestation failed"

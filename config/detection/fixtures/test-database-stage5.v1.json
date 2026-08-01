@@ -1,0 +1,36 @@
+{
+  "fixtureVersion": "1.0.0",
+  "sourceRevision": "staging_emusa_core-20260723-025548",
+  "a02": {
+    "clean": [23173],
+    "concurrent": [23281, 23451, 23639],
+    "threshold": [23811],
+    "receiptBeforeDetection": [23812],
+    "failureIsolation": [23817, 23824],
+    "administrativeClosure": [23947],
+    "mixed": [23960, 24520, 24559],
+    "cancel": [24687],
+    "reject": [26055],
+    "downstream": [26056]
+  },
+  "a03": {
+    "clean": [6954],
+    "threshold": [8290],
+    "concurrent": [11377, 11688, 11728, 12198],
+    "failure": [16328],
+    "administrativeClosure": [8290],
+    "availability": [8290]
+  },
+  "a05": {
+    "clean": [141084],
+    "thresholdBoth": [141088],
+    "independentProduced": [141090],
+    "independentRemnant": [10230],
+    "partialWeighFirst": [141116],
+    "partialMoveFirst": [141141],
+    "failure": [141150],
+    "administrativeClosure": [141184],
+    "handoff": [141244],
+    "otClosure": [141384]
+  }
+}

@@ -135,15 +135,25 @@ export function conversationScope(isAdministrator: boolean): "mine" | "all" {
 }
 
 export function buildConversationRows(backendRows: ConversationSummary[], includeReviewFixtures: boolean): ChatConversationRow[] {
-  const connectedRows = backendRows.map((row, index) => {
-    const fixture = UI_ONLY_CONVERSATION_FIXTURES[index % UI_ONLY_CONVERSATION_FIXTURES.length]!;
-    const count = Math.max(0, Number(row.openAlerts));
+  const connectedRows = backendRows.map((row) => {
+    const connectedAlerts = (row.openAlertItems ?? []).map((alert) => {
+      const ageMinutes = Math.max(0, Math.floor((Date.now() - Date.parse(alert.openedAt)) / 60_000));
+      const age = ageMinutes >= 60 ? `${Math.floor(ageMinutes / 60)} h ${ageMinutes % 60} min` : `${ageMinutes} min`;
+      return {
+        id: alert.id, code: alert.code, shortName: alert.title, age, ageMinutes, label: "Alerta",
+        title: alert.title, summary: alert.summary, ...(alert.workOrderCode ? { workOrderCode: alert.workOrderCode } : {}),
+        ...(alert.machineCode ? { machineCode: alert.machineCode } : {}), detectedAt: alert.openedAt,
+      } satisfies ChatAlertPresentation;
+    });
+    const participantCount = Math.max(0, Number(row.participantCount));
     return {
       ...row,
-      pinned: fixture.pinned,
-      alerts: count > 0 ? fixture.alerts.slice(0, Math.min(count, fixture.alerts.length)) : [],
-      oldestAge: count > 0 ? fixture.oldestAge : null,
-      participants: fixture.participants,
+      pinned: false,
+      alerts: connectedAlerts,
+      oldestAge: connectedAlerts.length ? connectedAlerts.reduce((oldest, alert) => Math.max(oldest, alert.ageMinutes ?? 0), 0) >= 60
+        ? `${Math.floor(Math.max(...connectedAlerts.map((alert) => alert.ageMinutes ?? 0)) / 60)} h ${Math.max(...connectedAlerts.map((alert) => alert.ageMinutes ?? 0)) % 60} min`
+        : `${Math.max(...connectedAlerts.map((alert) => alert.ageMinutes ?? 0))} min` : null,
+      participants: participantCount === 1 ? `1 participante · ${row.participantNames ?? ""}` : `${participantCount} participantes · ${row.participantNames ?? ""}`,
       mockOnly: false,
     };
   });

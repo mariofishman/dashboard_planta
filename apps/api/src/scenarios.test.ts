@@ -29,7 +29,7 @@ it("locks the scenario laboratory out of production", () => {
   }), /Scenario laboratory is local development and test only/);
 });
 
-it("drives A02 through source changes, failure preservation, resolution, and recurrence", async () => {
+it("drives A02 through source changes, failure preservation, and resolution without rewriting terminal source history", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
   const operator = { authorization: "Bearer mock:machine-operator" };
@@ -65,13 +65,7 @@ it("drives A02 through source changes, failure preservation, resolution, and rec
   incidents = (await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents;
   assert.equal(incidents[0].lifecycle, "resolved");
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
-  incidents = (await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents;
-  assert.equal(incidents.length, 2);
-  assert.equal(incidents.filter((incident: { lifecycle: string }) => incident.lifecycle === "open").length, 1);
-  assert.deepEqual(incidents.map((incident: { occurrence: number }) => incident.occurrence).sort(), [1, 2]);
+  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/recur", headers: manager })).statusCode, 409);
 });
 
 it("drives A03 and A05 through their local source thresholds and healthy resolution", async () => {
@@ -117,7 +111,7 @@ it("preserves every open scenario alert through every simulator read failure", a
   }
 });
 
-it("exposes the threshold matrix, A05 reason variants, and isolated scenario clocks", async () => {
+it("exposes the threshold matrix, A05 reason variants, and one shared factory clock", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
   const prepare = async (code: string, scenario: string) => {
@@ -157,7 +151,7 @@ it("exposes the threshold matrix, A05 reason variants, and isolated scenario clo
   const a03Clock = before.find((item: { ruleCode: string }) => item.ruleCode === "A03").scenarioClock.currentAt;
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 1 } });
   const after = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios;
-  assert.equal(after.find((item: { ruleCode: string }) => item.ruleCode === "A03").scenarioClock.currentAt, a03Clock, "one rule cannot advance another rule's clock");
+  assert.equal(Date.parse(after.find((item: { ruleCode: string }) => item.ruleCode === "A03").scenarioClock.currentAt), Date.parse(a03Clock) + 60_000, "all rules use one shared factory clock");
 });
 
 it("keeps A05 open until weighing and movement are both complete in either order", async () => {
@@ -187,7 +181,7 @@ it("keeps A05 open until weighing and movement are both complete in either order
   }
 });
 
-it("applies the complete persistent, duplicate, visible-integration, resolution, and recurrence path to every alert", async () => {
+it("applies the complete persistent, duplicate, visible-integration, and resolution path to every alert", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
   const assignment = (id: string, person: string, position: string, scope: string, operations: string[] = []) => ({
@@ -227,12 +221,7 @@ it("applies the complete persistent, duplicate, visible-integration, resolution,
     assert.equal(state.actualMonitor.latestIncident.lifecycle, "resolved");
     assert.equal(state.actualMonitor.openIncidentCount, 0);
 
-    assert.equal((await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/recur`, headers: manager })).statusCode, 200);
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
-    state = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === code);
-    assert.equal(state.actualMonitor.incidentCount, 2);
-    assert.equal(state.actualMonitor.openIncidentCount, 1);
-    assert.equal(state.actualMonitor.latestIncident.occurrence, 2);
+    assert.equal((await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/recur`, headers: manager })).statusCode, 409);
   }
 });
 
@@ -294,7 +283,7 @@ it("keeps source actions isolated from Monitor tables and separates simulated fr
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/fail-next-poll", headers: manager, payload: { fault: "partial" } });
   const after = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios;
   const a03After = after.find((item: { ruleCode: string }) => item.ruleCode === "A03");
-  assert.equal(a03After.scenarioClock.currentAt, a03.scenarioClock.currentAt);
+  assert.equal(Date.parse(a03After.scenarioClock.currentAt) - Date.parse(a03.scenarioClock.currentAt), 60 * 60_000);
   assert.equal(a03After.sourceRevision, a03.sourceRevision);
   assert.notEqual(advanced.json().scenarioClock.currentAt, advanced.json().sourceChangedAt, "simulated business time and real recording time must remain separate");
   assert.equal(Math.abs(Date.now() - Date.parse(advanced.json().sourceChangedAt)) < 10_000, true, "source action recording time must use real time");
@@ -307,7 +296,7 @@ it("keeps source actions isolated from Monitor tables and separates simulated fr
   assert.deepEqual(monitorAfter, monitorBefore, "source actions must not write Monitor-owned tables");
 });
 
-it("keeps evidence, routing, conversations, and alert cards idempotent and gates recurrence", async () => {
+it("keeps evidence, routing, conversations, and alert cards idempotent and rejects invalid source recurrence", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
   const assignment = (id: string, person: string, position: string, scope: string, operations: string[] = []) => ({
@@ -350,12 +339,7 @@ it("keeps evidence, routing, conversations, and alert cards idempotent and gates
 
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/correct", headers: manager });
   await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
-  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/recur", headers: manager })).statusCode, 200);
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
-  const recurred = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
-  assert.equal(recurred.actualMonitor.incidentCount, 2);
-  assert.equal(recurred.actualMonitor.openIncidentCount, 1);
-  assert.equal(recurred.actualMonitor.latestIncident.occurrence, 2);
+  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/recur", headers: manager })).statusCode, 409);
 });
 
 it("publishes a simulator-created incident as a cursor-recoverable committed change", async () => {

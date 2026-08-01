@@ -2,7 +2,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
 import { ConversationService, type ConversationParticipant } from "@monitor/conversations";
-import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry, TestDatabaseConnections, TestDatabaseScenarioRepository, testDatabaseContextFor, testDatabaseRegistry, type ScenarioSource } from "@monitor/detection";
+import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry, TestDatabaseConnections, TestDatabaseFreshnessProvider, TestDatabaseScenarioRepository, testDatabaseContextFor, testDatabaseRegistry, type DetectionQueryDefinition, type DetectionSourceAdapter, type ScenarioSource, type TestDatabaseFixtureSeeds } from "@monitor/detection";
 import { IncidentService, type IncidentChange, type RuleContract } from "@monitor/incidents";
 import Fastify from "fastify";
 import { readFile } from "node:fs/promises";
@@ -36,6 +36,12 @@ export interface MonitorServer {
   database: DatabaseRuntime;
   redis: RedisRuntime;
   config: MonitorConfig;
+  acceptance?: {
+    runner: DetectionRunner;
+    scheduler: DetectionScheduler;
+    source: ScenarioSource;
+    registry: Map<"A02" | "A03" | "A05", { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
+  };
   close(): Promise<void>;
 }
 
@@ -70,6 +76,7 @@ export async function buildMonitorServer(options: {
   config?: Partial<MonitorConfig>;
   identityAdapter?: IdentityAdapter;
   database?: DatabaseRuntime;
+  testDatabaseFixtureSeeds?: TestDatabaseFixtureSeeds;
 } = {}): Promise<MonitorServer> {
   const config = loadConfig(options.config);
   const app = Fastify({
@@ -135,11 +142,14 @@ export async function buildMonitorServer(options: {
   let scenarioSource: ScenarioSource | null = null;
   if (config.enableScenarioLab && config.scenarioSource === "test_database") {
     testDatabaseConnections = await TestDatabaseConnections.create(repositoryRoot);
-    scenarioSource = await TestDatabaseScenarioRepository.create(testDatabaseConnections, database, repositoryRoot);
+    scenarioSource = await TestDatabaseScenarioRepository.create(testDatabaseConnections, repositoryRoot, options.testDatabaseFixtureSeeds);
   } else if (config.enableScenarioLab) {
     scenarioSource = new ScenarioSourceRepository(database);
   }
-  const detectionRunner = new DetectionRunner(detectionRepository, new FixedBackupFreshnessProvider("phase1-fixtures.v1"), undefined, async ({ cycleId, query, rows, observedAt }) => {
+  const freshness = scenarioSource instanceof TestDatabaseScenarioRepository
+    ? new TestDatabaseFreshnessProvider(scenarioSource)
+    : new FixedBackupFreshnessProvider("phase1-fixtures.v1");
+  const detectionRunner = new DetectionRunner(detectionRepository, freshness, undefined, async ({ cycleId, query, rows, observedAt }) => {
     const rule = incidentRules.get(query.ruleCode);
     if (!rule) return;
     await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt, contextFor: (row) => query.adapterKind === "simulator"
@@ -170,7 +180,9 @@ export async function buildMonitorServer(options: {
   const localDetectionSources = scenarioSource
     ? [...fixtureSources.filter(({ query }) => !["A02", "A03", "A05"].includes(query.ruleCode)), ...scenarioSources]
     : fixtureSources;
-  await Promise.all(localDetectionSources.map(({ query, adapter }) => detectionScheduler.runRecovery(query, adapter)));
+  await Promise.all(localDetectionSources
+    .filter(({ query }) => !scenarioSource || !["A02", "A03", "A05"].includes(query.ruleCode))
+    .map(({ query, adapter }) => detectionScheduler.runRecovery(query, adapter)));
   // Deterministic tests invoke the same runner through the development poll route.
   // Development keeps normal scheduled polling active for source-to-screen review.
   if (config.nodeEnv !== "test") localDetectionSources.forEach(({ query, adapter }) => detectionScheduler.schedule(query, adapter));
@@ -249,6 +261,24 @@ export async function buildMonitorServer(options: {
     const incident = await incidentService.detail((request.params as { id: string }).id, request.principal!.plantIds);
     return incident ?? reply.code(404).send({ error: "incident_not_found" });
   });
+  app.post("/api/incidents/:id/close-without-resolution", { preHandler: app.requireScopes(["monitor:admin"]) }, async (request, reply) => {
+    const body = request.body as { reason?: unknown; comment?: unknown };
+    try {
+      const change = await incidentService.closeWithoutResolution({
+        incidentId: (request.params as { id: string }).id,
+        actorSysUserId: request.principal!.sysUserId,
+        reason: String(body?.reason ?? ""),
+        comment: String(body?.comment ?? ""),
+      });
+      await conversationService.closeIncident(change.incidentId);
+      return { change };
+    } catch (error) {
+      if (error instanceof Error && error.message === "invalid_administrative_closure") return reply.code(400).send({ error: error.message });
+      if (error instanceof Error && error.message === "incident_not_found") return reply.code(404).send({ error: error.message });
+      if (error instanceof Error && error.message === "incident_not_open") return reply.code(409).send({ error: error.message });
+      throw error;
+    }
+  });
   app.get("/api/internal/routing/:incidentId", { preHandler: app.requireScopes(["monitor:admin"]) }, async (request, reply) => {
     const diagnostics = await routingService.diagnostics((request.params as { incidentId: string }).incidentId);
     return diagnostics ?? reply.code(404).send({ error: "routing_decision_not_found" });
@@ -269,12 +299,13 @@ export async function buildMonitorServer(options: {
   await app.register(rosterRoutes, { database, onChanged: (plantId) => rerouteOpen(plantId) });
   await app.register(rotationRoutes, { database, onChanged: rerouteOpen });
   await app.register(conversationRoutes, { service: conversationService });
+  const scenarioRegistry = new Map(scenarioSources.map((entry) => [entry.query.ruleCode as "A02" | "A03" | "A05", entry]));
   if (scenarioSource) {
     await app.register(scenarioRoutes, {
       database,
       source: scenarioSource,
-      runner: detectionRunner,
-      registry: new Map(scenarioSources.map((entry) => [entry.query.ruleCode as "A02" | "A03" | "A05", entry])),
+      scheduler: detectionScheduler,
+      registry: scenarioRegistry,
     });
   }
 
@@ -286,5 +317,8 @@ export async function buildMonitorServer(options: {
     await database.close();
     if (testDatabaseConnections) await testDatabaseConnections.close();
   };
-  return { app, io, database, redis, config, close };
+  return {
+    app, io, database, redis, config, close,
+    ...(scenarioSource ? { acceptance: { runner: detectionRunner, scheduler: detectionScheduler, source: scenarioSource, registry: scenarioRegistry } } : {}),
+  };
 }

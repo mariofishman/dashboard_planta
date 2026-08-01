@@ -151,7 +151,7 @@ export function ChatList({ session }: { session: SessionResponse }) {
   const refresh = useCallback(() => {
     void conversations(search, undefined, scope)
       .then((result) => {
-        setRows(buildConversationRows(result.conversations, import.meta.env.DEV));
+        setRows(buildConversationRows(result.conversations, import.meta.env.DEV && result.conversations.length === 0));
         setNextCursor(result.nextCursor);
         setShowConnectionWarning(false);
         setState("ready");
@@ -425,7 +425,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
   }, [conversationId, flushPending, mockConversation, queueKey, refresh, socket]);
 
   const displayMessages = useMemo(() => {
-    const fixtureMessages = import.meta.env.DEV ? uiOnlyMessages : [];
+    const fixtureMessages = mockConversation ? uiOnlyMessages : [];
     const byId = new Map<string, ConversationMessage>();
     [...fixtureMessages, ...messages, ...localMessages].forEach((message) => byId.set(message.id, message));
     return [...byId.values()].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));

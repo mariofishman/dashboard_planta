@@ -65,6 +65,19 @@ describe("Phase 4 incident lifecycle", () => {
     assert.equal(Number((await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident")).count), 0);
   });
 
+  it("closes administratively, suppresses one uninterrupted condition, and expires suppression after a healthy clear", async () => {
+    const opened = await service.apply({ rule: a03, evidence: triggered, context });
+    assert.ok(opened);
+    await service.closeWithoutResolution({ incidentId: opened.incidentId, actorSysUserId: 9000, reason: "unreconstructable", comment: "La fuente histórica no puede reconstruirse." });
+    assert.equal((await service.detail(opened.incidentId, [1]))?.lifecycle, "closed_without_resolution");
+    assert.equal(await service.apply({ rule: a03, evidence: triggered, context }), null);
+    assert.equal(Number((await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident")).count), 1);
+
+    await service.reconcileHealthyCycle({ rule: a03, rows: [], contextFor: () => context, cycleId: "00000000-0000-4000-8000-000000000099", observedAt: new Date() });
+    assert.equal((await database.queryOne("SELECT active FROM monitor_condition_suppression WHERE rule_code='A03'")).active, false);
+    assert.equal(Number((await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident_administrative_closure")).count), 1);
+  });
+
   it("publishes only after a successful transaction", async () => {
     const failing: DatabaseRuntime = { ...database, async transaction(work) { await database.transaction(work); throw new Error("commit_failed"); } };
     const events: IncidentChange[] = [];

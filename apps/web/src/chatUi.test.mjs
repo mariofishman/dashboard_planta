@@ -45,11 +45,16 @@ test("backend rows remain connected while presentation-only metadata is added", 
   const backend = [{
     id: "server-row", title: "Grupo conectado", updatedAt: "2026-07-28T12:00:00-05:00", writableUntil: null,
     lastSender: "Monitor", lastBody: "Alerta conectada", lastKind: "alert", openAlerts: 2, unreadCount: 3, isParticipant: true,
+    participantCount: 1, participantNames: "María Torres", openAlertItems: [
+      { id: "a02", code: "A02", title: "Material reservado sin recepción", summary: "Pendiente", workOrderCode: "151087.3", machineCode: "P15", openedAt: "2026-07-28T11:30:00-05:00" },
+      { id: "a05", code: "A05", title: "Bobina pendiente", summary: "Pendiente", workOrderCode: "151087.3", machineCode: "P15", openedAt: "2026-07-28T11:00:00-05:00" },
+    ],
   }];
   const [row] = buildConversationRows(backend, false);
   assert.equal(row.id, "server-row");
   assert.equal(row.mockOnly, false);
   assert.equal(row.alerts.length, 2);
+  assert.equal(row.participants, "1 participante · María Torres");
 });
 
 test("responsive alert-chip limits preserve explicit overflow", () => {

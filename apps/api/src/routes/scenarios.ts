@@ -1,5 +1,5 @@
 import type { DatabaseRuntime } from "@monitor/database";
-import type { DetectionRunner, ScenarioCase, ScenarioCorrection, ScenarioFault, ScenarioSource } from "@monitor/detection";
+import type { DetectionScheduler, ScenarioCase, ScenarioCorrection, ScenarioFault, ScenarioSource } from "@monitor/detection";
 import type { DetectionQueryDefinition, DetectionSourceAdapter } from "@monitor/detection";
 import type { FastifyInstance, FastifyReply } from "fastify";
 
@@ -15,7 +15,7 @@ const scenarioCode = (value: string, reply: FastifyReply): ScenarioCode | null =
 export async function scenarioRoutes(app: FastifyInstance, options: {
   database: DatabaseRuntime;
   source: ScenarioSource;
-  runner: DetectionRunner;
+  scheduler: DetectionScheduler;
   registry: Map<ScenarioCode, { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
 }): Promise<void> {
   const status = async (code: ScenarioCode) => {
@@ -137,7 +137,11 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     if (!code) return reply;
     const scenario = String(request.body?.scenario ?? "");
     if (!options.source.supportedCases(code).includes(scenario as ScenarioCase)) return reply.code(400).send({ error: "invalid_scenario_case" });
-    await options.source.prepare(code, scenario);
+    try { await options.source.prepare(code, scenario); }
+    catch (error) {
+      if (error instanceof Error && ["movement_terminal", "work_order_closed", "consumption_already_recorded", "source_lifecycle_recurrence_unsupported"].includes(error.message)) return reply.code(409).send({ error: error.message });
+      throw error;
+    }
     return status(code);
   });
   app.post<{ Params: { code: string }; Body: { correction?: unknown } }>("/api/dev/scenarios/:code/correct", guard, async (request, reply) => {
@@ -146,7 +150,11 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     const correction = String(request.body?.correction ?? "both");
     if (!["weigh", "move", "both"].includes(correction)) return reply.code(400).send({ error: "invalid_scenario_correction" });
     if (code !== "A05" && correction !== "both") return reply.code(400).send({ error: "invalid_scenario_correction" });
-    await options.source.correct(code, correction as ScenarioCorrection);
+    try { await options.source.correct(code, correction as ScenarioCorrection); }
+    catch (error) {
+      if (error instanceof Error && error.message === "work_order_closed") return reply.code(409).send({ error: error.message });
+      throw error;
+    }
     return status(code);
   });
   app.post<{ Params: { code: string }; Body: { minutes?: unknown } }>("/api/dev/scenarios/:code/advance-time", guard, async (request, reply) => {
@@ -161,7 +169,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     const code = scenarioCode(request.params.code, reply);
     if (!code) return reply;
     const fault = request.body?.fault;
-    if (!["timeout", "source_error", "partial", "invalid_schema"].includes(String(fault))) return reply.code(400).send({ error: "invalid_scenario_fault" });
+    if (!["timeout", "source_error", "partial", "invalid_schema", "partial_pagination", "duplicate_keys", "revision_change", "stale", "unknown_freshness"].includes(String(fault))) return reply.code(400).send({ error: "invalid_scenario_fault" });
     await options.source.failNextPoll(code, fault as ScenarioFault);
     return status(code);
   });
@@ -169,7 +177,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     const code = scenarioCode(request.params.code, reply);
     if (!code) return reply;
     const entry = options.registry.get(code)!;
-    const result = await options.runner.run(entry.query, entry.adapter);
+    const result = await options.scheduler.runScheduled(entry.query, entry.adapter);
     return { result, scenario: await status(code) };
   });
   app.post<{ Params: { code: string } }>("/api/dev/scenarios/:code/recur", guard, async (request, reply) => {
@@ -177,7 +185,20 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     if (!code) return reply;
     try { await options.source.recur(code); }
     catch (error) {
-      if (error instanceof Error && error.message === "recurrence_requires_resolved_incident") return reply.code(409).send({ error: error.message });
+      if (error instanceof Error && ["recurrence_requires_resolved_incident", "source_lifecycle_recurrence_unsupported"].includes(error.message)) return reply.code(409).send({ error: error.message });
+      throw error;
+    }
+    return status(code);
+  });
+  app.post<{ Params: { code: string }; Body: { action?: unknown; key?: unknown } }>("/api/dev/scenarios/:code/source-action", guard, async (request, reply) => {
+    const code = scenarioCode(request.params.code, reply);
+    if (!code) return reply;
+    const action = String(request.body?.action ?? "") as "cancel" | "reject" | "close_work_order" | "handoff" | "start_competing_work_order";
+    const key = request.body?.key === undefined ? undefined : Number(request.body.key);
+    if (!options.source.sourceAction || !["cancel", "reject", "close_work_order", "handoff", "start_competing_work_order"].includes(action) || (key !== undefined && !Number.isSafeInteger(key))) return reply.code(400).send({ error: "invalid_source_action" });
+    try { await options.source.sourceAction(code, action, key); }
+    catch (error) {
+      if (error instanceof Error && ["invalid_source_action", "work_order_closed", "machine_has_active_work_order"].includes(error.message)) return reply.code(409).send({ error: error.message });
       throw error;
     }
     return status(code);

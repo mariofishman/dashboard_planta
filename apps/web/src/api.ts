@@ -31,11 +31,14 @@ export interface IncidentDetail extends IncidentSummary {
   evidence: { id: string; status: "triggered" | "clear"; reasons: string[]; evidence: Record<string, unknown>; observedAt: string }[];
   transitions: { fromState: IncidentLifecycle | null; toState: IncidentLifecycle; reason: string; occurredAt: string }[];
   related: { id: string; ruleCode: string; title: string; lifecycle: IncidentLifecycle }[];
+  administrativeClosure: { reason: string; comment: string; actorSysUserId: number; closedAt: string } | null;
 }
 
 export interface ConversationSummary {
   id: string; title: string; updatedAt: string; writableUntil: string | null; lastSender: string; lastBody: string;
   lastKind: "text" | "alert" | "attachment"; openAlerts: number; unreadCount: number; isParticipant: boolean;
+  participantCount?: number; participantNames?: string;
+  openAlertItems?: { id: string; code: string; title: string; summary: string; workOrderCode: string | null; machineCode: string | null; openedAt: string }[];
 }
 export interface ConversationMessage {
   id: string; cursor: number; senderSysUserId: number | null; senderName: string; kind: "text" | "alert" | "attachment";
@@ -129,6 +132,13 @@ export async function incidents(filters: { status?: string; operation?: string; 
 
 export async function incidentDetail(id: string): Promise<IncidentDetail> {
   return responseJson<IncidentDetail>(await fetch(`/api/incidents/${id}`, { credentials: "include" }));
+}
+
+export async function closeIncidentWithoutResolution(id: string, reason: string, comment: string): Promise<void> {
+  await responseJson(await fetch(`/api/incidents/${id}/close-without-resolution`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reason, comment }),
+  }));
 }
 
 export async function conversationForIncident(id: string): Promise<string | null> {

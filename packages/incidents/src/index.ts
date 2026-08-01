@@ -117,6 +117,17 @@ export class IncidentService {
       if (evaluation.status === "triggered" && evaluation.conditionKey) activeKeys.add(evaluation.conditionKey);
       await this.apply({ rule: input.rule, evidence: row, context: input.contextFor(row), cycleId: input.cycleId, observedAt: input.observedAt });
     }
+    const suppressions = await this.database.queryAll(
+      "SELECT condition_key FROM monitor_condition_suppression WHERE rule_code=$1 AND active=TRUE",
+      [input.rule.code],
+    );
+    for (const suppression of suppressions) {
+      if (!activeKeys.has(String(suppression.condition_key))) {
+        await this.database.execute(`UPDATE monitor_condition_suppression SET active=FALSE,expired_at=$3
+          WHERE rule_code=$1 AND condition_key=$2 AND active=TRUE`,
+        [input.rule.code, suppression.condition_key, input.observedAt.toISOString()]);
+      }
+    }
     const open = await this.database.queryAll("SELECT id,condition_key,plant_id FROM monitor_incident WHERE rule_code=$1 AND lifecycle='open'", [input.rule.code]);
     for (const incident of open) {
       if (!activeKeys.has(String(incident.condition_key))) {
@@ -173,6 +184,9 @@ export class IncidentService {
         await this.addEvidence(transaction, String(open.id), input, evaluated, observedAt);
         return this.addChangeEvent(transaction, String(open.id), "incident.updated", "open", input.context.plantId, observedAt);
       }
+      const suppression = await transaction.queryOne(`SELECT active FROM monitor_condition_suppression
+        WHERE rule_code=$1 AND condition_key=$2`, [input.rule.code, evaluated.conditionKey]);
+      if (suppression.active === true) return null;
       const occurrenceRow = await transaction.queryOne(`SELECT COALESCE(MAX(occurrence),0)::int + 1 AS occurrence
         FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2`, [input.rule.code, evaluated.conditionKey]);
       const incident = await transaction.queryOne(`INSERT INTO monitor_incident
@@ -190,6 +204,34 @@ export class IncidentService {
       return this.addChangeEvent(transaction, incidentId, "incident.opened", "open", input.context.plantId, observedAt);
     });
     if (change) await this.publish(change);
+    return change;
+  }
+
+  async closeWithoutResolution(input: { incidentId: string; actorSysUserId: number; reason: string; comment: string; closedAt?: Date }): Promise<IncidentChange> {
+    const reason = input.reason.trim();
+    const comment = input.comment.trim();
+    if (!reason || reason.length > 100 || !comment || comment.length > 2000) throw new Error("invalid_administrative_closure");
+    const closedAt = (input.closedAt ?? new Date()).toISOString();
+    const change = await this.database.transaction(async (transaction) => {
+      const incident = await transaction.queryOne(`SELECT id,rule_code,condition_key,plant_id,lifecycle
+        FROM monitor_incident WHERE id=$1`, [input.incidentId]);
+      if (!incident.id) throw new Error("incident_not_found");
+      if (incident.lifecycle !== "open") throw new Error("incident_not_open");
+      const evidence = await transaction.queryOne(`SELECT evidence FROM monitor_incident_evidence
+        WHERE incident_id=$1 ORDER BY observed_at DESC LIMIT 1`, [input.incidentId]);
+      await transaction.execute(`INSERT INTO monitor_incident_administrative_closure
+        (incident_id,reason,comment,actor_sys_user_id,frozen_evidence,closed_at)
+        VALUES ($1,$2,$3,$4,$5::jsonb,$6)`, [input.incidentId, reason, comment, input.actorSysUserId, JSON.stringify(jsonValue(evidence.evidence) ?? {}), closedAt]);
+      await transaction.execute(`UPDATE monitor_incident SET lifecycle='closed_without_resolution',updated_at=$2,resolved_at=$2,
+        resolution_reason='administrative_closure' WHERE id=$1`, [input.incidentId, closedAt]);
+      await transaction.execute(`INSERT INTO monitor_condition_suppression
+        (rule_code,condition_key,incident_id,active,created_at,expired_at) VALUES ($1,$2,$3,TRUE,$4,NULL)
+        ON CONFLICT (rule_code,condition_key) DO UPDATE SET incident_id=EXCLUDED.incident_id,active=TRUE,created_at=EXCLUDED.created_at,expired_at=NULL`,
+      [incident.rule_code, incident.condition_key, input.incidentId, closedAt]);
+      await this.addTransition(transaction, input.incidentId, "open", "closed_without_resolution", "administrative_closure", undefined, closedAt);
+      return this.addChangeEvent(transaction, input.incidentId, "incident.resolved", "closed_without_resolution", Number(incident.plant_id), closedAt);
+    });
+    await this.publish(change);
     return change;
   }
 
@@ -225,7 +267,9 @@ export class IncidentService {
       FROM monitor_incident_transition WHERE incident_id=$1 ORDER BY occurred_at`, [id]);
     const related = incident.correlationKey ? await this.database.queryAll(`SELECT id,rule_code AS "ruleCode",title,lifecycle
       FROM monitor_incident WHERE correlation_key=$1 AND id<>$2 ORDER BY opened_at DESC`, [incident.correlationKey, id]) : [];
-    return { ...incident, evidence, transitions, related };
+    const administrativeClosure = await this.database.queryOne(`SELECT reason,comment,actor_sys_user_id AS "actorSysUserId",closed_at AS "closedAt"
+      FROM monitor_incident_administrative_closure WHERE incident_id=$1`, [id]);
+    return { ...incident, evidence, transitions, related, administrativeClosure: administrativeClosure.reason ? administrativeClosure : null };
   }
 
   async changesAfter(cursor: number, plantIds: number[]): Promise<Record<string, unknown>[]> {

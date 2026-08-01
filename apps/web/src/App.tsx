@@ -20,6 +20,10 @@ import {
   CircularProgress,
   Container,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Drawer,
   FormControl,
   FormControlLabel,
@@ -52,6 +56,7 @@ import { io, type Socket } from "socket.io-client";
 import {
   currentSession,
   conversationForIncident,
+  closeIncidentWithoutResolution,
   incidentDetail,
   incidents,
   logout,
@@ -203,6 +208,10 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
   const [detail, setDetail] = useState<IncidentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailConversationId, setDetailConversationId] = useState<string | null>(null);
+  const [closureOpen, setClosureOpen] = useState(false);
+  const [closureReason, setClosureReason] = useState("");
+  const [closureComment, setClosureComment] = useState("");
+  const [closureSubmitting, setClosureSubmitting] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileQuickFiltersOpen, setMobileQuickFiltersOpen] = useState(false);
   const [desktopSearchExpanded, setDesktopSearchExpanded] = useState(false);
@@ -215,6 +224,7 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
   const pullStartY = useRef<number | null>(null);
   const customRangePhase = useRef<"start" | "end">("start");
   const socket = useMemo<Socket>(() => io({ withCredentials: true, autoConnect: false }), []);
+  const canCloseWithoutResolution = session.principal.scopes.includes("monitor:admin");
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -576,6 +586,9 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
         <Button variant="contained" startIcon={<ChatBubbleOutlineRounded/>} disabled={!detailConversationId} onClick={() => { window.location.href = `/chats/${detailConversationId}`; }} sx={{ mt: 2 }}>
           {detailConversationId ? "Abrir conversación" : "Conversación no disponible"}
         </Button>
+        {canCloseWithoutResolution && detail.lifecycle === "open" && <Button variant="outlined" color="warning" onClick={() => setClosureOpen(true)} sx={{ mt: 2, ml: 1 }}>
+          Cerrar sin resolución
+        </Button>}
 
         <Section title="Datos operativos">
           <Stack divider={<Divider flexItem/>}><Fact label="OT" value={detail.workOrderCode}/><Fact label="Máquina" value={detail.machineCode}/><Fact label="Operación" value={detail.operationName}/><Fact label="Turno" value={detail.shiftName}/><Fact label="Responsable" value={detail.responsibleName}/></Stack>
@@ -588,8 +601,25 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
         <Section title="¿Por qué se generó?">
           <IncidentExplanation detail={detail}/>
         </Section>
+        {detail.administrativeClosure && <Section title="Cierre administrativo"><Stack gap={.5}><Typography variant="body2" fontWeight={600}>{detail.administrativeClosure.reason}</Typography><Typography variant="body2">{detail.administrativeClosure.comment}</Typography><Typography variant="caption" color="text.secondary">{dateTime(detail.administrativeClosure.closedAt)}</Typography></Stack></Section>}
       </Box>}
     </Drawer>
+
+    <Dialog open={closureOpen} onClose={() => { if (!closureSubmitting) setClosureOpen(false); }} fullWidth maxWidth="xs">
+      <DialogTitle>Cerrar sin resolución</DialogTitle>
+      <DialogContent><Stack gap={2} sx={{ pt: 1 }}>
+        <Typography variant="body2">El cierre conserva la verdad de EmusaSoft y evita reabrir solo esta condición ininterrumpida.</Typography>
+        <TextField label="Motivo" value={closureReason} onChange={(event) => setClosureReason(event.target.value)} required/>
+        <TextField label="Comentario" value={closureComment} onChange={(event) => setClosureComment(event.target.value)} required multiline minRows={3} sx={{ "& .MuiOutlinedInput-root": { height: "auto", minHeight: 84 } }}/>
+      </Stack></DialogContent>
+      <DialogActions><Button onClick={() => setClosureOpen(false)} disabled={closureSubmitting}>Cancelar</Button><Button variant="contained" color="warning" disabled={!closureReason.trim() || !closureComment.trim() || closureSubmitting} onClick={() => {
+        if (!detail) return;
+        setClosureSubmitting(true);
+        void closeIncidentWithoutResolution(detail.id, closureReason, closureComment).then(async () => {
+          const next = await incidentDetail(detail.id); setDetail(next); setClosureOpen(false); setClosureReason(""); setClosureComment(""); refresh();
+        }).finally(() => setClosureSubmitting(false));
+      }}>Cerrar sin resolución</Button></DialogActions>
+    </Dialog>
   </Box>;
 }
 
