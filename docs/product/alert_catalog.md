@@ -248,16 +248,16 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 | Field | Definition |
 |---|---|
-| When it happens | A machine expected to be producing has no active OT for more than 30 minutes. |
+| When it happens | The current approved production plan expects a machine to be producing, but the machine has no active OT for more than 30 continuous minutes. |
 | Why the alert exists | Planned production time is being lost without a corresponding active work order. |
-| Possible causes | Disorganization, unrecorded machine stoppage, missing material, operator delay, maintenance, or a plan that was not updated. |
+| Possible causes | Disorganization, missing material, operator delay, maintenance that was not recorded in the production plan, or a plan that was not updated. |
 | Example | P09 is scheduled to produce during the shift but has no active OT between 14:00 and 14:31. |
 
-**Detection indicators and algorithm:** Require that the machine is scheduled or expected to operate, has no active OT, and has remained in that state for more than 30 minutes. Exclude recorded maintenance, planned shutdown, approved pause, or no-production schedule periods.
+**Detection indicators and algorithm:** Use the current approved production plan to establish one expected-production window for the machine. Within that window, start or continue the idle clock only while no OT is active. Trigger strictly after 30 continuous minutes; equality at 30 minutes does not trigger. An OT paused within its own execution remains an active OT and is outside B03. A planner- or supervisor-initiated whole-day or plan-level suspension, planned shutdown, or no-production period changes the approved plan so production is no longer expected and therefore excludes or clears B03. An equipment-pause record does not independently create that plan state. Maintain one condition per machine and approved expected-production window.
 
-**Primary action owner:** No machine-state or pause record → **machine operator**. Valid pause exists but the production plan still expects activity → **Planner**.
+**Primary action owner:** **Planner**, who updates or restructures the approved production plan. The operation shift supervisor remains informed and may initiate the need for a plan-level suspension. The machine operator may be an implicated recipient but cannot resolve B03 by recording an in-OT or equipment pause.
 
-**Resolution:** Record the machine’s real state using the equipment-pause workflow, including category, explanation when required, and expected duration. Then shift the remaining plan using the same `Actualizar todo el plan` behavior described in `B02`. Close normally when an OT starts, a valid pause is recorded, or the plan no longer expects production. If the interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration.
+**Resolution:** Close normally after a healthy evaluation observes that an OT is active or that an approved production-plan update makes production suspended or not expected for that interval. A plan-level suspension resolves B03 immediately; it is recorded through the production-planning workflow by an authorized planner or supervisor, not by a machine operator. Recording an in-OT or equipment pause does not resolve B03. If the interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration.
 
 
 ## C — Statistical and physical plausibility
@@ -514,7 +514,7 @@ Codes not listed use the seven general rules without modification.
 | A02 | The material has already been sent. Notify both the warehouse dispatcher or sender and the machine operator, plus their applicable shift supervisors. The reason determines which position is primary. |
 | A05 | The process operator owns both weighing and movement. A produced reel also notifies the process supervisor. A remnant raw-material reel additionally notifies the warehouse dispatcher or sender and its supervisor or leader. |
 | A06 | The machine operator owns waste declaration. When weighing is implicated, also notify the process operator and process supervisor. |
-| B03 | When no active OT exists, use the planned shift operator if known; otherwise the machine shift supervisor and technical leader are the actionable production recipients. |
+| B03 | The Planner is the primary action owner. Inform the operation shift supervisor and technical leader; include the planned shift operator when known as an implicated recipient, but an operator cannot resolve B03 by recording an in-OT or equipment pause. |
 | D02 | Add the material planner only when reservation quantity or reel selection is implicated. Add raw-material warehouse positions only when delivery or return evidence implicates them. |
 | E01 | Do not use OT reservation routing. Notify the material planner and the warehouse dispatcher or sender assigned to resins, not every user in that warehouse zone. |
 | E03 | This incident spans two OTs: notify the machine operators for the previous and current OTs and any identified process operator involved between them. |
