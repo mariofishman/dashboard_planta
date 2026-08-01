@@ -16,7 +16,7 @@ Correct and complete Stage 5 on the existing branch without discarding useful wo
 
 ## How to use this plan
 
-The twelve numbered sections are execution steps, not new Phase 6 stages. Complete them in order. Step 8B is a required human-review substep within Step 8.
+The twelve primary numbered sections are execution steps, not new Phase 6 stages. Complete them in order. Step 5 is divided into Steps 5.1–5.4 so the ledger framework exists before evidence-producing work begins. Steps 8B and 8C are required continuations of Step 8: 8B provides human acceptance, and 8C performs the authoritative 34-test execution and final ledger accounting.
 
 Each step states:
 
@@ -35,11 +35,15 @@ Each step states:
 | 2 | Commit and push only the approved planning correction. | Explicit commit and push authorization. |
 | 3 | Synchronize compatible accepted `main` changes into Stage 5. | Stop if Phase 7 work creates a sequencing conflict. |
 | 4 | Complete the connected laboratory source boundary. | Stage 5A exit assertions must pass. |
-| 5 | Produce exact 34-test chain-of-custody ledgers. | Exactly 34 valid IDs; no failures, skips, extras, or excluded IDs. |
+| 5.1 | Define the exact acceptance inventory and versioned ledger schema. | Schema and manifest validate without claiming test completion. |
+| 5.2 | Define isolated fixture and cleanup contracts for all 34 IDs. | Every approved ID has deterministic setup and restoration. |
+| 5.3 | Build reusable source-to-UI chain capture. | Every mandatory chain link can be captured from authoritative systems. |
+| 5.4 | Build JSON/Markdown rendering and strict ledger validation. | Dry-run fixtures prove formatting and failure behavior; no result is accepted yet. |
 | 6 | Prove source isolation and real-adapter failures. | Every unsafe or synthetic path must fail closed. |
 | 7 | Prove automatic scheduling, interruption, restart, and recovery. | No manual row deletion; repairs must be idempotent. |
 | 8 | Complete same-runtime browser acceptance. | Run-specific visible evidence only. |
 | 8B | Complete passive observability and human exploratory acceptance. | Explicit human acceptance after findings and retests. |
+| 8C | Execute exactly 34 connected cases and finalize the acceptance ledgers. | Exactly 34 valid IDs; no failures, skips, extras, or excluded IDs. |
 | 9 | Run the unchanged finished version twice from clean baselines. | Both complete independent runs must pass. |
 | 10 | Audit evidence and prepare final Stage 5 authority. | Stop uncommitted for user review. |
 | 11 | Commit and push the completed Stage 5 branch. | Explicit commit and push authorization. |
@@ -62,8 +66,8 @@ Each step states:
 
 ```text
 main and origin/main:       3d49bfe  Stage 4 complete
-codex/phase6-stage5:        abd377d  local-data ignore commit; checkpoint 165abc1 remains its parent
-origin/codex/phase6-stage5: 165abc1  published premature Stage 5 completion checkpoint
+codex/phase6-stage5:        d966249  completed and validated Stage 5A source-boundary checkpoint
+origin/codex/phase6-stage5: d966249  synchronized with the local Stage 5 branch
 ```
 
 The correction uses additive commits on the existing branch. Later commits must explicitly correct the checkpoint's status and evidence classification.
@@ -237,25 +241,86 @@ Every required source action is versioned, human/automation accessible through o
 
 Implementation commits stay on `codex/phase6-stage5`. Do not advance Stage 5 status.
 
-## Step 5 — Build the exact connected acceptance ledger
+## Step 5.1 — Define the exact inventory and ledger schema
 
 ### Purpose
 
-Execute every approved test independently and make its complete source-to-UI chain reviewable without reading application code.
+Define, before execution, exactly what may run and what evidence every accepted result must contain.
 
 ### Actions
 
-1. Execute exactly 34 approved IDs: 11 shared, 9 A02, 6 A03, and 8 A05.
-2. Never execute or substitute `A02-08`, `A03-06`, or `A05-07`.
-3. Give each test an independent result and isolated fixture/reset contract.
-4. Derive acceptance from Monitor records and the real UI, never laboratory expected counters.
-5. Record:
+1. Version the exact manifest of 34 approved IDs: 11 shared, 9 A02, 6 A03, and 8 A05.
+2. Keep `A02-08`, `A03-06`, and `A05-07` explicitly excluded and make execution or substitution of any excluded ID invalid.
+3. Declare each test's required actions, expected outcome, applicable technical/browser/recovery evidence, and mandatory chain fields.
+4. Version a ledger schema containing identity, action, source, read, Monitor, visible-result, scheduling/recovery, cleanup, and failure fields.
+5. Encode conditional applicability without allowing a required field to be silently omitted.
+
+### Terms
+
+- **Acceptance manifest:** versioned declaration of the only test IDs and evidence obligations allowed in Stage 5B.
+- **Ledger schema:** machine-validatable structure governing every result and its required chain evidence.
+
+### Artifacts
+
+- revised versioned 34-ID manifest; and
+- versioned ledger schema.
+
+### Exit
+
+The manifest has the exact approved accounting, the schema represents every mandatory field in this authority, excluded IDs fail validation, and no test result is yet described as accepted.
+
+### Approval and Git effect
+
+Schema and manifest work may be committed on the Stage 5 branch. No test-completion claim.
+
+## Step 5.2 — Define isolated fixture and cleanup contracts
+
+### Purpose
+
+Make every approved case independently repeatable without leaking source or Monitor state into another result.
+
+### Actions
+
+1. Give each approved ID a deterministic fixture/setup contract using the reusable Step 4 source actions.
+2. Record fixture identity, natural keys, required starting state, and allowed source mutations.
+3. Define Monitor-runtime isolation and per-test experiment identity.
+4. Restore source state in `finally` and verify the restored digest even when execution fails.
+5. Fail if setup depends on another test, cleanup is incomplete, or an unrelated source row changes.
+
+### Terms
+
+- **Fixture contract:** deterministic starting records, actions, and allowed mutations for one test.
+- **Cleanup contract:** mandatory restoration and verification performed whether the test passes or fails.
+
+### Artifacts
+
+- per-test fixture/setup contracts; and
+- cleanup and restoration validators.
+
+### Exit
+
+All 34 approved IDs have independent setup and cleanup contracts, and forced-failure tests prove restoration still occurs.
+
+### Approval and Git effect
+
+Fixture contracts and tests may be committed on the Stage 5 branch. No connected result is accepted.
+
+## Step 5.3 — Build reusable chain-of-custody capture
+
+### Purpose
+
+Capture authoritative identifiers and state transitions consistently while Steps 6–8B produce the required evidence.
+
+### Actions
+
+1. Capture, in order:
 
    `action ID → source key/before/after → writer → monitor_source_ro read → query/version → source revision → poll cycle → incident → routing/deliveries → conversation/message → cursor → Dashboard/Chat artifact`
 
-6. Version a ledger schema containing every mandatory field and validate each result against it.
-7. Produce machine-readable JSON and readable Markdown.
-8. Fail for a missing chain link, duplicate, skipped/extra ID, excluded recurrence, or mismatched outcome.
+2. Read source, poll, Monitor, and visible-product evidence from their authoritative stores rather than laboratory expected counters.
+3. Cross-validate natural keys, revisions, query versions, poll cycles, downstream IDs, cursors, and artifact metadata.
+4. Capture source/read/Monitor links immediately and expose validated attachment interfaces for scheduling, recovery, browser, and human evidence that Steps 6–8B will produce later.
+5. Fail capture for a missing or contradictory link rather than fabricating a placeholder.
 
 ### Terms
 
@@ -264,18 +329,49 @@ Execute every approved test independently and make its complete source-to-UI cha
 
 ### Artifacts
 
-- versioned ledger schema;
-- JSON ledger;
-- Markdown ledger; and
-- per-test chain-of-custody artifacts.
+- shared chain-capture modules; and
+- cross-link validation tests.
 
 ### Exit
 
-The ledger contains exactly 34 independently reported results and can validate only when all 34 pass, none fail or skip, and no excluded ID runs.
+Representative connected rehearsals prove source, read, and Monitor links can be captured and cross-validated. Contract tests prove later scheduling, recovery, browser, and human evidence can attach only with matching run/test identity. Rehearsals are diagnostic evidence only and cannot count as the authoritative 34-result ledger.
 
 ### Approval and Git effect
 
-No completion claim. Ledger structure and tests may be committed on the Stage 5 branch.
+Capture implementation and tests may be committed on the Stage 5 branch. No completion claim.
+
+## Step 5.4 — Build rendering and strict ledger validation
+
+### Purpose
+
+Make acceptance evidence reviewable by machines and humans while failing closed on incomplete or invalid accounting.
+
+### Actions
+
+1. Generate machine-readable JSON and readable Markdown from the same validated result objects.
+2. Validate every result against the Step 5.1 schema.
+3. Validate exact ID/group accounting, uniqueness, status, exclusions, chain completeness, artifact existence, and cleanup evidence.
+4. Exit nonzero for a missing chain link, duplicate, failed/skipped/extra ID, excluded execution, mismatched outcome, or renderer divergence.
+5. Use synthetic dry-run fixtures to prove every validation failure without presenting them as connected acceptance results.
+
+### Terms
+
+- **Strict accounting:** validation requiring the exact approved set and rejecting every missing, duplicate, extra, skipped, failed, or excluded result.
+- **Renderer divergence:** JSON and Markdown outputs disagree about the same validated result.
+
+### Artifacts
+
+- JSON and Markdown renderers;
+- strict accounting validator; and
+- validator failure-matrix tests.
+
+### Exit
+
+Dry-run fixtures prove valid rendering and every required failure mode. The validator is ready for Step 8C, but no authoritative 34-result ledger exists yet.
+
+### Approval and Git effect
+
+Renderer and validator work may be committed on the Stage 5 branch. No completion claim.
 
 ## Step 6 — Prove source isolation and real-adapter failure handling
 
@@ -433,6 +529,43 @@ The previews introduce no state-changing effects, findings are resolved or expli
 
 Human acceptance is mandatory. No automatic test may substitute for it.
 
+### Step 8C — Execute the exact connected acceptance set and finalize the ledgers
+
+#### Purpose
+
+After Steps 6–8B have completed the required negative, scheduling, recovery, browser, and human evidence capabilities, execute the authoritative Stage 5B set and produce the final reviewable chain-of-custody ledgers.
+
+#### Actions
+
+1. Start from a validated baseline and execute exactly 34 approved IDs: 11 shared, 9 A02, 6 A03, and 8 A05.
+2. Never execute or substitute `A02-08`, `A03-06`, or `A05-07`.
+3. Give every test an independent experiment/result and apply its Step 5.2 fixture and cleanup contract in `finally`.
+4. Use the Step 5.3 capture path to derive acceptance from source records, `monitor_source_ro` reads, Monitor records, scheduling/recovery evidence, and the real same-runtime UI—never laboratory expected counters.
+5. Include applicable Step 6, 7, 8, and 8B evidence and cross-validate every identifier against the current run.
+6. Generate the machine-readable JSON and readable Markdown ledgers through Step 5.4.
+7. Fail for a missing chain link, duplicate, failed/skipped/extra ID, excluded execution, different-runtime artifact, cleanup failure, or mismatched outcome.
+8. If 8C exposes an implementation or evidence defect, return the correction to its owning Step 6, 7, 8, or 8B gate, rerun affected rehearsals, and restart 8C from a validated baseline. Do not repair evidence inside the ledger renderer.
+
+#### Terms
+
+- **Authoritative execution:** the one complete 34-case run whose results populate the pre-official acceptance ledger; earlier rehearsals do not count.
+- **Owning gate:** the earlier step responsible for the behavior or evidence capability that failed.
+
+#### Artifacts
+
+- one schema-valid 34-result JSON ledger;
+- one equivalent readable Markdown ledger;
+- per-test chain-of-custody artifacts; and
+- complete execution and restoration evidence.
+
+#### Exit
+
+The ledgers contain exactly 34 independently reported results: 34 passed, zero failed, zero skipped, zero extras, and zero excluded IDs. Every applicable chain is complete, all artifacts belong to the same run, and source restoration passes.
+
+#### Approval and Git effect
+
+No Stage 5 completion claim. Ledger structure, execution corrections, and pre-official evidence may remain on the Stage 5 branch. Step 9 still requires two independent official runs of the unchanged finished version.
+
 ## Step 9 — Perform the complete final examination twice
 
 ### Purpose
@@ -445,8 +578,8 @@ Prove the finished implementation is repeatable from a clean starting state rath
 2. Merge compatible accepted changes into Stage 5 under Step 3 rules. Stop for user reconciliation if blocked Phase 7 work reached `main`.
 3. Record the exact Git commit to be tested and voluntarily stop changing code, authority, contracts, fixtures, and evidence logic.
 4. Restore and validate the protected baseline.
-5. Run Stage 5A, all 34 connected tests, real-adapter failures, scheduling/recovery, same-runtime browser acceptance, and observability checks.
-6. Generate schema-valid JSON and Markdown ledgers.
+5. Run Stage 5A, real-adapter failures, scheduling/recovery, same-runtime browser acceptance, and observability checks.
+6. Execute Step 8C to run the exact 34 connected cases and generate fresh schema-valid JSON and Markdown ledgers for that official run.
 7. Run automated tests, typecheck, production build, dependency security audit, routing regression, and query-plan validation.
 8. Restore and validate the baseline in `finally`, whether the run passes or fails.
 9. Repeat the entire process independently from the restored baseline without reusing incidents, conversations, messages, browser artifacts, or results.
@@ -593,10 +726,11 @@ Expected commit groups are:
 
 1. `docs(phase6): correct stage 5 status and execution authority`
 2. `feat(phase6): complete connected laboratory boundary`
-3. `test(phase6): add chain-of-custody and negative-source acceptance`
+3. `test(phase6): add ledger framework and negative-source acceptance`
 4. `test(phase6): add scheduler and downstream recovery acceptance`
 5. `feat(phase6): add same-runtime observability and browser acceptance`
-6. `docs(phase6): record final stage 5 evidence and handoff`
+6. `test(phase6): finalize exact connected acceptance ledgers`
+7. `docs(phase6): record final stage 5 evidence and handoff`
 
 Split commits further when a unit needs independent review. Never combine the initial status correction with corrective implementation.
 
@@ -695,8 +829,8 @@ Gap values are `partial`, `missing`, or `contradicted`. No checkpoint item is ma
 
 | Requirement ID | Prompt section | Required behavior or evidence | Checkpoint implementation reference | Checkpoint evidence reference | Gap | Planned change | Owning step | Exit assertion |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| ARCH-01 | Core architecture | Preserve the exact laboratory → `test_database` → read-only poll → Monitor → Dashboard → conversations/messages → Chat flow. | Server real-adapter selection and detection runner. | Checkpoint ledgers contain partial downstream IDs. | Partial | Make every scenario traverse and record every link. | 4–5 | Each ledger row has a complete connected chain. |
-| ARCH-02 | Core architecture | Laboratory simulates source actions only; acceptance comes from Monitor and its UI. | Scenario API plus direct writer calls in validator. | Summary counters and browser JSON. | Contradicted | Remove runner-side source SQL and expected-result acceptance. | 4–5 | Same human/automation action path; independent downstream assertions. |
+| ARCH-01 | Core architecture | Preserve the exact laboratory → `test_database` → read-only poll → Monitor → Dashboard → conversations/messages → Chat flow. | Server real-adapter selection and detection runner. | Checkpoint ledgers contain partial downstream IDs. | Partial | Make every scenario traverse and record every link. | 4/5.3/8C | Each ledger row has a complete connected chain. |
+| ARCH-02 | Core architecture | Laboratory simulates source actions only; acceptance comes from Monitor and its UI. | Scenario API plus direct writer calls in validator. | Summary counters and browser JSON. | Contradicted | Remove runner-side source SQL and expected-result acceptance. | 4/5.3/8C | Same human/automation action path; independent downstream assertions. |
 | ARCH-03 | Core architecture | Reuse connected actions rather than 34 database pathways. | Mixed endpoint/code/direct-SQL setup. | No action contract ledger. | Partial | Define reusable action catalog referenced by all tests. | 4 | Every test references contracted actions. |
 | ARCH-04 | Core architecture | Do not advance, merge, push, or claim completion before review. | Completion docs at checkpoint. | Commit `165abc1`. | Contradicted | Correct authority and preserve checkpoint historically. | 1–2 | Current authority says corrective work in progress. |
 | S4-01 | Stage 4 boundary | Preserve Stage 4 as complete only for source writes, read-only polling, and incident lifecycle. | Stage 4 handoff. | Stage 4 evidence. | Partial | State narrow scope in current authority without changing handoff. | 1 | README and roadmap preserve narrow scope. |
@@ -716,7 +850,7 @@ Gap values are `partial`, `missing`, or `contradicted`. No checkpoint item is ma
 | A02-04 | A02 actions | Reject at destination with precedence. | `sourceAction(reject)`. | Reverse-row count; precedence not durable. | Partial | Contract destination permission and both-zone precedence. | 4 | Reject/preference matrix passes. |
 | A02-05 | A02 actions | Create exactly one new reversed movement with reset time/endpoints. | Reverse movement implementation. | Only ID/state asserted. | Partial | Assert all fields and idempotency. | 4 | One exact reverse-row diff. |
 | A02-06 | A02 actions | Never make a terminal movement unreceived. | Recurrence rejected. | API 409 tests. | Partial | Add all terminal-state negative cases. | 4 | Backward-transition matrix passes. |
-| A02-07 | A02 actions | Preserve independent A02 ownership after A05 handoff. | Handoff case. | Partial incident IDs. | Partial | Contract one-time handoff and ownership transition. | 4–5 | One new movement; no duplicate A05 movement reason. |
+| A02-07 | A02 actions | Preserve independent A02 ownership after A05 handoff. | Handoff case. | Partial incident IDs. | Partial | Contract one-time handoff and ownership transition. | 4/8C | One new movement; no duplicate A05 movement reason. |
 | A03-01 | A03 actions | Start an OT. | Source action support is partial. | No action ledger. | Partial | Add contracted start action. | 4 | Exact source diff passes. |
 | A03-02 | A03 actions | Enforce one active OT per machine. | Competing start returns 409. | Test response. | Partial | Record machine/natural keys and unchanged digest. | 4 | Competing OT denial artifact passes. |
 | A03-03 | A03 actions | Record positive first consumption while open. | `correct` endpoint. | Clean and correction tests. | Partial | Contract exact material-row change. | 4 | Positive consumption diff passes. |
@@ -727,24 +861,24 @@ Gap values are `partial`, `missing`, or `contradicted`. No checkpoint item is ma
 | A05-01 | A05 actions | Declare produced and remnant reels. | Prepare variants. | Partial. | Partial | Contract both reel kinds and fields. | 4 | Both declaration diffs pass. |
 | A05-02 | A05 actions | Register weighing. | Partial correction. | A05 summaries. | Partial | Contract exact weighing fields and idempotency. | 4 | Exact weighing diff passes. |
 | A05-03 | A05 actions | Register movement from machine. | Partial correction. | A05 summaries. | Partial | Contract exact movement fields and idempotency. | 4 | Exact movement diff passes. |
-| A05-04 | A05 actions | Preserve A05 across OT closure. | A05-08 implementation. | Incident ID/cycles. | Partial | Add source and downstream chain. | 4–5 | Same occurrence survives closure. |
-| A05-05 | A05 actions | Create destination-bound A02 movement exactly once. | Handoff implementation. | Incident IDs only. | Partial | Assert full movement diff and retry idempotency. | 4–5 | One movement and one ownership transition. |
-| A05-06 | A05 actions | Remove movement delay from A05 after A02 ownership. | A05-06 checks one reason. | Partial. | Partial | Persist reason transition and A02 chain. | 5 | A05 reason removed; A02 owns delay. |
-| A05-07 | A05 actions | Do not invent A05 recurrence. | Recurrence rejected. | Excluded ID list. | Partial | Keep excluded and add source-validity negative assertion. | 4–5 | No A05-07 execution or hidden recurrence. |
+| A05-04 | A05 actions | Preserve A05 across OT closure. | A05-08 implementation. | Incident ID/cycles. | Partial | Add source and downstream chain. | 4/8C | Same occurrence survives closure. |
+| A05-05 | A05 actions | Create destination-bound A02 movement exactly once. | Handoff implementation. | Incident IDs only. | Partial | Assert full movement diff and retry idempotency. | 4/8C | One movement and one ownership transition. |
+| A05-06 | A05 actions | Remove movement delay from A05 after A02 ownership. | A05-06 checks one reason. | Partial. | Partial | Persist reason transition and A02 chain. | 8C | A05 reason removed; A02 owns delay. |
+| A05-07 | A05 actions | Do not invent A05 recurrence. | Recurrence rejected. | Excluded ID list. | Partial | Keep excluded and add source-validity negative assertion. | 4/8C | No A05-07 execution or hidden recurrence. |
 | LAB-01 | Experiment controls | Durable experiment identity and prior history. | Experiment tables/repository. | Experiment IDs; snapshot history weak. | Partial | Complete history contracts and persistence. | 4 | Restart preserves experiments and history. |
 | LAB-02 | Experiment controls | Shared business clock distinct from audit time. | Shared clock code. | SH-06 summary. | Partial | Tie clock to action/poll ledger. | 4/7 | Timeline artifacts distinguish both times. |
 | LAB-03 | Experiment controls | Independent speed/frequency, run/pause, deterministic jumps. | Repository configure/advance. | SH-02/SH-03 summaries. | Partial | Connect controls to scheduler-owned runtime. | 4/7 | Due timeline matches all crossed times. |
 | LAB-04 | Experiment controls | Automatic due polling and poll-boundary ordering. | Internal scheduler calls/manual polls. | SH-04/SH-07 summaries. | Contradicted | Drive actual scheduler runtime and action ordering. | 7 | No manual poll is used as automatic proof. |
 | LAB-05 | Experiment controls | Structured snapshots and pending-source/failed-read presentation. | Snapshot payloads and status. | Snapshot IDs only. | Partial | Version snapshot schema and visible presentation. | 4/8 | Snapshot schema and UI artifacts pass. |
-| LAB-06 | Experiment controls | Shared human and automation action path. | Mixed API/direct SQL. | Direct SQL in validator. | Contradicted | Remove bypasses and add endpoint identity to ledger. | 4 | All 34 reference contracted endpoints. |
-| B-01 | Stage 5B set | Execute exactly 11 shared, 9 A02, 6 A03, and 8 A05 IDs. | Manifest has exact IDs. | Ledger has 34 summaries. | Partial | Schema-validate groups and independent results. | 5 | Exact set/count passes. |
-| B-02 | Stage 5B set | Exclude A02-08, A03-06, A05-07. | Manifest exclusion list. | Ledger exclusion list. | Partial | Fail on any excluded execution or substitution. | 5 | Zero excluded IDs executed. |
-| B-03 | Stage 5B cases | Give every test an isolated fixture/reset contract. | Servers often share source mutations; fixture IDs listed. | No per-test reset artifact. | Missing | Add isolated source baseline contract per test. | 5 | Each row names and proves cleanup/reset. |
-| B-04 | Stage 5B cases | Accept from Monitor and real UI, never laboratory counters. | `actualMonitor` counts and one browser row. | Mostly summary counters. | Partial | Query independent records and exact UI objects. | 5/8 | Per-test chain and artifacts pass. |
-| B-05 | Stage 5B cases | Declare complete action/source/scheduler/downstream/UI/cursor/cleanup expectations. | Manifest has title/expected only. | Ledger varies by test. | Missing | Expand manifest schema with mandatory fields. | 5 | Manifest validator passes all 34. |
-| CHAIN-01 | Chain of custody | Record action → source key/diff/writer → read/query/version/revision/poll. | Scattered code variables. | Missing from ledger. | Missing | Persist ordered source/read chain. | 5 | Every row validates source/read links. |
-| CHAIN-02 | Chain of custody | Record incident/evidence → routing/deliveries → conversation/message/receipts. | Objects are created. | Some tests return a subset. | Partial | Capture exact IDs for every applicable test. | 5 | Every downstream link is present and cross-validates. |
-| CHAIN-03 | Chain of custody | Record cursor range and exact Dashboard/Chat artifacts. | Cursor sometimes returned; browser summary generic. | Reused browser JSON. | Missing | Generate run/test-specific artifact manifest. | 5/8 | Exact IDs visible in artifact metadata. |
+| LAB-06 | Experiment controls | Shared human and automation action path. | Mixed API/direct SQL. | Direct SQL in validator. | Contradicted | Remove bypasses and add endpoint identity to ledger. | 4/5.1/8C | All 34 reference contracted endpoints. |
+| B-01 | Stage 5B set | Execute exactly 11 shared, 9 A02, 6 A03, and 8 A05 IDs. | Manifest has exact IDs. | Ledger has 34 summaries. | Partial | Schema-validate groups and independent results. | 5.1/8C | Exact set/count passes. |
+| B-02 | Stage 5B set | Exclude A02-08, A03-06, A05-07. | Manifest exclusion list. | Ledger exclusion list. | Partial | Fail on any excluded execution or substitution. | 5.1/8C | Zero excluded IDs executed. |
+| B-03 | Stage 5B cases | Give every test an isolated fixture/reset contract. | Servers often share source mutations; fixture IDs listed. | No per-test reset artifact. | Missing | Add isolated source baseline contract per test. | 5.2/8C | Each row names and proves cleanup/reset. |
+| B-04 | Stage 5B cases | Accept from Monitor and real UI, never laboratory counters. | `actualMonitor` counts and one browser row. | Mostly summary counters. | Partial | Query independent records and exact UI objects. | 5.3/8/8C | Per-test chain and artifacts pass. |
+| B-05 | Stage 5B cases | Declare complete action/source/scheduler/downstream/UI/cursor/cleanup expectations. | Manifest has title/expected only. | Ledger varies by test. | Missing | Expand manifest schema with mandatory fields. | 5.1 | Manifest validator passes all 34. |
+| CHAIN-01 | Chain of custody | Record action → source key/diff/writer → read/query/version/revision/poll. | Scattered code variables. | Missing from ledger. | Missing | Persist ordered source/read chain. | 5.3/8C | Every row validates source/read links. |
+| CHAIN-02 | Chain of custody | Record incident/evidence → routing/deliveries → conversation/message/receipts. | Objects are created. | Some tests return a subset. | Partial | Capture exact IDs for every applicable test. | 5.3/8C | Every downstream link is present and cross-validates. |
+| CHAIN-03 | Chain of custody | Record cursor range and exact Dashboard/Chat artifacts. | Cursor sometimes returned; browser summary generic. | Reused browser JSON. | Missing | Generate run/test-specific artifact manifest. | 5.3/8/8C | Exact IDs visible in artifact metadata. |
 | ISO-01 | Isolation proofs | Source action changes source while Monitor remains unchanged before poll; healthy poll then changes Monitor. | Aggregate count check. | No exact digests. | Partial | Add black-box before/action/poll snapshots. | 6 | Exact source diff and Monitor stability/change pass. |
 | ISO-02 | Isolation proofs | Failed/incomplete poll preserves trustworthy state; direct fixture mutation is detected. | Fault tests; some direct SQL. | Bundled SH-10 result. | Partial | Separate black-box cases and artifacts. | 6 | Both cases pass independently. |
 | ISO-03 | Isolation proofs | Blocking source access prevents incidents; disabling simulator consumption does not break acceptance. | Not fully tested. | None. | Missing | Add network/credential block and simulator-disabled runs. | 6 | Both negative proofs pass. |
@@ -762,9 +896,9 @@ Gap values are `partial`, `missing`, or `contradicted`. No checkpoint item is ma
 | BROWSER-04 | Human review | Passive previews, no side effects, real links, exploratory findings/retests, explicit acceptance. | Absent. | None. | Missing | Build observability workspace and findings ledger. | 8B | Side-effect tests pass and user accepts. |
 | REC-01 | Recovery | Add interruption points around incident, routing, delivery, attachment, message, publication. | No explicit points. | None. | Missing | Add test-only fault contracts. | 7 | Every interruption is independently exercised. |
 | REC-02 | Recovery | Later healthy poll repairs idempotently without row deletion. | Validator deletes conversation/message rows. | SH-10 summary. | Contradicted | Replace deletion with controlled interruption and retry. | 7 | Repair produces no duplicates across repeated polls. |
-| LEDGER-01 | Durable ledger | Version a schema with all mandatory identity, source, read, downstream, cursor, browser, cleanup, and failure fields. | Result type is open-ended evidence object. | JSON only, inconsistent rows. | Missing | Add JSON schema and Markdown renderer. | 5 | Schema validates every result. |
-| LEDGER-02 | Durable ledger | Exactly one independent result per approved ID; fail missing/duplicate/extra/excluded. | Count/unique checks exist. | 34 rows. | Partial | Validate groups, status, all fields, and exclusions. | 5 | Exactly 34 passed; zero invalid states. |
-| LEDGER-03 | Durable ledger | Validator exits nonzero unless 34 passed, 0 failed/skipped/excluded. | Throws on failures; no skipped type. | Summary counts. | Partial | Add strict accounting and schema failures. | 5 | Exit gate matches exact accounting. |
+| LEDGER-01 | Durable ledger | Version a schema with all mandatory identity, source, read, downstream, cursor, browser, cleanup, and failure fields. | Result type is open-ended evidence object. | JSON only, inconsistent rows. | Missing | Add JSON schema and Markdown renderer. | 5.1/5.4 | Schema validates every result. |
+| LEDGER-02 | Durable ledger | Exactly one independent result per approved ID; fail missing/duplicate/extra/excluded. | Count/unique checks exist. | 34 rows. | Partial | Validate groups, status, all fields, and exclusions. | 5.4/8C | Exactly 34 passed; zero invalid states. |
+| LEDGER-03 | Durable ledger | Validator exits nonzero unless 34 passed, 0 failed/skipped/excluded. | Throws on failures; no skipped type. | Summary counts. | Partial | Add strict accounting and schema failures. | 5.4/8C | Exit gate matches exact accounting. |
 | VALID-01 | Repeatable command | Verify correct branch and clean start. | Shell omits both. | None. | Missing | Add hard preflight. | 9 | Wrong/dirty state fails before mutation. |
 | VALID-02 | Repeatable command | Validate source readiness, reset baseline, fixtures/contracts/Stage 5A, and restore in `finally`. | Reset/restore trap exists. | Reset/restore logs. | Partial | Add readiness/contracts/A gate and robust finally evidence. | 9 | Reset and restore validate for both runs. |
 | VALID-03 | Repeatable command | Run exact 34, failures, scheduler/recovery, browser, tests, typecheck, build, audit, routing, query plans. | Only Stage 5 script runs. | Connected log only. | Missing | Orchestrate all commands and collect statuses. | 9 | Complete command passes. |
