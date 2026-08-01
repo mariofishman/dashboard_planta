@@ -1,4 +1,5 @@
 import type { DatabaseExecutor, DatabaseRuntime } from "@monitor/database";
+import type { SourceActionContract, SourceActionEvidence } from "./source-actions.js";
 import type { DetectionQueryDefinition, DetectionSourceAdapter, SourcePage } from "./types.js";
 
 export type ScenarioRuleCode = "A02" | "A03" | "A05";
@@ -20,6 +21,11 @@ export type ScenarioCase =
   | "past_threshold_remnant"
   | "movement_started";
 export type ScenarioAction = "reset" | "prepare" | "correct" | "correct_weigh" | "correct_move" | "advance_time" | "recur";
+export type ScenarioPopulation = "a02_mixed" | "a03_mixed";
+export type ScenarioSourceAction =
+  | "prepare_dispatch" | "receive" | "cancel" | "reject"
+  | "start_work_order" | "record_first_consumption" | "close_work_order" | "cancel_work_order" | "start_competing_work_order"
+  | "declare_produced_reel" | "declare_remnant_reel" | "register_weighing" | "register_movement" | "handoff";
 
 export interface ScenarioContext {
   plantId: number;
@@ -48,19 +54,26 @@ export interface ScenarioStatus {
   };
 }
 
+export interface ScenarioSourceActionOutcome {
+  status: ScenarioStatus;
+  evidence: SourceActionEvidence;
+}
+
 export interface ScenarioSource {
   supportedCases(code: string): ScenarioCase[];
   reset(code: string): Promise<ScenarioStatus>;
   trigger(code: string): Promise<ScenarioStatus>;
   prepare(code: string, scenarioCase: string, action?: ScenarioAction): Promise<ScenarioStatus>;
+  preparePopulation?(code: ScenarioRuleCode, population: ScenarioPopulation, keys: number[]): Promise<ScenarioStatus>;
   correct(code: string, correction?: ScenarioCorrection): Promise<ScenarioStatus>;
   recur(code: string): Promise<ScenarioStatus>;
   advanceTime(code: string, minutes: number): Promise<ScenarioStatus>;
+  setBusinessTime(currentAt: string): Promise<void>;
   failNextPoll(code: string, fault: ScenarioFault): Promise<ScenarioStatus>;
   consumeFault(code: ScenarioRuleCode): Promise<ScenarioFault | null>;
   rows(code: ScenarioRuleCode): Promise<{ rows: Record<string, unknown>[]; sourceRevision: string }>;
   status(code: string): Promise<ScenarioStatus>;
-  sourceAction?(code: string, action: "cancel" | "reject" | "close_work_order" | "handoff" | "start_competing_work_order", key?: number): Promise<ScenarioStatus>;
+  sourceAction?(code: string, action: ScenarioSourceAction, key: number, contract: SourceActionContract): Promise<ScenarioSourceActionOutcome>;
   replaceTracked?(code: ScenarioRuleCode, keys: number[]): void;
   recordExternalSourceChange?(code: ScenarioRuleCode, action: string): void;
   pollMetadata?(code: ScenarioRuleCode): { currentAt: string; sourceRevision: string };
@@ -176,6 +189,12 @@ export class ScenarioSourceRepository {
       await this.touch(transaction, ruleCode, "advance_time", null, true);
     });
     return this.status(ruleCode);
+  }
+
+  async setBusinessTime(currentAt: string): Promise<void> {
+    const timestamp = new Date(currentAt);
+    if (!Number.isFinite(timestamp.getTime())) throw new Error("invalid_scenario_business_time");
+    await this.database.execute("UPDATE monitor_sim_scenario SET current_at=$1", [timestamp.toISOString()]);
   }
 
   async failNextPoll(code: string, fault: ScenarioFault): Promise<ScenarioStatus> {

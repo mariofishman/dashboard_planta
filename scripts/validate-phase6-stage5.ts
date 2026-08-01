@@ -7,6 +7,7 @@ import {
   TestDatabaseConnections,
   type ScenarioRuleCode,
   type ScenarioSource,
+  type SourceActionId,
   type TestDatabaseFixtureSeeds,
 } from "@monitor/detection";
 import { createDatabaseRuntime, migrateFoundation } from "@monitor/database";
@@ -25,7 +26,8 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const runId = process.env.STAGE5_RUN_ID ?? new Date().toISOString().replaceAll(/[-:.]/g, "");
 const pgliteDataDir = resolve(root, "local-data/test-database/evidence/stage5", `${runId}-monitor`);
 await mkdir(resolve(root, "local-data/test-database/evidence/stage5"), { recursive: true });
-const manifest = JSON.parse(await readFile(resolve(root, "config/detection/stage5-connected-acceptance.v1.json"), "utf8")) as { requiredCount: number; excluded: string[]; tests: TestDefinition[] };
+const manifest = JSON.parse(await readFile(resolve(root, "config/detection/stage5-connected-acceptance.v1.json"), "utf8")) as { version: string; requiredCount: number; excluded: string[]; tests: TestDefinition[] };
+const sourceActionContract = JSON.parse(await readFile(resolve(root, "config/detection/source-actions/stage5-source-actions.v1.json"), "utf8")) as { contractVersion: string };
 const fixtures = JSON.parse(await readFile(resolve(root, "config/detection/fixtures/test-database-stage5.v1.json"), "utf8")) as Stage5Fixtures;
 assert.equal(manifest.requiredCount, 34);
 assert.equal(manifest.tests.length, 34);
@@ -44,7 +46,9 @@ const rosterAssignment = (id: string, sysUserId: number, person: string, positio
 });
 const defaultSeeds: TestDatabaseFixtureSeeds = { A02: 26058, A03: 12198, A05: 141084 };
 const experimentRepository = new ScenarioExperimentRepository(ledgerDatabase);
-const experimentId = (await experimentRepository.create(`Stage 5 ${runId}`, "2026-08-01T09:00:00.000Z", { A02: 3, A03: 3, A05: 3 })).id;
+const experimentId = (await experimentRepository.create(`Stage 5 ${runId}`, "2026-08-01T09:00:00.000Z", { A02: 3, A03: 3, A05: 3 }, {
+  runId, manifestVersion: manifest.version, sourceActionContractVersion: sourceActionContract.contractVersion,
+})).id;
 const results: Result[] = [];
 
 const seeds = (code?: ScenarioRuleCode, key?: number): TestDatabaseFixtureSeeds => ({ ...defaultSeeds, ...(code && key ? { [code]: key } : {}) });
@@ -78,6 +82,16 @@ const request = async (server: MonitorServer, method: "GET" | "POST" | "PUT", ur
 const poll = (server: MonitorServer, code: ScenarioRuleCode) => request(server, "POST", `/api/dev/scenarios/${code}/poll`);
 const prepare = (server: MonitorServer, code: ScenarioRuleCode, scenario: string) => request(server, "POST", `/api/dev/scenarios/${code}/prepare`, { scenario });
 const fault = (server: MonitorServer, code: ScenarioRuleCode, value: string) => request(server, "POST", `/api/dev/scenarios/${code}/fail-next-poll`, { fault: value });
+const preparePopulation = (server: MonitorServer, code: ScenarioRuleCode, population: string, keys: number[]) => request(server, "POST", `/api/dev/scenarios/${code}/prepare-population`, { population, keys });
+const injectMonitorFault = (server: MonitorServer, code: ScenarioRuleCode, fault: string) => request(server, "POST", `/api/dev/scenarios/${code}/inject-monitor-fault`, { fault });
+const act = async (server: MonitorServer, actionId: SourceActionId, key?: number, authority?: "origin" | "destination" | "both") => {
+  const ruleCode = actionId.slice(0, 3).toUpperCase() as ScenarioRuleCode;
+  const status = key === undefined ? await server.acceptance!.source.status(ruleCode) : null;
+  const row = status?.sourceState.rows[0] ?? {};
+  const resolvedKey = key ?? Number(ruleCode === "A02" ? row.materialFlowDetailId : ruleCode === "A03" ? row.workOrderId : row.articleSerialId);
+  assert.ok(Number.isSafeInteger(resolvedKey) && resolvedKey > 0, `${actionId} source key unavailable`);
+  return request(server, "POST", "/api/dev/source-actions", { actionId, key: resolvedKey, ...(authority ? { authority } : {}) });
+};
 const counts = (server: MonitorServer) => server.database.queryOne(`SELECT
   (SELECT COUNT(*)::int FROM monitor_incident) incidents,
   (SELECT COUNT(*)::int FROM monitor_incident_evidence) evidence,
@@ -149,7 +163,9 @@ await run(test("SH-01"), defaultSeeds, async (server) => {
   const current = await repository.get(experimentId);
   const resultCount = await ledgerDatabase.queryOne("SELECT COUNT(*)::int count FROM monitor_scenario_acceptance_result WHERE experiment_id=$1", [experimentId]);
   assert.equal(Number(resultCount.count), 0);
-  return { experimentId, status: current.status, initialResultCount: 0 };
+  assert.equal(current.runId, runId); assert.equal(current.manifestVersion, manifest.version);
+  assert.equal(current.sourceActionContractVersion, sourceActionContract.contractVersion);
+  return { experimentId, runId: current.runId, manifestVersion: current.manifestVersion, sourceActionContractVersion: current.sourceActionContractVersion, status: current.status, initialResultCount: 0 };
 });
 await run(test("SH-02"), defaultSeeds, async (server) => {
   const repository = experimentRepository;
@@ -187,14 +203,21 @@ await run(test("SH-04"), seeds("A02", 26194), async (server) => {
 await run(test("SH-05"), defaultSeeds, async (server) => {
   const repository = experimentRepository;
   const before = await counts(server);
-  const beforeId = await repository.snapshot(experimentId, "before-failed-connected-poll", { source: await server.acceptance!.source.status("A03"), monitor: before });
+  const beforeStatus = (await request(server, "GET", "/api/dev/scenarios")).scenarios.find((scenario: { ruleCode: string }) => scenario.ruleCode === "A03");
+  assert.ok(beforeStatus);
+  const beforeSnapshot = await repository.snapshot(experimentId, "before-failed-connected-poll", {
+    source: beforeStatus.sourceState, clock: beforeStatus.scenarioClock, poll: beforeStatus.pollerState, monitor: { counts: before, actual: beforeStatus.actualMonitor },
+  });
   await fault(server, "A03", "partial");
   const failed = await poll(server, "A03");
   assert.equal(failed.result.status, "partial");
   assert.deepEqual(await counts(server), before);
-  const afterId = await repository.snapshot(experimentId, "after-failed-connected-poll", { source: failed.scenario.sourceState, monitor: await counts(server), cycle: failed.result });
-  assert.notEqual(beforeId, afterId);
-  return { beforeSnapshotId: beforeId, afterSnapshotId: afterId, preserved: true };
+  const afterSnapshot = await repository.snapshot(experimentId, "after-failed-connected-poll", {
+    source: failed.scenario.sourceState, clock: failed.scenario.scenarioClock, poll: { state: failed.scenario.pollerState, cycle: failed.result },
+    monitor: { counts: await counts(server), actual: failed.scenario.actualMonitor },
+  });
+  assert.notEqual(beforeSnapshot.id, afterSnapshot.id);
+  return { beforeSnapshotId: beforeSnapshot.id, afterSnapshotId: afterSnapshot.id, snapshotSchemaVersion: afterSnapshot.schemaVersion, preserved: true };
 });
 await run(test("SH-06"), defaultSeeds, async (server) => {
   const before = await Promise.all((["A02", "A03", "A05"] as const).map((code) => server.acceptance!.source.status(code)));
@@ -208,7 +231,7 @@ await run(test("SH-06"), defaultSeeds, async (server) => {
 await run(test("SH-07"), seeds("A02", 26174), async (server) => {
   const opened = await openAndAssert(server, "A02", "at_threshold");
   const committed = opened.scenario.actualMonitor;
-  await request(server, "POST", "/api/dev/scenarios/A02/correct");
+  await act(server, "a02.receive");
   assert.equal((await latest(server, "A02")).lifecycle, "open");
   const reconciled = await poll(server, "A02");
   assert.equal(reconciled.scenario.actualMonitor.latestIncident.lifecycle, "resolved");
@@ -217,14 +240,16 @@ await run(test("SH-07"), seeds("A02", 26174), async (server) => {
 await run(test("SH-08"), defaultSeeds, async (server) => {
   const repository = experimentRepository;
   await openAndAssert(server, "A02", "past_threshold");
-  const historical = await ledgerDatabase.queryOne("SELECT COUNT(*)::int count FROM monitor_scenario_snapshot WHERE experiment_id=$1", [experimentId]);
+  const historical = await repository.history(experimentId);
   const beforeMonitor = await counts(server);
-  const next = await repository.create(`Stage 5 ${runId} second`, "2026-08-01T10:00:00.000Z", { A02: 3, A03: 3, A05: 3 });
+  const next = await repository.create(`Stage 5 ${runId} second`, "2026-08-01T10:00:00.000Z", { A02: 3, A03: 3, A05: 3 }, {
+    runId: `${runId}-second`, manifestVersion: manifest.version, sourceActionContractVersion: sourceActionContract.contractVersion,
+  });
   assert.notEqual(next.id, experimentId);
-  const preserved = await ledgerDatabase.queryOne("SELECT COUNT(*)::int count FROM monitor_scenario_snapshot WHERE experiment_id=$1", [experimentId]);
-  assert.equal(preserved.count, historical.count);
+  const preserved = await repository.history(experimentId);
+  assert.equal(preserved.snapshots.items.length, historical.snapshots.items.length);
   assert.deepEqual(await counts(server), beforeMonitor);
-  return { newExperimentId: next.id, preservedSnapshots: Number(preserved.count), preservedMonitor: beforeMonitor };
+  return { newExperimentId: next.id, priorRunId: preserved.experiment.runId, preservedSnapshots: preserved.snapshots.items.length, preservedResults: preserved.results.items.length, preservedMonitor: beforeMonitor };
 });
 await run(test("SH-09"), seeds("A02", 26061), async (server) => {
   const opened = await openAndAssert(server, "A02", "past_threshold");
@@ -254,14 +279,12 @@ await run(test("SH-10"), seeds("A02", 26157), async (server) => {
   const firstResult = await first;
   assert.equal(second.status, "overlap_skipped");
   assert.equal(firstResult.status, "timeout");
-  const repairIncident = (await latest(server, "A02")).id;
-  await server.database.execute("DELETE FROM monitor_conversation_incident WHERE incident_id=$1", [repairIncident]);
-  await server.database.execute("DELETE FROM monitor_message WHERE client_command_id=$1", [`incident:${repairIncident}`]);
+  await injectMonitorFault(server, "A02", "missing_open_incident_downstream");
   const repaired = await poll(server, "A02");
   assert.equal(repaired.scenario.actualMonitor.latestIncident.lifecycle, "open");
   assert.equal(repaired.scenario.actualMonitor.conversationLinkCount, 1);
   assert.equal(repaired.scenario.actualMonitor.alertMessageCount, 1);
-  await request(server, "POST", "/api/dev/scenarios/A02/correct");
+  await act(server, "a02.receive");
   const resolved = await poll(server, "A02");
   assert.equal(resolved.scenario.actualMonitor.latestIncident.lifecycle, "resolved");
   return { statuses, overlap: [firstResult.status, second.status], repairCycle: repaired.result.cycleId, resolutionCycle: resolved.result.cycleId };
@@ -276,12 +299,9 @@ await run(test("A02-00"), seeds("A02", fixtures.a02.clean[0]), async (server) =>
   assert.equal(row.state, "RECIBIDO"); assert.equal(Number(row.elapsedMinutes), 20); assert.ok(row.receivedAt);
   return { history: "Recibido a tiempo", durationMinutes: 20, source: result.scenario.sourceState, incidentCount: 0 };
 });
-await run(test("A02-01"), seeds("A02", fixtures.a02.concurrent[1]), async (server, source) => {
+await run(test("A02-01"), seeds("A02", fixtures.a02.concurrent[1]), async (server) => {
   const [received, overdue, young] = fixtures.a02.concurrent;
-  await connections.writer.execute("UPDATE flujo_materiales_detalles SET estado='RECIBIDO',fecha_recepcion=UTC_TIMESTAMP(),fecha_creacion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 20 MINUTE) WHERE id=?", [received]);
-  await connections.writer.execute("UPDATE flujo_materiales_detalles SET estado='TRANSITO',fecha_recepcion=NULL,fecha_creacion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 31 MINUTE) WHERE id=?", [overdue]);
-  await connections.writer.execute("UPDATE flujo_materiales_detalles SET estado='TRANSITO',fecha_recepcion=NULL,fecha_creacion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 10 MINUTE) WHERE id=?", [young]);
-  source.replaceTracked?.("A02", [received, overdue, young]); source.recordExternalSourceChange?.("A02", "concurrent_movements");
+  await preparePopulation(server, "A02", "a02_mixed", [received, overdue, young]);
   const result = await poll(server, "A02"); assert.equal(result.scenario.actualMonitor.incidentCount, 1);
   assert.equal((await latest(server, "A02")).conditionKey, `A02:v1:${overdue}`);
   return { received, overdue, young, opened: overdue };
@@ -294,12 +314,12 @@ await run(test("A02-02"), seeds("A02", fixtures.a02.threshold[0]), async (server
   return { thresholdMinute: 30, incidentId: (await latest(server, "A02")).id };
 });
 await run(test("A02-03"), seeds("A02", fixtures.a02.receiptBeforeDetection[0]), async (server) => {
-  await prepare(server, "A02", "past_threshold"); await request(server, "POST", "/api/dev/scenarios/A02/correct");
+  await prepare(server, "A02", "past_threshold"); await act(server, "a02.receive");
   const result = await poll(server, "A02"); assert.equal(result.scenario.actualMonitor.incidentCount, 0);
   return { receiptBeforeFirstCompleteRead: true, incidentCount: 0 };
 });
 await run(test("A02-04"), seeds("A02", fixtures.a02.failureIsolation[0]), async (server) => {
-  const opened = await openAndAssert(server, "A02", "past_threshold"); await request(server, "POST", "/api/dev/scenarios/A02/correct");
+  const opened = await openAndAssert(server, "A02", "past_threshold"); await act(server, "a02.receive");
   await fault(server, "A02", "partial_pagination"); const failed = await poll(server, "A02");
   assert.equal(failed.scenario.actualMonitor.latestIncident.lifecycle, "open");
   const healthy = await poll(server, "A02"); assert.equal(healthy.scenario.actualMonitor.latestIncident.lifecycle, "resolved");
@@ -308,24 +328,21 @@ await run(test("A02-04"), seeds("A02", fixtures.a02.failureIsolation[0]), async 
 await run(test("A02-05"), seeds("A02", fixtures.a02.administrativeClosure[0]), async (server) => {
   await openAndAssert(server, "A02", "past_threshold"); return closeAdministratively(server, "A02");
 });
-await run(test("A02-06"), seeds("A02", fixtures.a02.mixed[1]), async (server, source) => {
+await run(test("A02-06"), seeds("A02", fixtures.a02.mixed[1]), async (server) => {
   const [received, overdue, young] = fixtures.a02.mixed;
-  await connections.writer.execute("UPDATE flujo_materiales_detalles SET estado='RECIBIDO',fecha_recepcion=UTC_TIMESTAMP(),fecha_creacion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 20 MINUTE) WHERE id=?", [received]);
-  await connections.writer.execute("UPDATE flujo_materiales_detalles SET estado='TRANSITO',fecha_recepcion=NULL,fecha_creacion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 31 MINUTE) WHERE id=?", [overdue]);
-  await connections.writer.execute("UPDATE flujo_materiales_detalles SET estado='TRANSITO',fecha_recepcion=NULL,fecha_creacion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 10 MINUTE) WHERE id=?", [young]);
-  source.replaceTracked?.("A02", [received, overdue, young]); source.recordExternalSourceChange?.("A02", "mixed_population");
+  await preparePopulation(server, "A02", "a02_mixed", [received, overdue, young]);
   const result = await poll(server, "A02"); assert.equal(result.scenario.actualMonitor.incidentCount, 1); assert.equal((await latest(server, "A02")).conditionKey, `A02:v1:${overdue}`);
   return { clean: [received, young], alerted: overdue };
 });
 await run(test("A02-07"), seeds("A02", fixtures.a02.cancel[0]), async (server) => {
   await openAndAssert(server, "A02", "past_threshold");
-  await request(server, "POST", "/api/dev/scenarios/A02/source-action", { action: "cancel" });
+  await act(server, "a02.cancel", undefined, "origin");
   const [cancelRows] = await connections.monitor.query("SELECT id,estado FROM flujo_materiales_detalles WHERE id_padre=? ORDER BY id", [fixtures.a02.cancel[0]]);
   assert.equal((cancelRows as unknown[]).length, 1); assert.notEqual(Number((cancelRows as { id: number }[])[0].id), fixtures.a02.cancel[0]);
   const resolved = await poll(server, "A02"); assert.equal(resolved.scenario.actualMonitor.latestIncident.lifecycle, "resolved");
   const rejectRows = await isolated(seeds("A02", fixtures.a02.reject[0]), async (rejectionServer) => {
     await openAndAssert(rejectionServer, "A02", "past_threshold");
-    await request(rejectionServer, "POST", "/api/dev/scenarios/A02/source-action", { action: "reject" });
+    await act(rejectionServer, "a02.reject", undefined, "both");
     const [rows] = await connections.monitor.query("SELECT id,estado FROM flujo_materiales_detalles WHERE id_padre=? ORDER BY id", [fixtures.a02.reject[0]]);
     assert.equal((rows as unknown[]).length, 1); assert.notEqual(Number((rows as { id: number }[])[0].id), fixtures.a02.reject[0]);
     assert.equal((await poll(rejectionServer, "A02")).scenario.actualMonitor.latestIncident.lifecycle, "resolved");
@@ -385,23 +402,23 @@ await run(test("A03-00"), seeds("A03", fixtures.a03.clean[0]), async (server) =>
   return { history: "Primer consumo a tiempo", consumptionAtMinute: 10, source: result.scenario.sourceState, incidentCount: 0 };
 });
 await run(test("A03-01"), seeds("A03", fixtures.a03.threshold[0]), async (server) => { await prepare(server, "A03", "before_threshold"); assert.equal((await poll(server, "A03")).scenario.actualMonitor.incidentCount, 0); await request(server, "POST", "/api/dev/scenarios/A03/advance-time", { minutes: 1 }); const opened = await poll(server, "A03"); assert.equal(opened.scenario.actualMonitor.incidentCount, 1); await assertStable(server, "A03", opened.scenario.actualMonitor); return { thresholdMinute: 15, incidentId: (await latest(server, "A03")).id }; });
-await run(test("A03-02"), seeds("A03", fixtures.a03.concurrent[0]), async (server, source) => {
+await run(test("A03-02"), seeds("A03", fixtures.a03.concurrent[0]), async (server) => {
   const [eligible, consumed, closed, young] = fixtures.a03.concurrent;
-  await connections.writer.execute("UPDATE ordenes_trabajo SET fecha_inicio_ejecucion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 16 MINUTE),fecha_fin_ejecucion=NULL WHERE id=?", [eligible]);
-  await connections.writer.execute("UPDATE orden_trabajo_materiales SET cantidad_consumida=0 WHERE id_orden_trabajo=? AND eliminado=0", [eligible]);
-  await connections.writer.execute("UPDATE ordenes_trabajo SET fecha_inicio_ejecucion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 16 MINUTE),fecha_fin_ejecucion=NULL WHERE id=?", [consumed]);
-  await connections.writer.execute("UPDATE orden_trabajo_materiales SET cantidad_consumida=1 WHERE id=(SELECT id FROM (SELECT MIN(id) id FROM orden_trabajo_materiales WHERE id_orden_trabajo=? AND eliminado=0) selected)", [consumed]);
-  await connections.writer.execute("UPDATE ordenes_trabajo SET fecha_inicio_ejecucion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 16 MINUTE),fecha_fin_ejecucion=UTC_TIMESTAMP() WHERE id=?", [closed]);
-  await connections.writer.execute("UPDATE ordenes_trabajo SET fecha_inicio_ejecucion=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 10 MINUTE),fecha_fin_ejecucion=NULL WHERE id=?", [young]);
-  source.replaceTracked?.("A03", [eligible, consumed, closed, young]); source.recordExternalSourceChange?.("A03", "concurrent_mixed_ots");
-  const duplicate = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/source-action", headers: manager, payload: { action: "start_competing_work_order", key: eligible } });
+  await preparePopulation(server, "A03", "a03_mixed", [eligible, consumed, closed, young]);
+  const [candidateRows] = await connections.monitor.query(`SELECT candidate.id FROM ordenes_trabajo active
+    JOIN ordenes_trabajo candidate ON candidate.id_equipo=active.id_equipo AND candidate.id<>active.id
+    WHERE active.id=? AND candidate.fecha_inicio_ejecucion IS NULL AND candidate.fecha_fin_ejecucion IS NULL
+      AND candidate.fecha_eliminacion IS NULL AND candidate.eliminado=0 ORDER BY candidate.id LIMIT 1`, [eligible]);
+  const candidate = Number((candidateRows as Array<{ id: number }>)[0]?.id);
+  assert.ok(Number.isSafeInteger(candidate) && candidate > 0, "inactive competing work order unavailable");
+  const duplicate = await server.app.inject({ method: "POST", url: "/api/dev/source-actions", headers: manager, payload: { actionId: "a03.start_work_order", key: candidate } });
   assert.equal(duplicate.statusCode, 409); assert.equal(duplicate.json().error, "machine_has_active_work_order");
   const result = await poll(server, "A03"); assert.equal(result.scenario.actualMonitor.incidentCount, 1); assert.equal((await latest(server, "A03")).conditionKey, `A03:v1:${eligible}`);
   return { eligible, consumed, closed, duplicateMachineAttempt: duplicate.json(), young };
 });
-await run(test("A03-03"), seeds("A03", fixtures.a03.failure[0]), async (server) => { await openAndAssert(server, "A03", "past_threshold"); await request(server, "POST", "/api/dev/scenarios/A03/correct"); await fault(server, "A03", "source_error"); const failed = await poll(server, "A03"); assert.equal(failed.scenario.actualMonitor.latestIncident.lifecycle, "open"); const healthy = await poll(server, "A03"); assert.equal(healthy.scenario.actualMonitor.latestIncident.lifecycle, "resolved"); return { failedCycle: failed.result.cycleId, recoveryCycle: healthy.result.cycleId }; });
+await run(test("A03-03"), seeds("A03", fixtures.a03.failure[0]), async (server) => { await openAndAssert(server, "A03", "past_threshold"); await act(server, "a03.record_first_consumption"); await fault(server, "A03", "source_error"); const failed = await poll(server, "A03"); assert.equal(failed.scenario.actualMonitor.latestIncident.lifecycle, "open"); const healthy = await poll(server, "A03"); assert.equal(healthy.scenario.actualMonitor.latestIncident.lifecycle, "resolved"); return { failedCycle: failed.result.cycleId, recoveryCycle: healthy.result.cycleId }; });
 await run(test("A03-04"), seeds("A03", fixtures.a03.administrativeClosure[0]), async (server) => { await openAndAssert(server, "A03", "past_threshold"); return closeAdministratively(server, "A03"); });
-await run(test("A03-05"), seeds("A03", fixtures.a03.availability[0]), async (server) => { await openAndAssert(server, "A03", "past_threshold"); await request(server, "POST", "/api/dev/scenarios/A03/correct"); await request(server, "POST", "/api/dev/scenarios/A03/source-action", { action: "close_work_order" }); const blocked = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/correct", headers: manager }); assert.equal(blocked.statusCode, 409); const healthy = await poll(server, "A03"); assert.equal(healthy.scenario.actualMonitor.latestIncident.lifecycle, "resolved"); return { consumptionAcceptedOpen: true, laterConsumptionStatus: blocked.statusCode, resolutionCycle: healthy.result.cycleId }; });
+await run(test("A03-05"), seeds("A03", fixtures.a03.availability[0]), async (server) => { await openAndAssert(server, "A03", "past_threshold"); await act(server, "a03.record_first_consumption"); await act(server, "a03.close_work_order"); const source = await server.acceptance!.source.status("A03"); const blocked = await server.app.inject({ method: "POST", url: "/api/dev/source-actions", headers: manager, payload: { actionId: "a03.record_first_consumption", key: Number(source.sourceState.rows[0]?.workOrderId) } }); assert.equal(blocked.statusCode, 409); const healthy = await poll(server, "A03"); assert.equal(healthy.scenario.actualMonitor.latestIncident.lifecycle, "resolved"); return { consumptionAcceptedOpen: true, laterConsumptionStatus: blocked.statusCode, resolutionCycle: healthy.result.cycleId }; });
 
 // A05 exact connected cases.
 await run(test("A05-00"), seeds("A05", fixtures.a05.clean[0]), async (server) => {
@@ -421,18 +438,18 @@ await run(test("A05-02"), seeds("A05", fixtures.a05.independentProduced[0]), asy
   return { producedReasons, remnantReasons: remnant };
 });
 await run(test("A05-03"), seeds("A05", fixtures.a05.partialWeighFirst[0]), async (server) => {
-  const opened = await openAndAssert(server, "A05", "past_threshold_both"); await request(server, "POST", "/api/dev/scenarios/A05/correct", { correction: "weigh" }); const weighed = await poll(server, "A05");
+  const opened = await openAndAssert(server, "A05", "past_threshold_both"); await act(server, "a05.register_weighing"); const weighed = await poll(server, "A05");
   const weighedReasons = (await latest(server, "A05")).reasons as string[]; assert.deepEqual(weighedReasons, ["still_at_machine"]); assert.equal(weighed.scenario.actualMonitor.incidentCount, opened.scenario.actualMonitor.incidentCount);
   const moved = await isolated(seeds("A05", fixtures.a05.partialMoveFirst[0]), async (moveServer) => {
-    const moveOpened = await openAndAssert(moveServer, "A05", "past_threshold_both"); await request(moveServer, "POST", "/api/dev/scenarios/A05/correct", { correction: "move" }); const after = await poll(moveServer, "A05");
+    const moveOpened = await openAndAssert(moveServer, "A05", "past_threshold_both"); await act(moveServer, "a05.register_movement"); const after = await poll(moveServer, "A05");
     const reasons = (await latest(moveServer, "A05")).reasons as string[]; assert.deepEqual(reasons, ["not_weighed"]); assert.equal(after.scenario.actualMonitor.incidentCount, moveOpened.scenario.actualMonitor.incidentCount); return reasons;
   });
   return { weighFirst: weighedReasons, moveFirst: moved };
 });
-await run(test("A05-04"), seeds("A05", fixtures.a05.failure[0]), async (server) => { await openAndAssert(server, "A05", "past_threshold_both"); await request(server, "POST", "/api/dev/scenarios/A05/correct"); await fault(server, "A05", "partial_pagination"); const failed = await poll(server, "A05"); assert.equal(failed.scenario.actualMonitor.latestIncident.lifecycle, "open"); const healthy = await poll(server, "A05"); assert.equal(healthy.scenario.actualMonitor.latestIncident.lifecycle, "resolved"); return { failedCycle: failed.result.cycleId, recoveryCycle: healthy.result.cycleId }; });
+await run(test("A05-04"), seeds("A05", fixtures.a05.failure[0]), async (server) => { await openAndAssert(server, "A05", "past_threshold_both"); await act(server, "a05.register_weighing"); await act(server, "a05.register_movement"); await fault(server, "A05", "partial_pagination"); const failed = await poll(server, "A05"); assert.equal(failed.scenario.actualMonitor.latestIncident.lifecycle, "open"); const healthy = await poll(server, "A05"); assert.equal(healthy.scenario.actualMonitor.latestIncident.lifecycle, "resolved"); return { failedCycle: failed.result.cycleId, recoveryCycle: healthy.result.cycleId }; });
 await run(test("A05-05"), seeds("A05", fixtures.a05.administrativeClosure[0]), async (server) => { await openAndAssert(server, "A05", "past_threshold_both"); return closeAdministratively(server, "A05"); });
-await run(test("A05-06"), seeds("A05", fixtures.a05.handoff[0]), async (server) => { await prepare(server, "A02", "clean_baseline"); const opened = await openAndAssert(server, "A05", "past_threshold_both"); await request(server, "POST", "/api/dev/scenarios/A05/source-action", { action: "handoff" }); await poll(server, "A05"); assert.deepEqual((await latest(server, "A05")).reasons, ["not_weighed"]); await request(server, "POST", "/api/dev/scenarios/A02/advance-time", { minutes: 31 }); const a02 = await poll(server, "A02"); assert.equal(a02.scenario.actualMonitor.openIncidentCount, 1); return { a05IncidentId: opened.scenario.actualMonitor.latestIncident.id, a02IncidentId: a02.scenario.actualMonitor.latestIncident.id }; });
-await run(test("A05-08"), seeds("A05", fixtures.a05.otClosure[0]), async (server) => { const opened = await openAndAssert(server, "A05", "past_threshold_both"); const incidentId = opened.scenario.actualMonitor.latestIncident.id; await request(server, "POST", "/api/dev/scenarios/A05/source-action", { action: "close_work_order" }); const survived = await poll(server, "A05"); assert.equal(survived.scenario.actualMonitor.latestIncident.id, incidentId); assert.equal(survived.scenario.actualMonitor.latestIncident.lifecycle, "open"); await request(server, "POST", "/api/dev/scenarios/A05/correct"); const resolved = await poll(server, "A05"); assert.equal(resolved.scenario.actualMonitor.latestIncident.lifecycle, "resolved"); return { incidentId, survivedClosureCycle: survived.result.cycleId, resolvedCycle: resolved.result.cycleId }; });
+await run(test("A05-06"), seeds("A05", fixtures.a05.handoff[0]), async (server) => { await prepare(server, "A02", "clean_baseline"); const opened = await openAndAssert(server, "A05", "past_threshold_both"); await act(server, "a05.handoff_to_a02"); await poll(server, "A05"); assert.deepEqual((await latest(server, "A05")).reasons, ["not_weighed"]); await request(server, "POST", "/api/dev/scenarios/A02/advance-time", { minutes: 31 }); const a02 = await poll(server, "A02"); assert.equal(a02.scenario.actualMonitor.openIncidentCount, 1); return { a05IncidentId: opened.scenario.actualMonitor.latestIncident.id, a02IncidentId: a02.scenario.actualMonitor.latestIncident.id }; });
+await run(test("A05-08"), seeds("A05", fixtures.a05.otClosure[0]), async (server) => { const opened = await openAndAssert(server, "A05", "past_threshold_both"); const incidentId = opened.scenario.actualMonitor.latestIncident.id; await act(server, "a05.close_source_work_order"); const survived = await poll(server, "A05"); assert.equal(survived.scenario.actualMonitor.latestIncident.id, incidentId); assert.equal(survived.scenario.actualMonitor.latestIncident.lifecycle, "open"); await act(server, "a05.register_weighing"); await act(server, "a05.register_movement"); const resolved = await poll(server, "A05"); assert.equal(resolved.scenario.actualMonitor.latestIncident.lifecycle, "resolved"); return { incidentId, survivedClosureCycle: survived.result.cycleId, resolvedCycle: resolved.result.cycleId }; });
 
 // SH-11 is completed by the browser-review command against the persisted connected runtime.
 await run(test("SH-11"), seeds("A02", 26061), async (server) => {

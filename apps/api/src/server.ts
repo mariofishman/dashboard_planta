@@ -2,7 +2,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
 import { ConversationService, type ConversationParticipant } from "@monitor/conversations";
-import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry, TestDatabaseConnections, TestDatabaseFreshnessProvider, TestDatabaseScenarioRepository, testDatabaseContextFor, testDatabaseRegistry, type DetectionQueryDefinition, type DetectionSourceAdapter, type ScenarioSource, type TestDatabaseFixtureSeeds } from "@monitor/detection";
+import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, loadSourceActionContracts, ScenarioExperimentRepository, ScenarioExperimentRuntime, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry, TestDatabaseConnections, TestDatabaseFreshnessProvider, TestDatabaseScenarioRepository, testDatabaseContextFor, testDatabaseRegistry, type DetectionQueryDefinition, type DetectionSourceAdapter, type ScenarioSource, type TestDatabaseFixtureSeeds } from "@monitor/detection";
 import { IncidentService, type IncidentChange, type RuleContract } from "@monitor/incidents";
 import Fastify from "fastify";
 import { readFile } from "node:fs/promises";
@@ -40,6 +40,7 @@ export interface MonitorServer {
     runner: DetectionRunner;
     scheduler: DetectionScheduler;
     source: ScenarioSource;
+    runtime: ScenarioExperimentRuntime;
     registry: Map<"A02" | "A03" | "A05", { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
   };
   close(): Promise<void>;
@@ -185,7 +186,9 @@ export async function buildMonitorServer(options: {
     .map(({ query, adapter }) => detectionScheduler.runRecovery(query, adapter)));
   // Deterministic tests invoke the same runner through the development poll route.
   // Development keeps normal scheduled polling active for source-to-screen review.
-  if (config.nodeEnv !== "test") localDetectionSources.forEach(({ query, adapter }) => detectionScheduler.schedule(query, adapter));
+  if (config.nodeEnv !== "test") localDetectionSources
+    .filter(({ query }) => !scenarioSource || !["A02", "A03", "A05"].includes(query.ruleCode))
+    .forEach(({ query, adapter }) => detectionScheduler.schedule(query, adapter));
 
   io.use(async (socket, next) => {
     const signedCookie = cookieValue(socket.handshake.headers.cookie, "monitor_session");
@@ -300,16 +303,32 @@ export async function buildMonitorServer(options: {
   await app.register(rotationRoutes, { database, onChanged: rerouteOpen });
   await app.register(conversationRoutes, { service: conversationService });
   const scenarioRegistry = new Map(scenarioSources.map((entry) => [entry.query.ruleCode as "A02" | "A03" | "A05", entry]));
+  let scenarioRuntime: ScenarioExperimentRuntime | null = null;
   if (scenarioSource) {
+    const sourceActionContracts = await loadSourceActionContracts(repositoryRoot);
+    const scenarioExperiments = new ScenarioExperimentRepository(database);
+    scenarioRuntime = new ScenarioExperimentRuntime(
+      scenarioExperiments,
+      scenarioSource,
+      detectionScheduler,
+      scenarioRegistry,
+      config.nodeEnv !== "test",
+      (error) => app.log.error({ err: error }, "scenario experiment runtime failed"),
+    );
+    await scenarioRuntime.initialize();
     await app.register(scenarioRoutes, {
       database,
       source: scenarioSource,
+      sourceActionContracts,
       scheduler: detectionScheduler,
+      runtime: scenarioRuntime,
+      experiments: scenarioExperiments,
       registry: scenarioRegistry,
     });
   }
 
   const close = async () => {
+    scenarioRuntime?.stop();
     detectionScheduler.stop();
     await redis.close();
     io.close();
@@ -319,6 +338,6 @@ export async function buildMonitorServer(options: {
   };
   return {
     app, io, database, redis, config, close,
-    ...(scenarioSource ? { acceptance: { runner: detectionRunner, scheduler: detectionScheduler, source: scenarioSource, registry: scenarioRegistry } } : {}),
+    ...(scenarioSource && scenarioRuntime ? { acceptance: { runner: detectionRunner, scheduler: detectionScheduler, source: scenarioSource, runtime: scenarioRuntime, registry: scenarioRegistry } } : {}),
   };
 }

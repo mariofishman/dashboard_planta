@@ -1,0 +1,231 @@
+import type { CycleResult, DetectionQueryDefinition, DetectionSourceAdapter } from "./types.js";
+import type { DetectionScheduler } from "./scheduler.js";
+import {
+  ScenarioExperimentRepository,
+  type ExperimentFrequencies,
+  type ExperimentSpeed,
+  type ScenarioDuePoll,
+  type ScenarioExperiment,
+  type ScenarioExperimentIdentity,
+} from "./experiment.js";
+import type { ScenarioRuleCode, ScenarioSource } from "./simulator.js";
+
+type ScenarioRegistry = Map<ScenarioRuleCode, { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
+
+export interface ScenarioRuntimeStatus {
+  experiment: ScenarioExperiment | null;
+  automaticScheduling: boolean;
+  realMillisecondsPerSimulatedMinute: number | null;
+  nextAutomaticTickAt: string | null;
+}
+
+export interface ScenarioRuntimePoll {
+  ruleCode: ScenarioRuleCode;
+  dueAt: string;
+  result: CycleResult;
+}
+
+export interface ScenarioRuntimeAdvance {
+  experiment: ScenarioExperiment;
+  polls: ScenarioRuntimePoll[];
+}
+
+export class ScenarioExperimentRuntime {
+  private queue: Promise<void> = Promise.resolve();
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private timerGeneration = 0;
+
+  constructor(
+    private readonly repository: ScenarioExperimentRepository,
+    private readonly source: ScenarioSource,
+    private readonly scheduler: DetectionScheduler,
+    private readonly registry: ScenarioRegistry,
+    private readonly automaticScheduling: boolean,
+    private readonly onError: (error: unknown) => void = () => {},
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  async initialize(): Promise<ScenarioRuntimeStatus> {
+    return this.serialized(async () => {
+      const runtime = await this.repository.activeRuntime();
+      if (runtime.experiment) await this.source.setBusinessTime(runtime.experiment.businessTime);
+      const nextTickAt = runtime.experiment?.status === "running" ? runtime.nextTickAt ?? this.nextDeadline(runtime.experiment.speed) : null;
+      if (runtime.experiment && nextTickAt !== runtime.nextTickAt) await this.repository.setNextTick(runtime.experiment.id, nextTickAt);
+      this.arm(runtime.experiment, nextTickAt);
+      return this.describe(runtime.experiment, nextTickAt);
+    });
+  }
+
+  async create(input: {
+    name: string;
+    businessTime: string;
+    frequencies: ExperimentFrequencies;
+    identity: ScenarioExperimentIdentity;
+  }): Promise<ScenarioRuntimeStatus> {
+    return this.serialized(async () => {
+      const created = await this.repository.create(input.name, input.businessTime, input.frequencies, input.identity);
+      const nextTickAt = this.nextDeadline(created.speed);
+      const active = await this.repository.activate(created.id, nextTickAt);
+      await this.source.setBusinessTime(active.businessTime);
+      this.arm(active, nextTickAt);
+      return this.describe(active, nextTickAt);
+    });
+  }
+
+  async status(): Promise<ScenarioRuntimeStatus> {
+    const runtime = await this.repository.activeRuntime();
+    return this.describe(runtime.experiment, runtime.nextTickAt);
+  }
+
+  async configure(id: string, speed: ExperimentSpeed, frequencies: ExperimentFrequencies): Promise<ScenarioRuntimeStatus> {
+    return this.serialized(async () => {
+      await this.requireActive(id);
+      const experiment = await this.repository.configure(id, speed, frequencies);
+      const nextTickAt = experiment.status === "running" ? this.nextDeadline(experiment.speed) : null;
+      await this.repository.setNextTick(id, nextTickAt);
+      this.arm(experiment, nextTickAt);
+      return this.describe(experiment, nextTickAt);
+    });
+  }
+
+  async pause(id: string, paused: boolean): Promise<ScenarioRuntimeStatus> {
+    return this.serialized(async () => {
+      await this.requireActive(id);
+      const experiment = await this.repository.pause(id, paused);
+      const nextTickAt = paused ? null : this.nextDeadline(experiment.speed);
+      await this.repository.setNextTick(id, nextTickAt);
+      this.arm(experiment, nextTickAt);
+      return this.describe(experiment, nextTickAt);
+    });
+  }
+
+  async advance(id: string, minutes: number): Promise<ScenarioRuntimeAdvance> {
+    return this.serialized(async () => {
+      await this.requireActive(id);
+      const result = await this.advanceLocked(id, minutes);
+      const nextTickAt = result.experiment.status === "running" ? this.nextDeadline(result.experiment.speed) : null;
+      await this.repository.setNextTick(id, nextTickAt);
+      this.arm(result.experiment, nextTickAt);
+      return result;
+    });
+  }
+
+  async executeBeforeSourceAction<T>(work: () => Promise<T>): Promise<T> {
+    return this.serialized(async () => {
+      const active = await this.repository.active();
+      if (active?.status === "running") await this.advanceLocked(active.id, 0);
+      const result = await work();
+      if (active && result && typeof result === "object") {
+        const event = result as Record<string, unknown>;
+        if (typeof event.actionId === "string" && ["A02", "A03", "A05"].includes(String(event.ruleCode))) {
+          await this.repository.recordRuntimeEvent(active.id, "source_action", event.ruleCode as ScenarioRuleCode, active.businessTime, event);
+        }
+      }
+      return result;
+    });
+  }
+
+  async executeSerialized<T>(work: () => Promise<T>): Promise<T> {
+    return this.serialized(work);
+  }
+
+  stop(): void {
+    this.timerGeneration += 1;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+  }
+
+  private async advanceLocked(id: string, minutes: number): Promise<ScenarioRuntimeAdvance> {
+    const plan = await this.repository.planAdvance(id, minutes);
+    if (plan.experiment.status !== "running") return { experiment: plan.experiment, polls: [] };
+    const polls: ScenarioRuntimePoll[] = [];
+    for (const due of plan.due) polls.push(await this.runDue(id, due));
+    await this.source.setBusinessTime(plan.targetTime);
+    const experiment = await this.repository.setBusinessTime(id, plan.targetTime);
+    return { experiment, polls };
+  }
+
+  private async runDue(id: string, due: ScenarioDuePoll): Promise<ScenarioRuntimePoll> {
+    await this.source.setBusinessTime(due.dueAt);
+    await this.repository.setBusinessTime(id, due.dueAt);
+    const entry = this.registry.get(due.ruleCode);
+    if (!entry) throw new Error(`missing_scenario_runtime_query:${due.ruleCode}`);
+    await this.repository.recordRuntimeEvent(id, "poll_started", due.ruleCode, due.dueAt, { queryId: entry.query.queryId });
+    try {
+      const result = await this.scheduler.runScheduled(entry.query, entry.adapter);
+      await this.repository.recordRuntimeEvent(id, "poll_completed", due.ruleCode, due.dueAt, result as unknown as Record<string, unknown>);
+      await this.repository.completeDue(id, due);
+      return { ...due, result };
+    } catch (error) {
+      await this.repository.recordRuntimeEvent(id, "poll_failed", due.ruleCode, due.dueAt, {
+        queryId: entry.query.queryId,
+        error: error instanceof Error ? error.message : "unknown_error",
+      });
+      throw error;
+    }
+  }
+
+  private async requireActive(id: string): Promise<ScenarioExperiment> {
+    const active = await this.repository.active();
+    if (!active || active.id !== id) throw new Error("scenario_experiment_not_active");
+    return active;
+  }
+
+  private describe(experiment: ScenarioExperiment | null, nextAutomaticTickAt: string | null): ScenarioRuntimeStatus {
+    return {
+      experiment,
+      automaticScheduling: this.automaticScheduling,
+      realMillisecondsPerSimulatedMinute: experiment ? 60_000 / experiment.speed : null,
+      nextAutomaticTickAt,
+    };
+  }
+
+  private arm(experiment: ScenarioExperiment | null, nextTickAt: string | null): void {
+    this.timerGeneration += 1;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    if (!this.automaticScheduling || experiment?.status !== "running" || !nextTickAt) return;
+    const generation = this.timerGeneration;
+    this.timer = setTimeout(() => {
+      void this.serialized(async () => {
+        if (generation !== this.timerGeneration) return;
+        const runtime = await this.repository.activeRuntime();
+        let active = runtime.experiment;
+        if (!active || active.id !== experiment.id || active.status !== "running" || runtime.nextTickAt !== nextTickAt) {
+          this.onError(new Error("scenario_runtime_timer_ownership_changed"));
+          return;
+        }
+        const interval = this.interval(active.speed);
+        const dueTicks = Math.max(1, Math.floor((this.now() - Date.parse(nextTickAt)) / interval) + 1);
+        let completedTicks = dueTicks;
+        try {
+          active = (await this.advanceLocked(active.id, dueTicks)).experiment;
+        } catch (error) {
+          completedTicks = 1;
+          throw error;
+        } finally {
+          if (generation === this.timerGeneration && active) {
+            const followingTick = new Date(Date.parse(nextTickAt) + completedTicks * interval).toISOString();
+            await this.repository.setNextTick(active.id, followingTick);
+            this.arm(active, followingTick);
+          }
+        }
+      }).catch(this.onError);
+    }, Math.max(0, Date.parse(nextTickAt) - this.now()));
+    this.timer.unref?.();
+  }
+
+  private interval(speed: ExperimentSpeed): number {
+    return 60_000 / speed;
+  }
+
+  private nextDeadline(speed: ExperimentSpeed): string {
+    return new Date(this.now() + this.interval(speed)).toISOString();
+  }
+
+  private serialized<T>(work: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(work, work);
+    this.queue = result.then(() => undefined, () => undefined);
+    return result;
+  }
+}

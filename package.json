@@ -30,6 +30,7 @@
     "validate:alert-specification": "python3 .agents/skills/monitor-alert-rule-workflow/scripts/validate_alert_specification.py",
     "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts",
     "validate:phase6-stage4": "tsx scripts/validate-phase6-stage4.ts",
+    "validate:phase6-stage5a": "./scripts/validate-phase6-stage5a.sh",
     "validate:phase6-stage5": "./scripts/validate-phase6-stage5.sh"
   },
   "devDependencies": {

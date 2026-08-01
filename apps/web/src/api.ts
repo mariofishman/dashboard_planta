@@ -47,6 +47,12 @@ export interface ConversationMessage {
 }
 
 export type ScenarioRuleCode = "A02" | "A03" | "A05";
+export type SourceActionId =
+  | "a02.prepare_dispatch" | "a02.receive" | "a02.cancel" | "a02.reject"
+  | "a03.start_work_order" | "a03.record_first_consumption" | "a03.close_work_order" | "a03.cancel_work_order"
+  | "a05.declare_produced_reel" | "a05.declare_remnant_reel" | "a05.register_weighing" | "a05.register_movement"
+  | "a05.close_source_work_order" | "a05.handoff_to_a02";
+export type A02SourceAuthority = "origin" | "destination" | "both";
 export type ScenarioFault = "timeout" | "source_error" | "partial" | "invalid_schema";
 export type ScenarioCase = "clean_baseline" | "before_threshold" | "at_threshold" | "past_threshold"
   | "before_threshold_not_weighed" | "before_threshold_still_at_machine"
@@ -75,6 +81,31 @@ export interface ScenarioStatus {
   comparison: { matches: boolean; mismatches: string[] };
   latestChangeCursor: number | null;
   detectionDelayMilliseconds: number | null;
+}
+
+export interface ScenarioExperiment {
+  id: string; runId: string; manifestVersion: string; sourceActionContractVersion: string; name: string;
+  status: "running" | "paused" | "completed"; businessTime: string; speed: 1 | 2 | 3 | 60;
+  frequencies: Record<ScenarioRuleCode, number>; nextDue: Record<ScenarioRuleCode, string>; createdAt: string; updatedAt: string;
+}
+export interface ScenarioRuntimeStatus {
+  experiment: ScenarioExperiment | null; automaticScheduling: boolean; realMillisecondsPerSimulatedMinute: number | null; nextAutomaticTickAt: string | null;
+}
+export interface ScenarioSnapshot {
+  id: string; experimentId: string; label: string; schemaVersion: string; payload: Record<string, unknown>; capturedBusinessTime: string; capturedAt: string;
+}
+export interface ScenarioAcceptanceResult {
+  experimentId: string; testId: string; status: "passed" | "failed" | "not_run"; evidence: Record<string, unknown>; startedAt: string; completedAt: string;
+}
+export interface ScenarioRuntimeEvent {
+  id: string; experimentId: string; eventType: "poll_started" | "poll_completed" | "poll_failed" | "source_action";
+  ruleCode: ScenarioRuleCode; businessTime: string; payload: Record<string, unknown>; recordedAt: string;
+}
+export interface ScenarioExperimentDetail {
+  experiment: ScenarioExperiment;
+  snapshots: { items: ScenarioSnapshot[]; nextCursor: string | null };
+  results: { items: ScenarioAcceptanceResult[]; nextCursor: string | null };
+  events: ScenarioRuntimeEvent[];
 }
 
 export class ApiRequestError extends Error {
@@ -235,9 +266,32 @@ export async function scenarios(): Promise<ScenarioStatus[]> {
   return (await responseJson<{ scenarios: ScenarioStatus[] }>(await fetch("/api/dev/scenarios", { credentials: "include" }))).scenarios;
 }
 
-export async function scenarioAction(code: ScenarioRuleCode, action: "reset" | "trigger" | "prepare" | "correct" | "advance-time" | "fail-next-poll" | "poll" | "recur", body?: Record<string, unknown>): Promise<ScenarioStatus> {
+export async function scenarioRuntime(): Promise<ScenarioRuntimeStatus> {
+  return responseJson<ScenarioRuntimeStatus>(await fetch("/api/dev/scenario-runtime", { credentials: "include" }));
+}
+
+export async function scenarioExperiments(cursor?: string): Promise<{ items: ScenarioExperiment[]; nextCursor: string | null }> {
+  const query = new URLSearchParams({ limit: "20" });
+  if (cursor) query.set("cursor", cursor);
+  return responseJson(await fetch(`/api/dev/scenario-experiments?${query}`, { credentials: "include" }));
+}
+
+export async function scenarioExperiment(id: string, cursors: { snapshotCursor?: string; resultCursor?: string } = {}): Promise<ScenarioExperimentDetail> {
+  const query = new URLSearchParams(Object.entries(cursors).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  return responseJson<ScenarioExperimentDetail>(await fetch(`/api/dev/scenario-experiments/${id}${query.size ? `?${query}` : ""}`, { credentials: "include" }));
+}
+
+export async function scenarioAction(code: ScenarioRuleCode, action: "reset" | "trigger" | "prepare" | "advance-time" | "fail-next-poll" | "poll" | "recur", body?: Record<string, unknown>): Promise<ScenarioStatus> {
   const init: RequestInit = { method: "POST", credentials: "include" };
   if (body) { init.headers = { "content-type": "application/json" }; init.body = JSON.stringify(body); }
   const result = await responseJson<ScenarioStatus | { scenario: ScenarioStatus }>(await fetch(`/api/dev/scenarios/${code}/${action}`, init));
   return "scenario" in result ? result.scenario : result;
+}
+
+export async function scenarioSourceAction(actionId: SourceActionId, key: number, authority?: A02SourceAuthority): Promise<ScenarioStatus> {
+  const payload = { actionId, key, ...(authority ? { authority } : {}) };
+  const result = await responseJson<{ scenario: ScenarioStatus }>(await fetch("/api/dev/source-actions", {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+  }));
+  return result.scenario;
 }

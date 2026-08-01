@@ -1,0 +1,156 @@
+{
+  "contractVersion": "1.0.0",
+  "sourceDatabase": "test_database",
+  "writerIdentity": "alertas_fake",
+  "actions": [
+    {
+      "id": "a02.prepare_dispatch",
+      "ruleCode": "A02",
+      "naturalKey": "materialFlowDetailId",
+      "invocation": { "operation": "sourceAction", "argument": "prepare_dispatch" },
+      "mutations": [{ "table": "flujo_materiales_detalles", "fields": ["id_articulo", "nombre_articulo", "id_unidad_uso", "cantidad_entransito_uso", "id_unidad_inventario", "cantidad_entransito_inventario", "costo_promedio", "id_articulo_serial", "id_lote", "id_almacen_origen", "id_almacen_destino", "id_ubicacion_almacen_origen", "id_ubicacion_almacen_destino", "observacion", "id_unidad_recibida_uso", "cantidad_recibida_uso", "id_unidad_recibida_inventario", "cantidad_recibida_inventario", "id_usuario_recepcion", "fecha_recepcion", "id_usuario_creador", "id_usuario_actualizacion", "id_usuario_eliminacion", "fecha_creacion", "fecha_actualizacion", "fecha_eliminacion", "id_orden_trabajo", "cantidad_inicial_inventario", "cantidad_inicial_uso", "id_orden_trabajo_material", "moneda", "estado", "id_padre", "id_documento_desencadenador", "id_documento_origen_desencadenador", "confirmar_peso", "id_material_orden_despacho", "id_orden_despacho"] }],
+      "preconditions": ["approved template movement exists with linked material, OT, and endpoints"],
+      "postconditions": ["one new movement ID is destination-bound, TRANSITO, and unreceived"],
+      "rejects": ["terminal movement reactivation"]
+    },
+    {
+      "id": "a02.receive",
+      "ruleCode": "A02",
+      "naturalKey": "materialFlowDetailId",
+      "invocation": { "operation": "sourceAction", "argument": "receive" },
+      "mutations": [{ "table": "flujo_materiales_detalles", "fields": ["estado", "fecha_recepcion", "fecha_actualizacion"] }],
+      "preconditions": ["movement state is TRANSITO"],
+      "postconditions": ["movement state is RECIBIDO with receipt time"],
+      "rejects": ["receipt of a terminal movement"]
+    },
+    {
+      "id": "a02.cancel",
+      "ruleCode": "A02",
+      "naturalKey": "materialFlowDetailId",
+      "invocation": { "operation": "sourceAction", "argument": "cancel" },
+      "mutations": [
+        { "table": "flujo_materiales_detalles", "fields": ["estado", "fecha_recepcion", "fecha_actualizacion"] },
+        { "table": "flujo_materiales_detalles", "fields": ["id_articulo", "nombre_articulo", "id_unidad_uso", "cantidad_entransito_uso", "id_unidad_inventario", "cantidad_entransito_inventario", "costo_promedio", "id_articulo_serial", "id_lote", "id_almacen_origen", "id_almacen_destino", "id_ubicacion_almacen_origen", "id_ubicacion_almacen_destino", "observacion", "id_unidad_recibida_uso", "cantidad_recibida_uso", "id_unidad_recibida_inventario", "cantidad_recibida_inventario", "id_usuario_recepcion", "fecha_recepcion", "id_usuario_creador", "id_usuario_actualizacion", "id_usuario_eliminacion", "fecha_creacion", "fecha_actualizacion", "fecha_eliminacion", "id_orden_trabajo", "cantidad_inicial_inventario", "cantidad_inicial_uso", "id_orden_trabajo_material", "moneda", "estado", "id_padre", "id_documento_desencadenador", "id_documento_origen_desencadenador", "confirmar_peso", "id_material_orden_despacho", "id_orden_despacho"] }
+      ],
+      "preconditions": ["origin-authorized movement state is TRANSITO"],
+      "postconditions": ["original is ANULADO and exactly one new reversed TRANSITO movement exists"],
+      "rejects": ["terminal movement reactivation", "duplicate reversal"]
+    },
+    {
+      "id": "a02.reject",
+      "ruleCode": "A02",
+      "naturalKey": "materialFlowDetailId",
+      "invocation": { "operation": "sourceAction", "argument": "reject" },
+      "mutations": [
+        { "table": "flujo_materiales_detalles", "fields": ["estado", "fecha_recepcion", "fecha_actualizacion"] },
+        { "table": "flujo_materiales_detalles", "fields": ["id_articulo", "nombre_articulo", "id_unidad_uso", "cantidad_entransito_uso", "id_unidad_inventario", "cantidad_entransito_inventario", "costo_promedio", "id_articulo_serial", "id_lote", "id_almacen_origen", "id_almacen_destino", "id_ubicacion_almacen_origen", "id_ubicacion_almacen_destino", "observacion", "id_unidad_recibida_uso", "cantidad_recibida_uso", "id_unidad_recibida_inventario", "cantidad_recibida_inventario", "id_usuario_recepcion", "fecha_recepcion", "id_usuario_creador", "id_usuario_actualizacion", "id_usuario_eliminacion", "fecha_creacion", "fecha_actualizacion", "fecha_eliminacion", "id_orden_trabajo", "cantidad_inicial_inventario", "cantidad_inicial_uso", "id_orden_trabajo_material", "moneda", "estado", "id_padre", "id_documento_desencadenador", "id_documento_origen_desencadenador", "confirmar_peso", "id_material_orden_despacho", "id_orden_despacho"] }
+      ],
+      "preconditions": ["destination-authorized movement state is TRANSITO", "rejection takes precedence when both source permissions apply"],
+      "postconditions": ["original is RECHAZADO and exactly one new reversed TRANSITO movement exists"],
+      "rejects": ["terminal movement reactivation", "duplicate reversal"]
+    },
+    {
+      "id": "a03.start_work_order",
+      "ruleCode": "A03",
+      "naturalKey": "workOrderId",
+      "invocation": { "operation": "sourceAction", "argument": "start_work_order" },
+      "mutations": [{ "table": "ordenes_trabajo", "fields": ["fecha_inicio_ejecucion", "fecha_actualizacion"] }],
+      "preconditions": ["OT is not started, closed, cancelled, or deleted", "machine has no active OT"],
+      "postconditions": ["OT has one actual start time and is the machine's only active OT"],
+      "rejects": ["second active OT on the machine", "closed or cancelled OT reactivation"]
+    },
+    {
+      "id": "a03.record_first_consumption",
+      "ruleCode": "A03",
+      "naturalKey": "workOrderId",
+      "invocation": { "operation": "sourceAction", "argument": "record_first_consumption" },
+      "mutations": [{ "table": "orden_trabajo_materiales", "fields": ["cantidad_consumida", "fecha_actualizacion"] }],
+      "preconditions": ["OT is open and active"],
+      "postconditions": ["consumption is positive and never lower than its previous value"],
+      "rejects": ["post-closure consumption", "consumed evidence removal"]
+    },
+    {
+      "id": "a03.close_work_order",
+      "ruleCode": "A03",
+      "naturalKey": "workOrderId",
+      "invocation": { "operation": "sourceAction", "argument": "close_work_order" },
+      "mutations": [{ "table": "ordenes_trabajo", "fields": ["fecha_fin_ejecucion", "fecha_actualizacion"] }],
+      "preconditions": ["OT is active and not cancelled"],
+      "postconditions": ["OT is closed and consumption rows are unchanged"],
+      "rejects": ["invented consumption", "closed OT reactivation"]
+    },
+    {
+      "id": "a03.cancel_work_order",
+      "ruleCode": "A03",
+      "naturalKey": "workOrderId",
+      "invocation": { "operation": "sourceAction", "argument": "cancel_work_order" },
+      "mutations": [{ "table": "ordenes_trabajo", "fields": ["eliminado", "fecha_eliminacion", "fecha_actualizacion"] }],
+      "preconditions": ["OT is open and not already cancelled"],
+      "postconditions": ["OT is cancelled and consumption rows are unchanged"],
+      "rejects": ["invented consumption", "cancelled OT reactivation"]
+    },
+    {
+      "id": "a05.declare_produced_reel",
+      "ruleCode": "A05",
+      "naturalKey": "articleSerialId",
+      "invocation": { "operation": "sourceAction", "argument": "declare_produced_reel" },
+      "mutations": [{ "table": "articulo_serial", "fields": ["tipo", "estado", "fecha_creacion", "fecha_actualizacion"] }],
+      "preconditions": ["produced reel has a source OT"],
+      "postconditions": ["declared reel kind is produced and remains keyed by articleSerialId"],
+      "rejects": ["identity reuse as recurrence"]
+    },
+    {
+      "id": "a05.declare_remnant_reel",
+      "ruleCode": "A05",
+      "naturalKey": "articleSerialId",
+      "invocation": { "operation": "sourceAction", "argument": "declare_remnant_reel" },
+      "mutations": [{ "table": "articulo_serial", "fields": ["tipo", "estado", "fecha_creacion", "fecha_actualizacion"] }],
+      "preconditions": ["remnant reel has a closing OT"],
+      "postconditions": ["declared reel kind is remnant and remains keyed by articleSerialId"],
+      "rejects": ["identity reuse as recurrence"]
+    },
+    {
+      "id": "a05.register_weighing",
+      "ruleCode": "A05",
+      "naturalKey": "articleSerialId",
+      "invocation": { "operation": "sourceAction", "argument": "register_weighing" },
+      "mutations": [{ "table": "balanza_carga_detalle_registros", "fields": ["secuencia", "peso_neto", "peso_tara", "peso_bruto", "tipo_registro", "fecha_creacion", "id_usuario_creador", "eliminado", "id_articulo_serial"] }],
+      "preconditions": ["reel exists and is not deleted"],
+      "postconditions": ["exactly one active scale record exists for the reel"],
+      "rejects": ["duplicate active scale record"]
+    },
+    {
+      "id": "a05.register_movement",
+      "ruleCode": "A05",
+      "naturalKey": "articleSerialId",
+      "invocation": { "operation": "sourceAction", "argument": "register_movement" },
+      "mutations": [{ "table": "articulo_serial", "fields": ["id_almacen", "fecha_actualizacion"] }],
+      "preconditions": ["reel is still at its source machine"],
+      "postconditions": ["reel is outside the source machine warehouse"],
+      "rejects": ["identity reuse as recurrence"]
+    },
+    {
+      "id": "a05.close_source_work_order",
+      "ruleCode": "A05",
+      "naturalKey": "articleSerialId",
+      "invocation": { "operation": "sourceAction", "argument": "close_work_order" },
+      "mutations": [{ "table": "ordenes_trabajo", "fields": ["fecha_fin_ejecucion", "fecha_actualizacion"] }],
+      "preconditions": ["reel retains its source OT relationship"],
+      "postconditions": ["source OT is closed without changing reel identity, weight, or warehouse"],
+      "rejects": ["A05 resolution caused only by OT closure"]
+    },
+    {
+      "id": "a05.handoff_to_a02",
+      "ruleCode": "A05",
+      "naturalKey": "articleSerialId",
+      "invocation": { "operation": "sourceAction", "argument": "handoff" },
+      "mutations": [
+        { "table": "articulo_serial", "fields": ["id_almacen", "fecha_actualizacion"] },
+        { "table": "flujo_materiales_detalles", "fields": ["id_articulo", "nombre_articulo", "id_unidad_uso", "cantidad_entransito_uso", "id_unidad_inventario", "cantidad_entransito_inventario", "costo_promedio", "id_articulo_serial", "id_lote", "id_almacen_origen", "id_almacen_destino", "id_ubicacion_almacen_origen", "id_ubicacion_almacen_destino", "observacion", "cantidad_recibida_uso", "cantidad_recibida_inventario", "id_usuario_creador", "fecha_creacion", "id_orden_trabajo", "cantidad_inicial_inventario", "cantidad_inicial_uso", "id_orden_trabajo_material", "moneda", "estado", "id_padre", "confirmar_peso"] }
+      ],
+      "preconditions": ["reel is still at the source machine", "no active Stage 5 handoff movement exists for the reel"],
+      "postconditions": ["reel leaves the machine and exactly one new destination-bound A02 movement owns movement delay"],
+      "rejects": ["duplicate handoff", "A05 movement-delay recurrence"]
+    }
+  ]
+}

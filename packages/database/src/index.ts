@@ -174,7 +174,7 @@ export async function createDatabaseRuntime(options: {
 }
 
 export async function migrateFoundation(database: DatabaseRuntime): Promise<void> {
-  for (const filename of ["0000_phase2_foundation.sql", "0001_phase3_detection.sql", "0002_phase4_incidents.sql", "0003_phase4b_simulator.sql", "0004_phase5_roster_authorization.sql", "0005_phase5_roster_assignments.sql", "0006_roster_operation_catalog.sql", "0007_configurable_roster_groups.sql", "0008_phase5_routing.sql", "0009_phase6_conversations.sql", "0010_phase6_alertas_fake_redesign.sql", "0011_phase6_a02_authority_reconciliation.sql", "0012_phase6_stage4_test_database.sql", "0013_phase6_stage5_acceptance.sql"]) {
+  for (const filename of ["0000_phase2_foundation.sql", "0001_phase3_detection.sql", "0002_phase4_incidents.sql", "0003_phase4b_simulator.sql", "0004_phase5_roster_authorization.sql", "0005_phase5_roster_assignments.sql", "0006_roster_operation_catalog.sql", "0007_configurable_roster_groups.sql", "0008_phase5_routing.sql", "0009_phase6_conversations.sql", "0010_phase6_alertas_fake_redesign.sql", "0011_phase6_a02_authority_reconciliation.sql", "0012_phase6_stage4_test_database.sql", "0013_phase6_stage5_acceptance.sql", "0014_phase6_stage5_experiment_history.sql", "0015_phase6_stage5_experiment_runtime.sql"]) {
     await database.execute(await readFile(resolve(import.meta.dirname, "../migrations", filename), "utf8"));
   }
 }
