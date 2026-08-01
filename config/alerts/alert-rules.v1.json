@@ -277,22 +277,28 @@
       "productionDependencies": ["Exact complete-production criterion"]
     },
     {
-      "code": "D03", "title": "OT input good production and waste do not balance", "ruleVersion": "1.0.0",
+      "code": "D03", "title": "OT input good production and waste do not balance", "ruleVersion": "1.1.0",
       "queryId": "d03-work-order-mass-balance", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
-      "naturalKey": ["workOrderId"], "classification": ["deterministic", "statistical", "physical"],
-      "labels": ["Error posible", "Error"], "productionReadiness": "fixture-proven-production-pending",
+      "naturalKey": ["workOrderId"], "classification": ["deterministic", "physical"],
+      "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
-        {"source":"orden_trabajo_materiales","fields":["id_orden_trabajo","cantidad_consumida"],"evidence":"backup-confirmed"},
-        {"source":"articulo_serial","fields":["id","id_orden_trabajo_origen","tipo"],"evidence":"backup-confirmed"},
-        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_neto"],"evidence":"backup-confirmed"}
+        {"source":"ordenes_trabajo","fields":["id","fecha_fin_ejecucion","metros_lineales_planificados","ancho_teorico_bobina"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_materiales","fields":["id","id_orden_trabajo","cantidad_consumida","tipo_materia_prima","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_salidas","fields":["id","id_orden_trabajo","tipo","cantidad_bulto_sin_pesar","cantidad_bulto_parcial_sin_pesar","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"articulo_serial","fields":["id","id_orden_trabajo_origen","id_tipo_merma","tipo","fecha_eliminacion"],"evidence":"backup-confirmed"},
+        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_neto","eliminado"],"evidence":"backup-confirmed"}
       ],
-      "requiredEvidence": ["workOrderId","consumedInputKg","goodOutputKg","wasteKg","specificCausePresent"],
-      "parameters": {"balanceToleranceFraction":{"value":0.05,"unit":"fraction-of-good-output","status":"approved"}},
-      "predicate": {"all":[{"not":{"var":"specificCausePresent"}},{"gt":[{"abs":{"sub":[{"sub":[{"var":"consumedInputKg"},{"var":"goodOutputKg"}]},{"var":"wasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputKg"}]}]}]},
-      "reasonRules": [{"code":"mass_balance_gap","when":{"gt":[{"abs":{"sub":[{"sub":[{"var":"consumedInputKg"},{"var":"goodOutputKg"}]},{"var":"wasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputKg"}]}]}}],
-      "resolution": "The balance returns within the versioned tolerance after evidence correction.",
+      "requiredEvidence": ["workOrderId","workOrderClosed","weighedRawMaterialsKg","goodOutputNetKg","weighedWasteKg","plannedProductionAreaM2","inkApplied","adhesiveApplied","containerBalanceValid","specificCausePresent"],
+      "parameters": {
+        "balanceToleranceFraction":{"value":0.05,"unit":"fraction-of-net-good-output","status":"approved"},
+        "inkKgPerM2":{"value":0.002,"unit":"kg-per-planned-square-meter","status":"approved"},
+        "adhesiveKgPerM2":{"value":0.002,"unit":"kg-per-planned-square-meter","status":"approved"}
+      },
+      "predicate": {"all":[{"var":"workOrderClosed"},{"var":"containerBalanceValid"},{"not":{"var":"specificCausePresent"}},{"gt":[{"abs":{"sub":[{"sub":[{"add":[{"var":"weighedRawMaterialsKg"},{"mul":[{"param":"inkKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"inkApplied"}]},{"mul":[{"param":"adhesiveKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"adhesiveApplied"}]}]},{"var":"goodOutputNetKg"}]},{"var":"weighedWasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputNetKg"}]}]}]},
+      "reasonRules": [{"code":"mass_balance_gap","when":{"gt":[{"abs":{"sub":[{"sub":[{"add":[{"var":"weighedRawMaterialsKg"},{"mul":[{"param":"inkKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"inkApplied"}]},{"mul":[{"param":"adhesiveKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"adhesiveApplied"}]}]},{"var":"goodOutputNetKg"}]},{"var":"weighedWasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputNetKg"}]}]}}],
+      "resolution": "After all required weights remain present, corrected source evidence returns the absolute balance gap to or below the versioned tolerance.",
       "correlations": ["Suppress when A03, A04, A05, A06, A07, D01, D02, or D04 explains the gap."],
-      "productionDependencies": ["Verified-versus-estimated evidence policy"]
+      "productionDependencies": ["All-weighed source completeness, planned-area and operation applicability mapping, bounded current-source query validation, and future EmusaSoft imbalance-state verification"]
     },
     {
       "code": "D04", "title": "Consumed-reel meters exceed declared meters", "ruleVersion": "1.0.0",

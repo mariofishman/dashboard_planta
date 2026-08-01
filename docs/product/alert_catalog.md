@@ -356,18 +356,20 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ### D03 — OT input, good production, and waste do not balance
 
-**Alert label:** Error posible / Error
+**Alert label:** Error
 
 | Field | Definition |
 |---|---|
-| When it happens | At closure, the absolute mass-balance gap exceeds 5% of total good-production mass. The percentage is an initial configurable parameter. |
-| Why the alert exists | One or more production, waste, consumption, or weighing records may be missing or incorrect. |
-| Possible causes | Undeclared produced reel, undeclared waste, unweighed output, wrong weight, missing consumption, or statistical assumptions that do not fit this OT. |
-| Example | Consumed input is 1,500 kg, good production is 1,300 kg, and waste is 90 kg. The 110 kg gap exceeds the current tolerance of 65 kg, which is 5% of good production. |
+| When it happens | After the OT closes and every applicable non-ink/non-adhesive raw material, production reel, and waste record has a measured weight, the absolute mass-balance gap exceeds 5% of total net good-production mass. The percentage is an initial configurable parameter. |
+| Why the alert exists | The completed, fully weighed OT still contains an unexplained physical mass difference. |
+| Possible causes | Missing or incorrect material consumption, production, waste, OT association, or scale evidence. |
+| Example | Measured raw-material input plus theoretical ink and adhesive is 1,500 kg, net weighed good production is 1,300 kg, and weighed waste is 90 kg. The 110 kg gap exceeds the current tolerance of 65 kg, which is 5% of net good production. |
 
-**Detection indicators and algorithm:** Calculate `balance gap = consumed input mass - good-output mass - waste mass` and `allowed gap = 0.05 × total good-production mass`. Alert when `absolute balance gap > allowed gap`. Store `0.05` as a configurable parameter so it can change later. Do not subtract an undefined generic process-loss value. Use actual scale weights from `balanza_carga_detalle_registros` when available. For declared but unweighed output, estimate from `articulo_serial`, `orden_trabajo_salidas`, width, grammage, declared linear meters when present, and comparable weighed serials. For missing or unweighed waste, use both the quotation waste matrix (`cotizacion_config_waste`, kilogram ranges and substrate/taxon gaps) and historical waste distributions. Recalculate whenever actual weights arrive. Statistical gaps are possible errors; gaps that remain beyond tolerance after actual weights are available are errors. If evidence identifies a specific `A03`, `A04`, `A05`, `A06`, `D01`, `D02`, or `D04` cause, enrich that incident and suppress a duplicate `D03` alert.
+**Detection indicators and algorithm — approved 2026-08-01:** Monitor calculates D03; EmusaSoft does not currently provide a verified authoritative OT-level imbalance state. A later source-owned replacement is permitted only after its state and semantics are verified. Do not evaluate D03 until the OT is closed and every applicable non-ink/non-adhesive raw material, production reel, and waste record has a measured weight. Missing required weights are insufficient evidence and must not create D03. Use the scale's net production-reel weight; it already excludes the core, so Monitor must not subtract core weight again. Ink and adhesive are the only approved unweighed raw-material inputs: calculate each applicable contribution from the OT's planned production area at `2 g/m²`. Apply both cumulatively when the OT includes both printing and lamination. Calculate `adjusted input kg = measured other raw-material kg + theoretical ink kg + theoretical adhesive kg`, `balance gap = adjusted input kg - net weighed good-production kg - weighed waste kg`, and `allowed gap = 0.05 × net weighed good-production kg`. Open `Error` only when `absolute balance gap > allowed gap`; equality does not trigger. D03 has no `Error posible` or estimated-output path. Do not subtract an undefined generic process-loss value. If E05 makes an extrusion-container consumption negative, D03 is blocked until that source evidence is corrected. If evidence identifies a specific `A03`, `A04`, `A05`, `A06`, `A07`, `D01`, `D02`, or `D04` cause, enrich that incident and suppress a duplicate D03 alert.
 
 **Primary action owner:** When a specific linked alert explains the gap, inherit that alert's deterministic owner. Otherwise, missing or incorrect OT declarations → **machine operator**; suspected weighing evidence → **Process operator**.
+
+**Resolution:** Correct the specific material, production, waste, OT-association, or scale evidence and recalculate after all required weights remain present. Resolve automatically when the absolute gap is at or below the configured tolerance. If the historical evidence cannot be reconstructed safely, an administrator may close D03 without resolution under the shared closure rules, preserving the final input, output, waste, theoretical additions, gap, tolerance, and linked incidents.
 
 ### D04 — Consumed-reel meters exceed declared meters
 

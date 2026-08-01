@@ -28,7 +28,7 @@
 | C06 | Physical + statistical | OT | Output, effective runtime, rate bounds | OT execution interval; meters/minute | Fixture proven; pause completeness pending |
 | D01 | Deterministic + physical | OT | Consumed-reel meters, run meters, tolerance | OT closure; meters | Fixture proven; conversion formula pending |
 | D02 | Deterministic | OT + article serial | Full completion, delivery, consumption, truncation | OT completion | Fixture proven; full-completion criterion pending |
-| D03 | Deterministic + statistical + physical | OT | Input, output, waste, specific-cause state | OT closure/latest weight; kilograms | Fixture proven; verified/estimated policy pending |
+| D03 | Deterministic + physical | OT | Fully weighed input, net output, weighed waste, planned-area ink/adhesive, specific-cause and E05 state | OT closure/latest required weight; kilograms, square meters | Fixture proven; all-weighed, planned-area, and operation-applicability query mapping pending |
 | D04 | Deterministic + physical | OT | Consumed, run and remnant meters, tolerance | OT closure; meters | Fixture proven; remnant conversion pending |
 | E01 | Deadline + deterministic | OT + article | Warehouse mapping, start horizon, stock, four-hour demand | Planned start; minutes, hours, kilograms | Fixture proven; stock mapping pending |
 | E02 | Deterministic | OT + container + article | OT open, recipe requirement, `saldo_apertura` presence, container-to-article mapping | OT opening; kilograms | Product rules define capture at opening, kilograms, a required container ID, and one opening/closing snapshot; Phase 10 validates deployed behavior |
