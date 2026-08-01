@@ -7,15 +7,10 @@ coverage/
 __pycache__/
 *.pyc
 
-# Phase 0 validation databases are derived from the protected local backup.
-/local-data/phase0-validation/
+# Local-only plans, protected databases, runtime state, and generated evidence
+/local-data/
 
-# Local database backups and extracted dumps
-/local-data/database/
-/local-data/test-database/
-
-# Embedded local Monitor database and local-only environment overrides
-/local-data/monitor/
+# Local-only environment overrides
 .env.monitor.local
 
 # Local test inputs and generated test data
