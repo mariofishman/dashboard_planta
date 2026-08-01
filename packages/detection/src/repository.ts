@@ -18,15 +18,15 @@ export class DetectionRepository {
 
   async recordFailure(input: {
     cycleId: string; query: DetectionQueryDefinition; status: Exclude<CycleStatus, "healthy">;
-    freshness: FreshnessSignal; pages: number; rows: number; startedAt: Date; finishedAt: Date; errorCode: string; recoveryRun: boolean;
+    freshness: FreshnessSignal; pages: number; pageEvidence: CycleResult["pageEvidence"]; rows: number; startedAt: Date; finishedAt: Date; errorCode: string; recoveryRun: boolean;
   }): Promise<CycleResult> {
     await this.insertCycle(this.database, { ...input, complete: false, fullEvaluation: false, sourceRevision: input.freshness.sourceRevision });
-    return this.result(input.cycleId, input.query.queryId, input.status, false, false, input.recoveryRun, input.pages, input.rows, input.errorCode);
+    return this.result(input.cycleId, input.query.queryId, input.status, false, false, input.recoveryRun, input.pages, input.rows, input.errorCode, input.pageEvidence);
   }
 
   async reconcileHealthy(input: {
     cycleId: string; query: DetectionQueryDefinition; freshness: FreshnessSignal; rows: Record<string, unknown>[];
-    sourceRevision: string; pages: number; startedAt: Date; finishedAt: Date; recoveryRun: boolean;
+    sourceRevision: string; pages: number; pageEvidence: CycleResult["pageEvidence"]; startedAt: Date; finishedAt: Date; recoveryRun: boolean;
   }): Promise<CycleResult> {
     await this.database.transaction(async (transaction) => {
       await this.insertCycle(transaction, {
@@ -57,7 +57,7 @@ export class DetectionRepository {
         }
       }
     });
-    return this.result(input.cycleId, input.query.queryId, "healthy", true, true, input.recoveryRun, input.pages, input.rows.length, null);
+    return this.result(input.cycleId, input.query.queryId, "healthy", true, true, input.recoveryRun, input.pages, input.rows.length, null, input.pageEvidence);
   }
 
   async diagnostics(): Promise<Record<string, unknown>[]> {
@@ -88,7 +88,7 @@ export class DetectionRepository {
     ]);
   }
 
-  private result(cycleId: string, queryId: string, status: CycleStatus, complete: boolean, fullEvaluation: boolean, recoveryRun: boolean, pageCount: number, rowCount: number, errorCode: string | null): CycleResult {
-    return { cycleId, queryId, status, complete, fullEvaluation, recoveryRun, pageCount, rowCount, errorCode };
+  private result(cycleId: string, queryId: string, status: CycleStatus, complete: boolean, fullEvaluation: boolean, recoveryRun: boolean, pageCount: number, rowCount: number, errorCode: string | null, pageEvidence: CycleResult["pageEvidence"]): CycleResult {
+    return { cycleId, queryId, status, complete, fullEvaluation, recoveryRun, pageCount, rowCount, errorCode, pageEvidence };
   }
 }

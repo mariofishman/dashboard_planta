@@ -1,0 +1,824 @@
+{
+  "registryVersion": "1.0.0",
+  "manifestVersion": "2.0.0",
+  "sourceActionContractVersion": "1.0.0",
+  "fixtureVersion": "1.0.0",
+  "sourceRevision": "staging_emusa_core-20260723-025548",
+  "writerIdentity": "alertas_fake",
+  "profiles": {
+    "isolated_per_test": {
+      "businessTime": "2026-08-01T09:00:00.000Z",
+      "speed": 1,
+      "frequencies": { "A02": 3, "A03": 3, "A05": 3 },
+      "runIdTemplate": "{runId}:{testId}",
+      "experimentNameTemplate": "Stage 5 {runId} {testId}",
+      "experimentIdentity": "unique_per_test",
+      "monitorIsolation": "fresh_per_test"
+    },
+    "restore_verified": {
+      "strategy": "snapshot_replay",
+      "baselineScope": "natural_keys_created_descendants_and_unrelated_digest",
+      "digestAlgorithm": "sha256_full_rows",
+      "restoreInFinally": true,
+      "verifySourceDigest": true,
+      "verifyUnrelatedRowsDigest": true,
+      "verifyMonitorIsolation": true,
+      "artifactPathTemplate": "local-data/test-database/evidence/stage5/{runId}/{testId}/cleanup.json"
+    }
+  },
+  "contracts": [
+    {
+      "testId": "SH-01", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-01", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": { "applicability": "not_applicable", "notApplicableReason": "Experiment creation has no source precondition." },
+      "actions": [{ "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} }],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-02", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-02", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": { "applicability": "not_applicable", "notApplicableReason": "Configuration isolation is proven without source mutation." },
+      "actions": [
+        { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.pause", "keyRefs": [], "parameters": { "pauseStates": [true, false] } },
+        { "sequence": 3, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "speedCases": [1, 2, 3, 60], "frequencyCases": [{ "A02": 3, "A03": 6, "A05": 9 }, { "A02": 9, "A03": 3, "A05": 6 }] } }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-03", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-03", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": { "applicability": "not_applicable", "notApplicableReason": "Clock serialization and pause behavior do not require source mutation." },
+      "actions": [
+        { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "speed": 1, "frequencies": { "A02": 3, "A03": 60, "A05": 60 } } },
+        { "sequence": 3, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 27 } },
+        { "sequence": 4, "actionId": "experiment.pause", "keyRefs": [], "parameters": { "pauseStates": [true, false] } }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-04", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-04", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "a02Flow", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.clean[0]" },
+          { "ref": "a03WorkOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.clean[0]" },
+          { "ref": "a05Serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.clean[0]" }
+        ],
+        "startingState": [
+          { "keyRef": "a02Flow", "path": "state", "operator": "equals", "expected": "RECIBIDO" },
+          { "keyRef": "a03WorkOrder", "path": "active", "operator": "equals", "expected": true },
+          { "keyRef": "a03WorkOrder", "path": "consumptionCount", "operator": "gt", "expected": 0 },
+          { "keyRef": "a05Serial", "path": "weighed", "operator": "equals", "expected": true },
+          { "keyRef": "a05Serial", "path": "movedFromMachine", "operator": "equals", "expected": true }
+        ],
+        "allowedMutations": [{ "type": "fixture_population_contract", "contractId": "baseline.shared_clean", "keyRefs": ["a02Flow", "a03WorkOrder", "a05Serial"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "speed": 1, "frequencies": { "A02": 3, "A03": 60, "A05": 60 } } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-05", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-05", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "a02Flow", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.clean[0]" }],
+        "startingState": [{ "keyRef": "a02Flow", "path": "state", "operator": "equals", "expected": "RECIBIDO" }],
+        "allowedMutations": [{ "type": "fixture_population_contract", "contractId": "baseline.a02_clean", "keyRefs": ["a02Flow"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.snapshot", "keyRefs": [], "parameters": { "snapshotLabel": "before_failed_poll" } },
+        { "sequence": 3, "actionId": "scenario.fail_next_poll", "keyRefs": [], "parameters": { "ruleCode": "A02", "fault": "transport_error" } },
+        { "sequence": 4, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 5, "actionId": "experiment.snapshot", "keyRefs": [], "parameters": { "snapshotLabel": "after_failed_poll" } }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-06", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-06", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "a02Template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.clean[0]" },
+          { "ref": "a02Movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 2 },
+          { "ref": "a03WorkOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.clean[0]" },
+          { "ref": "a05Serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.clean[0]" }
+        ],
+        "startingState": [
+          { "keyRef": "a02Template", "path": "state", "operator": "exists", "expected": true },
+          { "keyRef": "a02Movement", "path": "state", "operator": "not_exists", "expected": true },
+          { "keyRef": "a03WorkOrder", "path": "active", "operator": "equals", "expected": false },
+          { "keyRef": "a05Serial", "path": "state", "operator": "exists", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["a02Template", "a02Movement"] },
+          { "type": "source_action_contract", "contractId": "a03.start_work_order", "keyRefs": ["a03WorkOrder"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["a05Serial"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
+        { "sequence": 2, "actionId": "a02.prepare_dispatch", "keyRefs": ["a02Template", "a02Movement"], "parameters": {} },
+        { "sequence": 3, "actionId": "a03.start_work_order", "keyRefs": ["a03WorkOrder"], "parameters": {} },
+        { "sequence": 4, "actionId": "a05.declare_produced_reel", "keyRefs": ["a05Serial"], "parameters": {} },
+        { "sequence": 5, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-07", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-07", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "a02Template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.clean[0]" },
+          { "ref": "a02Movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 }
+        ],
+        "startingState": [
+          { "keyRef": "a02Template", "path": "state", "operator": "exists", "expected": true },
+          { "keyRef": "a02Movement", "path": "state", "operator": "not_exists", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["a02Template", "a02Movement"] },
+          { "type": "source_action_contract", "contractId": "a02.receive", "keyRefs": ["a02Movement"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["a02Template", "a02Movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 3, "actionId": "a02.receive", "keyRefs": ["a02Movement"], "parameters": {} },
+        { "sequence": 4, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-08", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-08", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": { "applicability": "not_applicable", "notApplicableReason": "Durable experiment-history isolation does not mutate source records." },
+      "actions": [
+        { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.snapshot", "keyRefs": [], "parameters": { "snapshotLabel": "prior_history" } },
+        { "sequence": 3, "actionId": "experiment.create", "keyRefs": [], "parameters": {} }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-09", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-09", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "a02Template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.downstream[0]" },
+          { "ref": "a02Movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 },
+          { "ref": "a03WorkOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.threshold[0]" },
+          { "ref": "a05Serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.thresholdBoth[0]" }
+        ],
+        "startingState": [
+          { "keyRef": "a02Template", "path": "state", "operator": "exists", "expected": true },
+          { "keyRef": "a02Movement", "path": "state", "operator": "not_exists", "expected": true },
+          { "keyRef": "a03WorkOrder", "path": "active", "operator": "equals", "expected": false },
+          { "keyRef": "a05Serial", "path": "state", "operator": "exists", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["a02Template", "a02Movement"] },
+          { "type": "source_action_contract", "contractId": "a03.start_work_order", "keyRefs": ["a03WorkOrder"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["a05Serial"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["a02Template", "a02Movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "a03.start_work_order", "keyRefs": ["a03WorkOrder"], "parameters": {} },
+        { "sequence": 3, "actionId": "a05.declare_produced_reel", "keyRefs": ["a05Serial"], "parameters": {} },
+        { "sequence": 4, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCodes": ["A02", "A03", "A05"], "cycles": 1 } },
+        { "sequence": 6, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCodes": ["A02", "A03", "A05"], "cycles": 1 } }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-10", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-10", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "a02Template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.failureIsolation[0]" },
+          { "ref": "a02Movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 }
+        ],
+        "startingState": [
+          { "keyRef": "a02Template", "path": "state", "operator": "exists", "expected": true },
+          { "keyRef": "a02Movement", "path": "state", "operator": "not_exists", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["a02Template", "a02Movement"] },
+          { "type": "source_action_contract", "contractId": "a02.receive", "keyRefs": ["a02Movement"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["a02Template", "a02Movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 4, "actionId": "a02.receive", "keyRefs": ["a02Movement"], "parameters": {} },
+        { "sequence": 5, "actionId": "scenario.fail_next_poll", "keyRefs": [], "parameters": { "ruleCode": "A02", "fault": "transport_error" } },
+        { "sequence": 6, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 7, "actionId": "monitor.inject_interruption", "keyRefs": [], "parameters": { "interruptionPoint": "conversation_message" } },
+        { "sequence": 8, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "SH-11", "group": "shared",
+      "fixtureIdentity": { "contractId": "stage5:SH-11", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
+      "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "a02Flow", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.downstream[0]" },
+          { "ref": "a03WorkOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.threshold[0]" },
+          { "ref": "a05Serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.thresholdBoth[0]" }
+        ],
+        "startingState": [
+          { "keyRef": "a02Flow", "path": "state", "operator": "equals", "expected": "TRANSITO" },
+          { "keyRef": "a02Flow", "path": "elapsedMinutes", "operator": "gte", "expected": 30 },
+          { "keyRef": "a03WorkOrder", "path": "active", "operator": "equals", "expected": true },
+          { "keyRef": "a03WorkOrder", "path": "consumptionCount", "operator": "equals", "expected": 0 },
+          { "keyRef": "a03WorkOrder", "path": "elapsedMinutes", "operator": "gte", "expected": 15 },
+          { "keyRef": "a05Serial", "path": "weighed", "operator": "equals", "expected": false },
+          { "keyRef": "a05Serial", "path": "movedFromMachine", "operator": "equals", "expected": false },
+          { "keyRef": "a05Serial", "path": "declaredAgeMinutes", "operator": "gte", "expected": 30 }
+        ],
+        "allowedMutations": [{ "type": "fixture_population_contract", "contractId": "browser.connected_runtime", "keyRefs": ["a02Flow", "a03WorkOrder", "a05Serial"] }]
+      },
+      "actions": [{ "sequence": 1, "actionId": "browser.verify_same_runtime", "keyRefs": ["a02Flow", "a03WorkOrder", "a05Serial"], "parameters": { "viewports": [390, 768, 1440] } }],
+      "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-00", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-00", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.clean[0]" },
+          { "ref": "movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 }
+        ],
+        "startingState": [{ "keyRef": "template", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "movement", "path": "state", "operator": "not_exists", "expected": true }],
+        "allowedMutations": [
+          { "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"] },
+          { "type": "source_action_contract", "contractId": "a02.receive", "keyRefs": ["movement"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 20 } },
+        { "sequence": 3, "actionId": "a02.receive", "keyRefs": ["movement"], "parameters": {} },
+        { "sequence": 4, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-01", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-01", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "templateReceived", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.concurrent[0]" },
+          { "ref": "receivedMovement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 },
+          { "ref": "templateOverdue", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.concurrent[1]" },
+          { "ref": "overdueMovement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 3 },
+          { "ref": "templateYoung", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.concurrent[2]" },
+          { "ref": "youngMovement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 6 }
+        ],
+        "startingState": [
+          { "keyRef": "templateReceived", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "receivedMovement", "path": "state", "operator": "not_exists", "expected": true },
+          { "keyRef": "templateOverdue", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "overdueMovement", "path": "state", "operator": "not_exists", "expected": true },
+          { "keyRef": "templateYoung", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "youngMovement", "path": "state", "operator": "not_exists", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["templateReceived", "receivedMovement", "templateOverdue", "overdueMovement", "templateYoung", "youngMovement"] },
+          { "type": "source_action_contract", "contractId": "a02.receive", "keyRefs": ["receivedMovement"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["templateReceived", "receivedMovement"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 20 } },
+        { "sequence": 3, "actionId": "a02.prepare_dispatch", "keyRefs": ["templateOverdue", "overdueMovement"], "parameters": {} },
+        { "sequence": 4, "actionId": "a02.receive", "keyRefs": ["receivedMovement"], "parameters": {} },
+        { "sequence": 5, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 6, "actionId": "a02.prepare_dispatch", "keyRefs": ["templateYoung", "youngMovement"], "parameters": {} },
+        { "sequence": 7, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-02", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-02", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.threshold[0]" }, { "ref": "movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 }],
+        "startingState": [{ "keyRef": "template", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "movement", "path": "state", "operator": "not_exists", "expected": true }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 29 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 4, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 1 } },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 6, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-03", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-03", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.receiptBeforeDetection[0]" }, { "ref": "movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 }],
+        "startingState": [{ "keyRef": "template", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "movement", "path": "state", "operator": "not_exists", "expected": true }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"] }, { "type": "source_action_contract", "contractId": "a02.receive", "keyRefs": ["movement"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "a02.receive", "keyRefs": ["movement"], "parameters": {} },
+        { "sequence": 4, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-04", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-04", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.failureIsolation[0]" },
+          { "ref": "movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 },
+          { "ref": "unrelatedFlow", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.failureIsolation[1]" }
+        ],
+        "startingState": [{ "keyRef": "template", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "movement", "path": "state", "operator": "not_exists", "expected": true }, { "keyRef": "unrelatedFlow", "path": "state", "operator": "exists", "expected": true }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"] }, { "type": "source_action_contract", "contractId": "a02.receive", "keyRefs": ["movement"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 4, "actionId": "a02.receive", "keyRefs": ["movement"], "parameters": {} },
+        { "sequence": 5, "actionId": "scenario.fail_next_poll", "keyRefs": [], "parameters": { "ruleCode": "A02", "fault": "partial_pagination" } },
+        { "sequence": 6, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 7, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-05", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-05", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.administrativeClosure[0]" }, { "ref": "movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 }],
+        "startingState": [{ "keyRef": "template", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "movement", "path": "state", "operator": "not_exists", "expected": true }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 4, "actionId": "monitor.close_without_resolution", "keyRefs": [], "parameters": { "reason": "administrative_test_closure" } },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-06", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-06", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "received", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.mixed[0]" },
+          { "ref": "overdue", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.mixed[1]" },
+          { "ref": "young", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.mixed[2]" }
+        ],
+        "startingState": [
+          { "keyRef": "received", "path": "state", "operator": "equals", "expected": "RECIBIDO" },
+          { "keyRef": "overdue", "path": "state", "operator": "equals", "expected": "TRANSITO" }, { "keyRef": "overdue", "path": "elapsedMinutes", "operator": "gte", "expected": 30 },
+          { "keyRef": "young", "path": "state", "operator": "equals", "expected": "TRANSITO" }, { "keyRef": "young", "path": "elapsedMinutes", "operator": "lt", "expected": 30 }
+        ],
+        "allowedMutations": [{ "type": "fixture_population_contract", "contractId": "a02_mixed", "keyRefs": ["received", "overdue", "young"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "scenario.prepare_population", "keyRefs": ["received", "overdue", "young"], "parameters": { "population": "a02_mixed", "ruleCode": "A02" } },
+        { "sequence": 2, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-07", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-07", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "executionLanes": [{ "id": "cancel", "monitorIsolation": "fresh_per_lane" }, { "id": "reject", "monitorIsolation": "fresh_per_lane" }],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "cancelTemplate", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.cancel[0]", "isolationLane": "cancel" },
+          { "ref": "cancelMovement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1, "isolationLane": "cancel" },
+          { "ref": "cancelReverse", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 4, "isolationLane": "cancel" },
+          { "ref": "rejectTemplate", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.reject[0]", "isolationLane": "reject" },
+          { "ref": "rejectMovement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 6, "isolationLane": "reject" },
+          { "ref": "rejectReverse", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 9, "isolationLane": "reject" }
+        ],
+        "startingState": [
+          { "keyRef": "cancelTemplate", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "cancelMovement", "path": "state", "operator": "not_exists", "expected": true }, { "keyRef": "cancelReverse", "path": "state", "operator": "not_exists", "expected": true },
+          { "keyRef": "rejectTemplate", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "rejectMovement", "path": "state", "operator": "not_exists", "expected": true }, { "keyRef": "rejectReverse", "path": "state", "operator": "not_exists", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["cancelTemplate", "cancelMovement", "rejectTemplate", "rejectMovement"] },
+          { "type": "source_action_contract", "contractId": "a02.cancel", "keyRefs": ["cancelMovement", "cancelReverse"] },
+          { "type": "source_action_contract", "contractId": "a02.reject", "keyRefs": ["rejectMovement", "rejectReverse"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["cancelTemplate", "cancelMovement"], "parameters": {}, "isolationLane": "cancel" },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 }, "isolationLane": "cancel" },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 }, "isolationLane": "cancel" },
+        { "sequence": 4, "actionId": "a02.cancel", "keyRefs": ["cancelMovement", "cancelReverse"], "parameters": { "authority": "origin" }, "isolationLane": "cancel" },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 }, "isolationLane": "cancel" },
+        { "sequence": 6, "actionId": "a02.prepare_dispatch", "keyRefs": ["rejectTemplate", "rejectMovement"], "parameters": {}, "isolationLane": "reject" },
+        { "sequence": 7, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 }, "isolationLane": "reject" },
+        { "sequence": 8, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 }, "isolationLane": "reject" },
+        { "sequence": 9, "actionId": "a02.reject", "keyRefs": ["rejectMovement", "rejectReverse"], "parameters": { "authority": "both" }, "isolationLane": "reject" },
+        { "sequence": 10, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 }, "isolationLane": "reject" }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A02-09", "group": "A02",
+      "fixtureIdentity": { "contractId": "stage5:A02-09", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.downstream[0]" }, { "ref": "movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 }],
+        "startingState": [{ "keyRef": "template", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "movement", "path": "state", "operator": "not_exists", "expected": true }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } },
+        { "sequence": 4, "actionId": "browser.verify_same_runtime", "keyRefs": ["movement"], "parameters": { "viewports": [390, 768, 1440] } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A03-00", "group": "A03",
+      "fixtureIdentity": { "contractId": "stage5:A03-00", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "workOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.actionTemplate[0]" }],
+        "startingState": [{ "keyRef": "workOrder", "path": "active", "operator": "equals", "expected": false }, { "keyRef": "workOrder", "path": "consumptionCount", "operator": "equals", "expected": 0 }, { "keyRef": "workOrder", "path": "startPreconditions.otherActiveCount", "operator": "equals", "expected": 0 }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a03.start_work_order", "keyRefs": ["workOrder"] }, { "type": "source_action_contract", "contractId": "a03.record_first_consumption", "keyRefs": ["workOrder"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a03.start_work_order", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 10 } },
+        { "sequence": 3, "actionId": "a03.record_first_consumption", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 4, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A03-01", "group": "A03",
+      "fixtureIdentity": { "contractId": "stage5:A03-01", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "workOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.actionTemplate[0]" }],
+        "startingState": [{ "keyRef": "workOrder", "path": "active", "operator": "equals", "expected": false }, { "keyRef": "workOrder", "path": "consumptionCount", "operator": "equals", "expected": 0 }, { "keyRef": "workOrder", "path": "startPreconditions.otherActiveCount", "operator": "equals", "expected": 0 }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a03.start_work_order", "keyRefs": ["workOrder"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a03.start_work_order", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 14 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } },
+        { "sequence": 4, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 1 } },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } },
+        { "sequence": 6, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A03-02", "group": "A03",
+      "fixtureIdentity": { "contractId": "stage5:A03-02", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "eligible", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.concurrent[0]" },
+          { "ref": "consumed", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.concurrent[1]" },
+          { "ref": "closed", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.concurrent[2]" },
+          { "ref": "young", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.concurrent[3]" },
+          { "ref": "competingCandidate", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.competingCandidate[0]" }
+        ],
+        "startingState": [
+          { "keyRef": "eligible", "path": "active", "operator": "equals", "expected": true }, { "keyRef": "eligible", "path": "consumptionCount", "operator": "equals", "expected": 0 }, { "keyRef": "eligible", "path": "elapsedMinutes", "operator": "gte", "expected": 15 },
+          { "keyRef": "consumed", "path": "active", "operator": "equals", "expected": true }, { "keyRef": "consumed", "path": "consumptionCount", "operator": "gt", "expected": 0 },
+          { "keyRef": "closed", "path": "active", "operator": "equals", "expected": false },
+          { "keyRef": "young", "path": "active", "operator": "equals", "expected": true }, { "keyRef": "young", "path": "elapsedMinutes", "operator": "lt", "expected": 15 },
+          { "keyRef": "competingCandidate", "path": "active", "operator": "equals", "expected": false }
+        ],
+        "relationships": [{ "phase": "starting_state", "leftKeyRef": "eligible", "leftPath": "machineCode", "operator": "equals", "rightKeyRef": "competingCandidate", "rightPath": "machineCode" }],
+        "allowedMutations": [
+          { "type": "fixture_population_contract", "contractId": "a03_mixed", "keyRefs": ["eligible", "consumed", "closed", "young"] },
+          { "type": "source_action_contract", "contractId": "a03.start_work_order", "keyRefs": ["competingCandidate"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "scenario.prepare_population", "keyRefs": ["eligible", "consumed", "closed", "young"], "parameters": { "population": "a03_mixed", "ruleCode": "A03" } },
+        { "sequence": 2, "actionId": "a03.start_work_order", "keyRefs": ["competingCandidate"], "parameters": { "expectedStatus": 409, "expectedError": "machine_has_active_work_order" } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A03-03", "group": "A03",
+      "fixtureIdentity": { "contractId": "stage5:A03-03", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "workOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.actionTemplate[0]" }],
+        "startingState": [{ "keyRef": "workOrder", "path": "active", "operator": "equals", "expected": false }, { "keyRef": "workOrder", "path": "consumptionCount", "operator": "equals", "expected": 0 }, { "keyRef": "workOrder", "path": "startPreconditions.otherActiveCount", "operator": "equals", "expected": 0 }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a03.start_work_order", "keyRefs": ["workOrder"] }, { "type": "source_action_contract", "contractId": "a03.record_first_consumption", "keyRefs": ["workOrder"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a03.start_work_order", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 16 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } },
+        { "sequence": 4, "actionId": "a03.record_first_consumption", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 5, "actionId": "scenario.fail_next_poll", "keyRefs": [], "parameters": { "ruleCode": "A03", "fault": "transport_error" } },
+        { "sequence": 6, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } },
+        { "sequence": 7, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A03-04", "group": "A03",
+      "fixtureIdentity": { "contractId": "stage5:A03-04", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "workOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.actionTemplate[0]" }],
+        "startingState": [{ "keyRef": "workOrder", "path": "active", "operator": "equals", "expected": false }, { "keyRef": "workOrder", "path": "consumptionCount", "operator": "equals", "expected": 0 }, { "keyRef": "workOrder", "path": "startPreconditions.otherActiveCount", "operator": "equals", "expected": 0 }],
+        "allowedMutations": [{ "type": "source_action_contract", "contractId": "a03.start_work_order", "keyRefs": ["workOrder"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a03.start_work_order", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 16 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } },
+        { "sequence": 4, "actionId": "monitor.close_without_resolution", "keyRefs": [], "parameters": { "reason": "administrative_test_closure" } },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A03-05", "group": "A03",
+      "fixtureIdentity": { "contractId": "stage5:A03-05", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "workOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.actionTemplate[0]" }],
+        "startingState": [{ "keyRef": "workOrder", "path": "active", "operator": "equals", "expected": false }, { "keyRef": "workOrder", "path": "consumptionCount", "operator": "equals", "expected": 0 }, { "keyRef": "workOrder", "path": "startPreconditions.otherActiveCount", "operator": "equals", "expected": 0 }],
+        "allowedMutations": [
+          { "type": "source_action_contract", "contractId": "a03.start_work_order", "keyRefs": ["workOrder"] },
+          { "type": "source_action_contract", "contractId": "a03.record_first_consumption", "keyRefs": ["workOrder"] },
+          { "type": "source_action_contract", "contractId": "a03.close_work_order", "keyRefs": ["workOrder"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a03.start_work_order", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 16 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } },
+        { "sequence": 4, "actionId": "a03.record_first_consumption", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 5, "actionId": "a03.close_work_order", "keyRefs": ["workOrder"], "parameters": {} },
+        { "sequence": 6, "actionId": "a03.record_first_consumption", "keyRefs": ["workOrder"], "parameters": { "expectedStatus": 409, "expectedError": "work_order_closed" } },
+        { "sequence": 7, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A03", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A05-00", "group": "A05",
+      "fixtureIdentity": { "contractId": "stage5:A05-00", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.clean[0]" }],
+        "startingState": [
+          { "keyRef": "serial", "path": "movedFromMachine", "operator": "equals", "expected": false },
+          { "keyRef": "serial", "path": "weighed", "operator": "equals", "expected": false },
+          { "keyRef": "serial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "fixture_population_contract", "contractId": "a05.closed_ot_unweighed_at_machine", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_weighing", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_movement", "keyRefs": ["serial"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a05.declare_produced_reel", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 10 } },
+        { "sequence": 3, "actionId": "a05.register_weighing", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 4, "actionId": "a05.register_movement", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A05-01", "group": "A05",
+      "fixtureIdentity": { "contractId": "stage5:A05-01", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.thresholdBoth[0]" }],
+        "startingState": [
+          { "keyRef": "serial", "path": "movedFromMachine", "operator": "equals", "expected": false },
+          { "keyRef": "serial", "path": "weighed", "operator": "equals", "expected": false },
+          { "keyRef": "serial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "fixture_population_contract", "contractId": "a05.closed_ot_unweighed_at_machine", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["serial"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a05.declare_produced_reel", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 30 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } },
+        { "sequence": 4, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A05-02", "group": "A05",
+      "fixtureIdentity": { "contractId": "stage5:A05-02", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "executionLanes": [{ "id": "produced", "monitorIsolation": "fresh_per_lane" }, { "id": "remnant", "monitorIsolation": "fresh_per_lane" }],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "producedSerial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.independentProduced[0]", "isolationLane": "produced" },
+          { "ref": "remnantSerial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.independentRemnant[0]", "isolationLane": "remnant" }
+        ],
+        "startingState": [
+          { "keyRef": "producedSerial", "path": "movedFromMachine", "operator": "equals", "expected": false }, { "keyRef": "producedSerial", "path": "weighed", "operator": "equals", "expected": false }, { "keyRef": "producedSerial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true },
+          { "keyRef": "remnantSerial", "path": "movedFromMachine", "operator": "equals", "expected": false }, { "keyRef": "remnantSerial", "path": "weighed", "operator": "equals", "expected": false }, { "keyRef": "remnantSerial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "fixture_population_contract", "contractId": "a05.closed_ot_unweighed_at_machine", "keyRefs": ["producedSerial", "remnantSerial"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["producedSerial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_movement", "keyRefs": ["producedSerial"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_remnant_reel", "keyRefs": ["remnantSerial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_weighing", "keyRefs": ["remnantSerial"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a05.declare_produced_reel", "keyRefs": ["producedSerial"], "parameters": {}, "isolationLane": "produced" },
+        { "sequence": 2, "actionId": "a05.register_movement", "keyRefs": ["producedSerial"], "parameters": {}, "isolationLane": "produced" },
+        { "sequence": 3, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 }, "isolationLane": "produced" },
+        { "sequence": 4, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 }, "isolationLane": "produced" },
+        { "sequence": 5, "actionId": "a05.declare_remnant_reel", "keyRefs": ["remnantSerial"], "parameters": {}, "isolationLane": "remnant" },
+        { "sequence": 6, "actionId": "a05.register_weighing", "keyRefs": ["remnantSerial"], "parameters": {}, "isolationLane": "remnant" },
+        { "sequence": 7, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 }, "isolationLane": "remnant" },
+        { "sequence": 8, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 }, "isolationLane": "remnant" }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A05-03", "group": "A05",
+      "fixtureIdentity": { "contractId": "stage5:A05-03", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "executionLanes": [{ "id": "weigh_first", "monitorIsolation": "fresh_per_lane" }, { "id": "move_first", "monitorIsolation": "fresh_per_lane" }],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "weighFirstSerial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.partialWeighFirst[0]", "isolationLane": "weigh_first" },
+          { "ref": "moveFirstSerial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.partialMoveFirst[0]", "isolationLane": "move_first" }
+        ],
+        "startingState": [
+          { "keyRef": "weighFirstSerial", "path": "movedFromMachine", "operator": "equals", "expected": false }, { "keyRef": "weighFirstSerial", "path": "weighed", "operator": "equals", "expected": false }, { "keyRef": "weighFirstSerial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true },
+          { "keyRef": "moveFirstSerial", "path": "movedFromMachine", "operator": "equals", "expected": false }, { "keyRef": "moveFirstSerial", "path": "weighed", "operator": "equals", "expected": false }, { "keyRef": "moveFirstSerial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true }
+        ],
+        "allowedMutations": [
+          { "type": "fixture_population_contract", "contractId": "a05.closed_ot_unweighed_at_machine", "keyRefs": ["weighFirstSerial", "moveFirstSerial"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["weighFirstSerial", "moveFirstSerial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_weighing", "keyRefs": ["weighFirstSerial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_movement", "keyRefs": ["moveFirstSerial"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a05.declare_produced_reel", "keyRefs": ["weighFirstSerial"], "parameters": {}, "isolationLane": "weigh_first" },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 }, "isolationLane": "weigh_first" },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 }, "isolationLane": "weigh_first" },
+        { "sequence": 4, "actionId": "a05.register_weighing", "keyRefs": ["weighFirstSerial"], "parameters": {}, "isolationLane": "weigh_first" },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 }, "isolationLane": "weigh_first" },
+        { "sequence": 6, "actionId": "a05.declare_produced_reel", "keyRefs": ["moveFirstSerial"], "parameters": {}, "isolationLane": "move_first" },
+        { "sequence": 7, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 }, "isolationLane": "move_first" },
+        { "sequence": 8, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 }, "isolationLane": "move_first" },
+        { "sequence": 9, "actionId": "a05.register_movement", "keyRefs": ["moveFirstSerial"], "parameters": {}, "isolationLane": "move_first" },
+        { "sequence": 10, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 }, "isolationLane": "move_first" }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A05-04", "group": "A05",
+      "fixtureIdentity": { "contractId": "stage5:A05-04", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.failure[0]" }],
+        "startingState": [{ "keyRef": "serial", "path": "movedFromMachine", "operator": "equals", "expected": false }, { "keyRef": "serial", "path": "weighed", "operator": "equals", "expected": false }, { "keyRef": "serial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true }],
+        "allowedMutations": [
+          { "type": "fixture_population_contract", "contractId": "a05.closed_ot_unweighed_at_machine", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_weighing", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_movement", "keyRefs": ["serial"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a05.declare_produced_reel", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } },
+        { "sequence": 4, "actionId": "a05.register_weighing", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 5, "actionId": "a05.register_movement", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 6, "actionId": "scenario.fail_next_poll", "keyRefs": [], "parameters": { "ruleCode": "A05", "fault": "partial_pagination" } },
+        { "sequence": 7, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } },
+        { "sequence": 8, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A05-05", "group": "A05",
+      "fixtureIdentity": { "contractId": "stage5:A05-05", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [{ "ref": "serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.administrativeClosure[0]" }],
+        "startingState": [{ "keyRef": "serial", "path": "movedFromMachine", "operator": "equals", "expected": false }, { "keyRef": "serial", "path": "weighed", "operator": "equals", "expected": false }, { "keyRef": "serial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true }],
+        "allowedMutations": [{ "type": "fixture_population_contract", "contractId": "a05.closed_ot_unweighed_at_machine", "keyRefs": ["serial"] }, { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["serial"] }]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a05.declare_produced_reel", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } },
+        { "sequence": 4, "actionId": "monitor.close_without_resolution", "keyRefs": [], "parameters": { "reason": "administrative_test_closure" } },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A05-06", "group": "A05",
+      "fixtureIdentity": { "contractId": "stage5:A05-06", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.handoff[0]" },
+          { "ref": "handoffTemplate", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.clean[0]" },
+          { "ref": "handoffMovement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 4 }
+        ],
+        "startingState": [
+          { "keyRef": "serial", "path": "movedFromMachine", "operator": "equals", "expected": false }, { "keyRef": "serial", "path": "weighed", "operator": "equals", "expected": false }, { "keyRef": "serial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": true },
+          { "keyRef": "handoffTemplate", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "handoffMovement", "path": "state", "operator": "not_exists", "expected": true }
+        ],
+        "relationships": [{ "phase": "after_production", "leftKeyRef": "serial", "leftPath": "articleSerialId", "operator": "equals", "rightKeyRef": "handoffMovement", "rightPath": "articleSerialId" }],
+        "allowedMutations": [
+          { "type": "fixture_population_contract", "contractId": "a05.closed_ot_unweighed_at_machine", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.handoff_to_a02", "keyRefs": ["serial", "handoffTemplate", "handoffMovement"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a05.declare_produced_reel", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } },
+        { "sequence": 4, "actionId": "a05.handoff_to_a02", "keyRefs": ["serial", "handoffTemplate", "handoffMovement"], "parameters": {} },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } },
+        { "sequence": 6, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 7, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    },
+    {
+      "testId": "A05-08", "group": "A05",
+      "fixtureIdentity": { "contractId": "stage5:A05-08", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" }, "dependencyTestIds": [],
+      "source": {
+        "applicability": "required",
+        "naturalKeys": [
+          { "ref": "serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.otClosure[0]" },
+          { "ref": "handoffTemplate", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.clean[0]" },
+          { "ref": "handoffMovement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 7 }
+        ],
+        "startingState": [
+          { "keyRef": "serial", "path": "movedFromMachine", "operator": "equals", "expected": false }, { "keyRef": "serial", "path": "weighed", "operator": "equals", "expected": false }, { "keyRef": "serial", "path": "sourceWorkOrderFinished", "operator": "equals", "expected": false },
+          { "keyRef": "handoffTemplate", "path": "state", "operator": "exists", "expected": true }, { "keyRef": "handoffMovement", "path": "state", "operator": "not_exists", "expected": true }
+        ],
+        "relationships": [{ "phase": "after_production", "leftKeyRef": "serial", "leftPath": "articleSerialId", "operator": "equals", "rightKeyRef": "handoffMovement", "rightPath": "articleSerialId" }],
+        "allowedMutations": [
+          { "type": "fixture_population_contract", "contractId": "a05.open_ot_unweighed_at_machine", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.declare_produced_reel", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.close_source_work_order", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.register_weighing", "keyRefs": ["serial"] },
+          { "type": "source_action_contract", "contractId": "a05.handoff_to_a02", "keyRefs": ["serial", "handoffTemplate", "handoffMovement"] }
+        ]
+      },
+      "actions": [
+        { "sequence": 1, "actionId": "a05.declare_produced_reel", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
+        { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } },
+        { "sequence": 4, "actionId": "a05.close_source_work_order", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A05", "cycles": 1 } },
+        { "sequence": 6, "actionId": "a05.register_weighing", "keyRefs": ["serial"], "parameters": {} },
+        { "sequence": 7, "actionId": "a05.handoff_to_a02", "keyRefs": ["serial", "handoffTemplate", "handoffMovement"], "parameters": {} },
+        { "sequence": 8, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCodes": ["A05", "A02"], "cycles": 1 } }
+      ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
+    }
+  ]
+}

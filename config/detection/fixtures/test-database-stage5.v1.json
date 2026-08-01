@@ -14,6 +14,8 @@
     "downstream": [26056]
   },
   "a03": {
+    "actionTemplate": [1415],
+    "competingCandidate": [4722],
     "clean": [6954],
     "threshold": [8290],
     "concurrent": [11377, 11688, 11728, 12198],

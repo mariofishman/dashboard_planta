@@ -1,0 +1,255 @@
+{
+  "manifestVersion": "2.0.0",
+  "stage": "phase6-stage5b",
+  "status": "declaration_only",
+  "sourceActionContractVersion": "1.0.0",
+  "requiredCount": 34,
+  "groupCounts": { "shared": 11, "A02": 9, "A03": 6, "A05": 8 },
+  "excluded": [
+    { "id": "A02-08", "reason": "A terminal movement cannot be reversed into an invented recurrence.", "substitutionAllowed": false },
+    { "id": "A03-06", "reason": "Consumed evidence cannot be removed to invent recurrence.", "substitutionAllowed": false },
+    { "id": "A05-07", "reason": "No legitimate source workflow exists for A05 recurrence.", "substitutionAllowed": false }
+  ],
+  "chainSections": [
+    "identity",
+    "laboratoryActions",
+    "sourceChain",
+    "readChain",
+    "monitorChain",
+    "visibleResult",
+    "schedulingRecovery",
+    "cleanup"
+  ],
+  "actionDefinitions": {
+    "experiment.create": { "name": "Create durable experiment", "kind": "orchestration", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/scenario-runtime" },
+    "experiment.configure": { "name": "Configure speed and frequencies", "kind": "orchestration", "invocationPath": "human_and_automation", "endpoint": "PUT /api/dev/scenario-runtime/:id/config" },
+    "experiment.pause": { "name": "Pause or resume experiment", "kind": "orchestration", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/scenario-runtime/:id/pause" },
+    "experiment.advance": { "name": "Advance shared business clock", "kind": "orchestration", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/scenario-runtime/:id/advance" },
+    "experiment.snapshot": { "name": "Capture durable experiment snapshot", "kind": "orchestration", "invocationPath": "automation_only", "endpoint": "ScenarioExperimentRepository.snapshot" },
+    "scheduler.await_due": { "name": "Wait for scheduler-owned due poll", "kind": "scheduler", "invocationPath": "automation_only", "endpoint": "ScenarioExperimentRuntime" },
+    "scenario.prepare_population": { "name": "Prepare an isolated mixed source population", "kind": "fixture", "invocationPath": "automation_only", "endpoint": "POST /api/dev/scenarios/:code/prepare-population", "writerIdentity": "alertas_fake" },
+    "scenario.fail_next_poll": { "name": "Inject one real-adapter read failure", "kind": "fault", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/scenarios/:code/fail-next-poll" },
+    "monitor.close_without_resolution": { "name": "Close incident without source resolution", "kind": "monitor", "invocationPath": "human_and_automation", "endpoint": "POST /api/incidents/:id/close-without-resolution" },
+    "monitor.inject_interruption": { "name": "Interrupt one downstream stage", "kind": "fault", "invocationPath": "automation_only", "endpoint": "Step 7 test-only interruption contract" },
+    "browser.verify_same_runtime": { "name": "Verify the same connected runtime in the real UI", "kind": "browser", "invocationPath": "automation_only", "endpoint": "Step 8 browser harness" },
+    "a02.prepare_dispatch": { "name": "Prepare destination-bound dispatch", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a02.receive": { "name": "Receive movement", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a02.cancel": { "name": "Cancel movement at origin", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a02.reject": { "name": "Reject movement at destination", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a03.start_work_order": { "name": "Start work order", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a03.record_first_consumption": { "name": "Record first consumption", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a03.close_work_order": { "name": "Close work order", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a05.declare_produced_reel": { "name": "Declare produced reel", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a05.declare_remnant_reel": { "name": "Declare remnant reel", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a05.register_weighing": { "name": "Register weighing", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a05.register_movement": { "name": "Register movement from machine", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a05.close_source_work_order": { "name": "Close source work order", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" },
+    "a05.handoff_to_a02": { "name": "Handoff movement ownership to A02", "kind": "source", "invocationPath": "human_and_automation", "endpoint": "POST /api/dev/source-actions", "writerIdentity": "alertas_fake" }
+  },
+  "tests": [
+    {
+      "id": "SH-01", "group": "shared", "title": "New experiment",
+      "requiredActionIds": ["experiment.create"],
+      "expected": "A new durable experiment starts empty while prior history remains queryable.",
+      "evidence": { "technical": ["durable-history"], "browser": ["visible-empty-state"], "scheduling": [], "recovery": [] }
+    },
+    {
+      "id": "SH-02", "group": "shared", "title": "Speed and frequency",
+      "requiredActionIds": ["experiment.create", "experiment.pause", "experiment.configure"],
+      "expected": "Speeds 1, 2, 3, and 60 and independent frequencies update due time without source or Monitor writes.",
+      "evidence": { "technical": ["source-monitor-isolation"], "browser": ["laboratory-controls"], "scheduling": ["frequency-conversion"], "recovery": [] }
+    },
+    {
+      "id": "SH-03", "group": "shared", "title": "Jump and pause",
+      "requiredActionIds": ["experiment.create", "experiment.configure", "experiment.advance", "experiment.pause"],
+      "expected": "Nine serialized due cycles occur at minutes 3–27 and pause freezes business time and polling.",
+      "evidence": { "technical": ["complete-read"], "browser": ["laboratory-controls"], "scheduling": ["crossed-due-times", "pause-freeze", "serialization"], "recovery": [] }
+    },
+    {
+      "id": "SH-04", "group": "shared", "title": "Automatic poll",
+      "requiredActionIds": ["experiment.create", "experiment.configure", "scheduler.await_due"],
+      "expected": "Exactly one scheduler-owned execution occurs when the connected query becomes due.",
+      "evidence": { "technical": ["test-database-adapter"], "browser": ["laboratory-controls"], "scheduling": ["automatic-due-poll"], "recovery": [] }
+    },
+    {
+      "id": "SH-05", "group": "shared", "title": "Snapshots",
+      "requiredActionIds": ["experiment.create", "experiment.snapshot", "scenario.fail_next_poll", "scheduler.await_due", "experiment.snapshot"],
+      "expected": "Durable before/after snapshots retain source, poll, downstream, audit, delay, and cursor state.",
+      "evidence": { "technical": ["failed-read-preservation", "durable-history"], "browser": ["experiment-history"], "scheduling": ["scheduler-owned-poll"], "recovery": ["snapshot-before-after"] }
+    },
+    {
+      "id": "SH-06", "group": "shared", "title": "Shared clock",
+      "requiredActionIds": ["experiment.create", "a02.prepare_dispatch", "a03.start_work_order", "a05.declare_produced_reel", "experiment.advance"],
+      "expected": "A02, A03, and A05 age from one business clock while audit time remains real server time.",
+      "evidence": { "technical": ["shared-business-clock", "audit-time-separation"], "browser": ["source-state"], "scheduling": ["chronological-advance"], "recovery": [] }
+    },
+    {
+      "id": "SH-07", "group": "shared", "title": "Action at poll time",
+      "requiredActionIds": ["a02.prepare_dispatch", "scheduler.await_due", "a02.receive", "scheduler.await_due"],
+      "expected": "A receipt recorded after a committed cycle remains pending until the next complete cycle.",
+      "evidence": { "technical": ["poll-boundary-ordering"], "browser": ["pending-source-state"], "scheduling": ["action-at-due-boundary"], "recovery": [] }
+    },
+    {
+      "id": "SH-08", "group": "shared", "title": "New experiment after history",
+      "requiredActionIds": ["experiment.create", "experiment.snapshot", "experiment.create"],
+      "expected": "A new experiment preserves all prior source observations, Monitor objects, and snapshots.",
+      "evidence": { "technical": ["durable-history"], "browser": ["experiment-history"], "scheduling": [], "recovery": ["restart-history"] }
+    },
+    {
+      "id": "SH-09", "group": "shared", "title": "Duplicate prevention",
+      "requiredActionIds": ["a02.prepare_dispatch", "a03.start_work_order", "a05.declare_produced_reel", "experiment.advance", "scheduler.await_due", "scheduler.await_due"],
+      "expected": "Repeated healthy polls duplicate no observation, incident, evidence, routing, delivery, conversation, message, card, or event.",
+      "evidence": { "technical": ["complete-read", "downstream-idempotency"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["repeated-due-poll"], "recovery": [] }
+    },
+    {
+      "id": "SH-10", "group": "shared", "title": "Failed read preservation",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "scheduler.await_due", "a02.receive", "scenario.fail_next_poll", "scheduler.await_due", "monitor.inject_interruption", "scheduler.await_due"],
+      "expected": "Failed reads preserve trustworthy state and the next healthy cycle repairs downstream work once.",
+      "evidence": { "technical": ["real-adapter-failure", "last-trustworthy-state"], "browser": ["pending-source-state", "dashboard", "chat-detail"], "scheduling": ["scheduler-owned-recovery"], "recovery": ["interruption-repair", "idempotency"] }
+    },
+    {
+      "id": "SH-11", "group": "shared", "title": "Responsive behavior",
+      "requiredActionIds": ["browser.verify_same_runtime"],
+      "expected": "Connected Dashboard and Chat pass 390, 768, and 1440 visual, keyboard, accessibility, responsive, reduced-motion, overflow, console, and reconnect review.",
+      "evidence": { "technical": ["same-runtime-identity"], "browser": ["dashboard", "chat-list", "chat-detail", "responsive", "keyboard", "accessibility", "reduced-motion", "overflow", "console", "reconnect"], "scheduling": [], "recovery": ["reconnect"] }
+    },
+    {
+      "id": "A02-00", "group": "A02", "title": "Clean baseline",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "a02.receive", "scheduler.await_due"],
+      "expected": "Receipt at minute 20 creates no incident or downstream alert object.",
+      "evidence": { "technical": ["complete-read", "source-history"], "browser": ["dashboard-absence", "chat-absence"], "scheduling": ["scheduler-owned-poll"], "recovery": [] }
+    },
+    {
+      "id": "A02-01", "group": "A02", "title": "Concurrent movements",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "a02.prepare_dispatch", "a02.receive", "experiment.advance", "a02.prepare_dispatch", "scheduler.await_due"],
+      "expected": "Only the independently keyed overdue movement opens A02; the received and young movements remain clean.",
+      "evidence": { "technical": ["independent-natural-keys", "complete-read"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["staggered-source-time"], "recovery": [] }
+    },
+    {
+      "id": "A02-02", "group": "A02", "title": "Threshold and persistence",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "scheduler.await_due", "experiment.advance", "scheduler.await_due", "scheduler.await_due"],
+      "expected": "No incident opens at minute 29, one occurrence opens at minute 30, and later polls do not duplicate it.",
+      "evidence": { "technical": ["threshold-boundary", "downstream-idempotency"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["chronological-threshold-polls"], "recovery": [] }
+    },
+    {
+      "id": "A02-03", "group": "A02", "title": "Receipt before detection",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "a02.receive", "scheduler.await_due"],
+      "expected": "Receipt after minute 30 but before the first complete read creates no historical A02 incident.",
+      "evidence": { "technical": ["source-truth-before-read"], "browser": ["dashboard-absence", "chat-absence"], "scheduling": ["receipt-before-due-poll"], "recovery": [] }
+    },
+    {
+      "id": "A02-04", "group": "A02", "title": "Correction failure isolation",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "scheduler.await_due", "a02.receive", "scenario.fail_next_poll", "scheduler.await_due", "scheduler.await_due"],
+      "expected": "A failed read preserves the selected incident; healthy recovery resolves it without changing unrelated movement outcomes.",
+      "evidence": { "technical": ["partial-pagination", "last-trustworthy-state", "unrelated-row-isolation"], "browser": ["pending-source-state", "dashboard", "chat-detail"], "scheduling": ["scheduler-owned-recovery"], "recovery": ["healthy-read-resolution"] }
+    },
+    {
+      "id": "A02-05", "group": "A02", "title": "Administrative closure",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "scheduler.await_due", "monitor.close_without_resolution", "scheduler.await_due"],
+      "expected": "Audited closure preserves source truth and suppresses only the same uninterrupted condition.",
+      "evidence": { "technical": ["source-read-only", "closure-suppression"], "browser": ["closed-detail", "dashboard-absence", "chat-detail"], "scheduling": ["unchanged-healthy-poll"], "recovery": [] }
+    },
+    {
+      "id": "A02-06", "group": "A02", "title": "Mixed population",
+      "requiredActionIds": ["scenario.prepare_population", "scheduler.await_due"],
+      "expected": "Only the overdue member reaches incident and downstream state; received and young members remain clean.",
+      "evidence": { "technical": ["mixed-population", "independent-natural-keys"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["scheduler-owned-poll"], "recovery": [] }
+    },
+    {
+      "id": "A02-07", "group": "A02", "title": "Cancel and reject",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "scheduler.await_due", "a02.cancel", "scheduler.await_due", "a02.prepare_dispatch", "experiment.advance", "scheduler.await_due", "a02.reject", "scheduler.await_due"],
+      "expected": "Cancellation and rejection each terminalize the original and create exactly one reversed movement with a new ID and reset clock; rejection wins both-zone precedence.",
+      "evidence": { "technical": ["forward-only-lifecycle", "authority-precedence", "exact-source-diff"], "browser": ["resolved-history", "dashboard-absence", "chat-detail"], "scheduling": ["post-action-complete-poll"], "recovery": [] }
+    },
+    {
+      "id": "A02-09", "group": "A02", "title": "Connected downstream",
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "scheduler.await_due", "browser.verify_same_runtime"],
+      "expected": "Exact recipients, deliveries, card, participant conversation, alert message, cursor, Chat list, and Chat detail remain stable.",
+      "evidence": { "technical": ["deterministic-routing", "downstream-idempotency", "cursor-delivery"], "browser": ["dashboard", "chat-list", "chat-detail", "receipts", "reconnect"], "scheduling": ["repeated-due-poll"], "recovery": ["reconnect"] }
+    },
+    {
+      "id": "A03-00", "group": "A03", "title": "Clean baseline",
+      "requiredActionIds": ["a03.start_work_order", "experiment.advance", "a03.record_first_consumption", "scheduler.await_due"],
+      "expected": "Positive first consumption at minute 10 creates no A03 incident.",
+      "evidence": { "technical": ["complete-read", "source-history"], "browser": ["dashboard-absence", "chat-absence"], "scheduling": ["scheduler-owned-poll"], "recovery": [] }
+    },
+    {
+      "id": "A03-01", "group": "A03", "title": "Threshold and persistence",
+      "requiredActionIds": ["a03.start_work_order", "experiment.advance", "scheduler.await_due", "experiment.advance", "scheduler.await_due", "scheduler.await_due"],
+      "expected": "One occurrence opens at minute 15 and persists without duplication.",
+      "evidence": { "technical": ["threshold-boundary", "downstream-idempotency"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["chronological-threshold-polls"], "recovery": [] }
+    },
+    {
+      "id": "A03-02", "group": "A03", "title": "Concurrent mixed OTs",
+      "requiredActionIds": ["scenario.prepare_population", "a03.start_work_order", "scheduler.await_due"],
+      "expected": "Only the eligible empty active OT opens; consumed and closed OTs remain clean and a same-machine competing start is rejected.",
+      "evidence": { "technical": ["mixed-population", "one-active-ot-per-machine", "independent-natural-keys"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["scheduler-owned-poll"], "recovery": [] }
+    },
+    {
+      "id": "A03-03", "group": "A03", "title": "Correction after failed poll",
+      "requiredActionIds": ["a03.start_work_order", "experiment.advance", "scheduler.await_due", "a03.record_first_consumption", "scenario.fail_next_poll", "scheduler.await_due", "scheduler.await_due"],
+      "expected": "Consumption remains pending through failure and resolves the incident only after healthy recovery.",
+      "evidence": { "technical": ["transport-error", "last-trustworthy-state"], "browser": ["pending-source-state", "dashboard", "chat-detail"], "scheduling": ["scheduler-owned-recovery"], "recovery": ["healthy-read-resolution"] }
+    },
+    {
+      "id": "A03-04", "group": "A03", "title": "Administrative closure",
+      "requiredActionIds": ["a03.start_work_order", "experiment.advance", "scheduler.await_due", "monitor.close_without_resolution", "scheduler.await_due"],
+      "expected": "Audited closure preserves active zero-consumption source and suppresses the same uninterrupted condition.",
+      "evidence": { "technical": ["source-read-only", "closure-suppression"], "browser": ["closed-detail", "dashboard-absence", "chat-detail"], "scheduling": ["unchanged-healthy-poll"], "recovery": [] }
+    },
+    {
+      "id": "A03-05", "group": "A03", "title": "Open-OT consumption availability",
+      "requiredActionIds": ["a03.start_work_order", "experiment.advance", "scheduler.await_due", "a03.record_first_consumption", "a03.close_work_order", "a03.record_first_consumption", "scheduler.await_due"],
+      "expected": "An open OT accepts first consumption; closure blocks later consumption and the next complete poll resolves A03 without inventing consumption.",
+      "evidence": { "technical": ["forward-only-lifecycle", "post-closure-denial", "exact-source-diff"], "browser": ["resolved-history", "dashboard-absence", "chat-detail"], "scheduling": ["post-action-complete-poll"], "recovery": [] }
+    },
+    {
+      "id": "A05-00", "group": "A05", "title": "Clean baseline",
+      "requiredActionIds": ["a05.declare_produced_reel", "experiment.advance", "a05.register_weighing", "a05.register_movement", "scheduler.await_due"],
+      "expected": "A reel weighed and moved at minute 10 creates no A05 incident.",
+      "evidence": { "technical": ["complete-read", "source-history"], "browser": ["dashboard-absence", "chat-absence"], "scheduling": ["scheduler-owned-poll"], "recovery": [] }
+    },
+    {
+      "id": "A05-01", "group": "A05", "title": "Threshold both reasons",
+      "requiredActionIds": ["a05.declare_produced_reel", "experiment.advance", "scheduler.await_due", "scheduler.await_due"],
+      "expected": "One occurrence opens at minute 30 with not_weighed and still_at_machine and persists without duplication.",
+      "evidence": { "technical": ["threshold-boundary", "multi-reason-incident", "downstream-idempotency"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["chronological-threshold-polls"], "recovery": [] }
+    },
+    {
+      "id": "A05-02", "group": "A05", "title": "Independent reasons and reel kinds",
+      "requiredActionIds": ["a05.declare_produced_reel", "a05.register_movement", "experiment.advance", "scheduler.await_due", "a05.declare_remnant_reel", "a05.register_weighing", "experiment.advance", "scheduler.await_due"],
+      "expected": "Produced and remnant cases open independently with one reason and their exact deterministic recipients.",
+      "evidence": { "technical": ["reel-kind-routing", "independent-reasons"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["scheduler-owned-poll"], "recovery": [] }
+    },
+    {
+      "id": "A05-03", "group": "A05", "title": "Partial correction both ways",
+      "requiredActionIds": ["a05.declare_produced_reel", "experiment.advance", "scheduler.await_due", "a05.register_weighing", "scheduler.await_due", "a05.declare_produced_reel", "experiment.advance", "scheduler.await_due", "a05.register_movement", "scheduler.await_due"],
+      "expected": "Both correction orders preserve one occurrence with only the outstanding reason and no downstream duplication.",
+      "evidence": { "technical": ["partial-resolution", "downstream-idempotency"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["post-action-complete-poll"], "recovery": [] }
+    },
+    {
+      "id": "A05-04", "group": "A05", "title": "Correction after failed poll",
+      "requiredActionIds": ["a05.declare_produced_reel", "experiment.advance", "scheduler.await_due", "a05.register_weighing", "a05.register_movement", "scenario.fail_next_poll", "scheduler.await_due", "scheduler.await_due"],
+      "expected": "Corrected source remains pending through failure and resolves only after healthy recovery.",
+      "evidence": { "technical": ["partial-pagination", "last-trustworthy-state"], "browser": ["pending-source-state", "dashboard", "chat-detail"], "scheduling": ["scheduler-owned-recovery"], "recovery": ["healthy-read-resolution"] }
+    },
+    {
+      "id": "A05-05", "group": "A05", "title": "Administrative closure",
+      "requiredActionIds": ["a05.declare_produced_reel", "experiment.advance", "scheduler.await_due", "monitor.close_without_resolution", "scheduler.await_due"],
+      "expected": "Audited closure preserves unweighed and unmoved source and suppresses the same uninterrupted condition.",
+      "evidence": { "technical": ["source-read-only", "closure-suppression"], "browser": ["closed-detail", "dashboard-absence", "chat-detail"], "scheduling": ["unchanged-healthy-poll"], "recovery": [] }
+    },
+    {
+      "id": "A05-06", "group": "A05", "title": "A05 to A02 handoff",
+      "requiredActionIds": ["a05.declare_produced_reel", "experiment.advance", "scheduler.await_due", "a05.handoff_to_a02", "scheduler.await_due", "experiment.advance", "scheduler.await_due"],
+      "expected": "Exactly one handoff movement removes A05 movement ownership and later opens one A02 incident after 30 minutes without duplicate A05 movement alerting.",
+      "evidence": { "technical": ["cross-rule-ownership", "one-time-handoff", "exact-source-diff"], "browser": ["dashboard", "chat-list", "chat-detail"], "scheduling": ["cross-rule-chronology"], "recovery": [] }
+    },
+    {
+      "id": "A05-08", "group": "A05", "title": "Survives OT closure",
+      "requiredActionIds": ["a05.declare_produced_reel", "experiment.advance", "scheduler.await_due", "a05.close_source_work_order", "scheduler.await_due", "a05.register_weighing", "a05.handoff_to_a02", "scheduler.await_due"],
+      "expected": "The same occurrence survives source-OT closure and resolves after legal weighing and movement with preserved closure, handoff, and downstream history.",
+      "evidence": { "technical": ["ot-closure-independence", "forward-only-lifecycle", "cross-rule-ownership"], "browser": ["dashboard", "chat-list", "chat-detail", "resolved-history"], "scheduling": ["post-action-complete-poll"], "recovery": [] }
+    }
+  ]
+}

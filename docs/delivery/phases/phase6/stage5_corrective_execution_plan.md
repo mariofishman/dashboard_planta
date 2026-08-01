@@ -255,6 +255,14 @@ Define, before execution, exactly what may run and what evidence every accepted 
 4. Version a ledger schema containing identity, action, source, read, Monitor, visible-result, scheduling/recovery, cleanup, and failure fields.
 5. Encode conditional applicability without allowing a required field to be silently omitted.
 
+### Internal execution sequence
+
+| Sub-step | Scope | Status |
+| --- | --- | --- |
+| 5.1a | Version the exact 34-ID inventory, group accounting, exclusions, required actions, outcomes, and evidence applicability in the acceptance manifest. | Complete — v2 declaration preserves the exact approved set, makes exclusions non-substitutable, orders every required action, and declares all four evidence dimensions. Second-pass review added missing clock advances and explicit human/automation invocation paths; exact action parameters remain correctly owned by Step 5.2. |
+| 5.1b | Add the versioned ledger schema with explicit mandatory fields and conditional applicability rules. | Complete — Draft 2020-12 result schema v1 requires identity, ordered actions, source/read/Monitor/visible chains, independent scheduling and recovery applicability, cleanup, and failure state. Strict compilation and positive/negative fixtures pass; cross-file identity, ordering, digest, and chronology checks remain correctly assigned to 5.1c. |
+| 5.1c | Add strict manifest/schema validation and a failure matrix covering missing, duplicate, extra, excluded, and structurally invalid declarations. | Complete — the repeatable declaration command strictly compiles the ledger schema, cross-validates manifest/source-action versions and boundaries, and rejects missing, duplicate, extra, excluded, malformed, misgrouped, undefined-action, and unsafe-writer declarations. Second-pass review made malformed collections fail closed with controlled errors; 11 focused tests pass. Final result-ledger accounting remains assigned to Step 5.4. |
+
 ### Terms
 
 - **Acceptance manifest:** versioned declaration of the only test IDs and evidence obligations allowed in Stage 5B.
@@ -287,6 +295,21 @@ Make every approved case independently repeatable without leaking source or Moni
 4. Restore source state in `finally` and verify the restored digest even when execution fails.
 5. Fail if setup depends on another test, cleanup is incomplete, or an unrelated source row changes.
 
+### Internal execution sequence
+
+The approved eight-part split was retained after an over-splitting challenge: schema and validation foundations were combined, as were deterministic setup and runtime isolation. The remaining boundaries protect four distinct fixture families plus independent setup, cleanup, and adversarial-proof results.
+
+| Sub-step | Scope | Status |
+| --- | --- | --- |
+| 5.2a | Define the fixture/cleanup contract schema and validation foundation. | Complete — strict Draft 2020-12 schema plus semantic validation enforce independent identity, exact action order, natural-key references, allowed-mutation linkage, isolated experiment/runtime declarations, mandatory cleanup, and a closed action-parameter vocabulary. Second-pass review prohibited hidden SQL and cross-test parameters; 5 focused tests pass. |
+| 5.2b | Define deterministic contracts for all 11 shared tests. | Complete — exact action order, parameters, fixture identities, seeded and produced natural keys, starting-state assertions, allowed mutation references, and isolated cleanup profiles are declared for every shared ID. Review replaced weak existence checks with exact clean or alert-ready source preconditions; exact 11-ID validation passes. |
+| 5.2c | Define deterministic contracts for all 9 A02 tests. | Complete — every A02 case declares seeded templates, produced movements/reversals, exact chronology, poll boundaries, failure/closure actions, authority, mixed-population state, and allowed source contracts. Review added fresh cancel/reject isolation lanes so reversed movements cannot contaminate the other subcase; exact 9-ID validation passes. |
+| 5.2d | Define deterministic contracts for all 6 A03 tests. | Complete — contracts cover clean consumption, threshold persistence, mixed concurrent OTs, failed-read correction, administrative closure, and post-closure denial. Review replaced dynamic competing-OT discovery with versioned keys and added machine-level start eligibility/relationship assertions; exact 6-ID validation passes. |
+| 5.2e | Define deterministic contracts for all 8 A05 tests. | Complete — contracts declare machine location, weighing, source-OT closure state, produced/remnant kinds, partial-correction lanes, failure/closure behavior, A05→A02 handoff keys, and OT-closure survival. Review added explicit post-production serial-to-movement lineage assertions; exact 8-ID and complete 34-ID validation pass. |
+| 5.2f | Build deterministic setup with per-test experiment identity and Monitor-runtime isolation. | Complete — the dependency-injected runner resolves only versioned seeds, creates lane-specific plans, applies declared population setup, verifies exact starting state/relationships, reserves or creates per-test experiments correctly, and requires fresh empty Monitor runtimes. Review added exact runtime and experiment identity checks; 6 runner tests and 5 contract-foundation tests pass. |
+| 5.2g | Build mandatory `finally` cleanup, restoration, and digest verification. | Complete — the lifecycle captures a valid baseline before setup; restores in `finally` after setup or execution failure; compares source and unrelated-row SHA-256 digests; destroys and verifies Monitor isolation; writes cleanup evidence; and preserves the primary error inside cleanup failures. Second-pass tests cover artifact and Monitor-disposal failures; 11 runner tests pass. |
+| 5.2h | Prove forced-failure restoration, test independence, and unrelated-row protection. | Complete — the strict validation command proves exact 34-ID manifest parity, valid versioned seeds, 37 unique execution-lane identities, and mandatory cleanup guarantees. An exhaustive forced-failure matrix executes every lane, mutates its synthetic source boundary, and proves `finally` restoration, unchanged unrelated-row digest, Monitor disposal, and cleanup evidence. The adversarial pass exposed and fixed incorrect setup reads of action-produced keys: only pre-action absence may now be asserted for such keys. All 17 fixture/runner tests pass, and the existing 25-test detection suite independently passes against `test_database`, including all connected source actions, unrelated-row tamper rejection, and final source restoration. These are contract/regression proofs, not accepted Stage 5 connected results. |
+
 ### Terms
 
 - **Fixture contract:** deterministic starting records, actions, and allowed mutations for one test.
@@ -299,7 +322,7 @@ Make every approved case independently repeatable without leaking source or Moni
 
 ### Exit
 
-All 34 approved IDs have independent setup and cleanup contracts, and forced-failure tests prove restoration still occurs.
+Complete. All 34 approved IDs have independent setup and cleanup contracts across 37 isolated execution lanes, and forced-failure tests prove restoration still occurs. `npm run validate:phase6-stage5-fixtures` is the repeatable exit check.
 
 ### Approval and Git effect
 
@@ -322,6 +345,19 @@ Capture authoritative identifiers and state transitions consistently while Steps
 4. Capture source/read/Monitor links immediately and expose validated attachment interfaces for scheduling, recovery, browser, and human evidence that Steps 6–8B will produce later.
 5. Fail capture for a missing or contradictory link rather than fabricating a placeholder.
 
+### Internal execution sequence
+
+The approved six-part split keeps the three authoritative capture boundaries separate, then validates their links before connected rehearsal. A seven-part version was rejected as over-split because later-evidence attachment interfaces belong with the foundational chain model; further merging would combine distinct authorities and failure modes.
+
+| Sub-step | Scope | Status |
+| --- | --- | --- |
+| 5.3a | Define the reusable chain model, builders, and validated later-evidence attachment interfaces. | Complete — immutable chain drafts accept each core authority section once and later scheduling, recovery, browser, or human evidence only through strict attachment envelopes matching the exact run, test, and experiment identity. The adversarial pass found that a valid test ID could initially claim the wrong group; group derivation is now enforced. Four focused contract tests pass. |
+| 5.3b | Capture laboratory actions and authoritative source mutations, writer identity, natural keys, revisions, and digests. | Complete — ordered action capture is derived from approved manifest definitions and authoritative execution timestamps; source capture derives exact before/after records, changed fields, natural keys, writer identity, final revision, and SHA-256 evidence from source-action responses plus chain-wide isolation evidence. The adversarial pass corrected an invalid assumption that every action in a multi-action chain shares one revision and unrelated-row scope: each action now retains local proof while the fixture lifecycle supplies the chain-wide unchanged digest. Seven focused tests pass. |
+| 5.3c | Capture `monitor_source_ro` reads, query versions, pages, completeness, freshness, revisions, and poll cycles. | Complete — read capture accepts only the `test_database` adapter and `monitor_source_ro` account, records query/version, ordered page counts and revisions, poll-cycle IDs, completeness, and freshness, and fails on query, authority, pagination, or revision contradictions. Review corrected page numbering and revision stability from an invalid global assumption to the actual per-cycle boundary. Connected-rehearsal preparation then exposed that the runner returned only aggregate page counts; `CycleResult` now carries exact page number, row count, and revision directly from each authoritative adapter response. Nine focused chain tests plus the complete detection suite pass. |
+| 5.3d | Capture Monitor incidents, evidence, routing, deliveries, conversations, messages, receipts, and cursors. | Complete — Monitor capture records authoritative downstream identifiers, producing poll-cycle IDs, and cursor boundaries for presence, absence, or history; presence requires the complete incident-to-message chain and a committed cursor, while absence rejects every downstream object. Review found that downstream objects were initially not tied to their poll cycles; the ledger schema and capture now require that link. Duplicate IDs and impossible cursor ranges fail closed. Eleven cumulative focused tests pass. |
+| 5.3e | Cross-validate every source/read/Monitor link and fail closed on missing or contradictory identifiers. | Complete — the core validator requires all four capture sections and cross-links each source-writing laboratory action to exact mutation evidence, the final source revision to the read revision, Monitor objects to recorded poll cycles, and Monitor presence to a complete fresh read. The ledger mutation schema now carries action ID and sequence so the first custody edge is machine-verifiable. Missing sections and action, revision, cycle, or trust contradictions fail closed. Thirteen cumulative focused tests pass. |
+| 5.3f | Run representative connected rehearsals and prove later scheduling, recovery, browser, and human evidence attaches only to matching identities. | Complete — a diagnostic A02 rehearsal uses the canonical source-action endpoint, advances the independent business clock, performs a real `monitor_source_ro` poll, captures actual page evidence and persisted Monitor identifiers, and validates the complete source-to-message chain before restoring the created source row in `finally`. Scheduling, recovery, browser, and human attachment envelopes accept only the same run/test/experiment identity. Review corrected an invalid assumption that audit time must follow simulated business time; both clocks remain independently validated. The rehearsal is explicitly diagnostic and creates no accepted result. |
+
 ### Terms
 
 - **Ledger:** structured record of what happened and the identifiers connecting every stage.
@@ -334,7 +370,7 @@ Capture authoritative identifiers and state transitions consistently while Steps
 
 ### Exit
 
-Representative connected rehearsals prove source, read, and Monitor links can be captured and cross-validated. Contract tests prove later scheduling, recovery, browser, and human evidence can attach only with matching run/test identity. Rehearsals are diagnostic evidence only and cannot count as the authoritative 34-result ledger.
+Complete. A representative connected rehearsal proves source, read, and Monitor links can be captured and cross-validated, while contract tests prove later scheduling, recovery, browser, and human evidence can attach only with matching run/test/experiment identity. `npm run validate:phase6-stage5-chain` is the repeatable exit check. Rehearsals are diagnostic evidence only and cannot count as the authoritative 34-result ledger.
 
 ### Approval and Git effect
 
@@ -354,6 +390,17 @@ Make acceptance evidence reviewable by machines and humans while failing closed 
 4. Exit nonzero for a missing chain link, duplicate, failed/skipped/extra ID, excluded execution, mismatched outcome, or renderer divergence.
 5. Use synthetic dry-run fixtures to prove every validation failure without presenting them as connected acceptance results.
 
+### Internal execution sequence
+
+The approved four-part split combines artifact checks with per-result validation and keeps JSON and Markdown rendering together because they must derive from the same validated object. A six-part version was rejected as over-split; further merging would combine validation, accounting, rendering, and executable failure-proof boundaries.
+
+| Sub-step | Scope | Status |
+| --- | --- | --- |
+| 5.4a | Build strict per-result validation covering the Step 5.1 schema, chain completeness, expected outcome, cleanup, and artifact existence. | Complete — asynchronous result validation compiles the strict Step 5.1 schema, matches identity/version/action order to manifest v2, enforces source/read/Monitor/browser/scheduling/recovery applicability from declared actions and evidence, validates core custody links, requires matched declared-versus-observed outcomes, verifies cleanup digests, and accepts only existing regular artifact files under the evidence root. Review exposed the missing machine-checkable outcome contract and a macOS `/var` containment bug; the schema now requires explicit expectation evidence and path checks preserve traversal/symlink protection without false rejection. Three focused tests pass. |
+| 5.4b | Build exact ledger accounting for IDs, groups, uniqueness, exclusions, and passed status. | Complete — the ledger envelope is strict and versioned, distinguishes synthetic dry runs from connected acceptance, requires the manifest run/version, validates every result, enforces exactly 34 approved unique IDs and exact group counts, rejects all exclusions and extras, and requires every result to be passed and tied to the same run. The 34-result synthetic ledger passes while missing, duplicate, extra, excluded, and skipped mutations fail. Four cumulative tests pass. |
+| 5.4c | Render deterministic JSON and readable Markdown from the same validated ledger and verify semantic parity. | Complete — one validated ledger produces canonical recursively key-sorted JSON and a readable Markdown summary/table. Markdown embeds a generated machine-readable semantic summary, and the parity guard compares both that summary and the complete rendered table to the full JSON ledger before output; repeated rendering is byte-stable and deliberate summary or table tampering fails as renderer divergence. Review added newline, table-delimiter, and raw-HTML escaping, then closed a table-only divergence gap. Five cumulative tests pass. |
+| 5.4d | Add the repeatable CLI and exhaustive synthetic failure matrix without presenting dry runs as connected evidence. | Complete — the reusable synthetic builder creates all 34 structurally complete dry-run results and real temporary artifacts, and the CLI validates and renders them while asserting and reporting `synthetic_dry_run`; it cannot claim connected acceptance. The failure matrix covers missing chain links, missing/duplicate/extra/excluded IDs, failed/skipped status, group/run mismatch, outcome mismatch, cleanup failure, missing/escaping artifacts, and renderer divergence. `npm run validate:phase6-stage5-ledger` runs the matrix and dry-run CLI. |
+
 ### Terms
 
 - **Strict accounting:** validation requiring the exact approved set and rejecting every missing, duplicate, extra, skipped, failed, or excluded result.
@@ -367,7 +414,7 @@ Make acceptance evidence reviewable by machines and humans while failing closed 
 
 ### Exit
 
-Dry-run fixtures prove valid rendering and every required failure mode. The validator is ready for Step 8C, but no authoritative 34-result ledger exists yet.
+Complete. Synthetic dry-run fixtures prove valid rendering and every required failure mode through `npm run validate:phase6-stage5-ledger`. The validator is ready for Step 8C, but no authoritative 34-result ledger exists yet.
 
 ### Approval and Git effect
 
@@ -931,6 +978,8 @@ Gap values are `partial`, `missing`, or `contradicted`. No checkpoint item is ma
 **Status:** No Stage 5 result is currently accepted.
 
 **Checkpoint manifest:** [`stage5-connected-acceptance.v1.json`](../../../../config/detection/stage5-connected-acceptance.v1.json) — incomplete and subject to revision.
+
+**Current declaration manifest:** [`stage5-connected-acceptance.v2.json`](../../../../config/detection/stage5-connected-acceptance.v2.json) — Step 5.1 declaration authority; it records required work but contains no acceptance results.
 
 **Source authority:** [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md)
 

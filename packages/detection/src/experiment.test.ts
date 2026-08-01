@@ -109,7 +109,7 @@ test("experiment runtime preserves cadence, serializes crossed polls, freezes wh
       }
       return {
         cycleId: randomUUID(), queryId: query.queryId, status: "healthy", complete: true, fullEvaluation: true,
-        recoveryRun: false, pageCount: 1, rowCount: 1, errorCode: null,
+        recoveryRun: false, pageCount: 1, rowCount: 1, errorCode: null, pageEvidence: [{ page: 1, rowCount: 1, revision: "revision-1" }],
       };
     },
   } as unknown as DetectionScheduler;

@@ -1,0 +1,254 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dashboard-planta.local/schemas/stage5-fixture-registry.v1.schema.json",
+  "title": "Phase 6 Stage 5 fixture and cleanup registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["registryVersion", "manifestVersion", "sourceActionContractVersion", "fixtureVersion", "sourceRevision", "writerIdentity", "profiles", "contracts"],
+  "properties": {
+    "registryVersion": { "const": "1.0.0" },
+    "manifestVersion": { "const": "2.0.0" },
+    "sourceActionContractVersion": { "const": "1.0.0" },
+    "fixtureVersion": { "const": "1.0.0" },
+    "sourceRevision": { "type": "string", "minLength": 1 },
+    "writerIdentity": { "const": "alertas_fake" },
+    "profiles": { "$ref": "#/$defs/profiles" },
+    "contracts": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 34,
+      "items": { "$ref": "#/$defs/contract" }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "identifier": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "testId": { "type": "string", "pattern": "^(SH-(?:0[1-9]|1[01])|A02-(?:0[0-7]|09)|A03-0[0-5]|A05-(?:0[0-6]|08))$" },
+    "ruleCode": { "enum": ["A02", "A03", "A05"] },
+    "naturalKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "ruleCode", "field"],
+      "properties": {
+        "ref": { "$ref": "#/$defs/identifier" },
+        "ruleCode": { "$ref": "#/$defs/ruleCode" },
+        "field": { "enum": ["materialFlowDetailId", "workOrderId", "articleSerialId"] },
+        "isolationLane": { "$ref": "#/$defs/identifier" },
+        "seedRef": { "$ref": "#/$defs/nonEmptyString" },
+        "producedByActionSequence": { "type": "integer", "minimum": 1 }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["seedRef"],
+          "properties": { "seedRef": { "$ref": "#/$defs/nonEmptyString" }, "producedByActionSequence": false }
+        },
+        {
+          "type": "object",
+          "required": ["producedByActionSequence"],
+          "properties": { "producedByActionSequence": { "type": "integer", "minimum": 1 }, "seedRef": false }
+        }
+      ]
+    },
+    "startingState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyRef", "path", "operator", "expected"],
+      "properties": {
+        "keyRef": { "$ref": "#/$defs/identifier" },
+        "path": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_.-]+$" },
+        "operator": { "enum": ["equals", "not_equals", "exists", "not_exists", "gt", "gte", "lt", "lte", "includes"] },
+        "expected": {}
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "leftKeyRef", "leftPath", "operator", "rightKeyRef", "rightPath"],
+      "properties": {
+        "phase": { "enum": ["starting_state", "after_production"] },
+        "leftKeyRef": { "$ref": "#/$defs/identifier" },
+        "leftPath": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_.-]+$" },
+        "operator": { "enum": ["equals", "not_equals"] },
+        "rightKeyRef": { "$ref": "#/$defs/identifier" },
+        "rightPath": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9_.-]+$" }
+      }
+    },
+    "allowedMutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "contractId", "keyRefs"],
+      "properties": {
+        "type": { "enum": ["source_action_contract", "fixture_population_contract"] },
+        "contractId": { "$ref": "#/$defs/identifier" },
+        "keyRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/identifier" },
+          "uniqueItems": true
+        }
+      }
+    },
+    "sourceRequired": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicability", "naturalKeys", "startingState", "allowedMutations"],
+      "properties": {
+        "applicability": { "const": "required" },
+        "naturalKeys": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/naturalKey" } },
+        "startingState": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/startingState" } },
+        "relationships": { "type": "array", "items": { "$ref": "#/$defs/relationship" } },
+        "allowedMutations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/allowedMutation" } }
+      }
+    },
+    "sourceNotApplicable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicability", "notApplicableReason"],
+      "properties": {
+        "applicability": { "const": "not_applicable" },
+        "notApplicableReason": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "actionId", "keyRefs", "parameters"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "actionId": { "$ref": "#/$defs/identifier" },
+        "keyRefs": { "type": "array", "items": { "$ref": "#/$defs/identifier" }, "uniqueItems": true },
+        "parameters": { "$ref": "#/$defs/actionParameters" }
+        ,"isolationLane": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "actionParameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
+        "paused": { "type": "boolean" },
+        "pauseStates": { "type": "array", "minItems": 1, "items": { "type": "boolean" }, "uniqueItems": true },
+        "speed": { "enum": [1, 2, 3, 60] },
+        "speedCases": { "type": "array", "minItems": 1, "items": { "enum": [1, 2, 3, 60] }, "uniqueItems": true },
+        "frequencies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["A02", "A03", "A05"],
+          "properties": {
+            "A02": { "type": "integer", "minimum": 1 },
+            "A03": { "type": "integer", "minimum": 1 },
+            "A05": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "frequencyCases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["A02", "A03", "A05"],
+            "properties": {
+              "A02": { "type": "integer", "minimum": 1 },
+              "A03": { "type": "integer", "minimum": 1 },
+              "A05": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "population": { "enum": ["a02_mixed", "a03_mixed"] },
+        "authority": { "enum": ["origin", "destination", "both"] },
+        "ruleCode": { "$ref": "#/$defs/ruleCode" },
+        "ruleCodes": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/ruleCode" }, "uniqueItems": true },
+        "cycles": { "type": "integer", "minimum": 1 },
+        "fault": { "enum": ["source_error", "incomplete", "invalid_shape", "partial_pagination", "duplicate_keys", "revision_drift", "stale", "unknown_freshness", "timeout", "transport_error", "overlap"] },
+        "reason": { "$ref": "#/$defs/nonEmptyString" },
+        "snapshotLabel": { "$ref": "#/$defs/identifier" },
+        "interruptionPoint": { "$ref": "#/$defs/identifier" },
+        "expectedStatus": { "enum": [200, 409] },
+        "expectedError": { "$ref": "#/$defs/identifier" },
+        "viewports": { "type": "array", "minItems": 1, "items": { "enum": [390, 768, 1440] }, "uniqueItems": true }
+      }
+    },
+    "experimentProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["businessTime", "speed", "frequencies", "runIdTemplate", "experimentNameTemplate", "experimentIdentity", "monitorIsolation"],
+      "properties": {
+        "businessTime": { "type": "string", "format": "date-time" },
+        "speed": { "enum": [1, 2, 3, 60] },
+        "frequencies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["A02", "A03", "A05"],
+          "properties": {
+            "A02": { "type": "integer", "minimum": 1 },
+            "A03": { "type": "integer", "minimum": 1 },
+            "A05": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "runIdTemplate": { "const": "{runId}:{testId}" },
+        "experimentNameTemplate": { "const": "Stage 5 {runId} {testId}" },
+        "experimentIdentity": { "const": "unique_per_test" },
+        "monitorIsolation": { "const": "fresh_per_test" }
+      }
+    },
+    "cleanupProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "baselineScope", "digestAlgorithm", "restoreInFinally", "verifySourceDigest", "verifyUnrelatedRowsDigest", "verifyMonitorIsolation", "artifactPathTemplate"],
+      "properties": {
+        "strategy": { "const": "snapshot_replay" },
+        "baselineScope": { "const": "natural_keys_created_descendants_and_unrelated_digest" },
+        "digestAlgorithm": { "const": "sha256_full_rows" },
+        "restoreInFinally": { "const": true },
+        "verifySourceDigest": { "const": true },
+        "verifyUnrelatedRowsDigest": { "const": true },
+        "verifyMonitorIsolation": { "const": true },
+        "artifactPathTemplate": { "const": "local-data/test-database/evidence/stage5/{runId}/{testId}/cleanup.json" }
+      }
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isolated_per_test", "restore_verified"],
+      "properties": {
+        "isolated_per_test": { "$ref": "#/$defs/experimentProfile" },
+        "restore_verified": { "$ref": "#/$defs/cleanupProfile" }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["testId", "group", "fixtureIdentity", "dependencyTestIds", "source", "actions", "experimentProfile", "cleanupProfile"],
+      "properties": {
+        "testId": { "$ref": "#/$defs/testId" },
+        "group": { "enum": ["shared", "A02", "A03", "A05"] },
+        "fixtureIdentity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["contractId", "fixtureVersion", "sourceRevision"],
+          "properties": {
+            "contractId": { "$ref": "#/$defs/identifier" },
+            "fixtureVersion": { "const": "1.0.0" },
+            "sourceRevision": { "$ref": "#/$defs/nonEmptyString" }
+          }
+        },
+        "dependencyTestIds": { "type": "array", "maxItems": 0 },
+        "executionLanes": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "monitorIsolation"],
+            "properties": { "id": { "$ref": "#/$defs/identifier" }, "monitorIsolation": { "const": "fresh_per_lane" } }
+          }
+        },
+        "source": { "oneOf": [{ "$ref": "#/$defs/sourceRequired" }, { "$ref": "#/$defs/sourceNotApplicable" }] },
+        "actions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/action" } },
+        "experimentProfile": { "const": "isolated_per_test" },
+        "cleanupProfile": { "const": "restore_verified" }
+      }
+    }
+  }
+}
