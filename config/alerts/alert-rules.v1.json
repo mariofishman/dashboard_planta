@@ -137,7 +137,7 @@
       "productionDependencies": ["Tolerance and verified-weight treatment"]
     },
     {
-      "code": "B01", "title": "OT started outside latest approved plan sequence", "ruleVersion": "1.0.0",
+      "code": "B01", "title": "OT started outside latest approved plan sequence", "ruleVersion": "1.0.1",
       "queryId": "b01-plan-sequence-deviation", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId"], "classification": ["deterministic"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
@@ -149,9 +149,9 @@
       "parameters": {},
       "predicate": {"all":[{"var":"actualStarted"},{"ne":[{"var":"workOrderId"},{"var":"nextApprovedWorkOrderId"}]},{"not":{"var":"sequenceUpdatedBeforeStart"}}]},
       "reasonRules": [{"code":"outside_approved_sequence","when":{"ne":[{"var":"workOrderId"},{"var":"nextApprovedWorkOrderId"}]}}],
-      "resolution": "The current plan is updated with the valid sequence and reason.",
+      "resolution": "A valid late sequence update with a reason resolves the incident while preserving the original deviation and update audit evidence; unreconstructable history requires administrative closure without resolution.",
       "correlations": ["Link material or machine incidents that explain the deviation."],
-      "productionDependencies": ["Latest approved plan source"]
+      "productionDependencies": ["Latest approved plan source and EmusaSoft validity mapping"]
     },
     {
       "code": "B02", "title": "Planned OT has not started on time", "ruleVersion": "1.0.0",

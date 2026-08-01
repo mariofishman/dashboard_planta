@@ -223,6 +223,10 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 **Primary action owner:** **Operation shift supervisor**, who must confirm the valid sequence and ensure any floor resequencing is recorded. The machine operator remains an implicated recipient because that operator started the OT.
 
+**Resolution:** If the valid sequence and its reason are recorded after the OT has already started, resolve B01 as explained. Preserve the originally expected OT, the OT that actually started, the start time, and the later update's actor, timestamp, and reason in incident history; the late update must not rewrite the original deviation. If the historical sequence and reason cannot be reconstructed safely, an administrator closes the incident without resolution under the shared administrative-closure rules.
+
+**EmusaSoft ownership boundary:** EmusaSoft determines who is authorized to change its production plan and whether a recorded change is valid. Monitor consumes the resulting approved-plan evidence; it does not define or enforce EmusaSoft plan-edit permissions. The current approved-plan source and validity mapping remain pending source-contract validation.
+
 
 ### B02 — Planned OT has not started on time
 
