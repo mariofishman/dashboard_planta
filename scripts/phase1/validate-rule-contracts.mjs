@@ -47,6 +47,7 @@ function evaluate(expression, input, parameters) {
     case "add": return values.reduce((total, value) => total + Number(value), 0);
     case "sub": return Number(values[0]) - Number(values[1]);
     case "mul": return values.reduce((total, value) => total * Number(value), 1);
+    case "min": return Math.min(...values.map(Number));
     case "div": {
       if (Number(values[1]) === 0) fail("division by zero");
       return Number(values[0]) / Number(values[1]);

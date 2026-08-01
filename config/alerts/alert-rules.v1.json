@@ -241,21 +241,30 @@
       "productionDependencies": ["Complete pause evidence, units, and segmented historical range"]
     },
     {
-      "code": "D01", "title": "Declared meters exceed consumed-reel meters", "ruleVersion": "1.0.0",
-      "queryId": "d01-declared-meters-over-input", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
+      "code": "D01", "title": "Declared meters exceed consumed-reel meters", "ruleVersion": "1.1.0",
+      "queryId": "d01-declared-meters-over-input", "queryVersion": "1.1.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId"], "classification": ["deterministic", "physical"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
-        {"source":"ordenes_trabajo","fields":["id","material_metro_lineal_total_consumo","tolerancia_bobina"],"evidence":"backup-confirmed"},
-        {"source":"consumed_reel_conversion_contract","fields":["weightKg","widthM","grammageGM2","estimatedMeters"],"evidence":"phase10-pending"}
+        {"source":"ordenes_trabajo","fields":["id","fecha_fin_ejecucion"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_salidas","fields":["id","id_orden_trabajo","metros_lineales_resultantes","ancho_bobina","gramaje","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_materiales","fields":["id","id_orden_trabajo","id_serial_articulo","ancho_bobina","gramaje","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"articulo_serial","fields":["id","peso_tara","peso_neto","factor_tara"],"evidence":"backup-confirmed"},
+        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_bruto","peso_tara","peso_neto","tipo_registro","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"balanza_cargas","fields":["id_tara_tuco","peso_tuco"],"evidence":"backup-confirmed"},
+        {"source":"balanza_carga_taras","fields":["id","tipo","peso","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"d01_consumed_reel_measurement_contract","fields":["materialRequirementId","initialGrossKg","coreTareKg","remnantGrossKg","widthM","grammageGM2"],"evidence":"phase10-pending"}
       ],
-      "requiredEvidence": ["workOrderId","consumedReelMeters","declaredRunMeters","toleranceMeters"],
-      "parameters": {},
-      "predicate": {"gt":[{"sub":[{"var":"declaredRunMeters"},{"var":"consumedReelMeters"}]},{"var":"toleranceMeters"}]},
-      "reasonRules": [{"code":"declared_meters_exceed_input","when":{"gt":[{"sub":[{"var":"declaredRunMeters"},{"var":"consumedReelMeters"}]},{"var":"toleranceMeters"}]}}],
-      "resolution": "Corrected run meters or consumption evidence falls within tolerance.",
+      "requiredEvidence": ["workOrderId","closed","declaredRunMeters","consumedLayerMeters","totalOrderKg"],
+      "parameters": {
+        "toleranceFraction":{"value":0.05,"unit":"fraction of theoretical order kg","status":"approved"},
+        "toleranceCapKg":{"value":150,"unit":"kg","status":"approved"}
+      },
+      "predicate": {"all":[{"var":"closed"},{"gt":[{"sub":[{"var":"declaredRunMeters"},{"var":"consumedLayerMeters"}]},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]}]},
+      "reasonRules": [{"code":"declared_meters_exceed_input","when":{"all":[{"var":"closed"},{"gt":[{"sub":[{"var":"declaredRunMeters"},{"var":"consumedLayerMeters"}]},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]}]}}],
+      "resolution": "Every required substrate layer has complete weight evidence and supports declared closure meters within the approved kilogram-derived tolerance.",
       "correlations": ["D01 is a specific cause that suppresses duplicate D03."],
-      "productionDependencies": ["Reel-to-meter formula, core treatment, units, and tolerance"]
+      "productionDependencies": ["Verified gross-weight, core-tare, weighed-remnant, layer, width, grammage, and closure mappings; current bounded query validation"]
     },
     {
       "code": "D02", "title": "Completed OT has delivered reserved reels unconsumed", "ruleVersion": "1.0.0",

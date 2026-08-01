@@ -26,7 +26,7 @@
 | C01 | Physical + statistical | Article serial | Weight, bounds, sample size | Scale record; kilograms | Fixture proven; model segmentation pending |
 | C02 | Statistical | OT | Waste weight, bounds, sample size | OT closure/latest waste weight; kilograms | Fixture proven; baseline version pending |
 | C06 | Physical + statistical | OT | Output, effective runtime, rate bounds | OT execution interval; meters/minute | Fixture proven; pause completeness pending |
-| D01 | Deterministic + physical | OT | Consumed-reel meters, run meters, tolerance | OT closure; meters | Fixture proven; conversion formula pending |
+| D01 | Deterministic + physical | OT | Closure, declared outputs, per-layer gross/core or weighed-remnant evidence, width, grammage, approved tolerance | OT closure; kilograms and meters | Formula, layer isolation, and tolerance proven standalone; connected mappings pending |
 | D02 | Deterministic | OT + article serial | Full completion, delivery, consumption, truncation | OT completion | Fixture proven; full-completion criterion pending |
 | D03 | Deterministic + statistical + physical | OT | Input, output, waste, specific-cause state | OT closure/latest weight; kilograms | Fixture proven; verified/estimated policy pending |
 | D04 | Deterministic + physical | OT | Consumed, run and remnant meters, tolerance | OT closure; meters | Fixture proven; remnant conversion pending |
@@ -41,7 +41,7 @@
 - A06 uses a provisional 30-minute waste-weighing interval only for local fixtures. The production interval remains configurable and pending confirmation.
 - A07 fixtures supply an effective tolerance and do not decide whether estimated evidence is strong enough for a production `Error` label.
 - B01 uses a mock latest-approved-plan record. No production plan-version source is inferred.
-- D01 fixtures supply already-normalized consumed-reel meters and tolerance. Core weight and conversion rules remain pending.
+- The Phase 1 D01 JSON fixtures supply normalized per-layer consumed meters and theoretical order kilograms. The Phase 7 standalone laboratory proves the approved gross/core or weighed-remnant conversion, per-layer isolation, and kilogram-derived tolerance with controlled fixtures; connected source semantics and joins remain pending.
 - E02–E04 use opening, recorded-addition, and ending values supplied by fixtures. Mutable current inventory is not accepted as a substitute. Phase 10 will verify deployed snapshot capture and correction behavior.
 - A01, B02, B03, C01, C02, C06, D02, D03, D04, and E01 also retain the production dependencies named in their contracts. Local fixtures prove rule behavior, not ERP availability.
 

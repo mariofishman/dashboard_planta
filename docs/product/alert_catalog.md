@@ -332,9 +332,21 @@ These rules detect values that are possible to enter but inconsistent with physi
 | Possible causes | Missing consumption declaration, incorrect run meters, incorrect reel data, or incorrect closure. |
 | Example | Consumed reels support approximately 30,000 m, but the operator declares 40,000 m. |
 
-**Detection indicators and algorithm:** Estimate meters in every consumed reel from weight, width, and basis weight. Sum them and compare them with declared run meters. Alert when the difference exceeds the configured tolerance. This is the primary closure rule.
+**Detection indicators and algorithm:** Estimate meters in every consumed reel from weight, width, and basis weight. Sum sequential reels only within the same required substrate layer and compare each layer with declared run meters. Alert when a layer's difference exceeds the configured tolerance. This is the primary closure rule.
+
+Evaluate each required substrate layer independently. Reels consumed sequentially for the same layer may be summed, but meters from different layers must never be combined. Keep one OT-level D01 incident and identify every deficient layer in its evidence.
+
+For a fully consumed reel, calculate `net consumed kg = measured gross kg - verified core tare kg`. The source schema contains core-tare candidates, but a connected source contract must still prove the applicable value and its relationship to each consumed reel. If the core tare is missing or invalid, evidence for that layer is insufficient. For a partially consumed reel with a weighed remnant, calculate `net consumed kg = initial gross kg - remnant gross kg`; the same core remains in both measurements and cancels. If the remnant has not been weighed, the exact consumption is unknown and D01 is insufficient rather than triggered or cleared. Do not substitute an unverified declared linear-meter value for missing weight evidence.
+
+Convert each reel's net consumed mass to meters using `consumed meters = net consumed kg / (width m × grammage kg/m²)`, equivalent to `net consumed kg × 1000 / (width m × grammage g/m²)`. Width and grammage must be positive and normalized before evaluation.
+
+At closure, calculate theoretical order mass from the declared outputs without waiting for produced reels to be weighed: `total order kg = Σ(declared output meters × output width m × output grammage g/m² / 1000)`. Calculate `allowed kg = min(0.05 × total order kg, 150 kg)` and convert it to output-equivalent meters using `allowed meters = allowed kg / (total order kg / total declared output meters)`. The `0.05` fraction and `150 kg` cap are approved configurable parameters. A layer triggers only when `declared output meters - consumed layer meters > allowed meters`; equality is within tolerance.
+
+Missing, invalid, incomplete, or unweighed evidence is insufficient and must preserve an existing occurrence. A later healthy complete evaluation resolves the occurrence when every required layer is within tolerance. A later recurrence after a proved clear interval creates a new occurrence. D01 is the specific deterministic explanation for its meter gap and suppresses a duplicate D03 incident for the same OT while preserving the D03 correlation.
 
 **Primary action owner:** **machine operator**.
+
+**Resolution:** Weigh the partial remnant when one exists, add missing consumption, or correct gross weight, core tare, width, grammage, declared output meters, or output dimensions in EmusaSoft. If locked history cannot be reconstructed safely, an administrator closes without resolution with the final deficient layers, meter gap, kilogram tolerance, source references, mandatory reason and comment, actor, timestamp, and frozen evidence. Administrative closure suppresses only the same uninterrupted condition.
 
 
 ### D02 — Completed OT has delivered reserved reels unconsumed

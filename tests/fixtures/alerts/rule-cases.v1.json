@@ -53,9 +53,9 @@
     {"id":"C06-clear","ruleCode":"C06","input":{"workOrderId":306,"outputMeters":2500,"effectiveRuntimeMinutes":10,"minimumMetersPerMinute":100,"maximumMetersPerMinute":400},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"C06-insufficient","ruleCode":"C06","input":{"workOrderId":306,"outputMeters":12000,"minimumMetersPerMinute":100,"maximumMetersPerMinute":400},"expectedStatus":"insufficient","expectedReasons":[]},
 
-    {"id":"D01-trigger","ruleCode":"D01","input":{"workOrderId":401,"consumedReelMeters":30000,"declaredRunMeters":40000,"toleranceMeters":500},"expectedStatus":"triggered","expectedReasons":["declared_meters_exceed_input"]},
-    {"id":"D01-clear","ruleCode":"D01","input":{"workOrderId":401,"consumedReelMeters":30000,"declaredRunMeters":30300,"toleranceMeters":500},"expectedStatus":"clear","expectedReasons":[]},
-    {"id":"D01-insufficient","ruleCode":"D01","input":{"workOrderId":401,"consumedReelMeters":30000,"declaredRunMeters":40000},"expectedStatus":"insufficient","expectedReasons":[]},
+    {"id":"D01-trigger","ruleCode":"D01","input":{"workOrderId":401,"closed":true,"declaredRunMeters":40000,"consumedLayerMeters":37000,"totalOrderKg":1200},"expectedStatus":"triggered","expectedReasons":["declared_meters_exceed_input"]},
+    {"id":"D01-clear-at-tolerance","ruleCode":"D01","input":{"workOrderId":401,"closed":true,"declaredRunMeters":40000,"consumedLayerMeters":38000,"totalOrderKg":1200},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"D01-insufficient","ruleCode":"D01","input":{"workOrderId":401,"closed":true,"declaredRunMeters":40000,"consumedLayerMeters":37000},"expectedStatus":"insufficient","expectedReasons":[]},
 
     {"id":"D02-trigger","ruleCode":"D02","input":{"workOrderId":402,"articleSerialId":42,"fullProductionCompleted":true,"reservedReelDelivered":true,"reelConsumed":false,"truncated":false},"expectedStatus":"triggered","expectedReasons":["delivered_reel_unconsumed"]},
     {"id":"D02-clear","ruleCode":"D02","input":{"workOrderId":402,"articleSerialId":42,"fullProductionCompleted":true,"reservedReelDelivered":true,"reelConsumed":true,"truncated":false},"expectedStatus":"clear","expectedReasons":[]},

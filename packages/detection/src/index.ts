@@ -1,4 +1,5 @@
 export * from "./adapters.js";
+export * from "./d01-laboratory.js";
 export * from "./freshness.js";
 export * from "./local-registry.js";
 export * from "./repository.js";
