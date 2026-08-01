@@ -1,17 +1,17 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://monitor.emusa.dev/contracts/alert-rules/1.0.0",
-  "title": "Monitor Phase 1 alert-rule catalog",
+  "title": "Monitor active alert-rule catalog",
   "type": "object",
   "additionalProperties": false,
   "required": ["contractVersion", "catalogRevision", "rules"],
   "properties": {
     "contractVersion": { "const": "1.0.0" },
-    "catalogRevision": { "const": "2026-07-31" },
+    "catalogRevision": { "const": "2026-08-01" },
     "rules": {
       "type": "array",
-      "minItems": 21,
-      "maxItems": 21,
+      "minItems": 20,
+      "maxItems": 20,
       "items": { "$ref": "#/$defs/rule" }
     }
   },

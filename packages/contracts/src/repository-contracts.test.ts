@@ -81,7 +81,7 @@ test("implemented alert contracts validate and reproduce all fixtures", async ()
   const validate = ajv.compile(schema);
 
   assert.equal(validate(catalog), true, JSON.stringify(validate.errors));
-  assert.equal(catalog.rules.length, 21);
+  assert.equal(catalog.rules.length, 20);
 
   const output = execFileSync(
     process.execPath,
@@ -99,8 +99,8 @@ test("implemented alert contracts validate and reproduce all fixtures", async ()
     },
     {
       result: "pass",
-      rules: 21,
-      fixtures: 63,
+      rules: 20,
+      fixtures: 65,
       statusesPerRule: ["triggered", "clear", "insufficient"],
       localQueryProven: ["A02", "A05"],
     },
@@ -128,6 +128,6 @@ test("backup-confirmed fields match the protected local schema", async (context)
   const result = JSON.parse(output);
   assert.deepEqual(
     { result: result.result, tables: result.tables, fields: result.fields, dataRowsPrinted: result.dataRowsPrinted },
-    { result: "pass", tables: 20, fields: 104, dataRowsPrinted: 0 },
+    { result: "pass", tables: 20, fields: 101, dataRowsPrinted: 0 },
   );
 });

@@ -9,7 +9,25 @@ interface RuleContract {
   naturalKey: string[];
   requiredEvidence: string[];
 }
-interface FixtureCase { ruleCode: string; input: Record<string, unknown>; expectedStatus: string }
+interface FixtureCase {
+  id: string;
+  ruleCode: string;
+  input: Record<string, unknown>;
+  expectedStatus: string;
+  registryCanonical?: boolean;
+}
+
+function canonicalTriggeredFixture(ruleCode: string, cases: FixtureCase[]): FixtureCase {
+  const triggered = cases.filter(
+    (fixture) => fixture.ruleCode === ruleCode && fixture.expectedStatus === "triggered",
+  );
+  if (triggered.length === 1) return triggered[0]!;
+  const canonical = triggered.filter((fixture) => fixture.registryCanonical === true);
+  if (canonical.length !== 1) {
+    throw new Error(`${ruleCode} requires exactly one registry canonical trigger fixture`);
+  }
+  return canonical[0]!;
+}
 
 export async function loadFixtureRegistry(catalogPath: string, fixturesPath: string): Promise<Array<{
   query: DetectionQueryDefinition;
@@ -18,7 +36,8 @@ export async function loadFixtureRegistry(catalogPath: string, fixturesPath: str
   const catalog = JSON.parse(await readFile(catalogPath, "utf8")) as { rules: RuleContract[] };
   const fixtures = JSON.parse(await readFile(fixturesPath, "utf8")) as { cases: FixtureCase[] };
   return catalog.rules.map((rule) => {
-    const triggered = fixtures.cases.filter((fixture) => fixture.ruleCode === rule.code && fixture.expectedStatus === "triggered").map((fixture) => fixture.input);
+    const triggeredFixture = canonicalTriggeredFixture(rule.code, fixtures.cases);
+    const triggered = [triggeredFixture.input];
     return {
       query: {
         queryId: rule.queryId,

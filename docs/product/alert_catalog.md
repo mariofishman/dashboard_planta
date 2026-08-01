@@ -60,10 +60,9 @@ For the A01 exception described during review, material may have been physically
 | C01 | Reweigh and correct unit, barcode, or scale association. Close a verified exceptional reel without resolution while preserving both measurements. |
 | C02 | Reweigh or correct the waste category/unit. Close verified exceptional waste without resolution rather than changing a correct value to fit the model. |
 | C06 | Correct production quantity, OT timing, or missing pauses. Close a verified exceptional rate without resolution with its evidence and model version. |
-| D01 | Add missing consumption or correct meters/reel data. If the locked history cannot be recovered, close without resolution with the remaining meter difference. |
+| D01 | Add missing consumption, weigh a declared remnant, or correct run, layer, reel, weight, width, or grammage evidence. If locked history cannot be recovered, close without resolution with the remaining layer and pairwise meter differences. |
 | D02 | Declare consumed material, return/reassign unused material, or correct completion/reservation. Preserve an unproven reel disposition as an inventory exception. |
 | D03 | Resolve the specific upstream cause and recalculate. Close an unreconstructable or accepted residual gap without resolution with final gap, tolerance, evidence, and linked incidents. |
-| D04 | Declare, weigh, label, and return the remnant reel or correct run-meter and reel data. If locked history cannot be reconstructed, close without resolution and preserve the discrepancy for EmusaSoft follow-up outside Monitor. |
 | E01 | Replenish safety stock, use an approved substitute, or reschedule/cancel. Close a passed historical readiness window without resolution and record whether production continued. |
 | E02 | Capture starting quantities or reconstruct them only from traceable records. Otherwise close without resolution and link E03/E04/D03. |
 | E03 | Correct closing/opening quantity or the missing intervening movement. If neither side is provable, close without resolution for the OT pair and preserve the difference. |
@@ -320,33 +319,47 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ## D — Work-order closure and material balance
 
-### D01 — Declared meters exceed consumed-reel meters
+### D01 — OT longitudinal meters and substrate layers do not close
 
 **Alert label:** Error
 **Confirmed:** Yes
 
 | Field | Definition |
 |---|---|
-| When it happens | At closure, declared run meters materially exceed the estimated meters provided by consumed reels. |
-| Why the alert exists | The declared production cannot be explained by recorded consumption. |
-| Possible causes | Missing consumption declaration, incorrect run meters, incorrect reel data, or incorrect closure. |
-| Example | Consumed reels support approximately 30,000 m, but the operator declares 40,000 m. |
+| When it happens | At OT closure, declared run meters and the used meters of every required substrate layer do not agree within tolerance, or required layers disagree with one another. |
+| Why the alert exists | Every required substrate layer should represent the same longitudinal production run. A material discrepancy means the closure evidence is internally inconsistent. |
+| Possible causes | Missing or excess consumption declaration, incorrect run meters, incorrect layer or reel association, missing or incorrect remnant evidence, or incorrect weight, core tare, width, or grammage. |
+| Example | The OT declares 40,000 m. One layer supports 37,000 m and another supports 43,000 m. D01 records both signed layer gaps and the layer-to-layer mismatch in one occurrence. |
 
-**Detection indicators and algorithm:** Estimate meters in every consumed reel from weight, width, and basis weight. Sum sequential reels only within the same required substrate layer and compare each layer with declared run meters. Alert when a layer's difference exceeds the configured tolerance. This is the primary closure rule.
+**Detection indicators and algorithm:** D01 is the single deterministic longitudinal closure rule and is evaluated only at OT closure. Estimate meters actually used from every assigned input reel, sum sequential reels only within the same required substrate layer, compare every layer with declared run meters, and compare every pair of required layers. Keep one OT-level occurrence containing every applicable reason and affected layer.
 
-Evaluate each required substrate layer independently. Reels consumed sequentially for the same layer may be summed, but meters from different layers must never be combined. Keep one OT-level D01 incident and identify every deficient layer in its evidence.
+Use neutral business terms: `original usable reel meters` means usable substrate originally present before production; `used layer meters` means meters actually consumed from all reels assigned sequentially to one required layer; `declared run meters` means the OT run meters declared at closure; and `weighed remnant meters` means usable meters remaining on a declared partial reel after weighing. Similar EmusaSoft linear-meter field names do not have verified operational semantics and remain production-mapping dependencies.
 
-For a fully consumed reel, calculate `net consumed kg = measured gross kg - verified core tare kg`. The source schema contains core-tare candidates, but a connected source contract must still prove the applicable value and its relationship to each consumed reel. If the core tare is missing or invalid, evidence for that layer is insufficient. For a partially consumed reel with a weighed remnant, calculate `net consumed kg = initial gross kg - remnant gross kg`; the same core remains in both measurements and cancels. If the remnant has not been weighed, the exact consumption is unknown and D01 is insufficient rather than triggered or cleared. Do not substitute an unverified declared linear-meter value for missing weight evidence.
+Evaluate every required substrate layer independently. Reels used sequentially for the same layer may be summed, but meters from different layers must never be summed into one input total. The same physical reel identity must never contribute to more than one layer in the same OT; a duplicate cross-layer association is insufficient evidence rather than a valid closure result. Every required layer represents the same run and is compared separately with declared run meters and pairwise with every other required layer.
 
-Convert each reel's net consumed mass to meters using `consumed meters = net consumed kg / (width m × grammage kg/m²)`, equivalent to `net consumed kg × 1000 / (width m × grammage g/m²)`. Width and grammage must be positive and normalized before evaluation.
+For a reel with no remnant declared at closure, treat it as fully used and calculate `net used kg = measured initial gross kg - verified core tare kg`; zero remnant meters are implicit. If verified core tare is missing, negative, or not smaller than initial gross weight, evidence for that layer is insufficient. The source schema contains core-tare candidates, but a connected source contract must still prove the applicable value and its relationship to each reel.
 
-At closure, calculate theoretical order mass from the declared outputs without waiting for produced reels to be weighed: `total order kg = Σ(declared output meters × output width m × output grammage g/m² / 1000)`. Calculate `allowed kg = min(0.05 × total order kg, 150 kg)` and convert it to output-equivalent meters using `allowed meters = allowed kg / (total order kg / total declared output meters)`. The `0.05` fraction and `150 kg` cap are approved configurable parameters. A layer triggers only when `declared output meters - consumed layer meters > allowed meters`; equality is within tolerance.
+For a declared partial reel with a weighed remnant, calculate `net used kg = measured initial gross kg - measured remnant gross kg`. The core remains in both measurements and cancels; do not subtract it twice. Equivalently, calculate original usable reel meters from `initial gross kg - verified core tare kg`, calculate weighed remnant meters from `remnant gross kg - the same verified core tare kg`, and subtract the latter from the former. Both paths must agree. Initial and remnant gross weights must be positive, and remnant gross must be smaller than initial gross.
 
-Missing, invalid, incomplete, or unweighed evidence is insufficient and must preserve an existing occurrence. A later healthy complete evaluation resolves the occurrence when every required layer is within tolerance. A later recurrence after a proved clear interval creates a new occurrence. D01 is the specific deterministic explanation for its meter gap and suppresses a duplicate D03 incident for the same OT while preserving the D03 correlation.
+If a remnant is declared but not yet weighed, evidence is incomplete: do not create a new D01 occurrence and do not resolve or change an existing occurrence. Evaluate immediately when the remnant is weighed and all other evidence is complete. A05 independently owns the declared remnant's 30-minute weighing and movement obligations. Do not substitute an unverified stored linear-meter value for missing weight evidence.
+
+Convert each reel's net used mass to meters using `used meters = net used kg / (width m × grammage kg/m²)`, equivalent to `net used kg × 1000 / (width m × grammage g/m²)`. Width and grammage must be positive and normalized before evaluation.
+
+Calculate theoretical order mass from declared outputs without waiting for produced reels to be weighed: `total order kg = Σ(declared output meters × output width m × output grammage g/m² / 1000)`. Calculate `allowed kg = min(0.05 × total order kg, 150 kg)` and `allowed meters = allowed kg / (total order kg / total declared output meters)`. The `0.05` fraction and `150 kg` cap are approved configurable parameters. Use the same allowed meters for all layer-to-run and pairwise comparisons.
+
+D01 triggers when any required layer satisfies `declared run meters - used layer meters > allowed meters`, any layer satisfies `used layer meters - declared run meters > allowed meters`, or any pair satisfies `absolute(used layer A meters - used layer B meters) > allowed meters`. Equality at every tolerance boundary is clear. Pairwise checks are required because two layers may each be within run tolerance in opposite directions while differing from each other beyond tolerance.
+
+Reasons are `declared_meters_exceed_layer_input`, `layer_input_exceeds_declared_meters`, and `substrate_layers_do_not_match`. The former D04 reason `unexplained_consumed_meters` is retired historical metadata, not an active rule reason.
+
+Evidence records declared run meters, theoretical order kilograms, allowed kilograms and meters, every required layer and its used meters, every signed layer-to-run gap, every pairwise gap beyond tolerance, and the contributing reels and measurement path. Missing and invalid fields are reported when evidence is insufficient. Repeated unchanged complete evaluations do not duplicate an occurrence or evidence. Changed complete evidence updates the same open occurrence. A later complete healthy evaluation resolves only when every layer agrees with the run and every other layer within tolerance. Failed, partial, invalid, or insufficient cycles preserve an existing occurrence unchanged. A later recurrence after a proved clear interval creates a new occurrence.
+
+D01 is a specific deterministic explanation. When its evidence explains the same chain, it replaces or enriches generic A04 or D03 evidence and prevents a duplicate incident for the same discrepancy. A04 remains the earlier physical/statistical rewinder-capacity warning, A05 remains the per-reel handling incident, and D03 remains the aggregate OT kilogram balance. Independent A04, A05, or D03 conditions are not suppressed.
 
 **Primary action owner:** **machine operator**.
 
-**Resolution:** Weigh the partial remnant when one exists, add missing consumption, or correct gross weight, core tare, width, grammage, declared output meters, or output dimensions in EmusaSoft. If locked history cannot be reconstructed safely, an administrator closes without resolution with the final deficient layers, meter gap, kilogram tolerance, source references, mandatory reason and comment, actor, timestamp, and frozen evidence. Administrative closure suppresses only the same uninterrupted condition.
+**Resolution:** Weigh a declared partial remnant, add or correct consumption, or correct gross weight, core tare, layer/reel association, width, grammage, declared run meters, or output dimensions in EmusaSoft. If locked history cannot be reconstructed safely, an administrator closes without resolution with mandatory reason, comment, administrator reference, timestamp, and frozen run, layer, reel, signed-gap, pairwise-gap, tolerance, and source evidence. Administrative closure suppresses only the same uninterrupted condition until a healthy clear evaluation expires suppression.
+
+**Consolidation record — 2026-08-01:** D04 was retired from the active catalog and executable inventory because its useful opposite-direction meter check is part of this same invariant. D01 retains its OT natural key and key-schema version; its rule and candidate-query versions change for the expanded predicate and evidence schema. Historical D04 records remain historical and are not production evidence.
 
 
 ### D02 — Completed OT has delivered reserved reels unconsumed
@@ -377,31 +390,13 @@ Missing, invalid, incomplete, or unweighed evidence is insufficient and must pre
 | Possible causes | Undeclared produced reel, undeclared waste, unweighed output, wrong weight, missing consumption, or statistical assumptions that do not fit this OT. |
 | Example | Consumed input is 1,500 kg, good production is 1,300 kg, and waste is 90 kg. The 110 kg gap exceeds the current tolerance of 65 kg, which is 5% of good production. |
 
-**Detection indicators and algorithm:** Calculate `balance gap = consumed input mass - good-output mass - waste mass` and `allowed gap = 0.05 × total good-production mass`. Alert when `absolute balance gap > allowed gap`. Store `0.05` as a configurable parameter so it can change later. Do not subtract an undefined generic process-loss value. Use actual scale weights from `balanza_carga_detalle_registros` when available. For declared but unweighed output, estimate from `articulo_serial`, `orden_trabajo_salidas`, width, grammage, declared linear meters when present, and comparable weighed serials. For missing or unweighed waste, use both the quotation waste matrix (`cotizacion_config_waste`, kilogram ranges and substrate/taxon gaps) and historical waste distributions. Recalculate whenever actual weights arrive. Statistical gaps are possible errors; gaps that remain beyond tolerance after actual weights are available are errors. If evidence identifies a specific `A03`, `A04`, `A05`, `A06`, `D01`, `D02`, or `D04` cause, enrich that incident and suppress a duplicate `D03` alert.
+**Detection indicators and algorithm:** Calculate `balance gap = consumed input mass - good-output mass - waste mass` and `allowed gap = 0.05 × total good-production mass`. Alert when `absolute balance gap > allowed gap`. Store `0.05` as a configurable parameter so it can change later. Do not subtract an undefined generic process-loss value. Use actual scale weights from `balanza_carga_detalle_registros` when available. For declared but unweighed output, estimate from `articulo_serial`, `orden_trabajo_salidas`, width, grammage, declared linear meters when present, and comparable weighed serials. For missing or unweighed waste, use both the quotation waste matrix (`cotizacion_config_waste`, kilogram ranges and substrate/taxon gaps) and historical waste distributions. Recalculate whenever actual weights arrive. Statistical gaps are possible errors; gaps that remain beyond tolerance after actual weights are available are errors. If evidence identifies a specific `A03`, `A04`, `A05`, `A06`, `D01`, or `D02` cause, enrich that incident and suppress a duplicate `D03` alert only for the same evidence chain.
 
 **Primary action owner:** When a specific linked alert explains the gap, inherit that alert's deterministic owner. Otherwise, missing or incorrect OT declarations → **machine operator**; suspected weighing evidence → **Process operator**.
 
-### D04 — Consumed-reel meters exceed declared meters
-
-**Alert label:** Error
-
-| Field | Definition |
-|---|---|
-| When it happens | At OT closure, consumed-reel meters exceed declared run meters plus the meters represented by any declared remnant reels beyond the configured tolerance. |
-| Why the alert exists | The excess material must be explained. It may still exist physically as a partially consumed remnant reel that must return to inventory. |
-| Possible causes | Undeclared remnant reel, incorrect run meters, incorrect consumed-reel weight, width, or grammage, or an unrecorded warehouse return. |
-| Example | A consumed reel supports 10,000 m, but the OT declares 5,000 run meters and no remnant. The remaining equivalent of 5,000 m should exist as a declared, weighed, labeled, and returned remnant reel. |
-
-**Detection indicators and algorithm:** Calculate `unexplained meters = consumed-reel meters - declared run meters - declared remnant-reel meters`. Alert when unexplained meters exceed the configured tolerance. Estimate remnant meters from its measured kilograms, width, and grammage. Link A04 when the remnant declaration is missing and A05 when the declared remnant is not weighed or moved; do not create duplicate incidents.
-
-**Primary action owner:** Missing remnant declaration or incorrect run meters → **machine operator**. A declared remnant that is not weighed or moved inherits A05 and routes to the **Process operator**.
-
-**Resolution:** Declare the remnant reel, record its remaining kilograms, weigh it, print or attach its identifying label, and return it to the raw-material warehouse. Otherwise correct run meters or reel data. If the OT is locked and the history cannot be reconstructed, close without resolution and preserve the discrepancy for EmusaSoft follow-up outside Monitor.
-
-
 ## E — Extrusion and Exlam resin-container alerts
 
-Every E01–E05 rule applies to both Extrusion and Exlam. Both operations use resin recipes and material containers. Operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients. Each container holds one specific resin used by the current OT. Separately, every applicable machine has a machine-specific safety warehouse holding resin for current and near-term orders. General output handling, weighing, movement, rate, and aggregate closure still use A04/A05, C06, D03, and D04. E04 is separate because resin proportions can be wrong even when total mass balances. E05 is a hard same-OT container invariant that prevents negative calculated consumption from contaminating E04 or D03.
+Every E01–E05 rule applies to both Extrusion and Exlam. Both operations use resin recipes and material containers. Operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients. Each container holds one specific resin used by the current OT. Separately, every applicable machine has a machine-specific safety warehouse holding resin for current and near-term orders. General output handling, weighing, movement, rate, and aggregate closure still use A04/A05, C06, consolidated D01, and D03. E04 is separate because resin proportions can be wrong even when total mass balances. E05 is a hard same-OT container invariant that prevents negative calculated consumption from contaminating E04 or D03.
 
 ### E01 — Required extrusion safety inventory is incomplete
 

@@ -309,8 +309,8 @@ describe("Phase 2 platform foundation", () => {
     });
     assert.equal(response.statusCode, 200);
     assert.equal(response.json().productionConnected, false);
-    assert.equal(response.json().sources.length, 21);
-    assert.equal(response.json().sources.filter((source: { status: string }) => source.status === "healthy").length, 21);
+    assert.equal(response.json().sources.length, 20);
+    assert.equal(response.json().sources.filter((source: { status: string }) => source.status === "healthy").length, 20);
   });
 
   it("serves the seeded Phase 4 incident dashboard and evidence detail", async () => {
