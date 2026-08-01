@@ -27,7 +27,7 @@
 | C02 | Statistical | OT | Waste weight, bounds, sample size | OT closure/latest waste weight; kilograms | Fixture proven; baseline version pending |
 | C06 | Physical + statistical | OT | Output, effective runtime, rate bounds | OT execution interval; meters/minute | Fixture proven; pause completeness pending |
 | D01 | Deterministic + physical | OT | Consumed-reel meters, run meters, tolerance | OT closure; meters | Fixture proven; conversion formula pending |
-| D02 | Deterministic | OT + article serial | Full completion, delivery, consumption, truncation | OT completion | Fixture proven; full-completion criterion pending |
+| D02 | Deterministic | OT + article serial | Closed OT, planned and good-output quantities in one unit, delivery, positive consumption, return/reassignment | OT completion; production quantity ratio | Fixture proven; 90% criterion approved, actual good-output and closure-reason mappings pending |
 | D03 | Deterministic + statistical + physical | OT | Input, output, waste, specific-cause state | OT closure/latest weight; kilograms | Fixture proven; verified/estimated policy pending |
 | D04 | Deterministic + physical | OT | Consumed, run and remnant meters, tolerance | OT closure; meters | Fixture proven; remnant conversion pending |
 | E01 | Deadline + deterministic | OT + article | Warehouse mapping, start horizon, stock, four-hour demand | Planned start; minutes, hours, kilograms | Fixture proven; stock mapping pending |
@@ -43,7 +43,7 @@
 - B01 uses a mock latest-approved-plan record. No production plan-version source is inferred.
 - D01 fixtures supply already-normalized consumed-reel meters and tolerance. Core weight and conversion rules remain pending.
 - E02–E04 use opening, recorded-addition, and ending values supplied by fixtures. Mutable current inventory is not accepted as a substitute. Phase 10 will verify deployed snapshot capture and correction behavior.
-- A01, B02, B03, C01, C02, C06, D02, D03, D04, and E01 also retain the production dependencies named in their contracts. Local fixtures prove rule behavior, not ERP availability.
+- A01, B02, B03, C01, C02, C06, D02, D03, D04, and E01 also retain the production dependencies named in their contracts. D02 does not treat `motivo_cierre` as complete-versus-truncated evidence because its values and operator provenance are unverified. Local fixtures prove rule behavior, not ERP availability.
 
 ## Exclusions
 
