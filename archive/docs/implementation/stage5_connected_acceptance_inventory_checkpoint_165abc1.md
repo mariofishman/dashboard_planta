@@ -1,9 +1,11 @@
+> **Archive provenance:** Preserved from commit `165abc1`, original path `docs/delivery/phases/phase6/stage5_connected_acceptance_inventory.md`. The completion claim below describes the historical checkpoint and is not accepted current Stage 5 authority or evidence.
+
 # Phase 6 Stage 5 — Connected acceptance inventory
 
 **Status:** Complete — 34/34 passed twice on 2026-08-01
 
-**Executable manifest:** [`../../../../config/detection/stage5-connected-acceptance.v1.json`](../../../../config/detection/stage5-connected-acceptance.v1.json)
-**Source authority:** [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md)
+**Executable manifest:** [`../../../../config/detection/stage5-connected-acceptance.v1.json`](../../../config/detection/stage5-connected-acceptance.v1.json)
+**Source authority:** [`alertas_fake_v2_edge_case_test_report_v2.md`](../../../docs/delivery/phases/phase6/alertas_fake_v2_edge_case_test_report_v2.md)
 **Acceptance set:** 34 user-approved Stage 2 tests
 
 Every row below preserves the approved Stage 2 intent and expected outcome while replacing browser-local synthetic counters with the connected path:

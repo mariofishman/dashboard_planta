@@ -1,9 +1,11 @@
+> **Archive provenance:** Preserved from commit `165abc1`, original path `docs/delivery/phases/phase6/test_database_stage5_handoff.md`. The claims below describe the historical checkpoint and are not accepted current Stage 5 authority or evidence.
+
 # Phase 6 Stage 5 — test_database handoff
 
 **Status:** Stage 5 connected acceptance passed
 
-**Authority:** [`stage5_connected_acceptance_inventory.md`](./stage5_connected_acceptance_inventory.md)
-**Evidence:** [`stage5_connected_acceptance_report.md`](./stage5_connected_acceptance_report.md)
+**Authority:** [`stage5_connected_acceptance_inventory.md`](./stage5_connected_acceptance_inventory_checkpoint_165abc1.md)
+**Evidence:** [`stage5_connected_acceptance_report.md`](./stage5_connected_acceptance_report_checkpoint_165abc1.md)
 
 ## Delivered
 

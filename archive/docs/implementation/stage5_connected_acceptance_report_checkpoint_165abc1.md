@@ -1,3 +1,5 @@
+> **Archive provenance:** Preserved from commit `165abc1`, original path `docs/delivery/phases/phase6/stage5_connected_acceptance_report.md`. The claims below describe the historical checkpoint and are not accepted current Stage 5 authority or evidence.
+
 # Phase 6 Stage 5 — Connected acceptance report
 
 **Execution date:** 2026-08-01
@@ -15,7 +17,7 @@ No invalid or deferred recurrence case was substituted. Production Aurora, real 
 
 ## Exact acceptance results
 
-The executable authority is [`../../../../config/detection/stage5-connected-acceptance.v1.json`](../../../../config/detection/stage5-connected-acceptance.v1.json), mapped from the approved definitions in [`stage5_connected_acceptance_inventory.md`](./stage5_connected_acceptance_inventory.md).
+The executable authority is [`../../../../config/detection/stage5-connected-acceptance.v1.json`](../../../config/detection/stage5-connected-acceptance.v1.json), mapped from the approved definitions in [`stage5_connected_acceptance_inventory.md`](./stage5_connected_acceptance_inventory_checkpoint_165abc1.md).
 
 | Corrected official run | Result | Durable local ledger |
 | --- | --- | --- |

@@ -16,7 +16,7 @@
 
 **Open integration register:** [EmusaSoft integration register](integrations/emusasoft/integration_register.md)
 
-**Current execution:** [Phase 6 stage plan](delivery/phases/phase6/README.md) — Stage 6 is next
+**Current execution:** [Stage 5 corrective execution plan](delivery/phases/phase6/stage5_corrective_execution_plan.md)
 
 ## 1. Why Version Three exists
 
@@ -85,7 +85,7 @@ Phase 5 remains complete. Its dynamic routing behavior will receive additional e
 
 ## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-**Status:** In progress. Stages 1–5 are complete. The exact 34 valid tests passed twice through the connected local `test_database` path, routing, Dashboard, conversations, messages, and accepted Chat UI. Stage 6 final audit and simulator retirement remain before the Phase 6 exit gate.
+**Status:** In progress. Stages 1–4 are complete. Stage 5 corrective execution is current under the single linked authority file. Stage 6 remains pending.
 
 **Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 
@@ -229,6 +229,8 @@ E02, E03, and E04 remain disabled in staging and production until ES2-05 proves 
 - performance, recovery, load, fault-injection, and prolonged-downtime testing;
 - Monitor database backup/restore, migration rollback, deployment rollback, and rule kill switches; and
 - operational runbooks and local acceptance evidence.
+
+Phase 9 hardening must also repeat source-boundary isolation across the complete local product, prove no operational dependency on `monitor_sim_*` or browser-local source truth, preserve versioned query and source-action contracts, automate schema-drift comparison, prove that changing source configuration does not require rewriting incident/routing/Dashboard/Chat business logic, and produce a complete rule-promotion matrix.
 
 Phase 9 uses mock identity, `test_database`, protected `backup_database`, and clearly labeled unit fixtures. It does not require production credentials, but it must not rely on synthetic source tables inside Monitor's database.
 
