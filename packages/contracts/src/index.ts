@@ -58,6 +58,46 @@ export const SocketSessionReadySchema = Type.Object({
 }, { additionalProperties: false });
 export type SocketSessionReady = Static<typeof SocketSessionReadySchema>;
 
+export type Stage5BrowserServiceName = "laboratory" | "api" | "scheduler" | "monitor_database" | "dashboard" | "chat";
+export type Stage5BrowserSurfaceName = "laboratory" | "dashboard" | "chat_list" | "chat_detail";
+export interface Stage5BrowserServiceIdentity {
+  name: Stage5BrowserServiceName;
+  instanceId: string;
+  location: string;
+  identityDigest: string;
+}
+export interface Stage5BrowserSurfaceIdentity {
+  name: Stage5BrowserSurfaceName;
+  url: string;
+  identityUrl: string;
+}
+export interface Stage5BrowserRuntimeIdentity {
+  schemaVersion: "1.0.0";
+  kind: "stage5_browser_runtime_identity";
+  identity: {
+    runId: string;
+    experimentId: string;
+    runtimeId: string;
+    captureNonce: string;
+    manifestVersion: string;
+    sourceActionContractVersion: string;
+    startedAt: string;
+  };
+  runtime: {
+    mode: "connected";
+    sourceKind: "test_database";
+    sourceAccount: "monitor_source_ro";
+    apiOrigin: string;
+    webOrigin: string;
+    identityEndpoint: "/api/dev/stage5/runtime-identity";
+    monitorDatabaseInstanceId: string;
+    schedulerOwnerId: string;
+    startedAt: string;
+    services: Stage5BrowserServiceIdentity[];
+    surfaces: Stage5BrowserSurfaceIdentity[];
+  };
+}
+
 const RosterPositionSchema = Type.Union([
   Type.Literal(""),
   Type.Literal("Gerente de fábrica"),

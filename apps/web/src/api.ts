@@ -1,4 +1,4 @@
-import type { RotationCalendarState, RotationException, RotationPattern, RotationPatternSnapshot, RosterAssignment, RosterSnapshot, SessionResponse } from "@monitor/contracts";
+import type { RotationCalendarState, RotationException, RotationPattern, RotationPatternSnapshot, RosterAssignment, RosterSnapshot, SessionResponse, Stage5BrowserRuntimeIdentity } from "@monitor/contracts";
 
 export interface MockIdentitySummary {
   identityId: "monitor-admin" | "plant-manager" | "shift-supervisor" | "machine-operator" | "operation-scheduler";
@@ -156,6 +156,10 @@ export async function sourceDiagnostics(): Promise<{ environment: string; produc
   return responseJson(await fetch("/api/diagnostics/source", { credentials: "include" }));
 }
 
+export async function stage5BrowserRuntimeIdentity(): Promise<Stage5BrowserRuntimeIdentity> {
+  return responseJson<Stage5BrowserRuntimeIdentity>(await fetch("/api/dev/stage5/runtime-identity", { credentials: "include" }));
+}
+
 export async function incidents(filters: { status?: string; operation?: string; search?: string } = {}): Promise<IncidentSummary[]> {
   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value && value !== "all") as [string, string][]);
   return (await responseJson<{ incidents: IncidentSummary[] }>(await fetch(`/api/incidents?${query}`, { credentials: "include" }))).incidents;
@@ -186,7 +190,7 @@ export async function conversations(search = "", before?: string, scope: "mine" 
   return responseJson(await fetch(`/api/conversations?${query}`, { credentials: "include" }));
 }
 
-export async function conversationMessages(id: string, before?: number): Promise<{ messages: ConversationMessage[]; nextCursor: number | null; writableUntil: string | null }> {
+export async function conversationMessages(id: string, before?: number): Promise<{ messages: ConversationMessage[]; nextCursor: number | null; writableUntil: string | null; title: string; participantCount: number; participantNames: string }> {
   const query = before ? `?before=${before}` : "";
   return responseJson(await fetch(`/api/conversations/${id}/messages${query}`, { credentials: "include" }));
 }

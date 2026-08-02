@@ -56,7 +56,7 @@ export class ConversationService {
   ) {}
 
   private async authorize(executor: DatabaseExecutor, conversationId: string, principal: ConversationPrincipal) {
-    const conversation = await executor.queryOne("SELECT id,writable_until FROM monitor_conversation WHERE id=$1", [conversationId]);
+    const conversation = await executor.queryOne("SELECT id,title,writable_until FROM monitor_conversation WHERE id=$1", [conversationId]);
     if (!conversation.id) throw new ConversationForbiddenError("conversation_not_found");
     if (!principal.admin) {
       const participant = await executor.queryOne(`SELECT 1 AS allowed FROM monitor_conversation_participant
@@ -232,6 +232,8 @@ export class ConversationService {
   async messages(conversationId: string, principal: ConversationPrincipal, options: { before?: number; limit?: number } = {}) {
     const conversation = await this.authorize(this.database, conversationId, principal);
     const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+    const participants = await this.database.queryOne(`SELECT COUNT(*)::int AS count,string_agg(display_name,', ' ORDER BY display_name) AS names
+      FROM monitor_conversation_participant WHERE conversation_id=$1 AND removed_at IS NULL`, [conversationId]);
     const rows = await this.database.queryAll(`SELECT id,cursor,sender_sys_user_id AS "senderSysUserId",sender_name AS "senderName",kind,body,payload,
       reply_to_message_id AS "replyToMessageId",sent_at AS "sentAt",edited_at AS "editedAt",deleted_at AS "deletedAt",
       (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=monitor_message.id AND r.delivered_at IS NOT NULL) AS "deliveredCount",
@@ -242,6 +244,9 @@ export class ConversationService {
       messages: rows.slice(0, limit).reverse().map((row) => ({ ...row, payload: json(row.payload) })),
       nextCursor: rows.length > limit ? Number(rows[limit - 1]!.cursor) : null,
       writableUntil: conversation.writable_until ? String(conversation.writable_until) : null,
+      title: String(conversation.title),
+      participantCount: Number(participants.count),
+      participantNames: String(participants.names ?? ""),
     };
   }
 

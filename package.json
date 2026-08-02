@@ -41,7 +41,13 @@
     "validate:phase6-stage5-scheduling": "tsx --test scripts/stage5-scheduling.connected.test.ts",
     "validate:phase6-stage5-recovery": "tsx --test scripts/stage5-recovery.connected.test.ts",
     "validate:phase6-stage5-step7-evidence": "node --test scripts/stage5-step7-evidence.test.mjs",
-    "validate:phase6-stage5-step7": "./scripts/validate-phase6-stage5-step7.sh"
+    "validate:phase6-stage5-step7": "./scripts/validate-phase6-stage5-step7.sh",
+    "validate:phase6-stage5-browser-evidence": "node --test scripts/stage5-browser-evidence.test.mjs",
+    "validate:phase6-stage5-browser-harness": "node --test scripts/stage5-browser-harness.test.mjs && tsx --test apps/api/src/stage5-browser-runtime.test.ts",
+    "validate:phase6-stage5-browser-runtime": "tsx scripts/validate-phase6-stage5-browser-runtime.ts",
+    "validate:phase6-stage5-browser-acceptance": "tsx scripts/run-phase6-stage5-browser-acceptance.ts",
+    "validate:phase6-stage5-step8": "node scripts/validate-phase6-stage5-step8.mjs",
+    "validate:phase6-stage5-step8-adversarial": "node scripts/validate-phase6-stage5-step8-adversarial.mjs"
   },
   "devDependencies": {
     "ajv": "8.20.0",

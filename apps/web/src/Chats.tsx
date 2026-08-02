@@ -59,9 +59,11 @@ import {
   conversations,
   deleteConversationMessage,
   editConversationMessage,
+  incidentDetail,
   markConversationRead,
   sendConversationMessage,
   type ConversationMessage,
+  type IncidentLifecycle,
 } from "./api";
 import {
   UI_ONLY_CONVERSATION_FIXTURES,
@@ -153,23 +155,24 @@ export function ChatList({ session }: { session: SessionResponse }) {
   const chipLimit = alertChipLimit(isVeryNarrow ? 420 : isNarrow ? 760 : 1024);
   const isAdministrator = session.principal.scopes.includes("monitor:admin");
   const scope = conversationScope(isAdministrator);
+  const allowUiOnlyFixtures = import.meta.env.DEV && new URLSearchParams(window.location.search).get("uiFixtures") === "1";
 
   const refresh = useCallback(() => {
     void conversations(search, undefined, scope)
       .then((result) => {
-        setRows(buildConversationRows(result.conversations, import.meta.env.DEV && result.conversations.length === 0));
+        setRows(buildConversationRows(result.conversations, allowUiOnlyFixtures && result.conversations.length === 0));
         setNextCursor(result.nextCursor);
         setShowConnectionWarning(false);
         setState("ready");
       })
       .catch(() => {
-        if (import.meta.env.DEV) {
+        if (allowUiOnlyFixtures) {
           setRows(buildConversationRows([], true));
           setShowConnectionWarning(true);
           setState("ready");
         } else setState("error");
       });
-  }, [scope, search]);
+  }, [allowUiOnlyFixtures, scope, search]);
 
   useEffect(refresh, [refresh]);
   useEffect(() => {
@@ -370,6 +373,8 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
   const [conversationMenuAnchor, setConversationMenuAnchor] = useState<HTMLElement | null>(null);
   const [historySearchOpen, setHistorySearchOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
+  const [conversationMeta, setConversationMeta] = useState<{ title: string; participantCount: number; participantNames: string } | null>(null);
+  const [incidentLifecycles, setIncidentLifecycles] = useState<Record<string, IncidentLifecycle>>({});
   const isMobile = useMediaQuery("(max-width:760px)");
   const socket = useMemo(() => io({ withCredentials: true, autoConnect: false }), []);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
@@ -384,8 +389,9 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
     return readChatPresentationContext(conversationId);
   }, [conversationId]);
   const mockConversation = Boolean(storedContext?.mockOnly || conversationId.startsWith("ui-demo-"));
-  const conversationTitle = storedContext?.title ?? fixtureConversation.title;
-  const participantSummary = storedContext?.participants ?? fixtureConversation.participants;
+  const conversationTitle = mockConversation ? storedContext?.title ?? fixtureConversation.title : conversationMeta?.title ?? storedContext?.title ?? "Conversación";
+  const participantSummary = mockConversation ? storedContext?.participants ?? fixtureConversation.participants
+    : conversationMeta ? `${conversationMeta.participantCount} ${conversationMeta.participantCount === 1 ? "participante" : "participantes"} · ${conversationMeta.participantNames}` : storedContext?.participants ?? "";
   const uiOnlyMessages = useMemo(() => buildUiOnlyMessages(demoPhoto, session.principal.sysUserId, session.principal.displayName), [session.principal.displayName, session.principal.sysUserId]);
 
   const refresh = useCallback(() => {
@@ -394,11 +400,20 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
       setMessages(result.messages);
       setNextMessageCursor(result.nextCursor);
       setReadOnly(Boolean(result.writableUntil && Date.parse(result.writableUntil) <= Date.now()));
+      if (result.title) setConversationMeta({ title: result.title, participantCount: result.participantCount, participantNames: result.participantNames });
+      else {
+        const listed = await conversations("", undefined, conversationScope(session.principal.scopes.includes("monitor:admin")));
+        const summary = listed.conversations.find((item) => item.id === conversationId);
+        if (summary) setConversationMeta({ title: summary.title, participantCount: Number(summary.participantCount ?? 0), participantNames: summary.participantNames ?? "" });
+      }
+      const incidentIds = [...new Set(result.messages.filter((message) => message.kind === "alert" && typeof message.payload.id === "string").map((message) => String(message.payload.id)))];
+      const details = await Promise.all(incidentIds.map((id) => incidentDetail(id)));
+      setIncidentLifecycles(Object.fromEntries(details.map((detail) => [detail.id, detail.lifecycle])));
       setState("ready");
       const latest = result.messages.at(-1)?.cursor;
       if (latest) await markConversationRead(conversationId, latest);
-    }).catch(() => setState(import.meta.env.DEV ? "ready" : "error"));
-  }, [conversationId, mockConversation]);
+    }).catch(() => setState("error"));
+  }, [conversationId, mockConversation, session.principal.scopes]);
   useEffect(refresh, [refresh]);
 
   const flushPending = useCallback(async (items: PendingMessage[]) => {
@@ -419,6 +434,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
     socket.on("connect", () => { void flushPending(readPendingMessages<PendingMessage>(queueKey)); });
     socket.on("message.created", refresh);
     socket.on("message.updated", refresh);
+    socket.on("incident.changed", refresh);
     socket.on("typing", (event: { conversationId: string; sysUserId: number; active: boolean }) => { if (event.conversationId === conversationId) setTypingUsers((current) => event.active ? [...new Set([...current, event.sysUserId])] : current.filter((id) => id !== event.sysUserId)); });
     socket.on("presence", (event: { conversationId: string; sysUserId: number; online: boolean }) => { if (event.conversationId === conversationId) setOnlineUsers((current) => event.online ? [...new Set([...current, event.sysUserId])] : current.filter((id) => id !== event.sysUserId)); });
     socket.connect();
@@ -439,7 +455,9 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
     if (!query) return displayMessages;
     return displayMessages.filter((message) => `${message.senderName} ${textFromMessage(message)}`.toLocaleLowerCase("es-PE").includes(query));
   }, [displayMessages, historySearch]);
-  const alertMessages = useMemo(() => displayMessages.filter((message) => message.kind === "alert" && !message.deletedAt), [displayMessages]);
+  const alertMessages = useMemo(() => displayMessages.filter((message) => message.kind === "alert" && !message.deletedAt
+    && (mockConversation || incidentLifecycles[String(message.payload.id)] === "open")), [displayMessages, incidentLifecycles, mockConversation]);
+  const unavailable = state !== "ready";
 
   useEffect(() => {
     if (state !== "ready") return;
@@ -567,8 +585,8 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
     <AppBar position="static" color="secondary" elevation={0}>
       <Toolbar sx={{ minHeight: "52px !important", gap: 1 }}>
         <IconButton color="inherit" aria-label="Volver a chats" onClick={() => go("/chats")} sx={{ width: 40, height: 40 }}><ArrowBackRounded/></IconButton>
-        <Box minWidth={0} flex={1}><Typography variant="h2" color="inherit" noWrap>{conversationTitle}</Typography><Typography variant="caption" sx={{ color: ui.color.textInverseMuted }} noWrap>{participantSummary}{onlineUsers.length ? ` · ${onlineUsers.length} en línea` : ""}</Typography></Box>
-        <IconButton color="inherit" aria-label="Opciones de la conversación" aria-haspopup="menu" aria-expanded={Boolean(conversationMenuAnchor)} onClick={(event) => setConversationMenuAnchor(event.currentTarget)} sx={{ width: 40, height: 40 }}><MoreVertRounded/></IconButton>
+        <Box minWidth={0} flex={1}><Typography variant="h2" color="inherit" noWrap>{state === "error" ? "Conversación no disponible" : conversationTitle}</Typography>{state !== "error" && <Typography variant="caption" sx={{ color: ui.color.textInverseMuted }} noWrap>{participantSummary}{onlineUsers.length ? ` · ${onlineUsers.length} en línea` : ""}</Typography>}</Box>
+        <IconButton color="inherit" aria-label="Opciones de la conversación" aria-haspopup="menu" aria-expanded={Boolean(conversationMenuAnchor)} disabled={unavailable} onClick={(event) => setConversationMenuAnchor(event.currentTarget)} sx={{ width: 40, height: 40 }}><MoreVertRounded/></IconButton>
       </Toolbar>
     </AppBar>
     <Menu anchorEl={conversationMenuAnchor} open={Boolean(conversationMenuAnchor)} onClose={() => setConversationMenuAnchor(null)}>
@@ -671,11 +689,11 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
           <IconButton aria-label="Quitar adjunto" onClick={() => setAttachment(null)} sx={{ width: 36, height: 36 }}><CloseRounded sx={{ fontSize: 17 }}/></IconButton>
         </Stack>}
         <Stack direction="row" gap={.5} alignItems="center">
-          <Tooltip title="Adjuntar imagen"><IconButton component="label" aria-label="Adjuntar imagen de la galería" disabled={readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><ImageRounded/><input hidden type="file" accept="image/*" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
-          <Tooltip title="Tomar foto"><IconButton component="label" aria-label="Tomar o adjuntar foto" disabled={readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><PhotoCameraRounded/><input hidden type="file" accept="image/*" capture="environment" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
-          <Tooltip title="Adjuntar archivo"><IconButton component="label" aria-label="Adjuntar archivo del dispositivo" disabled={readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><AttachFileRounded/><input hidden type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={(event) => { selectFile(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
-          <TextField inputRef={composerInputRef} fullWidth size="small" value={draft} onChange={(event) => { setDraft(event.target.value); if (!mockConversation) socket.emit("typing", { conversationId, active: Boolean(event.target.value) }); }} placeholder={readOnly ? "Conversación cerrada" : editingMessage ? "Editar mensaje" : attachment ? "Añadir comentario" : "Escribir mensaje"} disabled={readOnly} inputProps={{ "aria-label": "Escribir mensaje" }}/>
-          <IconButton type="submit" color="primary" disabled={readOnly || (!draft.trim() && !attachment) || sending} aria-label={editingMessage ? "Guardar edición" : "Enviar mensaje"} sx={{ width: 44, height: 44 }}><SendRounded/></IconButton>
+          <Tooltip title="Adjuntar imagen"><IconButton component="label" aria-label="Adjuntar imagen de la galería" disabled={unavailable || readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><ImageRounded/><input hidden type="file" accept="image/*" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
+          <Tooltip title="Tomar foto"><IconButton component="label" aria-label="Tomar o adjuntar foto" disabled={unavailable || readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><PhotoCameraRounded/><input hidden type="file" accept="image/*" capture="environment" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
+          <Tooltip title="Adjuntar archivo"><IconButton component="label" aria-label="Adjuntar archivo del dispositivo" disabled={unavailable || readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><AttachFileRounded/><input hidden type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={(event) => { selectFile(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
+          <TextField inputRef={composerInputRef} fullWidth size="small" value={draft} onChange={(event) => { setDraft(event.target.value); if (!mockConversation) socket.emit("typing", { conversationId, active: Boolean(event.target.value) }); }} placeholder={unavailable ? "Conversación no disponible" : readOnly ? "Conversación cerrada" : editingMessage ? "Editar mensaje" : attachment ? "Añadir comentario" : "Escribir mensaje"} disabled={unavailable || readOnly} inputProps={{ "aria-label": "Escribir mensaje" }}/>
+          <IconButton type="submit" color="primary" disabled={unavailable || readOnly || (!draft.trim() && !attachment) || sending} aria-label={editingMessage ? "Guardar edición" : "Enviar mensaje"} sx={{ width: 44, height: 44 }}><SendRounded/></IconButton>
         </Stack>
       </Box>
     </Paper>

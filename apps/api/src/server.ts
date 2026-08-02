@@ -22,6 +22,7 @@ import { rotationRoutes } from "./routes/rotation.js";
 import { RoutingService } from "./routing.js";
 import { TestInterruptionController } from "./test-interruptions.js";
 import { CommittedChangePublisher } from "./publication.js";
+import { createStage5BrowserRuntimeIdentity, type Stage5BrowserRuntimeSeed } from "./stage5-browser-runtime.js";
 
 function cookieValue(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -45,6 +46,11 @@ export interface MonitorServer {
     runtime: ScenarioExperimentRuntime;
     registry: Map<"A02" | "A03" | "A05", { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
     interruptions: TestInterruptionController;
+  };
+  stage5BrowserRuntime?: {
+    activate(seed: Stage5BrowserRuntimeSeed): void;
+    clear(): void;
+    active(): Stage5BrowserRuntimeSeed | null;
   };
   close(): Promise<void>;
 }
@@ -81,6 +87,7 @@ export async function buildMonitorServer(options: {
   identityAdapter?: IdentityAdapter;
   database?: DatabaseRuntime;
   testDatabaseFixtureSeeds?: TestDatabaseFixtureSeeds;
+  stage5BrowserRuntime?: Stage5BrowserRuntimeSeed;
 } = {}): Promise<MonitorServer> {
   const config = loadConfig(options.config);
   const app = Fastify({
@@ -383,6 +390,18 @@ export async function buildMonitorServer(options: {
       registry: scenarioRegistry,
     });
   }
+  if (options.stage5BrowserRuntime && (config.nodeEnv === "production" || config.scenarioSource !== "test_database" || !scenarioRuntime)) throw new Error("stage5_browser_runtime_requires_connected_test_database");
+  let stage5BrowserRuntimeSeed = options.stage5BrowserRuntime ?? null;
+  const stage5BrowserRuntime = scenarioRuntime && config.nodeEnv !== "production" && config.scenarioSource === "test_database" ? {
+    activate(seed: Stage5BrowserRuntimeSeed) { stage5BrowserRuntimeSeed = structuredClone(seed); },
+    clear() { stage5BrowserRuntimeSeed = null; },
+    active() { return stage5BrowserRuntimeSeed ? structuredClone(stage5BrowserRuntimeSeed) : null; },
+  } : undefined;
+  if (stage5BrowserRuntime) app.get("/api/dev/stage5/runtime-identity", { preHandler: app.requireScopes(["monitor:read"]) }, async (request, reply) => {
+    const seed = stage5BrowserRuntime.active();
+    if (!seed) return reply.code(404).send({ error: "stage5_browser_runtime_inactive" });
+    return createStage5BrowserRuntimeIdentity({ seed, database, runtime: scenarioRuntime!, apiOrigin: `${request.protocol}://${request.host}`, webOrigin: config.webOrigin });
+  });
 
   const close = async () => {
     scenarioRuntime?.stop();
@@ -396,5 +415,6 @@ export async function buildMonitorServer(options: {
   return {
     app, io, database, redis, config, close,
     ...(scenarioSource && scenarioRuntime ? { acceptance: { runner: detectionRunner, scheduler: detectionScheduler, source: scenarioSource, runtime: scenarioRuntime, registry: scenarioRegistry, interruptions: testInterruptions } } : {}),
+    ...(stage5BrowserRuntime ? { stage5BrowserRuntime } : {}),
   };
 }
