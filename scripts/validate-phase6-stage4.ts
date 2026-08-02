@@ -1,10 +1,53 @@
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { loadTestDatabaseFixtureSeeds } from "@monitor/detection";
+import { loadTestDatabaseFixtureSeeds, TestDatabaseConnections, TestDatabaseScenarioRepository } from "@monitor/detection";
 import { buildMonitorServer } from "../apps/api/src/server.js";
 
 const repositoryRoot = fileURLToPath(new URL("..", import.meta.url));
 const fixtureSeedIds = await loadTestDatabaseFixtureSeeds(repositoryRoot);
+const sourceConnections = await TestDatabaseConnections.create(repositoryRoot);
+const sourceRepository = await TestDatabaseScenarioRepository.create(sourceConnections, repositoryRoot, fixtureSeedIds);
+const sourceIds = sourceRepository.fixtureIds;
+
+const sourceRow = async (sql: string, parameters: unknown[]) => {
+  const [rows] = await sourceConnections.writer.query(sql, parameters);
+  return { ...((rows as Array<Record<string, unknown>>)[0] ?? {}) };
+};
+const sourceRows = async (sql: string, parameters: unknown[]) => {
+  const [rows] = await sourceConnections.writer.query(sql, parameters);
+  return (rows as Array<Record<string, unknown>>).map((row) => ({ ...row }));
+};
+const restoreRow = async (table: string, row: Record<string, unknown>) => {
+  assert.match(table, /^[a-z_][a-z0-9_]*$/i);
+  assert.ok(Number.isSafeInteger(Number(row.id)));
+  const columns = Object.keys(row).filter((column) => column !== "id");
+  assert.ok(columns.length > 0 && columns.every((column) => /^[a-z_][a-z0-9_]*$/i.test(column)));
+  await sourceConnections.writer.execute(
+    `UPDATE \`${table}\` SET ${columns.map((column) => `\`${column}\`=?`).join(",")} WHERE id=?`,
+    [...columns.map((column) => row[column] as string | number | Date | null), Number(row.id)],
+  );
+};
+const insertRow = async (table: string, row: Record<string, unknown>) => {
+  assert.match(table, /^[a-z_][a-z0-9_]*$/i);
+  const columns = Object.keys(row);
+  assert.ok(columns.length > 0 && columns.every((column) => /^[a-z_][a-z0-9_]*$/i.test(column)));
+  await sourceConnections.writer.execute(
+    `INSERT INTO \`${table}\` (${columns.map((column) => `\`${column}\``).join(",")}) VALUES (${columns.map(() => "?").join(",")})`,
+    columns.map((column) => row[column] as string | number | Date | null),
+  );
+};
+
+const a05WorkOrder = await sourceRow(`SELECT work_order.* FROM ordenes_trabajo work_order
+  JOIN articulo_serial serial ON work_order.id=COALESCE(serial.id_orden_trabajo_origen,serial.id_ultimo_orden_trabajo_cierre)
+  WHERE serial.id=?`, [sourceIds.A05.serialId]);
+const sourceBefore = {
+  a02: await sourceRow("SELECT * FROM flujo_materiales_detalles WHERE id=?", [sourceIds.A02.flowId]),
+  a03WorkOrder: await sourceRow("SELECT * FROM ordenes_trabajo WHERE id=?", [sourceIds.A03.workOrderId]),
+  a03Material: await sourceRow("SELECT * FROM orden_trabajo_materiales WHERE id=?", [sourceIds.A03.materialId]),
+  a05Serial: await sourceRow("SELECT * FROM articulo_serial WHERE id=?", [sourceIds.A05.serialId]),
+  a05WorkOrder,
+  a05Scale: await sourceRows("SELECT * FROM balanza_carga_detalle_registros WHERE id_articulo_serial=? ORDER BY id", [sourceIds.A05.serialId]),
+};
 
 const server = await buildMonitorServer({ config: {
   nodeEnv: "test",
@@ -80,5 +123,15 @@ try {
   assert.deepEqual(diagnostics.map((row) => row.adapterKind), ["test_database", "test_database", "test_database"]);
   console.log("Phase 6 Stage 4 connected source-to-incident validation passed");
 } finally {
-  await server.close();
+  try {
+    await restoreRow("flujo_materiales_detalles", sourceBefore.a02);
+    await restoreRow("ordenes_trabajo", sourceBefore.a03WorkOrder);
+    await restoreRow("orden_trabajo_materiales", sourceBefore.a03Material);
+    await restoreRow("articulo_serial", sourceBefore.a05Serial);
+    await restoreRow("ordenes_trabajo", sourceBefore.a05WorkOrder);
+    await sourceConnections.writer.execute("DELETE FROM balanza_carga_detalle_registros WHERE id_articulo_serial=?", [sourceIds.A05.serialId]);
+    for (const row of sourceBefore.a05Scale) await insertRow("balanza_carga_detalle_registros", row);
+  } finally {
+    await Promise.allSettled([server.close(), sourceConnections.close()]);
+  }
 }

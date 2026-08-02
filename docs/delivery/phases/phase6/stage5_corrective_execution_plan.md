@@ -6,7 +6,7 @@
 
 **Branch:** `codex/phase6-stage5`
 
-**Latest pushed documentation checkpoint:** `d68674c`. The preserved implementation recovery base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
+**Latest pushed recovery checkpoint:** `30ed384`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
 
 **Current Stage 5 status:** In progress. Stage 5 is not accepted, Step 8 is not accepted, and Step 8B has not started.
 
@@ -21,7 +21,7 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 | 1 | Approve Version 2, then separately authorize the documentation-only authority transition. | Complete — Version 1 is archived and Version 2 is the single current plan. |
 | 2 | Complete Recovery 1–2. | Questionable files are classified and active documentation points to the correct laboratory and evidence. |
 | 3 | Complete Recovery 3–4. | The approved V2 laboratory is connected and the obsolete executable workflow cannot be mistaken for current Stage 5 behavior. |
-| 4 | Complete Recovery 5. | Every affected focused check passes and the development baseline is restored. |
+| 4 | Complete Recovery 5. | Complete — every affected focused check passes and the development baseline is independently restored and verified. |
 | 5 | Complete Recovery 6. | New Step 8.2–8.7 evidence passes in one runtime using the approved laboratory. |
 | 6 | Resume the original path at Step 8B. | Complete 8B, 8C, and Steps 9–12 under their separate gates. |
 
@@ -35,9 +35,10 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 6. Complete — Recovery 2.1–2.4 corrected and verified the active documentation on 2026-08-02.
 7. Complete — Recovery 3 connected and reviewed the approved V2 laboratory on 2026-08-02.
 8. Complete — Recovery 4 retired the obsolete executable workflow through five approved units on 2026-08-02.
-9. Next — start `sequential-substep-review` for Recovery 5; do not begin its focused proof or baseline restoration before its split is approved.
+9. Complete — Recovery 5 passed all five calibrated units and independently restored and verified the protected baseline on 2026-08-02.
+10. Next — start `sequential-substep-review` for Recovery 6. Recovery 6 has not started.
 
-Recovery 5 has not started. Recovery 3–4 changes remain uncommitted and unpushed for review.
+Recovery 3–4 is committed and pushed at `30ed384`. Recovery 5 is complete and remains uncommitted and unpushed.
 
 ### What the approval and transition authorization mean
 
@@ -141,8 +142,8 @@ Recommended checkpoints, each requiring explicit approval and never authorizing 
 | Recovery 2 | Complete — 2026-08-02 | Nothing; active status, specification, handoff, path, authority, and evidence wording is corrected and verified. |
 | Recovery 3 | Complete — 2026-08-02 | Nothing; the connected V2 implementation and its focused review sequence are complete. |
 | Recovery 4 | Complete — 2026-08-02 | Nothing; obsolete normal routes, destructive repair, rejected executables, and misleading command bindings are retired or isolated. |
-| Recovery 5 | Not started | Start its own approval-gated `sequential-substep-review`; V2 connection and legacy retirement are complete. |
-| Recovery 6 | Not started | Focused recovery checks pass and baseline is restored. |
+| Recovery 5 | Complete — 2026-08-02 | Nothing; affected focused proof passes and the protected baseline is independently restored and verified. |
+| Recovery 6 | Not started | Nothing technical remains from Recovery 5; begin its separate reviewed execution sequence. |
 | Step 8B | Blocked | New Step 8.2–8.7 run passes. |
 
 ### Recovery 1 — Confirm what is current and what is obsolete
@@ -596,6 +597,28 @@ The nine-unit count is intentional. A smaller split would combine the shared dom
 - Restore and verify the protected development baseline.
 
 **Done when:** Every affected focused check passes and the source baseline is restored. This stage still does not accept Step 8.
+
+#### Approved Recovery 5 substeps
+
+The user preauthorized the complete sequence without the skill's usual split-approval pause. Five units are retained after count calibration. Merging them would combine distinct static, connected-runtime, cross-phase, browser/UI, and destructive-restoration failure boundaries; splitting further would duplicate command ownership without producing a more meaningful independently verifiable result.
+
+1. **Recovery 5a — Prove static and unit contracts.** Run changed web, API, and detection unit suites; Stage 5 declaration, fixture, chain-capture, ledger, browser-harness, and browser-evidence contract tests; and type checks. Exit: changed contracts and evidence foundations pass without relying on connected browser acceptance.
+2. **Recovery 5b — Prove connected source and runtime behavior.** Run the connected chain rehearsal, source isolation, scheduling, and durable recovery suites against the corrected experiment contract. Exit: real source identities, automatic shared-clock polling, isolation, and idempotent recovery pass without obsolete normal routes or destructive repair.
+3. **Recovery 5c — Prove API and cross-phase regressions.** Run the complete API suite plus the affected Phase 5 routing and Phase 6 Stage 4 connected regressions. Exit: V2/API changes preserve conversations, routing, incidents, Dashboard and Chat data paths, and the earlier connected boundary.
+4. **Recovery 5d — Prove the focused V2 browser/UI boundary.** Run focused V2 browser-runtime/harness checks, web tests, production build, static accessibility/responsive/obsolete-control checks, and a clean connected desktop/mobile browser review with console inspection. Exit: the approved V2 surface is usable and clean at representative desktop and mobile sizes; no Step 8 evidence is accepted or reused.
+5. **Recovery 5e — Restore and independently verify the protected baseline.** Reset from the immutable protected dump, then separately run pristine-baseline validation, operational health, driver, and query-plan checks; verify Git diff integrity and the Recovery 5 evidence boundary. Exit: the source baseline is pristine and independently verified, every affected focused check passes, and Recovery 6 remains not started.
+
+**Recovery 5a result:** Complete. Web tests pass 25/25, detection tests pass 25/25, focused changed API tests pass 29/29, declarations pass 11/11, fixture checks pass 17/17 and validate all 34 contracts across 37 lanes, chain-capture tests pass 13/13, ledger checks pass 5/5, browser-harness checks pass 3/3 plus 3/3 runtime tests, browser-evidence checks pass 9/9, and web/API/detection type checks pass. No test was skipped. The adversarial review challenged whether connected-capable source and API tests could be mistaken for Recovery 5's coordinated connected proof; they cannot, because this unit's ledger validator explicitly created only a synthetic dry run and Recovery 5b separately owns connected chain, isolation, scheduling, and recovery behavior. No correction was required.
+
+**Recovery 5b result:** Complete. The connected chain rehearsal passes 1/1, source isolation passes 16/16, shared-clock scheduling passes 9/9, durable interruption recovery passes 6/6, no test is skipped, and a following operational source-health check passes. The suites ran sequentially to avoid false interference through the shared protected runtime. The adversarial review identified that operational health does not prove a pristine source baseline; this is missing proof rather than an implementation defect, and Recovery 5e owns the destructive reset and independent baseline verification. No correction was required in this unit.
+
+**Recovery 5c result:** Complete after two improvement passes. The complete API suite passes 57/57 and the Phase 5 multi-user routing regression passes. The initial Phase 6 Stage 4 rerun correctly failed because its fixed A02 fixture had been left terminal by a prior run; the regression mutated source fixtures without restoring them and therefore could not prove repeatability. The first correction added exact `finally` restoration for its A02, A03, A05, related work-order, material, and weighing records. Its first cleanup attempt then exposed an over-restrictive identifier guard that rejected valid MySQL column names containing digits; the second correction accepts only valid alphanumeric SQL identifiers. After resetting the already-contaminated source, the Stage 4 regression passes twice consecutively, Phase 5 routing still passes, and source health remains green. The repeated run proves cleanup rather than relying on a fresh dump to mask contamination.
+
+**Recovery 5d result:** Complete. Focused web tests pass 25/25, the web type check and production build pass, obsolete manual-poll and fault-injection controls are absent, and `git diff --check` passes. A connected browser review at 1440×900 and 390×844 confirms all four V2 experiment tabs, the mobile controls drawer, and the new-experiment dialog work without horizontal overflow; the persistent floated labels remain in the shared position, visible controls retain the approved compact sizing, and browser warning/error logs are empty. The adversarial review challenged the compact 28-pixel controls and the absence of `name`/`autocomplete` on the two numeric experiment-setup fields. The compact sizing is explicit Monitor authority, while those local-only numeric controls neither identify a user nor benefit from browser autofill and already have associated persistent labels. Changing either would conflict with the approved interface or add no accessibility value, so no correction was required. This is focused regression proof only; it does not create or accept Step 8 browser evidence.
+
+**Recovery 5e result:** Complete. With the application runtime stopped, the protected development source was rebuilt from the immutable dump. The reset's internal pre-unlock and baseline checks passed, and the separately invoked pristine-baseline validator then passed independently. Operational health, the application-driver probe, polling query-plan checks, container readiness, and the correctly unlocked `alertas_fake` and `monitor_source_ro` application accounts all pass. Final web and API type checks and `git diff --check` pass. Git contains only the authoritative plan update and the Stage 4 regression cleanup correction; ignored local runtime evidence remains outside the tracked change set. The adversarial review challenged whether the reset's own checks were being counted twice and whether the Stage 4 validator should be rerun after the final reset. They are not: the standalone baseline invocation is the independent proof, and the validator already passed twice consecutively before this final reset. Running it again would mutate a newly restored baseline without adding a distinct guarantee. No further correction was required.
+
+**Recovery 5 final decision:** Complete. All five units meet their exits, the discovered non-repeatable Stage 4 cleanup defect is corrected and proved by two consecutive runs, the protected baseline is independently restored and verified, and no Step 8 evidence was created, reused, or accepted. Recovery 6 remains not started. Recovery 5 changes are uncommitted and unpushed.
 
 ### Recovery 6 — Repeat Step 8.2 through Step 8.7
 
