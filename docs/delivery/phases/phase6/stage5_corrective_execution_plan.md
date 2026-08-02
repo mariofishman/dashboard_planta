@@ -6,7 +6,7 @@
 
 **Branch:** `codex/phase6-stage5`
 
-**Latest pushed recovery checkpoint:** `d2ef6af`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
+**Latest pushed recovery checkpoint:** `5a9b28b`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
 
 **Current Stage 5 status:** In progress. Stage 5 is not accepted, Step 8 is not accepted, and Step 8B has not started.
 
@@ -38,7 +38,7 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 9. Complete — Recovery 5 passed all five calibrated units and independently restored and verified the protected baseline on 2026-08-02.
 10. Complete — Recovery 6 passed Steps 8.2a–8.7d in strengthened run `20260802-step8-recovery-v2-10`; the aggregate and adversarial gates passed and the protected baseline was independently restored on 2026-08-02.
 
-Recovery 3–4 is committed and pushed at `30ed384`; Recovery 5 is committed and pushed at `d2ef6af`. Recovery 6 is complete and remains uncommitted and unpushed.
+Recovery 3–4 is committed and pushed at `30ed384`; Recovery 5 is committed and pushed at `d2ef6af`; Recovery 6 is committed and pushed at `5a9b28b`.
 
 ### What the approval and transition authorization mean
 
@@ -706,7 +706,18 @@ The user preauthorized all six splits and their sequential execution without rou
 - **8.7 second review:** The validator previously accepted contradictory interaction records and temporally impossible receipt references. It now validates artifact-specific semantic claims, exact object binding, console-review provenance, reconnect digests, and receipt scope. The strengthened aggregate passed; omission, tamper, reuse, and different-runtime attacks all failed while the untouched manifest revalidated. The browser-result timeout remains configurable with a 90-minute default.
 - **Independent closure:** The protected dump reset passed, followed separately by baseline, health, MySQL application-driver, polling-query, readiness, typecheck, focused 20-test scenario, production build, and Git diff-integrity checks. The build review found a validation-only `*.connected.ts` file entering the production API build; excluding that diagnostic class from `tsconfig.build.json` restored the intended build boundary without changing runtime behavior.
 
-**Recovery 6 final decision:** Complete. The accepted replacement evidence uses the approved connected V2 laboratory and one exact runtime; the protected source is independently pristine. Stage 5 remains in progress, Step 8B has not started, and all Recovery 6 changes are uncommitted and unpushed.
+**Recovery 6 final decision:** Complete. The accepted replacement evidence uses the approved connected V2 laboratory and one exact runtime; the protected source is independently pristine. Stage 5 remains in progress and Step 8B has not started. Recovery 6 was subsequently committed and pushed at `5a9b28b`.
+
+#### Final Recovery 1–6 checkup — 2026-08-02
+
+| Recovery | Adversarial conclusion | Improvement made in this checkup |
+| --- | --- | --- |
+| 1 | The candidate classification still resolves to one active laboratory, route module, experiment runtime, and connected source boundary. Generated `apps/api/dist` was omitted from the original file register, but it is ignored build output, newer than its source, and contains the same isolated test-only routes rather than a second authority. | Recorded this bounded generated-output check; no source classification changed. |
+| 2 | The single-authority structure remains correct, but the roadmap, Phase 6 README, supporting V2 handoff wording, and this plan's checkpoint metadata had not advanced after Recovery 6. | Updated those current-status pointers to say Recovery 1–6 is complete, replacement Steps 8.2–8.7 passed, and Step 8B is next. Historical descriptions of what Stage 4 originally connected remain unchanged. |
+| 3 | The V2 contract and connected UI still match: paused creation, integer speed 1–60, one frequency 1–99, shared automatic clock, four tabs, source-valid actions, history, snapshots, Integrity, administrative closure, responsive behavior, and separated expected/actual evidence. Web tests pass 25/25; web typecheck and build pass; detection tests pass 25/25. | No implementation change required. Browser evidence, rather than a parallel synthetic component harness, remains the authoritative connected UI proof. |
+| 4 | Rejected executables, the misleading canonical validator, the destructive fault route, and normal-path legacy actions remain absent. Remaining legacy helpers are confined to `/api/dev/test/scenarios` and still have named regression callers. API tests pass 57/57; Phase 5 routing and Phase 6 Stage 4 regressions pass. | No implementation change required; broader deletion would remove useful isolated regression support. |
+| 5 | Declarations pass 11/11, fixture checks pass 17/17 across all 34 contracts and 37 lanes, chain checks pass 13/13 plus the connected rehearsal, ledger checks pass 5/5, isolation and restoration pass, scheduling passes 9/9, recovery passes 6/6, browser harness passes 3/3 plus 3/3 runtime tests, and browser-evidence checks pass 10/10. Independent baseline, health, driver, query-plan, API typecheck/build, and diff checks pass. | No implementation change required. The protected source was left at its independently verified baseline. |
+| 6 | The exact `20260802-step8-recovery-v2-10` manifest and 37 byte-bound artifacts remain intact. The serial aggregate gate re-passed, including omission, tamper, reuse, different-runtime, regression, typecheck, build, diff, and protected-source-health checks. | Corrected checkpoint/status documentation only; no new browser run or evidence substitution was created. |
 
 ## Part B — Work after recovery
 

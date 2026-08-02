@@ -2,7 +2,7 @@
 
 **Role:** Phase 6 status index; the linked Stage 5 recovery and completion plan is the sole Stage 5 execution and evidence authority
 
-**Status:** In progress; Stages 1–4 complete; Stage 5 recovery work is current; Stage 6 is pending
+**Status:** In progress; Stages 1–4 complete; Stage 5 Recovery 1–6 complete; Step 8B is next; Stage 6 is pending
 
 **Project sequencing authority:** [`../../../roadmap.md`](../../../roadmap.md)
 
@@ -16,9 +16,9 @@ The three prerequisite workstreams are complete within their separate scopes:
 - the guarded, resettable local `test_database`; and
 - the approved standalone `alertas_fake` Stage 2 laboratory and its 34 valid tests.
 
-They have not yet passed the complete Stage 5 connected-acceptance gate. Commit `165abc1` is a preserved implementation checkpoint whose useful code and evidence are being corrected and revalidated. Phase 7 remains blocked until Stage 5 and Stage 6 complete.
+They have not yet passed the complete Stage 5 connected-acceptance gate. Commit `165abc1` remains a preserved pre-recovery checkpoint; its useful implementation has now been corrected and revalidated through Recovery 1–6. Step 8B, Step 8C, and Steps 9–12 remain. Phase 7 remains blocked until Stage 5 and Stage 6 complete.
 
-The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It connected that correct boundary behind the older scenario-screen composition; it did not port or accept the approved tabbed V2 laboratory on `/dev/scenarios`. The earlier Step 8.2–8.7 browser run therefore remains diagnostic history and is invalid for acceptance.
+The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It originally connected that correct boundary behind the older scenario-screen composition. Recovery 3 later connected the approved tabbed V2 laboratory on `/dev/scenarios`, and Recovery 6 produced the passing replacement Step 8.2–8.7 evidence. The earlier browser run remains diagnostic history and is invalid for acceptance.
 
 ## Stage plan
 
@@ -28,12 +28,12 @@ The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete on
 | 2 — Approve the standalone laboratory | Complete — 2026-07-31 | Review the V2 laboratory one test at a time. | All 34 valid tests pass and are user-approved; invalid/deferred recurrence cases remain explicitly excluded. |
 | 3 — Inspect the `test_database` handoff | Complete — 2026-07-31 | Verified the merged runtime, reset safeguards, readiness contract, credentials, Node driver access, and A02/A03/A05 source mappings. | **Ready with exact gaps.** The evidence, approved mappings, corrections, and Stage 4 gaps are recorded in the Stage 3 handoff. |
 | 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected the older `/dev/scenarios` composition to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. This did not connect or accept the approved V2 interface. |
-| 5 — Run connected acceptance | **Recovery work in progress** | Follow the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). | The plan's Stage 5 exit assertions pass and the user accepts the evidence. |
+| 5 — Run connected acceptance | **Recovery complete; Step 8B next** | Follow the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). | The plan's Stage 5 exit assertions pass and the user accepts the evidence. |
 | 6 — Finalize Phase 6 | Pending | Audit the accepted Stage 5 evidence, reconcile authority and implementation, document Phase 10 exclusions, and decide whether the old operational source simulator can be retired. | The Phase 6 exit gate passes and the user accepts the integrated local result. |
 
-## Immediate next action — Stage 5 recovery
+## Immediate next action — Step 8B
 
-Use the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). It owns the replacement of the older connected screen with the approved V2 laboratory, the new Step 8.2–8.7 evidence run, and the return to Steps 8B–12. Prior Step 8.2–8.7 artifacts remain ignored diagnostic history and cannot be counted as acceptance evidence.
+Use the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). Recovery 1–6 and the replacement Step 8.2–8.7 evidence are complete. Step 8B, the passive Dashboard and Chat previews, is the next separately reviewed step. Prior Step 8.2–8.7 artifacts remain ignored diagnostic history and cannot be counted as acceptance evidence.
 
 ## Supporting specifications and evidence
 

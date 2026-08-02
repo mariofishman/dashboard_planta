@@ -8,7 +8,7 @@
 
 **Status:** Active; Phases 0–5 complete; Phase 6 in progress; Phase 7 is blocked by the Phase 6 exit gate
 
-**Roadmap date:** 2026-07-31
+**Roadmap date:** 2026-08-02
 
 **Supersedes:** [Version 2.1](../archive/docs/roadmaps/monitor_architecture_and_production_roadmap_v2.md)
 
@@ -23,7 +23,7 @@
 Version Two guided the dynamic source laboratory, roster, routing, and initial conversation implementation. Review of that work identified three corrections that materially change the remaining sequence:
 
 1. The Phase 4B laboratory changed synthetic source tables stored inside Monitor's own local database. That proved lifecycle behavior, but it did not adequately reproduce Monitor reading a separate foreign database with the same engine, schema, indexes, collations, and SQL behavior as EmusaSoft.
-2. The development scenario screen then in use was difficult to understand and did not provide the clear, business-level control and evidence required for acceptance. The standalone tabbed V2 laboratory has since been implemented and its Stage 2 user review was completed and approved on 2026-07-31. Stage 4 later connected the correct source boundary behind the older screen composition, not the approved V2 interface. The resulting earlier Step 8.2–8.7 browser run is diagnostic history and does not count as acceptance.
+2. The development scenario screen then in use was difficult to understand and did not provide the clear, business-level control and evidence required for acceptance. The standalone tabbed V2 laboratory was implemented and its Stage 2 user review was completed and approved on 2026-07-31. Stage 4 connected the correct source boundary behind the older screen composition. Recovery later ported V2 onto `/dev/scenarios` and replacement Steps 8.2–8.7 passed; the earlier browser run remains diagnostic history and does not count as acceptance.
 3. The initial Phase 6 chat implementation did not have accepted visual parity with the approved chat-list and chat-detail prototypes; the corrective UI workstream has since been implemented and accepted.
 
 Version Three preserves the completed work from Phases 0–5 and treats Phase 4B as historical. It expands Phase 6 to correct the local source boundary, rebuild the scenario laboratory, complete the conversation product, and establish the testing foundation used by Phases 7–9.
@@ -85,7 +85,7 @@ Phase 5 remains complete. Its dynamic routing behavior will receive additional e
 
 ## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-**Status:** In progress. Stages 1–4 are complete. Stage 5 recovery and completion work is current under the single linked authority file. Stage 6 remains pending.
+**Status:** In progress. Stages 1–4 and Stage 5 Recovery 1–6 are complete. Step 8B is next under the single linked authority file. Stage 6 remains pending.
 
 **Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 
@@ -116,7 +116,7 @@ The EmusaSoft MCP is useful for discovering entities, fields, types, relationshi
 
 The redesign covers only A02, A03, and A05.
 
-The standalone V2 laboratory and its documented browser matrix are implemented. The [Stage 5 recovery and completion plan](delivery/phases/phase6/stage5_corrective_execution_plan.md) is the sole current Stage 5 execution and evidence authority; [`alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) remains the supporting laboratory specification. Stage 2 user review was completed and approved on 2026-07-31. The prototype is UI and business-rule evidence only. Stage 4 connected the database and Monitor services behind the older screen, so recovery must port V2 onto `/dev/scenarios` and replace the invalid earlier Step 8.2–8.7 evidence before Stage 5 can resume normal sequencing.
+The standalone V2 laboratory and its documented browser matrix are implemented. The [Stage 5 recovery and completion plan](delivery/phases/phase6/stage5_corrective_execution_plan.md) is the sole current Stage 5 execution and evidence authority; [`alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) remains the supporting laboratory specification. Stage 2 user review was completed and approved on 2026-07-31. The prototype remains UI and business-rule evidence only. Recovery has now ported V2 onto `/dev/scenarios` using the connected database and Monitor services, and replacement Steps 8.2–8.7 passed. Step 8B is next; Stage 5 is not yet accepted.
 
 For each scenario, define in simple business language:
 
