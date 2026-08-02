@@ -68,6 +68,14 @@ const monitorCounts = () => server.database.queryOne(`SELECT
   (SELECT COUNT(*)::int FROM monitor_message) AS messages`);
 
 try {
+  // The validator owns these fixture rows for its duration. Establish the required
+  // forward-action preconditions, then restore the exact pre-run values in finally.
+  await sourceConnections.writer.execute(`UPDATE flujo_materiales_detalles
+    SET estado='TRANSITO',fecha_recepcion=NULL,fecha_eliminacion=NULL WHERE id=?`, [sourceIds.A02.flowId]);
+  await sourceConnections.writer.execute(`UPDATE ordenes_trabajo
+    SET fecha_fin_ejecucion=NULL,fecha_eliminacion=NULL,eliminado=0 WHERE id=?`, [sourceIds.A03.workOrderId]);
+  await sourceConnections.writer.execute(`UPDATE orden_trabajo_materiales
+    SET cantidad_consumida=0 WHERE id=?`, [sourceIds.A03.materialId]);
   const fixtureKeys = { A02: ["materialFlowDetailId", fixtureSeedIds.A02], A03: ["workOrderId", fixtureSeedIds.A03], A05: ["articleSerialId", fixtureSeedIds.A05] } as const;
   for (const [code, scenario] of [["A02", "past_threshold"], ["A03", "past_threshold"], ["A05", "past_threshold_both"]] as const) {
     const beforeSourceAction = await monitorCounts();
@@ -131,6 +139,11 @@ try {
     await restoreRow("ordenes_trabajo", sourceBefore.a05WorkOrder);
     await sourceConnections.writer.execute("DELETE FROM balanza_carga_detalle_registros WHERE id_articulo_serial=?", [sourceIds.A05.serialId]);
     for (const row of sourceBefore.a05Scale) await insertRow("balanza_carga_detalle_registros", row);
+    assert.deepEqual(await sourceRow("SELECT * FROM flujo_materiales_detalles WHERE id=?", [sourceIds.A02.flowId]), sourceBefore.a02);
+    assert.deepEqual(await sourceRow("SELECT * FROM ordenes_trabajo WHERE id=?", [sourceIds.A03.workOrderId]), sourceBefore.a03WorkOrder);
+    assert.deepEqual(await sourceRow("SELECT * FROM orden_trabajo_materiales WHERE id=?", [sourceIds.A03.materialId]), sourceBefore.a03Material);
+    assert.deepEqual(await sourceRow("SELECT * FROM articulo_serial WHERE id=?", [sourceIds.A05.serialId]), sourceBefore.a05Serial);
+    assert.deepEqual(await sourceRows("SELECT * FROM balanza_carga_detalle_registros WHERE id_articulo_serial=? ORDER BY id", [sourceIds.A05.serialId]), sourceBefore.a05Scale);
   } finally {
     await Promise.allSettled([server.close(), sourceConnections.close()]);
   }

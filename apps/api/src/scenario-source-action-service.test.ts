@@ -30,9 +30,10 @@ const sourceDiff = (table: string, field: string): SourceActionEvidence => ({
 });
 const consumptionDiff = sourceDiff("orden_trabajo_materiales", "cantidad_consumida");
 
-async function service(error?: string | Error) {
+async function service(error?: string | Error, candidate = 12199) {
   const calls: Array<{ code: string; action: ScenarioSourceAction; key?: number; input?: ScenarioSourceActionInput }> = [];
   const source = {
+    sourceActionCandidate: async () => candidate || null,
     sourceAction: async (code: string, action: ScenarioSourceAction, key: number, _contract: SourceActionContract, input?: ScenarioSourceActionInput) => {
       calls.push({ code, action, key, ...(input ? { input } : {}) });
       if (error) throw typeof error === "string" ? new Error(error) : error;
@@ -68,6 +69,20 @@ describe("scenario source-action service", () => {
     assert.deepEqual(result.input, input);
     await rejects(subject.value.execute({ actionId: "a03.start_work_order", key: 12198, input: { machineId: 0 } }, admin), 400, "invalid_source_action_input");
     await rejects(subject.value.execute({ actionId: "a03.close_work_order", key: 12198, input: { machineId: 8 } }, admin), 400, "invalid_source_action_input");
+  });
+
+  it("resolves a fresh source candidate for connected creation actions", async () => {
+    const subject = await service();
+    const a02 = await subject.value.execute({ actionId: "a02.prepare_dispatch" }, admin);
+    const a03 = await subject.value.execute({ actionId: "a03.start_work_order" }, admin);
+    assert.equal(a02.naturalKey.value, 12199);
+    assert.equal(a03.naturalKey.value, 12199);
+    assert.deepEqual(subject.calls, [
+      { code: "A02", action: "prepare_dispatch", key: 12199 },
+      { code: "A03", action: "start_work_order", key: 12199 },
+    ]);
+    const missing = await service(undefined, 0);
+    await rejects(missing.value.execute({ actionId: "a05.declare_produced_reel" }, admin), 404, "source_action_candidate_unavailable");
   });
 
   it("enforces administrative access and A02 source-authority precedence", async () => {

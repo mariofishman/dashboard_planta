@@ -19,6 +19,8 @@ export interface ScenarioExperiment {
   name: string;
   status: "running" | "paused" | "completed";
   businessTime: string;
+  initialBusinessTime: string;
+  sourceCutoffAt: string;
   secondsPerSimulatedMinute: ExperimentSecondsPerSimulatedMinute;
   pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes;
   nextDue: Record<ScenarioRuleCode, string>;
@@ -114,6 +116,8 @@ function experimentRow(row: Record<string, unknown>): ScenarioExperiment {
   return {
     ...row,
     businessTime: isoTimestamp(row.businessTime),
+    initialBusinessTime: isoTimestamp(row.initialBusinessTime),
+    sourceCutoffAt: isoTimestamp(row.sourceCutoffAt),
     secondsPerSimulatedMinute: Number(row.secondsPerSimulatedMinute),
     pollingFrequencyMinutes: Number(row.pollingFrequencyMinutes),
     nextDue: parseObject(row.nextDue),
@@ -163,23 +167,25 @@ function snapshotPayload(value: Record<string, unknown>, schemaVersion: string):
 export class ScenarioExperimentRepository {
   constructor(private readonly database: DatabaseRuntime) {}
 
-  async create(name: string, businessTime: string, pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes, identity: ScenarioExperimentIdentity): Promise<ScenarioExperiment> {
+  async create(name: string, businessTime: string, pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes, identity: ScenarioExperimentIdentity, sourceLookbackDays = -30): Promise<ScenarioExperiment> {
     if (!name.trim() || !Number.isFinite(Date.parse(businessTime)) || !nonEmpty(identity.runId)
       || !nonEmpty(identity.manifestVersion) || !nonEmpty(identity.sourceActionContractVersion)) throw new Error("invalid_scenario_experiment");
     if (!Number.isInteger(pollingFrequencyMinutes) || pollingFrequencyMinutes < 1 || pollingFrequencyMinutes > 99) throw new Error("invalid_scenario_frequency");
+    if (!Number.isInteger(sourceLookbackDays) || sourceLookbackDays > 0 || sourceLookbackDays < -3650) throw new Error("invalid_scenario_source_lookback");
     const nextDue = Object.fromEntries(codes.map((code) => [code, new Date(Date.parse(businessTime) + pollingFrequencyMinutes * 60_000).toISOString()])) as Record<ScenarioRuleCode, string>;
+    const sourceCutoffAt = new Date(Date.parse(businessTime) + sourceLookbackDays * 86_400_000).toISOString();
     const id = randomUUID();
     await this.database.execute(`INSERT INTO monitor_scenario_experiment
-      (id,run_id,manifest_version,source_action_contract_version,name,status,business_time,speed,frequencies,next_due,seconds_per_simulated_minute,polling_frequency_minutes)
-      VALUES ($1,$2,$3,$4,$5,'paused',$6,1,$7::jsonb,$8::jsonb,1,$9)`,
-    [id, identity.runId.trim(), identity.manifestVersion.trim(), identity.sourceActionContractVersion.trim(), name.trim(), businessTime,
+      (id,run_id,manifest_version,source_action_contract_version,name,status,business_time,initial_business_time,source_cutoff_at,speed,frequencies,next_due,seconds_per_simulated_minute,polling_frequency_minutes)
+      VALUES ($1,$2,$3,$4,$5,'paused',$6,$6,$7,1,$8::jsonb,$9::jsonb,1,$10)`,
+    [id, identity.runId.trim(), identity.manifestVersion.trim(), identity.sourceActionContractVersion.trim(), name.trim(), businessTime, sourceCutoffAt,
       json({ A02: pollingFrequencyMinutes, A03: pollingFrequencyMinutes, A05: pollingFrequencyMinutes }), json(nextDue), pollingFrequencyMinutes]);
     return this.get(id);
   }
 
   async get(id: string): Promise<ScenarioExperiment> {
     const row = await this.database.queryOne(`SELECT id,run_id AS "runId",manifest_version AS "manifestVersion",
-      source_action_contract_version AS "sourceActionContractVersion",name,status,business_time AS "businessTime",
+      source_action_contract_version AS "sourceActionContractVersion",name,status,business_time AS "businessTime",initial_business_time AS "initialBusinessTime",source_cutoff_at AS "sourceCutoffAt",
       seconds_per_simulated_minute AS "secondsPerSimulatedMinute",polling_frequency_minutes AS "pollingFrequencyMinutes",next_due AS "nextDue",
       created_at AS "createdAt",updated_at AS "updatedAt" FROM monitor_scenario_experiment WHERE id=$1`, [id]);
     if (!row.id) throw new Error("scenario_experiment_not_found");
@@ -190,7 +196,7 @@ export class ScenarioExperimentRepository {
     const limit = historyLimit(options.limit);
     const cursor = historyCursor(options.cursor);
     const rows = await this.database.queryAll(`SELECT id,run_id AS "runId",manifest_version AS "manifestVersion",
-      source_action_contract_version AS "sourceActionContractVersion",name,status,business_time AS "businessTime",
+      source_action_contract_version AS "sourceActionContractVersion",name,status,business_time AS "businessTime",initial_business_time AS "initialBusinessTime",source_cutoff_at AS "sourceCutoffAt",
       seconds_per_simulated_minute AS "secondsPerSimulatedMinute",polling_frequency_minutes AS "pollingFrequencyMinutes",next_due AS "nextDue",
       created_at AS "createdAt",updated_at AS "updatedAt" FROM monitor_scenario_experiment
       ${cursor ? "WHERE (created_at,id)<($2::timestamptz,$3::uuid)" : ""} ORDER BY created_at DESC,id DESC LIMIT $1`,

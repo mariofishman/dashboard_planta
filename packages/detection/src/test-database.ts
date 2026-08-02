@@ -372,7 +372,11 @@ export class TestDatabaseSourceAdapter implements DetectionSourceAdapter {
       if (this.code === "A05") row.declaredAgeMinutes = elapsed;
       return row;
     });
-    const trackedRows = allRows.filter((row) => this.source.tracks(this.code, Number(row[input.query.keyField])));
+    const trackedRows = allRows.filter((row) => this.source.tracks(
+      this.code,
+      Number(row[input.query.keyField]),
+      String(row.sourceTimestamp),
+    ));
     const rows = await Promise.all(trackedRows.map(async (row) => ({
       ...row, ...await this.routingContext(Number(row[input.query.keyField])),
     })));
@@ -423,6 +427,8 @@ export class TestDatabaseSourceAdapter implements DetectionSourceAdapter {
 export class TestDatabaseScenarioRepository implements ScenarioSource {
   private readonly states = new Map<ScenarioRuleCode, ScenarioState>();
   private readonly tracked = new Map<ScenarioRuleCode, Set<number>>();
+  private readonly trackingOverrides = new Set<ScenarioRuleCode>();
+  private sourceCutoffAt: string | null = null;
   private readonly deferredFreshnessFaults = new Map<ScenarioRuleCode, {
     fault: "stale" | "unknown_freshness";
     inspectionsRemaining: number;
@@ -481,8 +487,14 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
   }
 
   supportedCases(code: string): ScenarioCase[] { return cases[asCode(code)]; }
-  tracks(code: ScenarioRuleCode, key: number): boolean { return this.tracked.get(code)!.has(key); }
-  replaceTracked(code: ScenarioRuleCode, keys: number[]): void { this.tracked.set(code, new Set(keys)); }
+  tracks(code: ScenarioRuleCode, key: number, sourceTimestamp?: string): boolean {
+    if (this.trackingOverrides.has(code) || !this.sourceCutoffAt) return this.tracked.get(code)!.has(key);
+    return Boolean(sourceTimestamp) && Date.parse(String(sourceTimestamp)) >= Date.parse(this.sourceCutoffAt);
+  }
+  replaceTracked(code: ScenarioRuleCode, keys: number[]): void {
+    this.tracked.set(code, new Set(keys));
+    this.trackingOverrides.add(code);
+  }
   recordExternalSourceChange(code: ScenarioRuleCode, action: string): void { this.touch(code, action, null); }
 
   async reset(code: string): Promise<ScenarioStatus> { return this.prepare(code, "clean_baseline", "reset"); }
@@ -580,8 +592,65 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     const ruleCode = asCode(code);
     await this.connections.requireReady();
     const evidence = await this.writerTransaction((connection) => this.applySourceActionWithEvidence(connection, ruleCode, action, key, contract, input));
+    if (ruleCode === "A03" && action === "start_work_order") this.tracked.get("A03")!.add(key);
+    if (ruleCode === "A05" && (action === "declare_produced_reel" || action === "declare_remnant_reel")) this.tracked.get("A05")!.add(key);
     this.touch(ruleCode, action, null);
     return { status: await this.status(ruleCode), evidence };
+  }
+
+  async sourceActionCandidate(code: ScenarioRuleCode, action: ScenarioSourceAction): Promise<number | null> {
+    await this.connections.requireReady();
+    const tracked = this.tracked.get(code)!;
+    if (code === "A02" && action === "prepare_dispatch") {
+      const [rows] = await this.connections.monitor.query<RowDataPacket[]>(`SELECT flow.id
+        FROM flujo_materiales_detalles flow
+        JOIN ordenes_trabajo work_order ON work_order.id=flow.id_orden_trabajo
+        WHERE flow.fecha_eliminacion IS NULL
+          AND flow.id_orden_trabajo_material IS NOT NULL
+          AND work_order.fecha_eliminacion IS NULL AND work_order.eliminado=0
+        ORDER BY flow.id LIMIT 1`);
+      return Number(rows[0]?.id) || null;
+    }
+    if (code === "A03" && action === "start_work_order") {
+      const [rows] = await this.connections.monitor.query<RowDataPacket[]>(`SELECT candidate.id
+        FROM ordenes_trabajo candidate
+        WHERE candidate.id_equipo IS NOT NULL
+          AND candidate.fecha_inicio_ejecucion IS NULL
+          AND candidate.fecha_fin_ejecucion IS NULL
+          AND candidate.fecha_eliminacion IS NULL
+          AND candidate.eliminado=0
+          AND EXISTS (
+            SELECT 1 FROM orden_trabajo_materiales material
+            WHERE material.id_orden_trabajo=candidate.id
+              AND material.fecha_eliminacion IS NULL AND material.eliminado=0
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM ordenes_trabajo active
+            WHERE active.id_equipo=candidate.id_equipo AND active.id<>candidate.id
+              AND active.fecha_inicio_ejecucion IS NOT NULL AND active.fecha_fin_ejecucion IS NULL
+              AND active.fecha_eliminacion IS NULL AND active.eliminado=0
+          )
+        ORDER BY candidate.id LIMIT 1000`);
+      return Number(rows.find((row) => !tracked.has(Number(row.id)))?.id) || null;
+    }
+    if (code === "A05" && (action === "declare_produced_reel" || action === "declare_remnant_reel")) {
+      const relationship = action === "declare_produced_reel" ? "id_orden_trabajo_origen" : "id_ultimo_orden_trabajo_cierre";
+      const [rows] = await this.connections.monitor.query<RowDataPacket[]>(`SELECT serial.id
+        FROM articulo_serial serial
+        JOIN ordenes_trabajo work_order ON work_order.id=serial.${relationship}
+        JOIN almacenes warehouse ON warehouse.id=serial.id_almacen
+        WHERE serial.fecha_eliminacion IS NULL
+          AND serial.estado<>'CONFIRMAR_PESO'
+          AND work_order.fecha_eliminacion IS NULL AND work_order.eliminado=0
+          AND warehouse.id_equipo=work_order.id_equipo
+          AND NOT EXISTS (
+            SELECT 1 FROM balanza_carga_detalle_registros scale
+            WHERE scale.id_articulo_serial=serial.id AND scale.eliminado=0
+          )
+        ORDER BY serial.id LIMIT 1000`);
+      return Number(rows.find((row) => !tracked.has(Number(row.id)))?.id) || null;
+    }
+    return null;
   }
 
   async terminalizeA02ForAuthority(authority: A02SourceAuthority, key: number, contract: SourceActionContract) {
@@ -739,9 +808,10 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
           [new Date(state.currentAt), new Date(state.currentAt), Number(rows[0].id)]);
     } else if (ruleCode === "A05" && (action === "declare_produced_reel" || action === "declare_remnant_reel")) {
         const serialId = key ?? this.fixtureIds.A05.serialId;
-        const [rows] = await connection.query<RowDataPacket[]>(`SELECT id,id_orden_trabajo_origen,id_ultimo_orden_trabajo_cierre,fecha_eliminacion
+        const [rows] = await connection.query<RowDataPacket[]>(`SELECT id,estado,id_orden_trabajo_origen,id_ultimo_orden_trabajo_cierre,fecha_eliminacion
           FROM articulo_serial WHERE id=? FOR UPDATE`, [serialId]);
         if (!rows[0] || rows[0].fecha_eliminacion) throw new Error("reel_unavailable");
+        if (rows[0].estado === "CONFIRMAR_PESO") throw new Error("reel_already_declared");
         if (action === "declare_produced_reel" && rows[0].id_orden_trabajo_origen === null && input.sourceWorkOrderId === undefined) throw new Error("reel_source_work_order_missing");
         if (action === "declare_remnant_reel" && rows[0].id_ultimo_orden_trabajo_cierre === null && input.sourceWorkOrderId === undefined) throw new Error("reel_closing_work_order_missing");
         const produced = action === "declare_produced_reel";
@@ -756,17 +826,39 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
         await this.ensureScale(connection, key ?? this.fixtureIds.A05.serialId);
     } else if (ruleCode === "A05" && action === "register_movement") {
         const serialId = key ?? this.fixtureIds.A05.serialId;
-        const [rows] = await connection.query<RowDataPacket[]>("SELECT id_almacen FROM articulo_serial WHERE id=? FOR UPDATE", [serialId]);
-        if (!rows[0] || Number(rows[0].id_almacen) !== this.fixtureIds.A05.originWarehouseId) throw new Error("reel_already_moved");
-        await connection.execute("UPDATE articulo_serial SET id_almacen=?,fecha_actualizacion=? WHERE id=?", [this.fixtureIds.A05.movedWarehouseId, new Date(state.currentAt), serialId]);
+        const [rows] = await connection.query<RowDataPacket[]>(`SELECT serial.id_almacen AS currentWarehouseId,
+          source_work_order.id_equipo AS sourceEquipmentId,current_warehouse.id_equipo AS currentEquipmentId,
+          (SELECT MIN(destination.id) FROM almacenes destination
+            WHERE destination.id<>serial.id_almacen
+              AND (destination.id_equipo IS NULL OR destination.id_equipo<>source_work_order.id_equipo)) AS movedWarehouseId
+          FROM articulo_serial serial
+          JOIN ordenes_trabajo source_work_order
+            ON source_work_order.id=COALESCE(serial.id_orden_trabajo_origen,serial.id_ultimo_orden_trabajo_cierre)
+          LEFT JOIN almacenes current_warehouse ON current_warehouse.id=serial.id_almacen
+          WHERE serial.id=? FOR UPDATE`, [serialId]);
+        if (!rows[0] || rows[0].currentWarehouseId === null || rows[0].movedWarehouseId === null
+          || Number(rows[0].currentEquipmentId) !== Number(rows[0].sourceEquipmentId)) throw new Error("reel_already_moved");
+        await connection.execute("UPDATE articulo_serial SET id_almacen=?,fecha_actualizacion=? WHERE id=?", [Number(rows[0].movedWarehouseId), new Date(state.currentAt), serialId]);
     } else if (ruleCode === "A05" && action === "handoff") {
         const serialId = key ?? this.fixtureIds.A05.serialId;
-        const [reelRows] = await connection.query<RowDataPacket[]>("SELECT id_almacen FROM articulo_serial WHERE id=? FOR UPDATE", [serialId]);
-        if (!reelRows[0] || Number(reelRows[0].id_almacen) !== this.fixtureIds.A05.originWarehouseId) throw new Error("reel_already_moved");
+        const [reelRows] = await connection.query<RowDataPacket[]>(`SELECT serial.id_almacen AS currentWarehouseId,
+          source_work_order.id_equipo AS sourceEquipmentId,current_warehouse.id_equipo AS currentEquipmentId,
+          (SELECT MIN(destination.id) FROM almacenes destination
+            WHERE destination.id<>serial.id_almacen
+              AND (destination.id_equipo IS NULL OR destination.id_equipo<>source_work_order.id_equipo)) AS movedWarehouseId
+          FROM articulo_serial serial
+          JOIN ordenes_trabajo source_work_order
+            ON source_work_order.id=COALESCE(serial.id_orden_trabajo_origen,serial.id_ultimo_orden_trabajo_cierre)
+          LEFT JOIN almacenes current_warehouse ON current_warehouse.id=serial.id_almacen
+          WHERE serial.id=? FOR UPDATE`, [serialId]);
+        if (!reelRows[0] || reelRows[0].currentWarehouseId === null || reelRows[0].movedWarehouseId === null
+          || Number(reelRows[0].currentEquipmentId) !== Number(reelRows[0].sourceEquipmentId)) throw new Error("reel_already_moved");
+        const originWarehouseId = Number(reelRows[0].currentWarehouseId);
+        const movedWarehouseId = Number(reelRows[0].movedWarehouseId);
         const [handoffRows] = await connection.query<RowDataPacket[]>(`SELECT COUNT(*) AS handoffCount FROM flujo_materiales_detalles
           WHERE id_articulo_serial=? AND observacion='MONITOR-STAGE5-A05-HANDOFF' AND fecha_eliminacion IS NULL`, [serialId]);
         if (Number(handoffRows[0]?.handoffCount ?? 0) > 0) throw new Error("handoff_already_exists");
-        await connection.execute("UPDATE articulo_serial SET id_almacen=?,fecha_actualizacion=? WHERE id=?", [this.fixtureIds.A05.movedWarehouseId, new Date(state.currentAt), serialId]);
+        await connection.execute("UPDATE articulo_serial SET id_almacen=?,fecha_actualizacion=? WHERE id=?", [movedWarehouseId, new Date(state.currentAt), serialId]);
         await connection.execute(`INSERT INTO flujo_materiales_detalles
           (id_articulo,nombre_articulo,id_unidad_uso,cantidad_entransito_uso,id_unidad_inventario,cantidad_entransito_inventario,costo_promedio,
            id_articulo_serial,id_lote,id_almacen_origen,id_almacen_destino,id_ubicacion_almacen_origen,id_ubicacion_almacen_destino,observacion,
@@ -776,7 +868,7 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
            template.cantidad_entransito_inventario,template.costo_promedio,?,template.id_lote,?, ?,template.id_ubicacion_almacen_origen,
            template.id_ubicacion_almacen_destino,'MONITOR-STAGE5-A05-HANDOFF',0,0,template.id_usuario_creador,?,template.id_orden_trabajo,
            template.cantidad_inicial_inventario,template.cantidad_inicial_uso,template.id_orden_trabajo_material,template.moneda,'TRANSITO',NULL,template.confirmar_peso
-          FROM flujo_materiales_detalles template WHERE template.id=?`, [serialId, this.fixtureIds.A05.originWarehouseId, this.fixtureIds.A05.movedWarehouseId, new Date(state.currentAt), this.fixtureIds.A02.flowId]);
+          FROM flujo_materiales_detalles template WHERE template.id=?`, [serialId, originWarehouseId, movedWarehouseId, new Date(state.currentAt), this.fixtureIds.A02.flowId]);
         const [idRows] = await connection.query<RowDataPacket[]>("SELECT LAST_INSERT_ID() AS id");
         this.tracked.get("A02")!.add(Number(idRows[0]!.id));
     } else throw new Error("invalid_source_action");
@@ -799,6 +891,26 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     const timestamp = new Date(currentAt);
     if (!Number.isFinite(timestamp.getTime())) throw new Error("invalid_scenario_business_time");
     for (const state of this.states.values()) state.currentAt = timestamp.toISOString();
+  }
+
+  async setSourceCutoffAt(cutoffAt: string | null): Promise<void> {
+    this.trackingOverrides.clear();
+    if (cutoffAt === null) {
+      this.sourceCutoffAt = null;
+      return;
+    }
+    const timestamp = new Date(cutoffAt);
+    if (!Number.isFinite(timestamp.getTime())) throw new Error("invalid_scenario_source_cutoff");
+    this.sourceCutoffAt = timestamp.toISOString();
+  }
+
+  async resetAfterDatabaseRestore(): Promise<void> {
+    this.sourceCutoffAt = null;
+    this.trackingOverrides.clear();
+    this.tracked.set("A02", new Set([this.fixtureIds.A02.flowId]));
+    this.tracked.set("A03", new Set([this.fixtureIds.A03.workOrderId]));
+    this.tracked.set("A05", new Set([this.fixtureIds.A05.serialId]));
+    for (const code of codes) this.touch(code, "reset", "clean_baseline");
   }
 
   async failNextPoll(code: string, fault: ScenarioFault): Promise<ScenarioStatus> {
@@ -857,6 +969,7 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     const currentAt = new Date(this.state(code).currentAt);
     const keys = [...this.tracked.get(code)!].sort((left, right) => left - right);
     const placeholders = keys.map(() => "?").join(",");
+    const cutoff = this.sourceCutoffAt ? new Date(this.sourceCutoffAt) : null;
     if (code === "A02") {
       const [rows] = await this.connections.writer.query<RowDataPacket[]>(`SELECT f.id AS materialFlowDetailId,1 AS isWorkOrderReservation,
         f.estado AS state,f.fecha_recepcion AS receivedAt,TIMESTAMPDIFF(MINUTE,f.fecha_creacion,?) AS elapsedMinutes,
@@ -870,7 +983,8 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
         LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion
         LEFT JOIN unidades unit ON unit.id=f.id_unidad_uso LEFT JOIN almacenes origin_warehouse ON origin_warehouse.id=f.id_almacen_origen
         LEFT JOIN almacenes destination_warehouse ON destination_warehouse.id=f.id_almacen_destino
-        WHERE f.id IN (${placeholders}) ORDER BY f.id`, [currentAt, ...keys]);
+        WHERE f.id_orden_trabajo_material IS NOT NULL AND f.fecha_eliminacion IS NULL
+          AND ${cutoff ? "f.fecha_creacion>=?" : `f.id IN (${placeholders})`} ORDER BY f.id`, cutoff ? [currentAt, cutoff] : [currentAt, ...keys]);
       return { rows: rows.map((row) => normalizeRow(row)), sourceRevision: this.revision(code) };
     }
     if (code === "A03") {
@@ -883,7 +997,8 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
         'No determinado' AS shiftName,'Operación de máquina' AS responsibleName
         FROM ordenes_trabajo ot LEFT JOIN orden_trabajo_materiales material ON material.id_orden_trabajo=ot.id
         LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion
-        WHERE ot.id IN (${placeholders}) GROUP BY ot.id ORDER BY ot.id`, [currentAt, ...keys]);
+        WHERE ot.fecha_eliminacion IS NULL AND ot.eliminado=0
+          AND ${cutoff ? "ot.fecha_inicio_ejecucion>=?" : `ot.id IN (${placeholders})`} GROUP BY ot.id ORDER BY ot.id`, cutoff ? [currentAt, cutoff] : [currentAt, ...keys]);
       return { rows: rows.map((row) => normalizeRow(row)), sourceRevision: this.revision(code) };
     }
     const [rows] = await this.connections.writer.query<RowDataPacket[]>(`SELECT s.id AS articleSerialId,TIMESTAMPDIFF(MINUTE,s.fecha_creacion,?) AS declaredAgeMinutes,
@@ -895,7 +1010,8 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
       COALESCE(s.id_orden_trabajo_origen,s.id_ultimo_orden_trabajo_cierre) AS workOrderId,ot.codigo_orden_trabajo AS workOrderCode
       FROM articulo_serial s JOIN ordenes_trabajo ot ON ot.id=COALESCE(s.id_orden_trabajo_origen,s.id_ultimo_orden_trabajo_cierre)
       LEFT JOIN almacenes warehouse ON warehouse.id=s.id_almacen LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion
-      WHERE s.id IN (${placeholders}) ORDER BY s.id`, [currentAt, ...keys]);
+      WHERE s.fecha_eliminacion IS NULL
+        AND ${cutoff ? "s.fecha_creacion>=?" : `s.id IN (${placeholders})`} ORDER BY s.id`, cutoff ? [currentAt, cutoff] : [currentAt, ...keys]);
     return { rows: rows.map((row) => normalizeRow(row)), sourceRevision: this.revision(code) };
   }
 

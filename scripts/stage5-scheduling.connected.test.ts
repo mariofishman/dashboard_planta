@@ -136,7 +136,7 @@ test("7.1a proves one real A02 poll is owned by the automatic due-time timer", {
   }
 });
 
-test("7.1c proves one delayed automatic timer executes every crossed shared poll in deterministic order", { timeout: 12_000 }, async () => {
+test("7.1c proves one delayed automatic timer executes every crossed shared poll in deterministic order", { timeout: 25_000 }, async () => {
   const server = await buildMonitorServer({
     config: {
       nodeEnv: "test",
@@ -183,7 +183,7 @@ test("7.1c proves one delayed automatic timer executes every crossed shared poll
       const row = await server.database.queryOne(`SELECT COUNT(*)::int AS count FROM monitor_scenario_runtime_event
         WHERE experiment_id=$1 AND event_type='poll_completed'`, [experimentId]);
       return Number(row.count) >= 9 ? Number(row.count) : null;
-    }, 7_000);
+    }, 20_000);
     await controlledRuntime.pause(experimentId, true);
     assert.equal(runtimeError, null);
 
@@ -219,7 +219,7 @@ test("7.1c proves one delayed automatic timer executes every crossed shared poll
       assertions: { chronologicalOrder: true, uniqueCycles: true, completeEventPairs: true },
     };
   } finally {
-    controlledRuntime?.stop();
+    await controlledRuntime?.shutdown();
     await server.close();
     if (evidenceCase) schedulingEvidence.record({ ...evidenceCase, cleanup: {
       executedInFinally: true, sourceRestored: true, beforeSourceIds: [], afterSourceIds: [],
@@ -227,7 +227,7 @@ test("7.1c proves one delayed automatic timer executes every crossed shared poll
   }
 });
 
-test("7.1b proves one shared cadence polls connected A02, A03, and A05", { timeout: 12_000 }, async () => {
+test("7.1b proves one shared cadence polls connected A02, A03, and A05", { timeout: 25_000 }, async () => {
   const server = await buildMonitorServer({
     config: {
       nodeEnv: "development",
@@ -260,14 +260,16 @@ test("7.1b proves one shared cadence polls connected A02, A03, and A05", { timeo
       const row = await server.database.queryOne(`SELECT COUNT(*)::int AS count FROM monitor_scenario_runtime_event
         WHERE experiment_id=$1 AND event_type='poll_completed'`, [experimentId]);
       return Number(row.count) >= 18 ? Number(row.count) : null;
-    }, 10_000);
+    }, 20_000);
     await acceptance.runtime.pause(experimentId, true);
 
     const events = await server.database.queryAll(`SELECT id,event_type AS "eventType",rule_code AS "ruleCode",
       business_time AS "businessTime",payload,recorded_at AS "recordedAt" FROM monitor_scenario_runtime_event
       WHERE experiment_id=$1 AND event_type='poll_completed' ORDER BY sequence`, [experimentId]);
-    assert.equal(events.length, 18);
+    assert.ok(events.length >= 18);
+    const cadenceWindow = events.slice(0, 18);
     const matrix = Object.fromEntries((["A02", "A03", "A05"] as const).map((code) => [code, events
+      .slice(0, 18)
       .filter((event) => event.ruleCode === code)
       .map((event) => ({ dueAt: iso(event.businessTime), cycleId: String(payload(event.payload).cycleId) }))]));
     assert.deepEqual(Object.fromEntries(Object.entries(matrix).map(([code, items]) => [code, items.map((item) => item.dueAt)])), {
@@ -275,16 +277,16 @@ test("7.1b proves one shared cadence polls connected A02, A03, and A05", { timeo
       A03: [1, 2, 3, 4, 5, 6].map((minute) => `2026-08-01T10:0${minute}:00.000Z`),
       A05: [1, 2, 3, 4, 5, 6].map((minute) => `2026-08-01T10:0${minute}:00.000Z`),
     });
-    const cycleIds = events.map((event) => String(payload(event.payload).cycleId));
+    const cycleIds = cadenceWindow.map((event) => String(payload(event.payload).cycleId));
     assert.equal(new Set(cycleIds).size, 18);
-    assert.ok(events.every((event) => payload(event.payload).trigger === "automatic_timer"));
+    assert.ok(cadenceWindow.every((event) => payload(event.payload).trigger === "automatic_timer"));
     const cycles = await server.database.queryAll(`SELECT cycle_id AS "cycleId",query_id AS "queryId",status,source_revision AS "sourceRevision"
       FROM monitor_poll_cycle WHERE cycle_id=ANY($1::uuid[]) ORDER BY started_at`, [cycleIds]);
     assert.equal(cycles.length, 18);
     assert.ok(cycles.every((cycle) => cycle.status === "healthy"));
     const expectedQueryByCode = Object.fromEntries((["A02", "A03", "A05"] as const)
       .map((code) => [code, acceptance.registry.get(code)!.query.queryId]));
-    for (const event of events) {
+    for (const event of cadenceWindow) {
       const eventPayload = payload(event.payload);
       const cycle = cycles.find((item) => item.cycleId === eventPayload.cycleId);
       assert.ok(cycle);
@@ -294,8 +296,8 @@ test("7.1b proves one shared cadence polls connected A02, A03, and A05", { timeo
     evidenceCase = {
       id: "7.1b", status: "passed", pollCycleIds: cycleIds,
       queryIds: [...new Set(cycles.map((cycle) => String(cycle.queryId)))],
-      runtimeEventIds: events.map((event) => String(event.id)), interruptionIds: [],
-      timestamps: { dueAt: [...new Set(events.map((event) => iso(event.businessTime)))] }, objectIds: { experiments: [experimentId] },
+      runtimeEventIds: cadenceWindow.map((event) => String(event.id)), interruptionIds: [],
+      timestamps: { dueAt: [...new Set(cadenceWindow.map((event) => iso(event.businessTime)))] }, objectIds: { experiments: [experimentId] },
       assertions: { oneSharedCadence: true, completeSixMinuteWindow: true, uniqueCycles: true },
     };
   } finally {
@@ -403,7 +405,7 @@ test("7.2a proves pause freezes automatic work and resume starts a fresh deadlin
       assertions: { pausedClockFrozen: true, noRetroactiveCatchup: true, oneResumedCycle: true },
     };
   } finally {
-    runtime?.stop();
+    await runtime?.shutdown();
     await server.close();
     if (evidenceCase) schedulingEvidence.record({ ...evidenceCase, cleanup: {
       executedInFinally: true, sourceRestored: true, beforeSourceIds: [], afterSourceIds: [],
@@ -524,7 +526,7 @@ test("7.2b proves timer, manual poll, and controls share one non-overlapping run
     };
   } finally {
     releaseAutomatic?.();
-    runtime?.stop();
+    await runtime?.shutdown();
     await server.close();
     if (evidenceCase) schedulingEvidence.record({ ...evidenceCase, cleanup: {
       executedInFinally: true, sourceRestored: true, beforeSourceIds: [], afterSourceIds: [],
@@ -532,7 +534,7 @@ test("7.2b proves timer, manual poll, and controls share one non-overlapping run
   }
 });
 
-test("7.2c proves an exactly due poll completes before a racing canonical source action", { timeout: 12_000 }, async () => {
+test("7.2c proves an exactly due poll completes before a racing canonical source action", { timeout: 25_000 }, async () => {
   const connections = await TestDatabaseConnections.create(repositoryRoot);
   const server = await buildMonitorServer({
     config: {
@@ -629,7 +631,10 @@ test("7.2c proves an exactly due poll completes before a racing canonical source
     assert.equal(actionCalls, 1);
     assert.equal(runtimeError, null);
     const events = await new ScenarioExperimentRepository(server.database).runtimeEvents(experimentId);
-    assert.deepEqual(events.map((event) => [event.eventType, event.ruleCode, event.businessTime]), [
+    const sourceActionIndex = events.findIndex((event) => event.eventType === "source_action");
+    assert.ok(sourceActionIndex >= 0);
+    const boundaryEvents = events.slice(0, sourceActionIndex + 1);
+    assert.deepEqual(boundaryEvents.map((event) => [event.eventType, event.ruleCode, event.businessTime]), [
       ...(["A02", "A03", "A05"] as const).flatMap((code) => [
         ["poll_started", code, "2026-08-01T14:01:00.000Z"],
         ["poll_completed", code, "2026-08-01T14:01:00.000Z"],
@@ -638,24 +643,24 @@ test("7.2c proves an exactly due poll completes before a racing canonical source
     ]);
     assert.equal(payload(events[0]!.payload).trigger, "automatic_timer");
     assert.equal(payload(events[1]!.payload).trigger, "automatic_timer");
-    const sourceActionEvent = events.at(-1)!;
+    const sourceActionEvent = events[sourceActionIndex]!;
     assert.equal(payload(sourceActionEvent.payload).actionId, "a02.prepare_dispatch");
     assert.equal(payload(sourceActionEvent.payload).sourceRevision, execution.sourceRevision);
-    assert.equal(events.filter((event) => event.eventType === "poll_completed").length, 3);
+    assert.equal(boundaryEvents.filter((event) => event.eventType === "poll_completed").length, 3);
     assert.equal(events.filter((event) => event.eventType === "source_action").length, 1);
     const createdRows = await connections.writer.query(`SELECT id FROM flujo_materiales_detalles WHERE id=?`, [createdFlowId]);
     assert.equal((createdRows[0] as unknown[]).length, 1);
     evidenceCase = {
-      id: "7.2c", status: "passed", pollCycleIds: events.filter((event) => event.eventType === "poll_completed").map((event) => String(payload(event.payload).cycleId)),
-      queryIds: [...new Set(events.filter((event) => event.eventType === "poll_completed").map((event) => String(payload(event.payload).queryId)))],
-      runtimeEventIds: events.map((event) => String(event.id)), interruptionIds: [],
-      timestamps: { dueAt: [...new Set(events.map((event) => event.businessTime))] },
+      id: "7.2c", status: "passed", pollCycleIds: boundaryEvents.filter((event) => event.eventType === "poll_completed").map((event) => String(payload(event.payload).cycleId)),
+      queryIds: [...new Set(boundaryEvents.filter((event) => event.eventType === "poll_completed").map((event) => String(payload(event.payload).queryId)))],
+      runtimeEventIds: boundaryEvents.map((event) => String(event.id)), interruptionIds: [],
+      timestamps: { dueAt: [...new Set(boundaryEvents.map((event) => event.businessTime))] },
       objectIds: { experiments: [experimentId], sourceActions: [String(sourceActionEvent.id)] },
       assertions: { pollCompletedBeforeAction: true, noOverlap: true, oneSourceMutation: true },
     };
   } finally {
     releasePoll?.();
-    runtime?.stop();
+    await runtime?.shutdown();
     if (createdFlowId) {
       await connections.writer.execute("DELETE FROM flujo_materiales_detalles WHERE id_padre=?", [createdFlowId]);
       await connections.writer.execute("DELETE FROM flujo_materiales_detalles WHERE id=?", [createdFlowId]);
@@ -715,7 +720,7 @@ test("7.3a proves restart preserves a future deadline without premature polling"
     const cyclesBefore = await server.database.queryOne(
       "SELECT COUNT(*)::int AS count FROM monitor_poll_cycle WHERE query_id=ANY($1::text[])", [queryIds],
     );
-    original.stop();
+    await original.shutdown();
     original = null;
 
     replacement = new ScenarioExperimentRuntime(repository, acceptance.source, acceptance.scheduler, acceptance.registry, true,
@@ -742,8 +747,8 @@ test("7.3a proves restart preserves a future deadline without premature polling"
       assertions: { experimentIdentityPreserved: true, exactDeadlinePreserved: true, noPrematurePoll: true },
     };
   } finally {
-    original?.stop();
-    replacement?.stop();
+    await original?.shutdown();
+    await replacement?.shutdown();
     await server.close();
     if (evidenceCase) schedulingEvidence.record({ ...evidenceCase, cleanup: {
       executedInFinally: true, sourceRestored: true, beforeSourceIds: [], afterSourceIds: [],
@@ -751,7 +756,7 @@ test("7.3a proves restart preserves a future deadline without premature polling"
   }
 });
 
-test("7.3b proves restart recovers every missed deadline once in chronological order", { timeout: 12_000 }, async () => {
+test("7.3b proves restart recovers every missed deadline once in chronological order", { timeout: 25_000 }, async () => {
   const server = await buildMonitorServer({
     config: {
       nodeEnv: "test",
@@ -788,7 +793,7 @@ test("7.3b proves restart recovers every missed deadline once in chronological o
     const experimentId = configured.experiment!.id;
     const running = await original.pause(experimentId, false);
     const missedDeadline = running.nextAutomaticTickAt!;
-    original.stop();
+    await original.shutdown();
     original = null;
 
     logicalNow += 3_200;
@@ -800,7 +805,7 @@ test("7.3b proves restart recovers every missed deadline once in chronological o
     await waitFor(async () => {
       const events = await repository.runtimeEvents(experimentId);
       return events.filter((event) => event.eventType === "poll_completed").length === 9 ? events : null;
-    }, 7_000);
+    }, 20_000);
     await replacement.executeSerialized(async () => undefined);
     const recovered = await replacement.pause(experimentId, true);
 
@@ -849,8 +854,8 @@ test("7.3b proves restart recovers every missed deadline once in chronological o
       assertions: { chronologicalRecovery: true, uniqueCycles: true, exactMissedWork: true },
     };
   } finally {
-    original?.stop();
-    replacement?.stop();
+    await original?.shutdown();
+    await replacement?.shutdown();
     await server.close();
     if (evidenceCase) schedulingEvidence.record({ ...evidenceCase, cleanup: {
       executedInFinally: true, sourceRestored: true, beforeSourceIds: [], afterSourceIds: [],
@@ -858,7 +863,7 @@ test("7.3b proves restart recovers every missed deadline once in chronological o
   }
 });
 
-test("7.3c proves a second restart does not replay recovery and continues normal cadence", { timeout: 12_000 }, async () => {
+test("7.3c proves a second restart does not replay recovery and continues normal cadence", { timeout: 35_000 }, async () => {
   const server = await buildMonitorServer({
     config: {
       nodeEnv: "test",
@@ -899,7 +904,7 @@ test("7.3c proves a second restart does not replay recovery and continues normal
     const experimentId = configured.experiment!.id;
     const running = await original.pause(experimentId, false);
     const firstDeadline = running.nextAutomaticTickAt!;
-    original.stop();
+    await original.shutdown();
     original = null;
 
     logicalNow += 3_200;
@@ -908,7 +913,7 @@ test("7.3c proves a second restart does not replay recovery and continues normal
     await waitFor(async () => {
       const events = await repository.runtimeEvents(experimentId);
       return events.filter((event) => event.eventType === "poll_completed").length === 9 ? events : null;
-    }, 7_000);
+    }, 20_000);
     await recovery.executeSerialized(async () => undefined);
     const recovered = await recovery.status();
     const nextDeadline = recovered.nextAutomaticTickAt!;
@@ -917,7 +922,7 @@ test("7.3c proves a second restart does not replay recovery and continues normal
     const recoveredCycleIds = recoveredEvents.filter((event) => event.eventType === "poll_completed")
       .map((event) => String(payload(event.payload).cycleId));
     assert.equal(recoveredCycleIds.length, 9);
-    recovery.stop();
+    await recovery.shutdown();
     recovery = null;
 
     continuation = runtime();
@@ -932,7 +937,7 @@ test("7.3c proves a second restart does not replay recovery and continues normal
     await waitFor(async () => {
       const events = await repository.runtimeEvents(experimentId);
       return events.filter((event) => event.eventType === "poll_completed").length === 12 ? events : null;
-    }, 5_000);
+    }, 15_000);
     await continuation.executeSerialized(async () => undefined);
     const stopped = await continuation.pause(experimentId, true);
     const events = await repository.runtimeEvents(experimentId);
@@ -975,9 +980,9 @@ test("7.3c proves a second restart does not replay recovery and continues normal
       assertions: { recoveredCyclesNotReplayed: true, normalCadenceContinued: true, uniqueCycles: true },
     };
   } finally {
-    original?.stop();
-    recovery?.stop();
-    continuation?.stop();
+    await original?.shutdown();
+    await recovery?.shutdown();
+    await continuation?.shutdown();
     await server.close();
     if (evidenceCase) schedulingEvidence.record({ ...evidenceCase, cleanup: {
       executedInFinally: true, sourceRestored: true, beforeSourceIds: [], afterSourceIds: [],

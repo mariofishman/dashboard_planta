@@ -43,6 +43,7 @@ test("experiment identity, versioned snapshots, and paginated history survive mi
     [randomUUID(), legacyIds[0], JSON.stringify({ unversioned: true }), "2026-08-01T08:00:00.000Z"]);
     await database.execute(await readFile(resolve(migrationRoot, "0014_phase6_stage5_experiment_history.sql"), "utf8"));
     await database.execute(await readFile(resolve(migrationRoot, "0018_phase6_stage5_v2_experiment_contract.sql"), "utf8"));
+    await database.execute(await readFile(resolve(migrationRoot, "0019_phase6_stage5_source_cutoff.sql"), "utf8"));
 
     const legacyRows = await database.queryAll("SELECT id,run_id AS \"runId\" FROM monitor_scenario_experiment WHERE id=ANY($1::uuid[]) ORDER BY id", [legacyIds]);
     assert.equal(new Set(legacyRows.map((row) => row.runId)).size, 2);
@@ -52,6 +53,8 @@ test("experiment identity, versioned snapshots, and paginated history survive mi
 
     const repository = new ScenarioExperimentRepository(database);
     const experiment = await repository.create("Current run", "2026-08-01T09:00:00.000Z", pollingFrequencyMinutes, identity("stage5-current"));
+    assert.equal(experiment.initialBusinessTime, "2026-08-01T09:00:00.000Z");
+    assert.equal(experiment.sourceCutoffAt, "2026-07-02T09:00:00.000Z");
     const first = await repository.snapshot(experiment.id, "before", payload("before"));
     const retry = await repository.snapshot(experiment.id, "before", payload("before"));
     assert.equal(retry.id, first.id);
@@ -99,7 +102,11 @@ test("experiment runtime preserves cadence, serializes crossed polls, freezes wh
   await migrateFoundation(database);
   const repository = new ScenarioExperimentRepository(database);
   let sourceClock = "2026-08-01T09:00:00.000Z";
-  const source = { setBusinessTime: async (currentAt: string) => { sourceClock = currentAt; } } as ScenarioSource;
+  let sourceCutoff: string | null = "uninitialized";
+  const source = {
+    setBusinessTime: async (currentAt: string) => { sourceClock = currentAt; },
+    setSourceCutoffAt: async (cutoffAt: string | null) => { sourceCutoff = cutoffAt; },
+  } as ScenarioSource;
   const calls: Array<{ ruleCode: string; businessTime: string }> = [];
   let automaticPollResolved: (() => void) | null = null;
   const scheduler = {
@@ -127,9 +134,12 @@ test("experiment runtime preserves cadence, serializes crossed polls, freezes wh
 
   try {
     const runtime = new ScenarioExperimentRuntime(repository, source, scheduler, registry, false);
+    await runtime.initialize();
+    assert.equal(sourceCutoff, null);
     const created = await runtime.create({
       name: "Manual runtime", businessTime: sourceClock, pollingFrequencyMinutes: 3, identity: identity("runtime-manual"),
     });
+    assert.equal(sourceCutoff, created.experiment!.sourceCutoffAt);
     const id = created.experiment!.id;
     for (const seconds of [1, 2, 3, 17, 60] as const) {
       const configured = await runtime.configure(id, seconds, 3);
@@ -142,6 +152,8 @@ test("experiment runtime preserves cadence, serializes crossed polls, freezes wh
     await runtime.configure(id, 1, 3);
     await runtime.pause(id, false);
     const jumped = await runtime.advance(id, 29);
+    assert.equal(jumped.experiment.initialBusinessTime, "2026-08-01T09:00:00.000Z");
+    assert.equal(jumped.experiment.businessTime, "2026-08-01T09:29:00.000Z");
     assert.deepEqual(jumped.polls.map(({ ruleCode, dueAt }) => [ruleCode, dueAt]), Array.from({ length: 9 }, (_, index) =>
       ["A02", "A03", "A05"].map((ruleCode) => [ruleCode, `2026-08-01T09:${String((index + 1) * 3).padStart(2, "0")}:00.000Z`])).flat());
     const paused = await runtime.pause(id, true);

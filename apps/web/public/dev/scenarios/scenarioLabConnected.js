@@ -21,9 +21,14 @@ let data = {
     selected: null,
     permission: "origin",
     snapshots: [],
+    page: 1,
+    pageSize: 50,
+    reset: null,
+    resetObserved: false,
   },
-  busy = false,
-  closureTarget = null;
+  refreshPromise = null,
+  closureTarget = null,
+  tabInteractionActive = false;
 const fmt = (v) =>
   v
     ? new Intl.DateTimeFormat("es-PE", {
@@ -35,6 +40,7 @@ const fmt = (v) =>
         hour12: false,
       }).format(new Date(v))
     : "—";
+const businessTimeIsoValue = (value) => new Date(`${value}:00-05:00`).toISOString();
 const val = (r, ...ks) => {
   for (const k of ks) if (r[k] != null && r[k] !== "") return r[k];
   return "—";
@@ -66,6 +72,7 @@ function incident(record) {
     ? {
         id: i.id,
         status: i.lifecycle,
+        occurrence: i.occurrence,
         openedAt: i.openedAt,
         reasons: record.expected.reasons,
         evidence: record.actual.evidenceCount,
@@ -78,6 +85,7 @@ function incident(record) {
     : null;
 }
 function rows(type) {
+  if (!experiment()) return [];
   const s = status(type.toUpperCase());
   return (s?.records || []).map((record) => {
     const r = record.row,
@@ -118,7 +126,8 @@ function rows(type) {
         machine: val(r, "machineCode"),
         startedAt: val(r, "startedAt"),
         active: r.active === true,
-        consumptionAt: r.firstConsumptionAt,
+        consumptionAt:
+          Number(r.consumptionCount) > 0 ? r.firstConsumptionAt || true : null,
         closedAt: r.closedAt,
       };
     return {
@@ -135,14 +144,16 @@ function rows(type) {
     };
   });
 }
-const chip = (r) =>
-  r.pending
+const chip = (r) => {
+  const lifecycle = r.incident?.status ?? r.actual?.incident?.lifecycle;
+  return r.pending
     ? '<span class="chip pending">Cambio pendiente</span>'
-    : r.incident?.status === "open"
+    : lifecycle === "open"
       ? '<span class="chip open">Abierta</span>'
-      : r.incident?.status === "resolved"
+      : lifecycle === "resolved"
         ? '<span class="chip resolved">Resuelta</span>'
         : '<span class="chip neutral">Sin incidente</span>';
+};
 const eye =
   '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z"/><circle cx="12" cy="12" r="2.5"/></svg>';
 function actions(type, r) {
@@ -184,7 +195,7 @@ function actions(type, r) {
           '">Registrar pesaje</button>'
         : "") +
       (!r.movedAt
-        ? '<button class="success" data-do="a05.register_movement" data-key="' +
+        ? '<button class="success" data-do="a05.handoff_to_a02" data-key="' +
           r.key +
           '">Registrar salida</button>'
         : "") +
@@ -250,23 +261,30 @@ function renderHeader() {
     : "Aún no ejecutado";
   $("#sourcePending").classList.toggle(
     "hidden",
-    !data.items.some((i) => i.records.some((r) => r.pendingPoll)),
+    !e || !data.items.some((i) => i.expectedResult?.awaitingPoll),
   );
   if (e) {
-    $("#startTime").value = new Date(e.businessTime).toISOString().slice(0, 16);
-    $("#speed").value = e.secondsPerSimulatedMinute;
-    $("#frequency").value = e.pollingFrequencyMinutes;
+    const speed = $("#speed");
+    if (document.activeElement !== speed)
+      speed.value = e.secondsPerSimulatedMinute;
   }
   $$("[data-jump]").forEach((b) => (b.disabled = e?.status !== "running"));
 }
 function renderAlert(type) {
-  const list = rows(type).filter((r) =>
+  const hasExperiment = Boolean(experiment()),
+    list = rows(type).filter((r) =>
       type === "a02"
-        ? r.sourceState === "TRANSITO"
+        ? r.pending || r.sourceState === "TRANSITO"
         : type === "a03"
-          ? r.active && !r.consumptionAt
+          ? r.pending || (r.active && !r.consumptionAt)
           : r.pending || !r.weighedAt || !r.movedAt,
     ),
+    pagination = (hasExperiment ? status(type.toUpperCase())?.pagination : null) ?? {
+      page: 1,
+      pageSize: data.pageSize,
+      totalRecords: list.length,
+      totalPages: 1,
+    },
     labels = {
       a02: [
         "A02 · Movimientos de material",
@@ -328,46 +346,75 @@ function renderAlert(type) {
   $("#tabContent").innerHTML =
     '<div class="section-head"><div><h2>' +
     labels[0] +
-    '</h2><p>Crea varios registros en momentos diferentes y deja que Monitor los evalúe independientemente.</p></div><div class="section-actions"><button id="historyButton">Ver historial</button><div class="split-action"><button class="primary" id="createButton">' +
+    '</h2><p>Crea varios registros en momentos diferentes y deja que Monitor los evalúe independientemente.</p></div><div class="section-actions"><button id="historyButton">Ver historial</button><div class="split-action"><button class="primary" id="createButton" ' +
+    (hasExperiment ? "" : "disabled") +
+    ">" +
     labels[1] +
-    '</button><button class="primary split-more" id="createOptions">▼</button></div></div></div>' +
+    '</button><button class="primary split-more" id="createOptions" ' +
+    (hasExperiment ? "" : "disabled") +
+    '>▼</button></div></div></div>' +
     (type === "a02"
       ? '<div class="scenario-control"><label><span>Zona de influencia del usuario</span><select id="a02Permission"><option value="origin">Solo origen</option><option value="destination">Solo destino</option><option value="both">Origen y destino</option></select></label><p>El laboratorio permite recibir el material o simular que el emisor anuló el envío.</p></div>'
       : "") +
     '<div class="table-block"><div class="table-title"><h3>' +
     labels[2] +
     '</h3><span class="count">' +
-    list.length +
+    pagination.totalRecords +
     "</span></div>" +
     table(type, list, cols, labels[3]) +
+    '<div class="pagination"><span>Página ' +
+    pagination.page +
+    " de " +
+    pagination.totalPages +
+    " · " +
+    pagination.totalRecords +
+    ' registros</span><button data-page="' +
+    (pagination.page - 1) +
+    '" ' +
+    (pagination.page <= 1 ? "disabled" : "") +
+    '>Anterior</button><button data-page="' +
+    (pagination.page + 1) +
+    '" ' +
+    (pagination.page >= pagination.totalPages ? "disabled" : "") +
+    ">Siguiente</button></div>" +
     "</div>";
   bind();
 }
 async function sourceAction(action, key) {
-  await api("/api/dev/source-actions", {
+  const authorityApplies = action === "a02.cancel" || action === "a02.reject";
+  const execution = await api("/api/dev/source-actions", {
     method: "POST",
     body: JSON.stringify({
       actionId: action,
-      key,
-      ...(action.startsWith("a02.") ? { authority: data.permission } : {}),
+      ...(key === undefined ? {} : { key }),
+      ...(authorityApplies ? { authority: data.permission } : {}),
     }),
   });
-  if (action === "a05.register_movement")
-    await api("/api/dev/source-actions", {
-      method: "POST",
-      body: JSON.stringify({ actionId: "a05.handoff_to_a02", key }),
-    });
+  if (action === "a02.prepare_dispatch") data.page = Number.MAX_SAFE_INTEGER;
   notify("Cambio guardado en el origen");
-  await refresh();
+  await refresh(true);
+  return execution;
 }
 function bind() {
-  $$("[data-do]").forEach(
-    (b) =>
-      (b.onclick = () =>
-        sourceAction(b.dataset.do, Number(b.dataset.key)).catch((e) =>
-          notify("No se pudo guardar: " + e.message),
-        )),
-  );
+  $$('[data-page]').forEach((button) => {
+    button.onclick = async () => {
+      data.page = Number(button.dataset.page);
+      data.selected = null;
+      await refresh(true);
+    };
+  });
+  $("#tabContent").onclick = async (event) => {
+    const button = event.target.closest("[data-do]");
+    if (!button) return;
+    button.disabled = true;
+    try {
+      await sourceAction(button.dataset.do, Number(button.dataset.key));
+    } catch (error) {
+      notify("No se pudo guardar: " + error.message);
+    } finally {
+      if (document.contains(button)) button.disabled = false;
+    }
+  };
   $$("[data-inspect]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -386,8 +433,23 @@ function bind() {
       render();
     };
   }
-  $("#createButton").onclick = () => createSource(data.tab);
-  $("#createOptions").setAttribute(
+  const createButton = $("#createButton"),
+    createOptions = $("#createOptions");
+  createButton.onclick = async () => {
+    createButton.disabled = true;
+    createOptions.disabled = true;
+    try {
+      await createSource(data.tab);
+    } catch (error) {
+      notify("No se pudo crear: " + error.message);
+    } finally {
+      if (document.contains(createButton)) {
+        createButton.disabled = false;
+        createOptions.disabled = false;
+      }
+    }
+  };
+  createOptions.setAttribute(
     "aria-label",
     data.tab === "a02"
       ? "Editar datos antes de despachar"
@@ -395,12 +457,13 @@ function bind() {
         ? "Editar datos antes de iniciar la OT"
         : "Editar datos antes de declarar la bobina",
   );
-  $("#createOptions").onclick = () => openConnectedEditor(data.tab);
+  createOptions.onclick = () => openConnectedEditor(data.tab);
   $("#historyButton").onclick = () => openHistory(data.tab);
 }
 function renderDetail() {
   const box = $("#detailPanel"),
-    r = data.selected;
+    r = data.selected,
+    pending = r?.pending ?? r?.pendingPoll ?? false;
   if (!r) {
     box.classList.add("hidden");
     return;
@@ -410,13 +473,13 @@ function renderDetail() {
     '<div class="detail-col"><h3>Fuente actual</h3><div class="fact"><span>Registro</span><strong>' +
     r.key +
     '</strong></div><div class="fact"><span>Cambio pendiente</span><strong>' +
-    (r.pendingPoll ? "Sí" : "No") +
+    (pending ? "Sí" : "No") +
     '</strong></div></div><div class="detail-col"><h3>Resultado esperado</h3><p>' +
     (r.expected.triggered
       ? "Abrir o conservar una sola alerta."
       : "Sin alerta: no hay motivo activo.") +
     '</p><div class="fact"><span>Comparación</span><strong>' +
-    (r.comparison.matches ? "Coincide" : "No coincide") +
+    (pending ? "Pendiente de sondeo" : r.comparison.matches ? "Coincide" : "No coincide") +
     '</strong></div></div><div class="detail-col"><h3>Monitor real</h3><div class="fact"><span>Incidente</span><strong>' +
     (r.actual.incident?.id || "Ninguno") +
     '</strong></div><div class="fact"><span>Estado</span><strong>' +
@@ -441,50 +504,100 @@ function render() {
   $$(".tab").forEach((t) =>
     t.classList.toggle("active", t.dataset.tab === data.tab),
   );
+  if (tabInteractionActive) return;
   if (data.tab === "integrity") renderIntegrity();
   else renderAlert(data.tab);
   renderDetail();
 }
-async function refresh() {
-  if (busy) return;
-  busy = true;
-  try {
+function reconcileSelectedRecord() {
+  if (!data.selected) return;
+  const current = status(code())?.records.find(
+    (record) => record.key === data.selected.key,
+  );
+  data.selected = current || null;
+}
+const resetRunning = (reset) =>
+  ["validating", "restoring_source", "validating_source", "clearing_monitor"].includes(
+    reset?.stage,
+  );
+const resetLabels = {
+  validating: "Validando el destino local protegido…",
+  restoring_source: "Restableciendo y validando test_database…",
+  validating_source: "Confirmando la restauración de test_database…",
+  clearing_monitor: "Eliminando experimentos, sondeos, incidentes y conversaciones locales de Monitor…",
+  succeeded: "Restauración completa. Recargando el laboratorio…",
+  failed: "La restauración falló. test_database no se considera listo.",
+};
+function renderReset(reset) {
+  data.reset = reset;
+  const dialog = $("#resetDatabaseDialog"),
+    running = resetRunning(reset),
+    progress = $("#resetProgress");
+  if (running || (data.resetObserved && reset?.stage !== "idle")) {
+    if (!dialog.open) dialog.showModal();
+    progress.classList.remove("hidden");
+    progress.textContent = resetLabels[reset.stage] || "Procesando…";
+  }
+  $("#cancelResetButton").disabled = running;
+  $("#confirmResetButton").disabled = running;
+  $("#resetDatabaseButton").disabled = running;
+}
+async function refresh(force = false) {
+  if (refreshPromise) {
+    await refreshPromise;
+    if (!force) return;
+    return refresh();
+  }
+  const task = (async () => {
+   try {
+    const reset = await api("/api/dev/test-database-reset");
+    renderReset(reset);
+    if (resetRunning(reset)) return;
+    if (data.resetObserved && reset.stage === "succeeded") {
+      window.location.reload();
+      return;
+    }
     const [s, r] = await Promise.all([
-      api("/api/dev/scenarios"),
+      api(
+        `/api/dev/scenarios?page=${data.page}&pageSize=${data.pageSize}&activeOnly=true`,
+      ),
       api("/api/dev/scenario-runtime"),
     ]);
     data.items = s.scenarios;
     data.runtime = r;
+    reconcileSelectedRecord();
     if ($("#pollFailure")?.dataset.connectionError === "true") {
       $("#pollFailure").classList.add("hidden");
       $("#pollFailure").dataset.connectionError = "false";
     }
     render();
-  } catch (e) {
+   } catch (e) {
     const notice = $("#pollFailure");
     notice.dataset.connectionError = "true";
     notice.className = "notice";
     notice.textContent =
       "El laboratorio conectado no está disponible temporalmente. Se reanudará cuando test_database vuelva a estar listo.";
+   }
+  })();
+  refreshPromise = task;
+  try {
+    await task;
   } finally {
-    busy = false;
+    if (refreshPromise === task) refreshPromise = null;
   }
 }
 async function createSource(type) {
-  const s = status(type.toUpperCase()),
-    record = s?.records?.[0];
-  if (!record) return notify("No existe una plantilla fuente conectada");
   const action =
     type === "a02"
       ? "a02.prepare_dispatch"
       : type === "a03"
         ? "a03.start_work_order"
         : "a05.declare_produced_reel";
-  await sourceAction(action, record.key);
+  await sourceAction(action);
 }
 function openConnectedEditor(type) {
   const record = rows(type)[0];
-  if (!record) return notify("No existe una plantilla fuente conectada");
+  if (!record && type !== "a05") return notify("No existe una plantilla fuente conectada");
   const fields =
     type === "a02"
       ? [
@@ -515,10 +628,10 @@ function openConnectedEditor(type) {
             [
               "serialCode",
               "Código único",
-              record.source.serialCode || record.id,
+              "",
             ],
-            ["sku", "SKU", record.source.sku],
-            ["sourceWorkOrderId", "OT", record.source.workOrderId],
+            ["sku", "SKU", ""],
+            ["sourceWorkOrderId", "OT", ""],
           ];
   $("#dialogTitle").textContent =
     type === "a02"
@@ -527,7 +640,7 @@ function openConnectedEditor(type) {
         ? "Iniciar OT"
         : "Declarar bobina";
   $("#dialogFields").innerHTML =
-    `<input type="hidden" name="sourceKey" value="${record.key}"><input type="hidden" name="sourceType" value="${type}">${fields.map(([name, label, value]) => `<label><span>${label}</span><input name="${name}" value="${value === "—" ? "" : value}"></label>`).join("")}` +
+    `<input type="hidden" name="sourceKey" value="${type === "a05" ? "" : record.key}"><input type="hidden" name="sourceType" value="${type}">${fields.map(([name, label, value]) => `<label><span>${label}</span><input name="${name}" value="${value === "—" ? "" : value}"></label>`).join("")}` +
     (type === "a05"
       ? '<label><span>Tipo</span><select name="kind"><option value="produced">Producida</option><option value="remnant">Remanente</option></select></label>'
       : "");
@@ -537,7 +650,7 @@ $("#recordForm").onsubmit = async (event) => {
   event.preventDefault();
   const form = Object.fromEntries(new FormData(event.currentTarget));
   const type = form.sourceType,
-    key = Number(form.sourceKey);
+    key = form.sourceKey === "" ? undefined : Number(form.sourceKey);
   delete form.sourceType;
   delete form.sourceKey;
   const numeric = new Set([
@@ -571,11 +684,15 @@ $("#recordForm").onsubmit = async (event) => {
           : "a05.declare_produced_reel";
   await api("/api/dev/source-actions", {
     method: "POST",
-    body: JSON.stringify({ actionId, key, input }),
+    body: JSON.stringify({
+      actionId,
+      ...(key === undefined ? {} : { key }),
+      input,
+    }),
   });
   $("#recordDialog").close();
   notify("Registro creado en el origen");
-  await refresh();
+  await refresh(true);
 };
 async function openHistory(type) {
   const p = await api(
@@ -726,7 +843,8 @@ $$(".tab").forEach(
     (b.onclick = () => {
       data.tab = b.dataset.tab;
       data.selected = null;
-      render();
+      data.page = 1;
+      refresh(true);
     }),
 );
 $$("[data-jump]").forEach(
@@ -738,7 +856,7 @@ $$("[data-jump]").forEach(
         method: "POST",
         body: JSON.stringify({ minutes: Number(b.dataset.jump) }),
       });
-      await refresh();
+      await refresh(true);
     }),
 );
 $("#runButton").onclick = async () => {
@@ -748,15 +866,16 @@ $("#runButton").onclick = async () => {
     method: "POST",
     body: JSON.stringify({ paused: e.status === "running" }),
   });
-  await refresh();
+  await refresh(true);
 };
 $("#newExperimentButton").onclick = async () => {
   const r = await api("/api/dev/scenario-runtime", {
     method: "POST",
     body: JSON.stringify({
       name: "Experimento " + new Date().toLocaleString("es-PE"),
-      businessTime: new Date($("#startTime").value).toISOString(),
+      businessTime: businessTimeIsoValue($("#startTime").value),
       pollingFrequencyMinutes: Number($("#frequency").value),
+      sourceLookbackDays: Number($("#sourceLookbackDays").value),
       runId: "v2-" + Date.now(),
       manifestVersion: "stage5.v2",
     }),
@@ -768,7 +887,7 @@ $("#newExperimentButton").onclick = async () => {
       pollingFrequencyMinutes: Number($("#frequency").value),
     }),
   });
-  await refresh();
+  await refresh(true);
 };
 $("#snapshotButton").onclick = async () => {
   const e = experiment();
@@ -794,18 +913,41 @@ const configure = async () => {
       pollingFrequencyMinutes: Number($("#frequency").value),
     }),
   });
-  await refresh();
+  await refresh(true);
 };
 $("#speed").onchange = configure;
 $("#frequency").onchange = configure;
+$("#resetDatabaseButton").onclick = () => {
+  data.resetObserved = false;
+  $("#resetProgress").classList.add("hidden");
+  $("#cancelResetButton").disabled = false;
+  $("#confirmResetButton").disabled = false;
+  $("#resetDatabaseDialog").showModal();
+};
+$("#cancelResetButton").onclick = () => $("#resetDatabaseDialog").close();
+$("#confirmResetButton").onclick = async () => {
+  data.resetObserved = true;
+  const reset = await api("/api/dev/test-database-reset", {
+    method: "POST",
+    body: JSON.stringify({ confirmation: "RESET TEST DATABASE" }),
+  });
+  renderReset(reset);
+};
 $$("[data-close]").forEach(
   (button) => (button.onclick = () => $("#" + button.dataset.close).close()),
 );
 $$("dialog").forEach((dialog) =>
   dialog.addEventListener("click", (event) => {
-    if (event.target === dialog) dialog.close();
+    if (
+      event.target === dialog &&
+      !(dialog.id === "resetDatabaseDialog" && resetRunning(data.reset))
+    )
+      dialog.close();
   }),
 );
+$("#resetDatabaseDialog").addEventListener("cancel", (event) => {
+  if (resetRunning(data.reset)) event.preventDefault();
+});
 $("#closureForm").onsubmit = async (event) => {
   event.preventDefault();
   if (!closureTarget?.actual.incident) return;
@@ -824,7 +966,18 @@ $("#closureForm").onsubmit = async (event) => {
   data.selected = null;
   event.currentTarget.reset();
   notify("Incidente cerrado y movido al historial sin modificar el origen");
-  await refresh();
+  await refresh(true);
 };
+$("#tabContent").addEventListener("pointerdown", (event) => {
+  if (event.target.closest("button, input, select")) tabInteractionActive = true;
+});
+document.addEventListener("pointerup", () => {
+  setTimeout(() => {
+    tabInteractionActive = false;
+  }, 100);
+});
+document.addEventListener("pointercancel", () => {
+  tabInteractionActive = false;
+});
 refresh();
 setInterval(refresh, 1000);

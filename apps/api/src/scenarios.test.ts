@@ -404,6 +404,12 @@ it("exposes durable experiment history and ordered runtime events to administrat
   assert.equal(created.statusCode, 200, created.body);
   const experimentId = created.json().experiment.id;
   assert.equal(created.json().experiment.status, "paused");
+  const pristine = (await instance.app.inject({ url: "/api/dev/scenarios?activeOnly=true", headers: manager })).json().scenarios;
+  for (const item of pristine) {
+    assert.equal(item.sourceState.rows.length, 0, `${item.ruleCode} must be empty before the experiment starts`);
+    assert.equal(item.pollerState.latestPoll, null, `${item.ruleCode} must not inherit a prior experiment poll`);
+    assert.equal(item.actualMonitor.incidentCount, 0, `${item.ruleCode} must not inherit prior experiment incidents`);
+  }
   const started = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/pause`, headers: manager, payload: { paused: false } });
   assert.equal(started.statusCode, 200, started.body);
   const advanced = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/advance`, headers: manager, payload: { minutes: 1 } });
@@ -479,28 +485,43 @@ it("executes the canonical source-action endpoint against test_database and rest
       payload: { actionId: "a02.prepare_dispatch", key: flowId, input: { materialName: "Material laboratorio editable", quantity: 2 } },
     });
     assert.equal(dispatch.statusCode, 200, dispatch.body);
-    const dispatchRows = dispatch.json().scenario.sourceState.rows as Array<{ materialFlowDetailId: number; state: string; materialName: string; quantity: number }>;
-    createdFlowId = Number(dispatchRows.find((row) => Number(row.materialFlowDetailId) !== flowId)?.materialFlowDetailId);
+    const dispatchExecution = dispatch.json().execution as { sourceDiff: { changes: Array<{ table: string; key: number }>; after: Array<{ table: string; key: number; values: Record<string, unknown> }> } };
+    createdFlowId = Number(dispatchExecution.sourceDiff.changes.find((change) => change.table === "flujo_materiales_detalles"
+      && !existingDispatchIds.has(Number(change.key)) && Number(change.key) !== flowId)?.key);
     assert.ok(Number.isSafeInteger(createdFlowId) && createdFlowId > 0);
-    assert.equal(dispatchRows.find((row) => Number(row.materialFlowDetailId) === createdFlowId)?.state, "TRANSITO");
-    assert.equal(dispatchRows.find((row) => Number(row.materialFlowDetailId) === createdFlowId)?.materialName, "Material laboratorio editable");
-    assert.equal(Number(dispatchRows.find((row) => Number(row.materialFlowDetailId) === createdFlowId)?.quantity), 2);
-    assert.equal(dispatch.json().scenario.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, true);
-    assert.equal(dispatch.json().scenario.records.find((record: { key: number }) => record.key === flowId)?.pendingPoll, false);
+    const createdEvidence = dispatchExecution.sourceDiff.after.find((record) => record.table === "flujo_materiales_detalles" && Number(record.key) === createdFlowId)?.values;
+    assert.equal(createdEvidence?.estado, "TRANSITO");
+    assert.equal(createdEvidence?.nombre_articulo, "Material laboratorio editable");
+    assert.equal(Number(createdEvidence?.cantidad_entransito_uso), 2);
+    const dispatchStatus = await instance.app.inject({ url: `/api/dev/scenarios?page=${Number.MAX_SAFE_INTEGER}&pageSize=50&activeOnly=true`, headers: manager });
+    const dispatchScenario = dispatchStatus.json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
+    assert.equal(dispatchScenario.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, true);
     const receipt = await instance.app.inject({
       method: "POST", url: "/api/dev/source-actions", headers: { authorization: "Bearer mock:plant-manager" },
       payload: { actionId: "a02.receive", key: createdFlowId },
     });
     assert.equal(receipt.statusCode, 200, receipt.body);
-    assert.equal((receipt.json().scenario.sourceState.rows as Array<{ materialFlowDetailId: number; state: string }>).find((row) => Number(row.materialFlowDetailId) === createdFlowId)?.state, "RECIBIDO");
+    const receivedEvidence = receipt.json().execution.sourceDiff.after.find((record: { table: string; key: number }) => record.table === "flujo_materiales_detalles" && Number(record.key) === createdFlowId)?.values;
+    assert.equal(receivedEvidence?.estado, "RECIBIDO");
     const history = await instance.app.inject({ url: "/api/dev/scenario-operational-history?code=A02&timingOutcome=on_time", headers: manager });
     assert.equal(history.statusCode, 200, history.body);
     assert.equal(history.json().items.some((item: { sourceKey: number; experimentName: string }) => item.sourceKey === createdFlowId && item.experimentName === "Connected editable history"), true);
     const experimentId = experiment.json().experiment.id;
     await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/pause`, headers: manager, payload: { paused: false } });
+    const armedFailure = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/fail-next-poll", headers: manager, payload: { fault: "partial" } });
+    assert.equal(armedFailure.statusCode, 200, armedFailure.body);
+    const failedAdvance = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/advance`, headers: manager, payload: { minutes: 3 } });
+    assert.equal(failedAdvance.statusCode, 200, failedAdvance.body);
+    assert.equal(failedAdvance.json().polls.find((poll: { ruleCode: string }) => poll.ruleCode === "A02")?.result.status, "partial");
+    const afterFailedPoll = await instance.app.inject({ url: `/api/dev/scenarios?page=${Number.MAX_SAFE_INTEGER}&pageSize=50&activeOnly=true`, headers: manager });
+    const a02AfterFailedPoll = afterFailedPoll.json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
+    assert.equal(a02AfterFailedPoll.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, true,
+      "an incomplete poll must not acknowledge a source action");
+    const failedEvents = await instance.app.inject({ url: `/api/dev/scenario-experiments/${experimentId}`, headers: manager });
+    assert.equal(failedEvents.json().events.some((event: { eventType: string; ruleCode: string }) => event.eventType === "poll_failed" && event.ruleCode === "A02"), true);
     const advanced = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/advance`, headers: manager, payload: { minutes: 3 } });
     assert.equal(advanced.statusCode, 200, advanced.body);
-    const afterPoll = await instance.app.inject({ url: "/api/dev/scenarios", headers: manager });
+    const afterPoll = await instance.app.inject({ url: `/api/dev/scenarios?page=${Number.MAX_SAFE_INTEGER}&pageSize=50`, headers: manager });
     const a02AfterPoll = afterPoll.json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
     assert.equal(a02AfterPoll.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, false);
 

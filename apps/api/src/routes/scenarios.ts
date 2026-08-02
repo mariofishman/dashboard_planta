@@ -3,11 +3,13 @@ import type { DetectionScheduler, ScenarioCase, ScenarioCorrection, ScenarioExpe
 import type { DetectionQueryDefinition, DetectionSourceAdapter } from "@monitor/detection";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { ScenarioSourceActionError, ScenarioSourceActionService } from "../scenario-source-action-service.js";
+import type { TestDatabaseResetCoordinator } from "../test-database-reset.js";
 
 type ScenarioCode = "A02" | "A03" | "A05";
 const codes: ScenarioCode[] = ["A02", "A03", "A05"];
 const validPollingFrequency = (value: unknown): value is number => Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 99;
 const validSecondsPerMinute = (value: unknown): value is number => Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 60;
+const validSourceLookbackDays = (value: unknown): value is number => Number.isInteger(value) && Number(value) <= 0 && Number(value) >= -3650;
 
 const recordKey = (code: ScenarioCode, row: Record<string, unknown>): number => Number(
   code === "A02" ? row.materialFlowDetailId : code === "A03" ? row.workOrderId : row.articleSerialId,
@@ -35,17 +37,25 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
   runtime: ScenarioExperimentRuntime;
   experiments: ScenarioExperimentRepository;
   registry: Map<ScenarioCode, { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
+  reset?: TestDatabaseResetCoordinator;
 }): Promise<void> {
   const sourceActionService = new ScenarioSourceActionService(options.source, options.sourceActionContracts);
-  const status = async (code: ScenarioCode) => {
+  const status = async (code: ScenarioCode, requestedPage = 1, pageSize = 50, activeOnly = false) => {
     const activeRuntime = await options.experiments.activeRuntime();
     const runtimeEvents = activeRuntime.experiment ? await options.experiments.runtimeEvents(activeRuntime.experiment.id) : [];
-    const latestSuccessfulPollAt = runtimeEvents
-      .filter((event) => event.ruleCode === code && event.eventType === "poll_completed")
-      .at(-1)?.recordedAt;
+    const pristineExperiment = activeRuntime.experiment?.status === "paused" && runtimeEvents.length === 0;
+    const latestPollEvent = [...runtimeEvents].reverse().find((event) => event.ruleCode === code
+      && (event.eventType === "poll_completed" || event.eventType === "poll_failed"));
+    const latestPollPayload = latestPollEvent?.payload;
+    const latestPollPages = Array.isArray(latestPollPayload?.pageEvidence) ? latestPollPayload.pageEvidence : [];
+    let latestSuccessfulPollIndex = -1;
+    runtimeEvents.forEach((event, index) => {
+      if (event.ruleCode === code && event.eventType === "poll_completed" && event.payload.status === "healthy"
+        && event.payload.complete === true && event.payload.fullEvaluation === true) latestSuccessfulPollIndex = index;
+    });
     const pendingRecordKeys = new Set<number>();
-    for (const event of runtimeEvents.filter((candidate) => candidate.ruleCode === code && candidate.eventType === "source_action"
-      && (!latestSuccessfulPollAt || Date.parse(candidate.recordedAt) > Date.parse(latestSuccessfulPollAt)))) {
+    for (const event of runtimeEvents.slice(latestSuccessfulPollIndex + 1)
+      .filter((candidate) => candidate.ruleCode === code && candidate.eventType === "source_action")) {
       const actionId = String(event.payload.actionId ?? "");
       const naturalKeyValue = Number((event.payload.naturalKey as Record<string, unknown> | undefined)?.value);
       if (actionId !== "a02.prepare_dispatch" && Number.isSafeInteger(naturalKeyValue)) pendingRecordKeys.add(naturalKeyValue);
@@ -58,13 +68,39 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
         if (item.table === primaryTable && Number.isSafeInteger(key)) pendingRecordKeys.add(key);
       }
     }
-    const source = await options.source.status(code);
+    const currentSource = await options.source.status(code);
+    const source = pristineExperiment ? {
+      ...currentSource,
+      sourceState: {
+        ...currentSource.sourceState,
+        rows: [],
+        evaluation: { status: "clear", reasons: [] },
+      },
+    } : currentSource;
+    const activeRows = source.sourceState.rows.filter((row) => {
+      const key = recordKey(code, row);
+      if (pendingRecordKeys.has(key)) return true;
+      if (code === "A02") return row.state === "TRANSITO";
+      if (code === "A03") return row.active === true && Number(row.consumptionCount) === 0;
+      return row.notWeighed === true || row.movedFromMachine !== true;
+    });
+    const visibleRows = activeOnly ? activeRows : source.sourceState.rows;
+    const totalRecords = visibleRows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+    const page = Math.min(requestedPage, totalPages);
+    const pageRows = visibleRows.slice((page - 1) * pageSize, page * pageSize);
     const entry = options.registry.get(code)!;
-    const poll = await options.database.queryOne(`SELECT status,source_revision AS "sourceRevision",complete,full_evaluation AS "fullEvaluation",error_code AS "errorCode",
-      finished_at AS "finishedAt" FROM monitor_poll_cycle WHERE query_id=$1 ORDER BY finished_at DESC LIMIT 1`, [entry.query.queryId]);
-    const incident = await options.database.queryOne(`SELECT id,lifecycle,occurrence,opened_at AS "openedAt",resolved_at AS "resolvedAt",updated_at AS "updatedAt"
-      FROM monitor_incident WHERE rule_code=$1 ORDER BY occurrence DESC LIMIT 1`, [code]);
-    const totals = await options.database.queryOne(`SELECT COUNT(*)::int AS "incidentCount",
+    const poll = pristineExperiment ? {} : latestPollEvent ? {
+      ...latestPollPayload,
+      sourceRevision: latestPollPayload?.sourceRevision
+        ?? (latestPollPages[0] as Record<string, unknown> | undefined)?.revision,
+      finishedAt: latestPollPayload?.finishedAt ?? latestPollEvent.businessTime,
+    } : !activeRuntime.experiment ? await options.database.queryOne(`SELECT status,source_revision AS "sourceRevision",complete,
+      full_evaluation AS "fullEvaluation",error_code AS "errorCode",finished_at AS "finishedAt"
+      FROM monitor_poll_cycle WHERE query_id=$1 ORDER BY finished_at DESC LIMIT 1`, [entry.query.queryId]) : {};
+    const incident = pristineExperiment ? {} : await options.database.queryOne(`SELECT id,lifecycle,occurrence,opened_at AS "openedAt",resolved_at AS "resolvedAt",updated_at AS "updatedAt"
+      FROM monitor_incident WHERE rule_code=$1 ORDER BY updated_at DESC,opened_at DESC,occurrence DESC,id DESC LIMIT 1`, [code]);
+    const totals = pristineExperiment ? {} : await options.database.queryOne(`SELECT COUNT(*)::int AS "incidentCount",
       COUNT(*) FILTER (WHERE lifecycle='open')::int AS "openIncidentCount"
       FROM monitor_incident WHERE rule_code=$1`, [code]);
     const downstream = incident.id ? await options.database.queryOne(`SELECT
@@ -77,7 +113,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     [incident.id, `incident:${incident.id}`]) : {};
     const change = incident.id ? await options.database.queryOne("SELECT cursor FROM monitor_change_event WHERE payload->>'incidentId'=$1 ORDER BY cursor DESC LIMIT 1", [incident.id]) : {};
     const actionAt = Date.parse(source.sourceChangedAt);
-    const sourceChangePending = poll.status !== "healthy" || String(poll.sourceRevision ?? "") !== source.sourceRevision;
+    const sourceChangePending = pristineExperiment ? false : poll.status !== "healthy" || String(poll.sourceRevision ?? "") !== source.sourceRevision;
     const sourceTriggered = source.sourceState.evaluation.status === "triggered";
     const pendingFailure = Boolean(source.pendingFault);
     const currentLifecycle = incident.id ? String(incident.lifecycle) : null;
@@ -112,7 +148,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
       alertMessageCount: Number(downstream.alertMessageCount ?? 0),
       primaryRole: downstream.primaryRole ? String(downstream.primaryRole) : null,
     };
-    const records = await Promise.all(source.sourceState.rows.map(async (row) => {
+    const records = await Promise.all(pageRows.map(async (row) => {
       const key = recordKey(code, row);
       if (!Number.isSafeInteger(key) || key < 1) throw new Error(`invalid_scenario_record_key:${code}`);
       const reasons = recordReasons(code, row);
@@ -159,7 +195,9 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     }
     return {
       ...source,
+      sourceState: { ...source.sourceState, rows: pageRows },
       records,
+      pagination: { page, pageSize, totalRecords, totalPages },
       supportedCases: options.source.supportedCases(code),
       pollerState: { pendingFault: source.pendingFault, latestPoll: poll.status ? poll : null },
       expectedResult: {
@@ -191,12 +229,35 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     };
   };
 
-  const all = async () => Promise.all(codes.map(status));
+  const all = async (page = 1, pageSize = 50, activeOnly = false) => Promise.all(codes.map((code) => status(code, page, pageSize, activeOnly)));
   const guard = { preHandler: app.requireScopes(["monitor:admin"]) };
 
-  app.get("/api/dev/scenarios", guard, async () => ({ scenarios: await all() }));
+  app.get<{ Querystring: { page?: string; pageSize?: string; activeOnly?: string } }>("/api/dev/scenarios", guard, async (request, reply) => {
+    const page = request.query.page === undefined ? 1 : Number(request.query.page);
+    const pageSize = request.query.pageSize === undefined ? 50 : Number(request.query.pageSize);
+    if (!Number.isInteger(page) || page < 1 || !Number.isInteger(pageSize) || pageSize < 10 || pageSize > 100) {
+      return reply.code(400).send({ error: "invalid_scenario_pagination" });
+    }
+    if (request.query.activeOnly !== undefined && request.query.activeOnly !== "true" && request.query.activeOnly !== "false") {
+      return reply.code(400).send({ error: "invalid_scenario_active_filter" });
+    }
+    return { scenarios: await all(page, pageSize, request.query.activeOnly === "true") };
+  });
 
   app.get("/api/dev/scenario-runtime", guard, async () => options.runtime.status());
+  app.get("/api/dev/test-database-reset", guard, async (_request, reply) => {
+    if (!options.reset) return reply.code(404).send({ error: "test_database_reset_unavailable" });
+    return options.reset.status();
+  });
+  app.post<{ Body: { confirmation?: unknown } }>("/api/dev/test-database-reset", guard, async (request, reply) => {
+    if (!options.reset) return reply.code(404).send({ error: "test_database_reset_unavailable" });
+    if (request.body?.confirmation !== "RESET TEST DATABASE") return reply.code(400).send({ error: "test_database_reset_confirmation_required" });
+    try { return reply.code(202).send(options.reset.start()); }
+    catch (error) {
+      if (error instanceof Error && error.message === "test_database_reset_active") return reply.code(409).send({ error: error.message });
+      throw error;
+    }
+  });
   app.get<{ Querystring: { cursor?: string; limit?: string } }>("/api/dev/scenario-experiments", guard, async (request, reply) => {
     const limit = request.query.limit === undefined ? 20 : Number(request.query.limit);
     if (!Number.isInteger(limit) || limit < 1 || limit > 50) return reply.code(400).send({ error: "invalid_scenario_history_limit" });
@@ -301,10 +362,12 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
       throw error;
     }
   });
-  app.post<{ Body: { name?: unknown; businessTime?: unknown; pollingFrequencyMinutes?: unknown; runId?: unknown; manifestVersion?: unknown } }>("/api/dev/scenario-runtime", guard, async (request, reply) => {
+  app.post<{ Body: { name?: unknown; businessTime?: unknown; pollingFrequencyMinutes?: unknown; sourceLookbackDays?: unknown; runId?: unknown; manifestVersion?: unknown } }>("/api/dev/scenario-runtime", guard, async (request, reply) => {
     const body = request.body ?? {};
+    const sourceLookbackDays = body.sourceLookbackDays ?? -30;
     if (typeof body.name !== "string" || typeof body.runId !== "string" || typeof body.manifestVersion !== "string"
-      || typeof body.businessTime !== "string" || !validPollingFrequency(body.pollingFrequencyMinutes)) {
+      || typeof body.businessTime !== "string" || !validPollingFrequency(body.pollingFrequencyMinutes)
+      || !validSourceLookbackDays(sourceLookbackDays)) {
       return reply.code(400).send({ error: "invalid_scenario_experiment" });
     }
     try {
@@ -312,6 +375,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
         name: body.name,
         businessTime: body.businessTime,
         pollingFrequencyMinutes: body.pollingFrequencyMinutes,
+        sourceLookbackDays,
         identity: {
           runId: body.runId,
           manifestVersion: body.manifestVersion,

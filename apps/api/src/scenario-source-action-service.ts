@@ -36,6 +36,7 @@ const invocationActions = new Set<ScenarioSourceAction>([
   "start_work_order", "record_first_consumption", "close_work_order", "cancel_work_order", "start_competing_work_order",
   "declare_produced_reel", "declare_remnant_reel", "register_weighing", "register_movement", "handoff",
 ]);
+const candidateActions = new Set<ScenarioSourceAction>(["prepare_dispatch", "start_work_order", "declare_produced_reel", "declare_remnant_reel"]);
 
 export class ScenarioSourceActionError extends Error {
   constructor(readonly statusCode: 400 | 403 | 404 | 409 | 501 | 503, code: string) {
@@ -148,13 +149,19 @@ export class ScenarioSourceActionService {
     if (contract.invocation.operation !== "sourceAction" || !invocationActions.has(contract.invocation.argument as ScenarioSourceAction)) {
       throw new ScenarioSourceActionError(501, "source_action_contract_not_executable");
     }
-    const key = naturalKey(input.key);
+    let key = naturalKey(input.key);
+    const action = contract.invocation.argument as ScenarioSourceAction;
+    if (key === undefined && candidateActions.has(action)) {
+      if (!this.source.sourceActionCandidate) throw new ScenarioSourceActionError(501, "source_action_candidate_source_unavailable");
+      key = await this.source.sourceActionCandidate(contract.ruleCode, action) ?? undefined;
+      if (key === undefined) throw new ScenarioSourceActionError(404, "source_action_candidate_unavailable");
+    }
     if (key === undefined) throw new ScenarioSourceActionError(400, "source_action_key_required");
     authorizeContract(contract, a02Authority(input.authority));
     const sourceInput = editableInput(contract.id, input.input);
     if (!this.source.sourceAction) throw new ScenarioSourceActionError(501, "source_action_source_unavailable");
     try {
-      const outcome = await this.source.sourceAction(contract.ruleCode, contract.invocation.argument as ScenarioSourceAction, key, contract, sourceInput);
+      const outcome = await this.source.sourceAction(contract.ruleCode, action, key, contract, sourceInput);
       validateEvidence(contract, outcome.evidence, this.registry.writerIdentity);
       return {
         actionId: contract.id,

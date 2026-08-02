@@ -71,13 +71,16 @@ export interface ScenarioSource {
   recur(code: string): Promise<ScenarioStatus>;
   advanceTime(code: string, minutes: number): Promise<ScenarioStatus>;
   setBusinessTime(currentAt: string): Promise<void>;
+  setSourceCutoffAt?(cutoffAt: string | null): Promise<void>;
   failNextPoll(code: string, fault: ScenarioFault): Promise<ScenarioStatus>;
   consumeFault(code: ScenarioRuleCode): Promise<ScenarioFault | null>;
   rows(code: ScenarioRuleCode): Promise<{ rows: Record<string, unknown>[]; sourceRevision: string }>;
   status(code: string): Promise<ScenarioStatus>;
+  sourceActionCandidate?(code: ScenarioRuleCode, action: ScenarioSourceAction): Promise<number | null>;
   sourceAction?(code: string, action: ScenarioSourceAction, key: number, contract: SourceActionContract, input?: ScenarioSourceActionInput): Promise<ScenarioSourceActionOutcome>;
   replaceTracked?(code: ScenarioRuleCode, keys: number[]): void;
   recordExternalSourceChange?(code: ScenarioRuleCode, action: string): void;
+  resetAfterDatabaseRestore?(): Promise<void>;
   pollMetadata?(code: ScenarioRuleCode): { currentAt: string; sourceRevision: string };
 }
 

@@ -23,6 +23,7 @@ import { RoutingService } from "./routing.js";
 import { TestInterruptionController } from "./test-interruptions.js";
 import { CommittedChangePublisher } from "./publication.js";
 import { createStage5BrowserRuntimeIdentity, type Stage5BrowserRuntimeSeed } from "./stage5-browser-runtime.js";
+import { TestDatabaseResetCoordinator } from "./test-database-reset.js";
 
 function cookieValue(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -367,6 +368,7 @@ export async function buildMonitorServer(options: {
   await app.register(rotationRoutes, { database, onChanged: rerouteOpen });
   await app.register(conversationRoutes, { service: conversationService });
   const scenarioRegistry = new Map(scenarioSources.map((entry) => [entry.query.ruleCode as "A02" | "A03" | "A05", entry]));
+  let stage5BrowserRuntimeSeed = options.stage5BrowserRuntime ?? null;
   let scenarioRuntime: ScenarioExperimentRuntime | null = null;
   if (scenarioSource) {
     const sourceActionContracts = await loadSourceActionContracts(repositoryRoot);
@@ -380,6 +382,9 @@ export async function buildMonitorServer(options: {
       (error) => app.log.error({ err: error }, "scenario experiment runtime failed"),
     );
     await scenarioRuntime.initialize();
+    const reset = config.scenarioSource === "test_database"
+      ? new TestDatabaseResetCoordinator(repositoryRoot, database, scenarioRuntime, () => { stage5BrowserRuntimeSeed = null; })
+      : undefined;
     await app.register(scenarioRoutes, {
       database,
       source: scenarioSource,
@@ -388,10 +393,10 @@ export async function buildMonitorServer(options: {
       runtime: scenarioRuntime,
       experiments: scenarioExperiments,
       registry: scenarioRegistry,
+      ...(reset ? { reset } : {}),
     });
   }
   if (options.stage5BrowserRuntime && (config.nodeEnv === "production" || config.scenarioSource !== "test_database" || !scenarioRuntime)) throw new Error("stage5_browser_runtime_requires_connected_test_database");
-  let stage5BrowserRuntimeSeed = options.stage5BrowserRuntime ?? null;
   const stage5BrowserRuntime = scenarioRuntime && config.nodeEnv !== "production" && config.scenarioSource === "test_database" ? {
     activate(seed: Stage5BrowserRuntimeSeed) { stage5BrowserRuntimeSeed = structuredClone(seed); },
     clear() { stage5BrowserRuntimeSeed = null; },
@@ -404,7 +409,7 @@ export async function buildMonitorServer(options: {
   });
 
   const close = async () => {
-    scenarioRuntime?.stop();
+    await scenarioRuntime?.shutdown();
     detectionScheduler.stop();
     await redis.close();
     io.close();

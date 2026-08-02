@@ -53,7 +53,10 @@ export class ScenarioExperimentRuntime {
   async initialize(): Promise<ScenarioRuntimeStatus> {
     return this.serialized(async () => {
       const runtime = await this.repository.activeRuntime();
-      if (runtime.experiment) await this.source.setBusinessTime(runtime.experiment.businessTime);
+      if (runtime.experiment) {
+        await this.source.setBusinessTime(runtime.experiment.businessTime);
+        await this.source.setSourceCutoffAt?.(runtime.experiment.sourceCutoffAt);
+      } else await this.source.setSourceCutoffAt?.(null);
       const nextTickAt = runtime.experiment?.status === "running" ? runtime.nextTickAt ?? this.nextDeadline(runtime.experiment.secondsPerSimulatedMinute) : null;
       if (runtime.experiment && nextTickAt !== runtime.nextTickAt) await this.repository.setNextTick(runtime.experiment.id, nextTickAt);
       this.arm(runtime.experiment, nextTickAt);
@@ -65,12 +68,14 @@ export class ScenarioExperimentRuntime {
     name: string;
     businessTime: string;
     pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes;
+    sourceLookbackDays?: number;
     identity: ScenarioExperimentIdentity;
   }): Promise<ScenarioRuntimeStatus> {
     return this.serialized(async () => {
-      const created = await this.repository.create(input.name, input.businessTime, input.pollingFrequencyMinutes, input.identity);
+      const created = await this.repository.create(input.name, input.businessTime, input.pollingFrequencyMinutes, input.identity, input.sourceLookbackDays);
       const active = await this.repository.activate(created.id, null);
       await this.source.setBusinessTime(active.businessTime);
+      await this.source.setSourceCutoffAt?.(active.sourceCutoffAt);
       this.arm(active, null);
       return this.describe(active, null);
     });
@@ -139,6 +144,19 @@ export class ScenarioExperimentRuntime {
     this.timer = null;
   }
 
+  async shutdown(): Promise<void> {
+    this.stop();
+    await this.queue;
+  }
+
+  async resetLocalState(work: () => Promise<void>): Promise<void> {
+    return this.serialized(async () => {
+      this.stop();
+      await work();
+      await this.source.resetAfterDatabaseRestore?.();
+    });
+  }
+
   private async advanceLocked(id: string, minutes: number, trigger: ScenarioRuntimeTrigger): Promise<ScenarioRuntimeAdvance> {
     const plan = await this.repository.planAdvance(id, minutes);
     if (plan.experiment.status !== "running") return { experiment: plan.experiment, polls: [] };
@@ -157,7 +175,9 @@ export class ScenarioExperimentRuntime {
     await this.repository.recordRuntimeEvent(id, "poll_started", due.ruleCode, due.dueAt, { queryId: entry.query.queryId, ...trigger });
     try {
       const result = await this.scheduler.runScheduled(entry.query, entry.adapter);
-      await this.repository.recordRuntimeEvent(id, "poll_completed", due.ruleCode, due.dueAt, { ...result, ...trigger } as unknown as Record<string, unknown>);
+      const trustedCompletion = result.status === "healthy" && result.complete && result.fullEvaluation;
+      await this.repository.recordRuntimeEvent(id, trustedCompletion ? "poll_completed" : "poll_failed", due.ruleCode, due.dueAt,
+        { ...result, ...trigger } as unknown as Record<string, unknown>);
       await this.repository.completeDue(id, due);
       return { ...due, result };
     } catch (error) {

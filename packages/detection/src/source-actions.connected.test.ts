@@ -238,6 +238,7 @@ describe("connected Stage 5 source actions", { skip: !runtimeAvailable }, () => 
       await evidencedAction(connection, "A05", "declare_remnant_reel", remnantId);
       const [declaredRows] = await connection.query<RowDataPacket[]>("SELECT tipo,estado FROM articulo_serial WHERE id=?", [remnantId]);
       assert.deepEqual({ tipo: declaredRows[0]?.tipo, estado: declaredRows[0]?.estado }, { tipo: "SOBRANTE", estado: "CONFIRMAR_PESO" });
+      await assert.rejects(evidencedAction(connection, "A05", "declare_remnant_reel", remnantId), /reel_already_declared/);
     });
   });
 
@@ -282,6 +283,29 @@ describe("connected Stage 5 source actions", { skip: !runtimeAvailable }, () => 
       assert.equal(Number(handoffRows[0]?.id_almacen_origen), repository.fixtureIds.A05.originWarehouseId);
       assert.equal(Number(handoffRows[0]?.id_almacen_destino), repository.fixtureIds.A05.movedWarehouseId);
       await assert.rejects(repository.applySourceActionMutation(connection, "A05", "handoff", serialId), /reel_already_moved|handoff_already_exists/);
+    });
+
+    await rollback(async (connection) => {
+      const [candidateRows] = await connection.query<RowDataPacket[]>(`SELECT serial.id,serial.id_almacen AS originWarehouseId,
+        work_order.id_equipo AS sourceEquipmentId FROM articulo_serial serial
+        JOIN ordenes_trabajo work_order
+          ON work_order.id=COALESCE(serial.id_orden_trabajo_origen,serial.id_ultimo_orden_trabajo_cierre)
+        JOIN almacenes warehouse ON warehouse.id=serial.id_almacen AND warehouse.id_equipo=work_order.id_equipo
+        WHERE serial.fecha_eliminacion IS NULL AND serial.id_almacen<>?
+          AND NOT EXISTS (SELECT 1 FROM flujo_materiales_detalles flow
+            WHERE flow.id_articulo_serial=serial.id AND flow.observacion='MONITOR-STAGE5-A05-HANDOFF' AND flow.fecha_eliminacion IS NULL)
+        ORDER BY serial.id LIMIT 1`, [repository.fixtureIds.A05.originWarehouseId]);
+      assert.ok(candidateRows[0]);
+      const dynamicSerialId = Number(candidateRows[0]?.id);
+      const originWarehouseId = Number(candidateRows[0]?.originWarehouseId);
+      await evidencedAction(connection, "A05", "handoff", dynamicSerialId);
+      const [handoffRows] = await connection.query<RowDataPacket[]>(`SELECT flow.id_almacen_origen,flow.id_almacen_destino,
+        destination.id_equipo AS destinationEquipmentId FROM flujo_materiales_detalles flow
+        LEFT JOIN almacenes destination ON destination.id=flow.id_almacen_destino
+        WHERE flow.id_articulo_serial=? AND flow.observacion='MONITOR-STAGE5-A05-HANDOFF'`, [dynamicSerialId]);
+      assert.equal(Number(handoffRows[0]?.id_almacen_origen), originWarehouseId);
+      assert.notEqual(Number(handoffRows[0]?.id_almacen_destino), originWarehouseId);
+      assert.notEqual(Number(handoffRows[0]?.destinationEquipmentId), Number(candidateRows[0]?.sourceEquipmentId));
     });
 
     await assert.rejects(repository.recur("A05"), /source_lifecycle_recurrence_unsupported/);
