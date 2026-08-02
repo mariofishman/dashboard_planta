@@ -9,7 +9,7 @@ const source = (path: string) => readFile(resolve(repositoryRoot, path), "utf8")
 it("keeps the V2 laboratory on current contracts and rejected executables absent", async () => {
   const [apiClient, laboratory, routes, recovery, stage5aGate, packageDocument] = await Promise.all([
     source("apps/web/src/api.ts"),
-    source("apps/web/src/ScenarioLab.tsx"),
+    source("apps/web/public/dev/scenarios/scenarioLabConnected.js"),
     source("apps/api/src/routes/scenarios.ts"),
     source("scripts/stage5-recovery.connected.test.ts"),
     source("scripts/validate-phase6-stage5a.sh"),
@@ -18,7 +18,8 @@ it("keeps the V2 laboratory on current contracts and rejected executables absent
   const packageJson = JSON.parse(packageDocument) as { scripts: Record<string, string> };
 
   assert.match(apiClient, /fetch\("\/api\/dev\/source-actions"/);
-  assert.match(laboratory, /scenarioSourceAction\(action,/);
+  assert.match(laboratory, /fetch\(path/);
+  assert.match(laboratory, /\/api\/dev\/source-actions/);
   assert.doesNotMatch(routes, /inject-monitor-fault/);
   assert.match(recovery, /interruptions\.arm\("after_incident_commit"\)/);
 
