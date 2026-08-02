@@ -102,7 +102,11 @@ const presentation: Record<SupportedRuleCode, { label: string; title: string; su
 };
 
 export class IncidentService {
-  constructor(private readonly database: DatabaseRuntime, private readonly publish: (change: IncidentChange) => unknown | Promise<unknown> = () => undefined) {}
+  constructor(
+    private readonly database: DatabaseRuntime,
+    private readonly publish: (change: IncidentChange, context: { cycleId?: string }) => unknown | Promise<unknown> = () => undefined,
+    private readonly afterCommit: (change: IncidentChange, context: { cycleId?: string }) => unknown | Promise<unknown> = () => undefined,
+  ) {}
 
   async reconcileHealthyCycle(input: {
     rule: RuleContract;
@@ -203,7 +207,10 @@ export class IncidentService {
       await this.addTransition(transaction, incidentId, null, "open", "condition_triggered", input.cycleId, observedAt);
       return this.addChangeEvent(transaction, incidentId, "incident.opened", "open", input.context.plantId, observedAt);
     });
-    if (change) await this.publish(change);
+    if (change) {
+      await this.afterCommit(change, { ...(input.cycleId ? { cycleId: input.cycleId } : {}) });
+      await this.publish(change, { ...(input.cycleId ? { cycleId: input.cycleId } : {}) });
+    }
     return change;
   }
 
@@ -231,7 +238,8 @@ export class IncidentService {
       await this.addTransition(transaction, input.incidentId, "open", "closed_without_resolution", "administrative_closure", undefined, closedAt);
       return this.addChangeEvent(transaction, input.incidentId, "incident.resolved", "closed_without_resolution", Number(incident.plant_id), closedAt);
     });
-    await this.publish(change);
+    await this.afterCommit(change, {});
+    await this.publish(change, {});
     return change;
   }
 
@@ -272,10 +280,14 @@ export class IncidentService {
     return { ...incident, evidence, transitions, related, administrativeClosure: administrativeClosure.reason ? administrativeClosure : null };
   }
 
-  async changesAfter(cursor: number, plantIds: number[]): Promise<Record<string, unknown>[]> {
-    return this.database.queryAll(`SELECT cursor,event_id AS "eventId",event_type AS "eventType",payload,occurred_at AS "occurredAt"
-      FROM monitor_change_event WHERE cursor>$1 AND scope_type='plant' AND scope_id=ANY($2::text[]) ORDER BY cursor LIMIT 200`,
-      [cursor, plantIds.map(String)]);
+  async changesAfter(cursor: number, plantIds: number[], conversationIds: string[] = []): Promise<Record<string, unknown>[]> {
+    return this.database.queryAll(`SELECT cursor,event_id AS "eventId",event_type AS "eventType",scope_type AS "scopeType",
+      scope_id AS "scopeId",payload,occurred_at AS "occurredAt"
+      FROM monitor_change_event WHERE cursor>$1 AND (
+        (scope_type='plant' AND scope_id=ANY($2::text[]))
+        OR (scope_type='conversation' AND scope_id=ANY($3::text[]))
+      ) ORDER BY cursor LIMIT 200`,
+    [cursor, plantIds.map(String), conversationIds]);
   }
 
   private async addEvidence(transaction: DatabaseExecutor, incidentId: string, input: { evidence: Record<string, unknown>; cycleId?: string }, evaluation: RuleEvaluation, observedAt: string) {
@@ -294,7 +306,10 @@ export class IncidentService {
       await this.addTransition(transaction, incidentId, "open", "resolved", "absent_from_healthy_cycle", cycleId, timestamp);
       return this.addChangeEvent(transaction, incidentId, "incident.resolved", "resolved", plantId, timestamp);
     });
-    if (change) await this.publish(change);
+    if (change) {
+      await this.afterCommit(change, { cycleId });
+      await this.publish(change, { cycleId });
+    }
   }
 
   private async addTransition(transaction: DatabaseExecutor, incidentId: string, from: IncidentLifecycle | null, to: IncidentLifecycle, reason: string, cycleId: string | undefined, observedAt: string) {

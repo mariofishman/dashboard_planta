@@ -20,6 +20,8 @@ import { scenarioRoutes } from "./routes/scenarios.js";
 import { rosterRoutes } from "./routes/roster.js";
 import { rotationRoutes } from "./routes/rotation.js";
 import { RoutingService } from "./routing.js";
+import { TestInterruptionController } from "./test-interruptions.js";
+import { CommittedChangePublisher } from "./publication.js";
 
 function cookieValue(header: string | undefined, name: string): string | null {
   if (!header) return null;
@@ -42,6 +44,7 @@ export interface MonitorServer {
     source: ScenarioSource;
     runtime: ScenarioExperimentRuntime;
     registry: Map<"A02" | "A03" | "A05", { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
+    interruptions: TestInterruptionController;
   };
   close(): Promise<void>;
 }
@@ -97,6 +100,8 @@ export async function buildMonitorServer(options: {
     ...(config.databaseUrl ? { databaseUrl: config.databaseUrl } : {}),
   });
   await migrateFoundation(database);
+  const testInterruptions = new TestInterruptionController(database, config.nodeEnv);
+  const changePublisher = new CommittedChangePublisher(testInterruptions);
   const identityAdapter = options.identityAdapter ?? new MockIdentityAdapter();
   const canEnterMonitor = async (principal: { sysUserId: number; plantIds: number[] }) => {
     const bound = await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_roster_assignment WHERE plant_id=ANY($1::bigint[]) AND sys_user_id IS NOT NULL", [principal.plantIds]);
@@ -109,31 +114,76 @@ export async function buildMonitorServer(options: {
   await app.register(authRoutes, { config, identityAdapter, canEnter: canEnterMonitor });
   const repositoryRoot = resolve(import.meta.dirname, "../../..");
   const io = new SocketIOServer(app.server, { cors: { origin: config.webOrigin, credentials: true } });
-  const routingService = new RoutingService(database);
-  const conversationService = new ConversationService(database, async (event) => {
-    const participantIds = await conversationService.activeParticipantIds(String(event.conversationId));
-    io.to([`conversation:${event.conversationId}`, ...participantIds.map((sysUserId) => `user:${sysUserId}`), "user:9000"]).emit(String(event.type), event);
+  const routingService = new RoutingService(database, async (point, context) => {
+    await testInterruptions.fire(point, { interruptionPoint: point, ...context });
   });
+  const conversationService = new ConversationService(
+    database,
+    async (event) => {
+      const participantIds = await conversationService.activeParticipantIds(String(event.conversationId));
+      const rooms = [`conversation:${event.conversationId}`, ...participantIds.map((sysUserId) => `user:${sysUserId}`), "user:9000"];
+      if (event.type === "message.created" && event.eventId && event.cursor) {
+        const { type: eventType, eventId, cursor, conversationId, ...payload } = event;
+        await changePublisher.publish({
+          channel: "message.created",
+          eventId: String(eventId),
+          cursor: Number(cursor),
+          eventType: String(eventType),
+          scopeType: "conversation",
+          scopeId: String(conversationId),
+          payload: { conversationId, ...payload },
+        }, () => { io.to(rooms).emit("message.created", event); });
+      } else io.to(rooms).emit(String(event.type), event);
+    },
+    {
+      armed: (points) => testInterruptions.armed(points),
+      fire: (point, context) => testInterruptions.fire(point, context),
+    },
+  );
   const localRoleIdentity: Record<string, ConversationParticipant> = {
     factory_manager: { sysUserId: 9001, displayName: "Gerencia de planta", sourceKey: "mock:plant-manager" },
     operation_shift_supervisor: { sysUserId: 9002, displayName: "Supervisión de turno", sourceKey: "mock:shift-supervisor" },
     technical_leader: { sysUserId: 9004, displayName: "Programación de Impresión", sourceKey: "mock:operation-scheduler" },
     machine_operator: { sysUserId: 9003, displayName: "Operación de máquina", sourceKey: "mock:machine-operator" },
   };
-  const routeAndAttachConversation = async (incidentId: string, plantId: number) => {
-    const routed = await routingService.routeIncident(incidentId);
+  const authorizedConversationIds = (principal: { sysUserId: number; displayName: string; plantIds: number[]; scopes: string[] }) =>
+    conversationService.authorizedConversationIds({
+      sysUserId: principal.sysUserId,
+      displayName: principal.displayName,
+      admin: principal.scopes.includes("monitor:admin"),
+    }, principal.plantIds);
+  const routeAndAttachConversation = async (incidentId: string, plantId: number, cycleId?: string) => {
+    const routed = await routingService.routeIncident(incidentId, { ...(cycleId ? { cycleId } : {}) });
     const recipients = Array.isArray(routed?.recipients) ? routed.recipients as Array<{ role?: string; sysUserId?: number | null; name?: string; key?: string }> : [];
     const participants = recipients.map((recipient) => recipient.sysUserId
       ? { sysUserId: recipient.sysUserId, displayName: String(recipient.name), sourceKey: String(recipient.key) }
       : localRoleIdentity[String(recipient.role)]).filter((value): value is ConversationParticipant => Boolean(value));
     const incident = await database.queryOne(`SELECT id,rule_code AS "ruleCode",label,title,summary,work_order_code AS "workOrderCode",
       machine_code AS "machineCode",opened_at AS "openedAt" FROM monitor_incident WHERE id=$1`, [incidentId]);
-    await conversationService.attachIncident({ incidentId, plantId, participants, alert: incident });
+    await conversationService.attachIncident({ incidentId, plantId, participants, alert: incident, ...(cycleId ? { cycleId } : {}) });
   };
-  const incidentService = new IncidentService(database, async (change: IncidentChange) => {
-    io.to(`plant:${change.plantId}`).emit("incident.changed", change);
-    if (change.lifecycle === "open") await routeAndAttachConversation(change.incidentId, change.plantId);
+  const incidentService = new IncidentService(database, async (change: IncidentChange, context) => {
+    await changePublisher.publish({
+      channel: "incident.changed",
+      eventId: change.eventId,
+      cursor: change.cursor,
+      eventType: change.eventType,
+      scopeType: "plant",
+      scopeId: String(change.plantId),
+      payload: { incidentId: change.incidentId, lifecycle: change.lifecycle },
+    }, () => { io.to(`plant:${change.plantId}`).emit("incident.changed", change); });
+    if (change.lifecycle === "open") await routeAndAttachConversation(change.incidentId, change.plantId, context.cycleId);
     else await conversationService.closeIncident(change.incidentId);
+  }, async (change, context) => {
+    await testInterruptions.fire("after_incident_commit", {
+      interruptionPoint: "after_incident_commit",
+      incidentId: change.incidentId,
+      changeEventId: change.eventId,
+      changeCursor: change.cursor,
+      lifecycle: change.lifecycle,
+      plantId: change.plantId,
+      ...(context.cycleId ? { cycleId: context.cycleId } : {}),
+    });
   });
   if (!config.enableScenarioLab) await seedPhase4Incidents(incidentService, repositoryRoot, database);
   const ruleDocument = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
@@ -164,7 +214,7 @@ export async function buildMonitorServer(options: {
         OR (i.lifecycle<>'open' AND ci.incident_id IS NOT NULL AND ci.closed_at IS NULL)
       )`, [query.ruleCode]);
     for (const incident of downstream) {
-      if (incident.lifecycle === "open") await routeAndAttachConversation(String(incident.id), Number(incident.plantId));
+      if (incident.lifecycle === "open") await routeAndAttachConversation(String(incident.id), Number(incident.plantId), cycleId);
       else await conversationService.closeIncident(String(incident.id), observedAt);
     }
   });
@@ -204,7 +254,7 @@ export async function buildMonitorServer(options: {
   });
   io.on("connection", (socket) => {
     metrics.websocketConnections += 1;
-    const principal = socket.data.principal as { plantIds: number[]; sysUserId: number };
+    const principal = socket.data.principal as { plantIds: number[]; sysUserId: number; displayName: string; scopes: string[] };
     principal.plantIds.forEach((plantId) => void socket.join(`plant:${plantId}`));
     void socket.join(`user:${principal.sysUserId}`);
     void database.queryAll(`SELECT conversation_id FROM monitor_conversation_participant WHERE sys_user_id=$1 AND removed_at IS NULL`, [principal.sysUserId])
@@ -218,8 +268,11 @@ export async function buildMonitorServer(options: {
     socket.emit("session.ready", { cursor: 0, principal: socket.data.principal, features: config.features });
     socket.on("sync.resume", async (message: { cursor?: unknown }) => {
       const cursor = Number.isSafeInteger(message?.cursor) && Number(message.cursor) >= 0 ? Number(message.cursor) : 0;
-      const changes = await incidentService.changesAfter(cursor, principal.plantIds);
-      changes.forEach((change) => socket.emit("incident.changed", change));
+      const changes = await incidentService.changesAfter(cursor, principal.plantIds, await authorizedConversationIds(principal));
+      changes.forEach((change) => socket.emit(
+        String(change.eventType).startsWith("incident.") ? "incident.changed" : String(change.eventType),
+        change,
+      ));
       const latest = changes.length ? Number(changes.at(-1)?.cursor) : cursor;
       socket.emit("session.ready", { cursor: latest, principal: socket.data.principal, features: config.features });
     });
@@ -289,7 +342,11 @@ export async function buildMonitorServer(options: {
   app.post("/api/internal/routing/retry", { preHandler: app.requireScopes(["monitor:admin"]) }, async () => ({ retried: await routingService.retryDue() }));
   app.get("/api/changes", { preHandler: app.requireScopes(["monitor:read"]) }, async (request) => {
     const cursor = Math.max(0, Number((request.query as { after?: string }).after ?? 0) || 0);
-    return { changes: await incidentService.changesAfter(cursor, request.principal!.plantIds) };
+    return { changes: await incidentService.changesAfter(
+      cursor,
+      request.principal!.plantIds,
+      await authorizedConversationIds(request.principal!),
+    ) };
   });
   app.get("/api/admin/authorization-check", { preHandler: app.requireScopes(["monitor:admin"]) }, async () => ({ authorized: true }));
   const rerouteOpen = async (plantId: number, operation?: string) => {
@@ -338,6 +395,6 @@ export async function buildMonitorServer(options: {
   };
   return {
     app, io, database, redis, config, close,
-    ...(scenarioSource && scenarioRuntime ? { acceptance: { runner: detectionRunner, scheduler: detectionScheduler, source: scenarioSource, runtime: scenarioRuntime, registry: scenarioRegistry } } : {}),
+    ...(scenarioSource && scenarioRuntime ? { acceptance: { runner: detectionRunner, scheduler: detectionScheduler, source: scenarioSource, runtime: scenarioRuntime, registry: scenarioRegistry, interruptions: testInterruptions } } : {}),
   };
 }

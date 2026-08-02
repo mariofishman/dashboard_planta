@@ -336,6 +336,27 @@ describe("Phase 2 platform foundation", () => {
     const cursors = changes.json().changes.map((change: { cursor: number }) => change.cursor);
     assert.deepEqual(cursors, [...cursors].sort((a, b) => a - b));
   });
+
+  it("scopes conversation change recovery to participants and plant administrators", async () => {
+    const instance = await server();
+    const conversationId = "00000000-0000-4000-8000-000000000060";
+    const messageId = "00000000-0000-4000-8000-000000000061";
+    await instance.database.execute(`INSERT INTO monitor_conversation (id,plant_id,title,participant_fingerprint)
+      VALUES ($1,1,'Operación','participant-9003')`, [conversationId]);
+    await instance.database.execute(`INSERT INTO monitor_conversation_participant
+      (conversation_id,sys_user_id,display_name,source_key) VALUES ($1,9003,'Operación de máquina','mock:machine-operator')`, [conversationId]);
+    const message = await instance.database.queryOne(`INSERT INTO monitor_message
+      (id,conversation_id,sender_name,kind,body,payload,client_command_id)
+      VALUES ($1,$2,'Monitor','alert','','{}'::jsonb,'scope-test') RETURNING cursor`, [messageId, conversationId]);
+    await instance.database.execute(`INSERT INTO monitor_change_event (event_type,scope_type,scope_id,payload)
+      VALUES ('message.created','conversation',$1,$2::jsonb)`, [conversationId, JSON.stringify({ conversationId, messageId, messageCursor: Number(message.cursor) })]);
+    const recover = async (identity: string) => (await instance.app.inject({
+      method: "GET", url: "/api/changes?after=0", headers: { authorization: `Bearer mock:${identity}` },
+    })).json().changes.filter((change: { eventType: string }) => change.eventType === "message.created");
+    assert.equal((await recover("machine-operator")).some((change: { payload: { messageId: string } }) => change.payload.messageId === messageId), true);
+    assert.equal((await recover("shift-supervisor")).some((change: { payload: { messageId: string } }) => change.payload.messageId === messageId), false);
+    assert.equal((await recover("plant-manager")).some((change: { payload: { messageId: string } }) => change.payload.messageId === messageId), true);
+  });
 });
 
 async function sourceFiles(directory: string): Promise<string[]> {

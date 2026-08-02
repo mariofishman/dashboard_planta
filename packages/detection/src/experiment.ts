@@ -119,8 +119,9 @@ function experimentRow(row: Record<string, unknown>): ScenarioExperiment {
 
 function snapshotRow(row: Record<string, unknown>): ScenarioSnapshot {
   if (!row.id) throw new Error("scenario_snapshot_not_found");
+  const { snapshotSequence: _snapshotSequence, ...snapshot } = row;
   return {
-    ...row,
+    ...snapshot,
     payload: parseObject(row.payload),
     capturedBusinessTime: isoTimestamp(row.capturedBusinessTime),
     capturedAt: isoTimestamp(row.capturedAt),
@@ -332,13 +333,14 @@ export class ScenarioExperimentRepository {
     await this.get(id);
     const limit = historyLimit(options.limit);
     const cursor = historyCursor(options.cursor);
+    if (cursor && !/^\d+$/.test(cursor[1])) throw new Error("invalid_scenario_history_cursor");
     const rows = await this.database.queryAll(`SELECT id,experiment_id AS "experimentId",label,schema_version AS "schemaVersion",
-      payload,captured_business_time AS "capturedBusinessTime",captured_at AS "capturedAt"
-      FROM monitor_scenario_snapshot WHERE experiment_id=$1 ${cursor ? "AND (captured_at,id)>($3::timestamptz,$4::uuid)" : ""}
-      ORDER BY captured_at,id LIMIT $2`, cursor ? [id, limit + 1, cursor[0], cursor[1]] : [id, limit + 1]);
+      payload,captured_business_time AS "capturedBusinessTime",captured_at AS "capturedAt",snapshot_sequence AS "snapshotSequence"
+      FROM monitor_scenario_snapshot WHERE experiment_id=$1 ${cursor ? "AND snapshot_sequence>$3::bigint" : ""}
+      ORDER BY snapshot_sequence LIMIT $2`, cursor ? [id, limit + 1, cursor[1]] : [id, limit + 1]);
     const items = rows.slice(0, limit).map(snapshotRow);
-    const last = items.at(-1);
-    return { items, nextCursor: rows.length > limit && last ? encodeCursor(cursorTimestamp(last.capturedAt), last.id) : null };
+    const last = rows.slice(0, limit).at(-1);
+    return { items, nextCursor: rows.length > limit && last ? encodeCursor("snapshot_sequence", last.snapshotSequence) : null };
   }
 
   async results(id: string, options: ScenarioHistoryOptions = {}): Promise<ScenarioHistoryPage<ScenarioAcceptanceResult>> {

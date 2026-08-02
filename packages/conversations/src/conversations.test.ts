@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
-import { ConversationForbiddenError, ConversationReadOnlyError, ConversationService } from "./index.js";
+import {
+  conversationInterruptionPoints,
+  ConversationForbiddenError,
+  ConversationReadOnlyError,
+  ConversationService,
+  type ConversationInterruptionPoint,
+} from "./index.js";
 
 const databases: DatabaseRuntime[] = [];
 async function setup() {
@@ -42,6 +48,73 @@ describe("Phase 6 conversations", () => {
     await service.attachIncident({ incidentId: "00000000-0000-4000-8000-000000000004", plantId: 1, participants: [ana, maria], alert: {} });
     const participants = await database.queryAll("SELECT sys_user_id FROM monitor_conversation_participant WHERE conversation_id=$1 AND removed_at IS NULL ORDER BY sys_user_id", [attached?.conversationId]);
     assert.deepEqual(participants.map((row) => Number(row.sys_user_id)), [11, 12, 13]);
+  });
+
+  it("rolls back every conversation and alert-message interruption boundary before recording the firing", async () => {
+    const { database, ana, carlos } = await setup();
+    let armedPoint: ConversationInterruptionPoint | null = null;
+    const fired: Array<{ point: ConversationInterruptionPoint; context: Record<string, unknown> }> = [];
+    const service = new ConversationService(database, async () => {}, {
+      armed: async (points) => new Set(armedPoint && points.includes(armedPoint) ? [armedPoint] : []),
+      fire: async (point, context) => {
+        const counts = await database.queryOne(`SELECT
+          (SELECT COUNT(*)::int FROM monitor_conversation) AS conversations,
+          (SELECT COUNT(*)::int FROM monitor_conversation_participant) AS participants,
+          (SELECT COUNT(*)::int FROM monitor_conversation_membership_audit) AS audits,
+          (SELECT COUNT(*)::int FROM monitor_conversation_incident) AS links,
+          (SELECT COUNT(*)::int FROM monitor_message) AS messages,
+          (SELECT COUNT(*)::int FROM monitor_change_event) AS changes`);
+        assert.deepEqual(counts, { conversations: 0, participants: 0, audits: 0, links: 0, messages: 0, changes: 0 });
+        fired.push({ point, context });
+        throw new Error(`durable_interruption:${point}`);
+      },
+    });
+    const incidentIds = conversationInterruptionPoints.map((_, index) => `00000000-0000-4000-8000-00000000004${index}`);
+    for (const [index, point] of conversationInterruptionPoints.entries()) {
+      const incidentId = incidentIds[index]!;
+      await database.execute(`INSERT INTO monitor_incident
+        (id,rule_code,condition_key,occurrence,lifecycle,label,title,summary,plant_id,reasons,opened_at,updated_at)
+        VALUES ($1,'A02',$2,1,'open','Alerta','Material pendiente','Material en tránsito',1,'[]'::jsonb,now(),now())`,
+      [incidentId, `condition:${incidentId}`]);
+      armedPoint = point;
+      await assert.rejects(service.attachIncident({
+        incidentId,
+        plantId: 1,
+        participants: [ana, carlos],
+        alert: { id: incidentId, ruleCode: "A02" },
+        cycleId: `cycle-${index}`,
+      }), new RegExp(`durable_interruption:${point}`));
+      armedPoint = null;
+    }
+    assert.deepEqual(fired.map(({ point }) => point), [...conversationInterruptionPoints]);
+    assert.deepEqual(fired.map(({ context }) => context.cycleId), ["cycle-0", "cycle-1", "cycle-2", "cycle-3"]);
+    const repaired = await service.attachIncident({
+      incidentId: incidentIds[0]!, plantId: 1, participants: [ana, carlos], alert: { id: incidentIds[0], ruleCode: "A02" },
+    });
+    assert.ok(repaired?.conversationId);
+    assert.equal(Number((await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_conversation_incident WHERE incident_id=$1", [incidentIds[0]])).count), 1);
+    assert.equal(Number((await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_message WHERE client_command_id=$1", [`incident:${incidentIds[0]}`])).count), 1);
+  });
+
+  it("commits one globally ordered change per message and resolves authorized conversation scopes", async () => {
+    const { database, service, ana, carlos, maria, principal, incident } = await setup();
+    const attached = await incident("00000000-0000-4000-8000-000000000051", [ana, carlos]);
+    const sent = await service.send(attached!.conversationId, principal(ana), { body: "Seguimiento", clientCommandId: "ledger-1" });
+    const duplicate = await service.send(attached!.conversationId, principal(ana), { body: "Duplicado", clientCommandId: "ledger-1" });
+    assert.equal(duplicate.id, sent.id);
+    const changes = await database.queryAll(`SELECT cursor,event_id AS "eventId",event_type AS "eventType",scope_type AS "scopeType",
+      scope_id AS "scopeId",payload FROM monitor_change_event ORDER BY cursor`);
+    assert.equal(changes.length, 2);
+    assert.deepEqual(changes.map((change) => change.eventType), ["message.created", "message.created"]);
+    assert.equal(changes.every((change) => change.scopeType === "conversation" && change.scopeId === attached!.conversationId), true);
+    assert.deepEqual(changes.map((change) => Number(change.cursor)), [...changes.map((change) => Number(change.cursor))].sort((a, b) => a - b));
+    assert.equal(new Set(changes.map((change) => change.eventId)).size, 2);
+    const payloads = changes.map((change) => typeof change.payload === "string" ? JSON.parse(change.payload) : change.payload) as Array<{ messageId: string }>;
+    assert.ok(payloads.some((payload) => payload.messageId === attached!.messageId));
+    assert.ok(payloads.some((payload) => payload.messageId === sent.id));
+    assert.deepEqual(await service.authorizedConversationIds(principal(ana), [1]), [attached!.conversationId]);
+    assert.deepEqual(await service.authorizedConversationIds(principal(maria), [1]), []);
+    assert.deepEqual(await service.authorizedConversationIds(principal(maria, true), [1]), [attached!.conversationId]);
   });
 
   it("deduplicates sends, paginates history, and maintains unread counts", async () => {

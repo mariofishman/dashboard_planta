@@ -4,6 +4,18 @@ import type { DatabaseExecutor, DatabaseRuntime } from "@monitor/database";
 export interface ConversationParticipant { sysUserId: number; displayName: string; sourceKey: string }
 export interface ConversationPrincipal { sysUserId: number; displayName: string; admin: boolean }
 
+export const conversationInterruptionPoints = [
+  "before_conversation_attachment",
+  "after_conversation_attachment",
+  "before_alert_message_creation",
+  "after_alert_message_creation",
+] as const;
+export type ConversationInterruptionPoint = typeof conversationInterruptionPoints[number];
+export interface ConversationInterruptionCoordinator {
+  armed(points: readonly ConversationInterruptionPoint[]): Promise<Set<ConversationInterruptionPoint>>;
+  fire(point: ConversationInterruptionPoint, context: Record<string, unknown>): Promise<void>;
+}
+
 const EDIT_WINDOW_MS = 15 * 60_000;
 const DELETE_WINDOW_MS = 2 * 24 * 60 * 60_000;
 
@@ -27,8 +39,21 @@ export class ConversationReadOnlyError extends Error {}
 export class MessageWindowExpiredError extends Error {}
 export class ConversationValidationError extends Error {}
 
+class ConversationTransactionInterruption extends Error {
+  constructor(
+    readonly point: ConversationInterruptionPoint,
+    readonly context: Record<string, unknown>,
+  ) {
+    super(`conversation_transaction_interruption:${point}`);
+  }
+}
+
 export class ConversationService {
-  constructor(private readonly database: DatabaseRuntime, private readonly publish: (event: Record<string, unknown>) => Promise<void> = async () => {}) {}
+  constructor(
+    private readonly database: DatabaseRuntime,
+    private readonly publish: (event: Record<string, unknown>) => Promise<void> = async () => {},
+    private readonly interruptions?: ConversationInterruptionCoordinator,
+  ) {}
 
   private async authorize(executor: DatabaseExecutor, conversationId: string, principal: ConversationPrincipal) {
     const conversation = await executor.queryOne("SELECT id,writable_until FROM monitor_conversation WHERE id=$1", [conversationId]);
@@ -51,11 +76,34 @@ export class ConversationService {
       .map((row) => Number(row.sys_user_id));
   }
 
-  async attachIncident(input: { incidentId: string; plantId: number; participants: ConversationParticipant[]; alert: Record<string, unknown> }) {
+  async authorizedConversationIds(principal: ConversationPrincipal, plantIds: number[]): Promise<string[]> {
+    if (!plantIds.length) return [];
+    const rows = principal.admin
+      ? await this.database.queryAll("SELECT id FROM monitor_conversation WHERE plant_id=ANY($1::bigint[]) ORDER BY id", [plantIds])
+      : await this.database.queryAll(`SELECT c.id FROM monitor_conversation c
+          JOIN monitor_conversation_participant p ON p.conversation_id=c.id
+          WHERE c.plant_id=ANY($1::bigint[]) AND p.sys_user_id=$2 AND p.removed_at IS NULL ORDER BY c.id`,
+        [plantIds, principal.sysUserId]);
+    return rows.map((row) => String(row.id));
+  }
+
+  async attachIncident(input: { incidentId: string; plantId: number; participants: ConversationParticipant[]; alert: Record<string, unknown>; cycleId?: string }) {
     if (!input.participants.length) return null;
     const unique = [...new Map(input.participants.map((item) => [item.sysUserId, item])).values()];
     const participantFingerprint = fingerprint(unique);
-    const result = await this.database.transaction(async (transaction) => {
+    const armed = await this.interruptions?.armed(conversationInterruptionPoints) ?? new Set<ConversationInterruptionPoint>();
+    const interrupt = (point: ConversationInterruptionPoint, context: Record<string, unknown>) => {
+      if (armed.has(point)) throw new ConversationTransactionInterruption(point, {
+        ...(input.cycleId ? { cycleId: input.cycleId } : {}),
+        incidentId: input.incidentId,
+        plantId: input.plantId,
+        participantFingerprint,
+        ...context,
+      });
+    };
+    let result: { conversationId: string; created: boolean; cursor: number; messageId?: string; changeCursor?: number; changeEventId?: string };
+    try {
+      result = await this.database.transaction(async (transaction) => {
       const already = await transaction.queryOne("SELECT conversation_id FROM monitor_conversation_incident WHERE incident_id=$1", [input.incidentId]);
       if (already.conversation_id) {
         const conversationId = String(already.conversation_id);
@@ -86,15 +134,52 @@ export class ConversationService {
         }
       }
       await transaction.execute("UPDATE monitor_conversation SET writable_until=NULL,updated_at=now() WHERE id=$1", [conversation.id]);
+      const attachmentContext = {
+        transactionConversationId: String(conversation.id),
+        conversationCreated: created,
+      };
+      interrupt("before_conversation_attachment", attachmentContext);
       await transaction.execute("INSERT INTO monitor_conversation_incident (conversation_id,incident_id) VALUES ($1,$2)", [conversation.id, input.incidentId]);
+      interrupt("after_conversation_attachment", attachmentContext);
+      interrupt("before_alert_message_creation", attachmentContext);
       const message = await transaction.queryOne(`INSERT INTO monitor_message
         (conversation_id,sender_name,kind,body,payload,client_command_id)
         VALUES ($1,'Monitor','alert','',$2::jsonb,$3) RETURNING id,cursor,sent_at`,
       [conversation.id, JSON.stringify(input.alert), `incident:${input.incidentId}`]);
+      interrupt("after_alert_message_creation", {
+        ...attachmentContext,
+        transactionMessageId: String(message.id),
+        transactionMessageCursor: Number(message.cursor),
+      });
+      const change = await transaction.queryOne(`INSERT INTO monitor_change_event
+        (event_type,scope_type,scope_id,payload,occurred_at)
+        VALUES ('message.created','conversation',$1,$2::jsonb,$3) RETURNING cursor,event_id`,
+      [conversation.id, JSON.stringify({
+        conversationId: String(conversation.id),
+        messageId: String(message.id),
+        messageCursor: Number(message.cursor),
+        kind: "alert",
+        incidentId: input.incidentId,
+      }), message.sent_at]);
       await transaction.execute("UPDATE monitor_conversation SET updated_at=$2 WHERE id=$1", [conversation.id, message.sent_at]);
-      return { conversationId: String(conversation.id), created, cursor: Number(message.cursor), messageId: String(message.id) };
+      return {
+        conversationId: String(conversation.id), created, cursor: Number(message.cursor), messageId: String(message.id),
+        changeCursor: Number(change.cursor), changeEventId: String(change.event_id),
+      };
+      });
+    } catch (error) {
+      if (!(error instanceof ConversationTransactionInterruption) || !this.interruptions) throw error;
+      await this.interruptions.fire(error.point, error.context);
+      throw error;
+    }
+    if (result.changeCursor) await this.publish({
+      type: "message.created",
+      eventId: result.changeEventId,
+      cursor: result.changeCursor,
+      conversationId: result.conversationId,
+      messageId: result.messageId,
+      messageCursor: result.cursor,
     });
-    if (result.cursor) await this.publish({ type: "message.created", conversationId: result.conversationId, cursor: result.cursor, messageId: result.messageId });
     return result;
   }
 
@@ -184,10 +269,29 @@ export class ConversationService {
         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8) RETURNING id,cursor,sent_at`,
       [conversationId, principal.sysUserId, principal.displayName, input.payload ? "attachment" : "text", body,
         JSON.stringify(input.payload ?? {}), input.replyToMessageId ?? null, input.clientCommandId]);
+      const change = await transaction.queryOne(`INSERT INTO monitor_change_event
+        (event_type,scope_type,scope_id,payload,occurred_at)
+        VALUES ('message.created','conversation',$1,$2::jsonb,$3) RETURNING cursor,event_id`,
+      [conversationId, JSON.stringify({
+        conversationId,
+        messageId: String(message.id),
+        messageCursor: Number(message.cursor),
+        kind: input.payload ? "attachment" : "text",
+      }), message.sent_at]);
       await transaction.execute("UPDATE monitor_conversation SET updated_at=$2 WHERE id=$1", [conversationId, message.sent_at]);
-      return { id: String(message.id), cursor: Number(message.cursor), duplicate: false };
+      return {
+        id: String(message.id), cursor: Number(message.cursor), duplicate: false,
+        changeCursor: Number(change.cursor), changeEventId: String(change.event_id),
+      };
     });
-    if (!result.duplicate) await this.publish({ type: "message.created", conversationId, messageId: result.id, cursor: result.cursor });
+    if (!result.duplicate) await this.publish({
+      type: "message.created",
+      eventId: result.changeEventId,
+      cursor: result.changeCursor,
+      conversationId,
+      messageId: result.id,
+      messageCursor: result.cursor,
+    });
     return result;
   }
 

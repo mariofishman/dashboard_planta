@@ -37,7 +37,11 @@
     "validate:phase6-stage5-chain": "node --test scripts/stage5-chain-capture.test.mjs && tsx --test scripts/stage5-chain-connected.test.ts",
     "validate:phase6-stage5-ledger": "node --test scripts/stage5-ledger.test.mjs && node scripts/validate-stage5-ledger.mjs",
     "validate:phase6-stage5-source-isolation": "./scripts/validate-phase6-stage5-source-isolation.sh",
-    "validate:phase6-stage5-source-isolation:focused": "tsx --test scripts/stage5-source-isolation.connected.test.ts"
+    "validate:phase6-stage5-source-isolation:focused": "tsx --test scripts/stage5-source-isolation.connected.test.ts",
+    "validate:phase6-stage5-scheduling": "tsx --test scripts/stage5-scheduling.connected.test.ts",
+    "validate:phase6-stage5-recovery": "tsx --test scripts/stage5-recovery.connected.test.ts",
+    "validate:phase6-stage5-step7-evidence": "node --test scripts/stage5-step7-evidence.test.mjs",
+    "validate:phase6-stage5-step7": "./scripts/validate-phase6-stage5-step7.sh"
   },
   "devDependencies": {
     "ajv": "8.20.0",

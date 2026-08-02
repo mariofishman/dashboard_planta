@@ -84,4 +84,17 @@ describe("Phase 4 incident lifecycle", () => {
     await assert.rejects(new IncidentService(failing, (change) => events.push(change)).apply({ rule: a03, evidence: triggered, context }), /commit_failed/);
     assert.equal(events.length, 0);
   });
+
+  it("recovers authorized plant and conversation changes in one global cursor order", async () => {
+    await database.execute(`INSERT INTO monitor_change_event (event_type,scope_type,scope_id,payload)
+      VALUES ('incident.opened','plant','1','{"incidentId":"incident-1"}'::jsonb),
+        ('message.created','conversation','conversation-1','{"messageId":"message-1"}'::jsonb),
+        ('message.created','conversation','conversation-2','{"messageId":"message-2"}'::jsonb)`);
+    const authorized = await service.changesAfter(0, [1], ["conversation-1"]);
+    assert.deepEqual(authorized.map((change) => change.eventType), ["incident.opened", "message.created"]);
+    assert.deepEqual(authorized.map((change) => Number(change.cursor)), [...authorized.map((change) => Number(change.cursor))].sort((a, b) => a - b));
+    assert.deepEqual(authorized.map((change) => change.scopeId), ["1", "conversation-1"]);
+    const plantOnly = await service.changesAfter(0, [1], []);
+    assert.deepEqual(plantOnly.map((change) => change.eventType), ["incident.opened"]);
+  });
 });

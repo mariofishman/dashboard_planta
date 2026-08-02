@@ -211,6 +211,18 @@ export const changeEvent = pgTable("monitor_change_event", {
   index("monitor_change_event_occurred_at_idx").on(table.occurredAt),
 ]);
 
+export const testInterruption = pgTable("monitor_test_interruption", {
+  id: uuid("id").primaryKey(),
+  point: text("point").notNull(),
+  status: text("status").notNull().default("armed"),
+  context: jsonb("context").notNull().default({}),
+  armedAt: timestamp("armed_at", { withTimezone: true }).notNull().defaultNow(),
+  firedAt: timestamp("fired_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("monitor_test_interruption_one_armed_point_idx").on(table.point).where(sql`${table.status} = 'armed'`),
+  index("monitor_test_interruption_history_idx").on(table.armedAt, table.id),
+]);
+
 export const detectionQuery = pgTable("monitor_detection_query", {
   queryId: text("query_id").primaryKey(),
   ruleCode: text("rule_code").notNull(),

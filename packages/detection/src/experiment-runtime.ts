@@ -11,6 +11,11 @@ import {
 import type { ScenarioRuleCode, ScenarioSource } from "./simulator.js";
 
 type ScenarioRegistry = Map<ScenarioRuleCode, { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
+interface ScenarioRuntimeTrigger {
+  trigger: "automatic_timer" | "manual_advance" | "source_action_boundary";
+  timerDeadline?: string;
+  timerObservedAt?: string;
+}
 
 export interface ScenarioRuntimeStatus {
   experiment: ScenarioExperiment | null;
@@ -102,7 +107,7 @@ export class ScenarioExperimentRuntime {
   async advance(id: string, minutes: number): Promise<ScenarioRuntimeAdvance> {
     return this.serialized(async () => {
       await this.requireActive(id);
-      const result = await this.advanceLocked(id, minutes);
+      const result = await this.advanceLocked(id, minutes, { trigger: "manual_advance" });
       const nextTickAt = result.experiment.status === "running" ? this.nextDeadline(result.experiment.speed) : null;
       await this.repository.setNextTick(id, nextTickAt);
       this.arm(result.experiment, nextTickAt);
@@ -113,7 +118,7 @@ export class ScenarioExperimentRuntime {
   async executeBeforeSourceAction<T>(work: () => Promise<T>): Promise<T> {
     return this.serialized(async () => {
       const active = await this.repository.active();
-      if (active?.status === "running") await this.advanceLocked(active.id, 0);
+      if (active?.status === "running") await this.advanceLocked(active.id, 0, { trigger: "source_action_boundary" });
       const result = await work();
       if (active && result && typeof result === "object") {
         const event = result as Record<string, unknown>;
@@ -135,30 +140,31 @@ export class ScenarioExperimentRuntime {
     this.timer = null;
   }
 
-  private async advanceLocked(id: string, minutes: number): Promise<ScenarioRuntimeAdvance> {
+  private async advanceLocked(id: string, minutes: number, trigger: ScenarioRuntimeTrigger): Promise<ScenarioRuntimeAdvance> {
     const plan = await this.repository.planAdvance(id, minutes);
     if (plan.experiment.status !== "running") return { experiment: plan.experiment, polls: [] };
     const polls: ScenarioRuntimePoll[] = [];
-    for (const due of plan.due) polls.push(await this.runDue(id, due));
+    for (const due of plan.due) polls.push(await this.runDue(id, due, trigger));
     await this.source.setBusinessTime(plan.targetTime);
     const experiment = await this.repository.setBusinessTime(id, plan.targetTime);
     return { experiment, polls };
   }
 
-  private async runDue(id: string, due: ScenarioDuePoll): Promise<ScenarioRuntimePoll> {
+  private async runDue(id: string, due: ScenarioDuePoll, trigger: ScenarioRuntimeTrigger): Promise<ScenarioRuntimePoll> {
     await this.source.setBusinessTime(due.dueAt);
     await this.repository.setBusinessTime(id, due.dueAt);
     const entry = this.registry.get(due.ruleCode);
     if (!entry) throw new Error(`missing_scenario_runtime_query:${due.ruleCode}`);
-    await this.repository.recordRuntimeEvent(id, "poll_started", due.ruleCode, due.dueAt, { queryId: entry.query.queryId });
+    await this.repository.recordRuntimeEvent(id, "poll_started", due.ruleCode, due.dueAt, { queryId: entry.query.queryId, ...trigger });
     try {
       const result = await this.scheduler.runScheduled(entry.query, entry.adapter);
-      await this.repository.recordRuntimeEvent(id, "poll_completed", due.ruleCode, due.dueAt, result as unknown as Record<string, unknown>);
+      await this.repository.recordRuntimeEvent(id, "poll_completed", due.ruleCode, due.dueAt, { ...result, ...trigger } as unknown as Record<string, unknown>);
       await this.repository.completeDue(id, due);
       return { ...due, result };
     } catch (error) {
       await this.repository.recordRuntimeEvent(id, "poll_failed", due.ruleCode, due.dueAt, {
         queryId: entry.query.queryId,
+        ...trigger,
         error: error instanceof Error ? error.message : "unknown_error",
       });
       throw error;
@@ -196,10 +202,19 @@ export class ScenarioExperimentRuntime {
           return;
         }
         const interval = this.interval(active.speed);
-        const dueTicks = Math.max(1, Math.floor((this.now() - Date.parse(nextTickAt)) / interval) + 1);
+        const observedNow = this.now();
+        if (observedNow < Date.parse(nextTickAt)) {
+          this.arm(active, nextTickAt);
+          return;
+        }
+        const dueTicks = Math.floor((observedNow - Date.parse(nextTickAt)) / interval) + 1;
         let completedTicks = dueTicks;
         try {
-          active = (await this.advanceLocked(active.id, dueTicks)).experiment;
+          active = (await this.advanceLocked(active.id, dueTicks, {
+            trigger: "automatic_timer",
+            timerDeadline: nextTickAt,
+            timerObservedAt: new Date(observedNow).toISOString(),
+          })).experiment;
         } catch (error) {
           completedTicks = 1;
           throw error;
