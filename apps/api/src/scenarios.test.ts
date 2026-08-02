@@ -599,7 +599,14 @@ it("reroutes an open Phase 4B incident when the roster changes and protects diag
   const advance = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
   assert.equal(advance.statusCode, 200, advance.body);
   const incidentAt = advance.json().scenarioClock.currentAt;
-  const incidentWorkerGroup = workerGroupForIncident(incidentAt, "Día");
+  const poll = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  assert.equal(poll.statusCode, 200, poll.body);
+  assert.equal(poll.json().scenario.scenarioClock.currentAt, incidentAt);
+  const incident = (await instance.app.inject({ url: "/api/incidents", headers: manager })).json().incidents
+    .find((item: { ruleCode: string }) => item.ruleCode === "A02");
+  assert.ok(incident?.openedAt);
+  assert.equal(Number((await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_routing_decision WHERE incident_id=$1", [incident.id])).count), 1);
+  const incidentWorkerGroup = workerGroupForIncident(incident.openedAt, "Día");
   const assignment = (id: string, person: string, position: string, scope: string, group: string | null, operations: string[] = [], warehouseType: string | null = null) => ({
     id, person, position, operations, warehouseType, scope, group, validFrom: "2026-07-01", validTo: null, state: "active", setupComplete: true,
   });
@@ -612,15 +619,12 @@ it("reroutes an open Phase 4B incident when the roster changes and protects diag
     assignment("warehouse-supervisor-active", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", incidentWorkerGroup, [], "Materias primas"),
   ];
   assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: roster } })).statusCode, 200);
-  const poll = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
-  assert.equal(poll.statusCode, 200, poll.body);
-  assert.equal(poll.json().scenario.scenarioClock.currentAt, incidentAt);
-  const incident = (await instance.app.inject({ url: "/api/incidents", headers: manager })).json().incidents.find((item: { ruleCode: string }) => item.ruleCode === "A02");
   const route = `/api/internal/routing/${incident.id}`;
   assert.equal((await instance.app.inject({ url: route, headers: operator })).statusCode, 403);
   const before = await instance.app.inject({ url: route, headers: manager });
   assert.equal(before.statusCode, 200, before.body);
   assert.ok(before.json().recipients.some((recipient: { name: string }) => recipient.name === "Carlos Mendoza"), before.body);
+  assert.equal(Number((await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_routing_decision WHERE incident_id=$1", [incident.id])).count), 2);
 
   const replacement = assignment("dispatcher-replacement", "Carmen Ríos", "Despachador de almacén", "warehouse_group", incidentWorkerGroup, [], "Materias primas");
   const changed = roster.filter((item) => item.id !== "dispatcher-active").concat(replacement);
@@ -628,7 +632,7 @@ it("reroutes an open Phase 4B incident when the roster changes and protects diag
   const after = await instance.app.inject({ url: route, headers: manager });
   assert.ok(after.json().recipients.some((recipient: { name: string }) => recipient.name === "Carmen Ríos"));
   assert.equal(after.json().recipients.some((recipient: { name: string }) => recipient.name === "Carlos Mendoza"), false);
-  assert.equal(Number((await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_routing_decision WHERE incident_id=$1", [incident.id])).count), 2);
+  assert.equal(Number((await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_routing_decision WHERE incident_id=$1", [incident.id])).count), 3);
 });
 
 it("keeps simulator routes unavailable when disabled", async () => {

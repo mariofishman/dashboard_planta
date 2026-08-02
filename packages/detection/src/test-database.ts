@@ -309,7 +309,11 @@ function changedFields(changes: SourceActionFieldChange[]): Record<string, strin
 export class TestDatabaseSourceAdapter implements DetectionSourceAdapter {
   private retryFault: Extract<ScenarioFault, "source_error" | "timeout"> | null = null;
   private retryFaultReadsRemaining = 0;
-  private continuation: { fault: "duplicate_keys" | "revision_change"; row: Record<string, unknown>; revision: string } | null = null;
+  private continuation: {
+    fault: "partial_pagination" | "duplicate_keys" | "revision_change";
+    row?: Record<string, unknown>;
+    revision: string;
+  } | null = null;
 
   constructor(
     private readonly connections: TestDatabaseConnections,
@@ -325,8 +329,14 @@ export class TestDatabaseSourceAdapter implements DetectionSourceAdapter {
     if (this.continuation) {
       const continuation = this.continuation;
       this.continuation = null;
+      if (continuation.fault === "partial_pagination") {
+        return {
+          rows: [], nextCursor: null, complete: false, sourceRevision: continuation.revision,
+          schemaVersion: input.query.queryVersion,
+        };
+      }
       return {
-        rows: continuation.fault === "duplicate_keys" ? [continuation.row] : [],
+        rows: continuation.fault === "duplicate_keys" ? [continuation.row!] : [],
         nextCursor: null,
         complete: true,
         sourceRevision: continuation.fault === "revision_change" ? `${continuation.revision}.changed` : continuation.revision,
@@ -374,7 +384,12 @@ export class TestDatabaseSourceAdapter implements DetectionSourceAdapter {
       sourceRevision: poll.sourceRevision,
       schemaVersion: input.query.queryVersion,
     };
-    if (fault === "partial" || fault === "partial_pagination") return { ...normal, complete: false, nextCursor: null };
+    if (fault === "partial") return { ...normal, complete: false, nextCursor: null };
+    if (fault === "partial_pagination") {
+      if (!normal.nextCursor) throw new Error("partial_pagination_requires_first_page");
+      this.continuation = { fault, revision: normal.sourceRevision };
+      return normal;
+    }
     if (fault === "invalid_schema") return { ...normal, schemaVersion: "test_database.invalid" };
     if ((fault === "duplicate_keys" || fault === "revision_change") && rows[0]) {
       this.continuation = { fault, row: rows[0], revision: normal.sourceRevision };
@@ -407,6 +422,10 @@ export class TestDatabaseSourceAdapter implements DetectionSourceAdapter {
 export class TestDatabaseScenarioRepository implements ScenarioSource {
   private readonly states = new Map<ScenarioRuleCode, ScenarioState>();
   private readonly tracked = new Map<ScenarioRuleCode, Set<number>>();
+  private readonly deferredFreshnessFaults = new Map<ScenarioRuleCode, {
+    fault: "stale" | "unknown_freshness";
+    inspectionsRemaining: number;
+  }>();
   private constructor(
     private readonly connections: TestDatabaseConnections,
     readonly fixtureIds: FixtureIds,
@@ -770,6 +789,17 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     return this.status(ruleCode);
   }
 
+  async failFreshnessAfterRead(code: string, fault: "stale" | "unknown_freshness"): Promise<ScenarioStatus> {
+    const ruleCode = asCode(code);
+    this.deferredFreshnessFaults.set(ruleCode, { fault, inspectionsRemaining: 1 });
+    const state = this.state(ruleCode);
+    state.pendingFault = null;
+    state.lastAction = "fail_next_poll";
+    state.lastActionAt = state.currentAt;
+    state.lastActionRecordedAt = new Date().toISOString();
+    return this.status(ruleCode);
+  }
+
   async consumeFault(code: ScenarioRuleCode): Promise<ScenarioFault | null> {
     const state = this.state(code);
     if (state.pendingFault === "stale" || state.pendingFault === "unknown_freshness") return null;
@@ -783,6 +813,15 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
   }
 
   consumeFreshnessFault(code: ScenarioRuleCode): Extract<ScenarioFault, "stale" | "unknown_freshness"> | null {
+    const deferred = this.deferredFreshnessFaults.get(code);
+    if (deferred) {
+      if (deferred.inspectionsRemaining > 0) {
+        deferred.inspectionsRemaining -= 1;
+        return null;
+      }
+      this.deferredFreshnessFaults.delete(code);
+      return deferred.fault;
+    }
     const state = this.state(code);
     if (state.pendingFault !== "stale" && state.pendingFault !== "unknown_freshness") return null;
     const fault = state.pendingFault;

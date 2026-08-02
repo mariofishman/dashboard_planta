@@ -78,8 +78,14 @@ import {
   type ChatConversationRow,
   type ChatFilter,
 } from "./chatUi";
+import {
+  pendingMessageStorageKey,
+  readChatPresentationContext,
+  readPendingMessages,
+  writeChatPresentationContext,
+  writePendingMessages,
+} from "./browserStorageAuthority";
 
-const CHAT_CONTEXT_KEY = "monitor.chat.presentation-context";
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const alertToneColor = {
   danger: ui.color.lifecycleOpen,
@@ -186,7 +192,7 @@ export function ChatList({ session }: { session: SessionResponse }) {
     setFilter(next);
   };
   const openConversation = (row: ChatConversationRow) => {
-    sessionStorage.setItem(CHAT_CONTEXT_KEY, JSON.stringify({ id: row.id, title: row.title, participants: row.participants, mockOnly: row.mockOnly }));
+    writeChatPresentationContext({ id: row.id, title: row.title, participants: row.participants, mockOnly: row.mockOnly });
     go(`/chats/${row.id}`);
   };
   const clearLongPress = () => {
@@ -333,10 +339,10 @@ function AlertAttachment({ message, expanded, highlighted, register, onToggle, o
 }
 
 export function ChatDetail({ session, conversationId }: { session: SessionResponse; conversationId: string }) {
-  const queueKey = `monitor.pending.${session.principal.sysUserId}.${conversationId}`;
+  const queueKey = pendingMessageStorageKey(session.principal.sysUserId, conversationId);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [localMessages, setLocalMessages] = useState<ConversationMessage[]>([]);
-  const [pending, setPending] = useState<PendingMessage[]>(() => JSON.parse(localStorage.getItem(queueKey) ?? "[]") as PendingMessage[]);
+  const [pending, setPending] = useState<PendingMessage[]>(() => readPendingMessages<PendingMessage>(queueKey));
   const [draft, setDraft] = useState("");
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [sending, setSending] = useState(false);
@@ -375,10 +381,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
 
   const fixtureConversation = UI_ONLY_CONVERSATION_FIXTURES.find((row) => row.id === conversationId) ?? UI_ONLY_CONVERSATION_FIXTURES[0]!;
   const storedContext = useMemo(() => {
-    try {
-      const value = JSON.parse(sessionStorage.getItem(CHAT_CONTEXT_KEY) ?? "null") as { id?: string; title?: string; participants?: string; mockOnly?: boolean } | null;
-      return value?.id === conversationId ? value : null;
-    } catch { return null; }
+    return readChatPresentationContext(conversationId);
   }, [conversationId]);
   const mockConversation = Boolean(storedContext?.mockOnly || conversationId.startsWith("ui-demo-"));
   const conversationTitle = storedContext?.title ?? fixtureConversation.title;
@@ -404,7 +407,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
       try {
         await sendConversationMessage(conversationId, item.body, item.id, item.replyToMessageId, item.payload);
         remaining = remaining.filter((pendingItem) => pendingItem.id !== item.id);
-        localStorage.setItem(queueKey, JSON.stringify(remaining));
+        writePendingMessages(queueKey, remaining);
         setPending(remaining);
       } catch { break; }
     }
@@ -413,13 +416,13 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
 
   useEffect(() => {
     if (mockConversation) return;
-    socket.on("connect", () => { void flushPending(JSON.parse(localStorage.getItem(queueKey) ?? "[]") as PendingMessage[]); });
+    socket.on("connect", () => { void flushPending(readPendingMessages<PendingMessage>(queueKey)); });
     socket.on("message.created", refresh);
     socket.on("message.updated", refresh);
     socket.on("typing", (event: { conversationId: string; sysUserId: number; active: boolean }) => { if (event.conversationId === conversationId) setTypingUsers((current) => event.active ? [...new Set([...current, event.sysUserId])] : current.filter((id) => id !== event.sysUserId)); });
     socket.on("presence", (event: { conversationId: string; sysUserId: number; online: boolean }) => { if (event.conversationId === conversationId) setOnlineUsers((current) => event.online ? [...new Set([...current, event.sysUserId])] : current.filter((id) => id !== event.sysUserId)); });
     socket.connect();
-    const online = () => void flushPending(JSON.parse(localStorage.getItem(queueKey) ?? "[]") as PendingMessage[]);
+    const online = () => void flushPending(readPendingMessages<PendingMessage>(queueKey));
     window.addEventListener("online", online);
     return () => { window.removeEventListener("online", online); socket.disconnect(); };
   }, [conversationId, flushPending, mockConversation, queueKey, refresh, socket]);
@@ -549,7 +552,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
     }
     const nextMessage: PendingMessage = { id: crypto.randomUUID(), body: draft.trim(), replyToMessageId: replyTo?.id ?? null, ...(attachment ? { payload: { attachment } } : {}) };
     const next = [...pending, nextMessage];
-    setPending(next); localStorage.setItem(queueKey, JSON.stringify(next)); setDraft(""); setAttachment(null); setReplyTo(null); setSending(true);
+    setPending(next); writePendingMessages(queueKey, next); setDraft(""); setAttachment(null); setReplyTo(null); setSending(true);
     try { await flushPending(next); } finally { setSending(false); }
   };
 

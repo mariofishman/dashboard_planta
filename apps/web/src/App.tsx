@@ -70,6 +70,7 @@ import {
 import { ChatDetail, ChatList } from "./Chats";
 import { OperationalResponsibilityRoster } from "./OperationalResponsibilityRoster";
 import { ScenarioLab } from "./ScenarioLab";
+import { readMonitorCursor, writeMonitorCursor } from "./browserStorageAuthority";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -239,11 +240,11 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
   useEffect(() => {
     socket.on("connect", () => {
       setLiveState("live");
-      socket.emit("sync.resume", { cursor: Number(localStorage.getItem("monitor.cursor") ?? 0) });
+      socket.emit("sync.resume", { cursor: readMonitorCursor() });
     });
     socket.on("disconnect", () => setLiveState("reconnecting"));
     socket.on("incident.changed", (change: { cursor: number }) => {
-      localStorage.setItem("monitor.cursor", String(change.cursor));
+      writeMonitorCursor(change.cursor);
       refresh();
     });
     socket.connect();

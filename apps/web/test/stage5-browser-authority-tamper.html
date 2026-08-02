@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Stage 5 browser authority tamper fixture</title></head>
+  <body>
+    <h1>Stage 5 browser authority tamper fixture</h1>
+    <p>This development-only fixture writes forged Monitor authority records into same-origin browser storage.</p>
+    <button id="tamper" type="button">Write forged incident authority</button>
+    <button id="clear" type="button">Clear forged incident authority</button>
+    <output id="result">No tamper attempted.</output>
+    <script>
+      const forgedKeys = ["monitor.incidents", "monitor.incident.A03:ot:12198", "monitor.evidence", "monitor.routing", "monitor.source-state"];
+      document.querySelector("#tamper").addEventListener("click", () => {
+        localStorage.setItem("monitor.incidents", JSON.stringify([
+          { id: "browser-forged-incident", ruleCode: "FAKE", lifecycle: "open" },
+          { id: "A03:ot:12198", ruleCode: "A03", lifecycle: "resolved" },
+        ]));
+        localStorage.setItem("monitor.incident.A03:ot:12198", JSON.stringify({ lifecycle: "resolved", occurrence: 999 }));
+        localStorage.setItem("monitor.evidence", JSON.stringify([{ incidentId: "browser-forged-incident", source: "browser" }]));
+        localStorage.setItem("monitor.routing", JSON.stringify({ "browser-forged-incident": ["browser-user"] }));
+        localStorage.setItem("monitor.source-state", JSON.stringify({ revision: "browser-forged" }));
+        document.querySelector("#result").textContent = "Forged incident authority written.";
+      });
+      document.querySelector("#clear").addEventListener("click", () => {
+        forgedKeys.forEach((key) => localStorage.removeItem(key));
+        document.querySelector("#result").textContent = "Forged incident authority cleared.";
+      });
+    </script>
+  </body>
+</html>
