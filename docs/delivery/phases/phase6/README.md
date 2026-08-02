@@ -18,7 +18,7 @@ The three prerequisite workstreams are complete within their separate scopes:
 
 They have not yet passed the complete Stage 5 connected-acceptance gate. Commit `165abc1` is a preserved implementation checkpoint whose useful code and evidence are being corrected and revalidated. Phase 7 remains blocked until Stage 5 and Stage 6 complete.
 
-The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. Stage 5 discovered that the connected laboratory and acceptance evidence require additional work.
+The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It connected that correct boundary behind the older scenario-screen composition; it did not port or accept the approved tabbed V2 laboratory on `/dev/scenarios`. The earlier Step 8.2–8.7 browser run therefore remains diagnostic history and is invalid for acceptance.
 
 ## Stage plan
 
@@ -27,13 +27,13 @@ The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete on
 | 1 — Stabilize requirements | Complete — 2026-07-29 | Audit A02, A03, A05 and define the redesigned laboratory and connected boundary. | Requirements and V2 specification recorded. |
 | 2 — Approve the standalone laboratory | Complete — 2026-07-31 | Review the V2 laboratory one test at a time. | All 34 valid tests pass and are user-approved; invalid/deferred recurrence cases remain explicitly excluded. |
 | 3 — Inspect the `test_database` handoff | Complete — 2026-07-31 | Verified the merged runtime, reset safeguards, readiness contract, credentials, Node driver access, and A02/A03/A05 source mappings. | **Ready with exact gaps.** The evidence, approved mappings, corrections, and Stage 4 gaps are recorded in the Stage 3 handoff. |
-| 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected `/dev/scenarios` to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. |
+| 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected the older `/dev/scenarios` composition to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. This did not connect or accept the approved V2 interface. |
 | 5 — Run connected acceptance | **Recovery work in progress** | Follow the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). | The plan's Stage 5 exit assertions pass and the user accepts the evidence. |
 | 6 — Finalize Phase 6 | Pending | Audit the accepted Stage 5 evidence, reconcile authority and implementation, document Phase 10 exclusions, and decide whether the old operational source simulator can be retired. | The Phase 6 exit gate passes and the user accepts the integrated local result. |
 
 ## Immediate next action — Stage 5 recovery
 
-Use the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). It owns the recovery from the wrong connected laboratory, the return to Steps 8B–12, the checkpoint assessment, file classification, requirement trace, exact 34-test inventory, exit gates, and eventual Stage 5 evidence status.
+Use the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). It owns the replacement of the older connected screen with the approved V2 laboratory, the new Step 8.2–8.7 evidence run, and the return to Steps 8B–12. Prior Step 8.2–8.7 artifacts remain ignored diagnostic history and cannot be counted as acceptance evidence.
 
 ## Supporting specifications and evidence
 
