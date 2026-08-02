@@ -64,7 +64,7 @@ function apiOrigin(server: MonitorServer): string {
   return `http://127.0.0.1:${address.port}`;
 }
 
-async function waitForBrowserResults(timeoutMs = 30 * 60_000): Promise<Record<string, unknown>> {
+async function waitForBrowserResults(timeoutMs = Number(process.env.STEP8_BROWSER_RESULTS_TIMEOUT_MS ?? 90 * 60_000)): Promise<Record<string, unknown>> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (existsSync(browserResultsPath)) return JSON.parse(await readFile(browserResultsPath, "utf8"));
@@ -94,7 +94,7 @@ try {
   server = await buildMonitorServer({
     testDatabaseFixtureSeeds: { A02: Number(fixtures.a02.downstream[0]), A03: 1415, A05: 141084 },
     config: {
-      nodeEnv: "test", cookieSecret: "stage5-browser-acceptance-secret", allowMockAuth: true,
+      nodeEnv: "development", cookieSecret: "stage5-browser-acceptance-secret", allowMockAuth: true,
       enableScenarioLab: true, scenarioSource: "test_database", databaseMode: "pglite", pgliteDataDir: "memory://", webOrigin,
     },
   });
@@ -108,6 +108,7 @@ try {
   });
   const experiment = created.experiment;
   assert.ok(experiment);
+  await acceptance.runtime.configure(experiment.id, 60, 60);
   const roster = await server.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: [
     { id: "manager", sysUserId: 9001, person: "Gerencia de planta", position: "Gerente de fábrica", operations: [], warehouseType: null, scope: "factory", group: null, validFrom: "2026-07-01", validTo: null, state: "active", setupComplete: true },
   ] } });
@@ -119,10 +120,10 @@ try {
   assert.ok(createdSourceId > 0);
   acceptance.source.replaceTracked!("A02", [createdSourceId]);
   await acceptance.runtime.pause(experiment.id, false);
-  await acceptance.runtime.advance(experiment.id, 31);
-  const poll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
-  assert.equal(poll.statusCode, 200, poll.body);
-  const cycleId = String(poll.json().result.cycleId);
+  const advanced = await acceptance.runtime.advance(experiment.id, 61);
+  const a02Poll = advanced.polls.find(({ ruleCode }) => ruleCode === "A02");
+  assert.ok(a02Poll, "normal experiment runtime must execute the due A02 poll");
+  const cycleId = String(a02Poll.result.cycleId);
   const incident = await server.database.queryOne("SELECT id FROM monitor_incident WHERE rule_code='A02' ORDER BY opened_at DESC LIMIT 1");
   const incidentId = String(incident.id);
   const routingDecisionIds = await ids(server, "SELECT id FROM monitor_routing_decision WHERE incident_id=$1", [incidentId]);

@@ -12,6 +12,7 @@ const validSecondsPerMinute = (value: unknown): value is number => Number.isInte
 const recordKey = (code: ScenarioCode, row: Record<string, unknown>): number => Number(
   code === "A02" ? row.materialFlowDetailId : code === "A03" ? row.workOrderId : row.articleSerialId,
 );
+const incidentConditionKey = (code: ScenarioCode, key: number | string): string => `${code}:v1:${key}`;
 
 const recordReasons = (code: ScenarioCode, row: Record<string, unknown>): string[] => {
   if (code === "A02") return row.isWorkOrderReservation === true && row.state === "TRANSITO" && row.receivedAt === null && Number(row.elapsedMinutes) >= 30 ? ["not_received"] : [];
@@ -117,7 +118,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
       const reasons = recordReasons(code, row);
       const sourceTriggeredForRecord = reasons.length > 0;
       const recordIncident = await options.database.queryOne(`SELECT id,lifecycle,occurrence,opened_at AS "openedAt",resolved_at AS "resolvedAt",updated_at AS "updatedAt"
-        FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2 ORDER BY occurrence DESC LIMIT 1`, [code, String(key)]);
+        FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2 ORDER BY occurrence DESC LIMIT 1`, [code, incidentConditionKey(code, key)]);
       const recordLifecycle = recordIncident.id ? String(recordIncident.lifecycle) : null;
       const expectedLifecycle = pendingFailure ? recordLifecycle : sourceTriggeredForRecord ? "open" : recordLifecycle === "open" ? "resolved" : recordLifecycle;
       const recordDownstream = recordIncident.id ? await options.database.queryOne(`SELECT
@@ -264,7 +265,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     for (const record of records.values()) {
       const evidence = record.evidence as Record<string, unknown>;
       const sourceKey = String(record.sourceKey);
-      const incident = await options.database.queryOne(`SELECT lifecycle FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2 ORDER BY occurrence DESC LIMIT 1`, [code, sourceKey]);
+      const incident = await options.database.queryOne(`SELECT lifecycle FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2 ORDER BY occurrence DESC LIMIT 1`, [code, incidentConditionKey(code, sourceKey)]);
       const item: Record<string, unknown> = { ...record, incidentOutcome: incident.lifecycle ? String(incident.lifecycle) : "none" };
       const input = (item.input && typeof item.input === "object" ? item.input : {}) as Record<string, unknown>;
       const exact = (query: string | undefined, values: unknown[]) => !query || values.some((value) => String(value ?? "").toLowerCase() === query.toLowerCase());

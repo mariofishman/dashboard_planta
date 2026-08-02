@@ -6,7 +6,7 @@
 
 **Branch:** `codex/phase6-stage5`
 
-**Latest pushed recovery checkpoint:** `30ed384`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
+**Latest pushed recovery checkpoint:** `d2ef6af`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
 
 **Current Stage 5 status:** In progress. Stage 5 is not accepted, Step 8 is not accepted, and Step 8B has not started.
 
@@ -22,7 +22,7 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 | 2 | Complete Recovery 1–2. | Questionable files are classified and active documentation points to the correct laboratory and evidence. |
 | 3 | Complete Recovery 3–4. | The approved V2 laboratory is connected and the obsolete executable workflow cannot be mistaken for current Stage 5 behavior. |
 | 4 | Complete Recovery 5. | Complete — every affected focused check passes and the development baseline is independently restored and verified. |
-| 5 | Complete Recovery 6. | New Step 8.2–8.7 evidence passes in one runtime using the approved laboratory. |
+| 5 | Complete Recovery 6. | Complete — new Step 8.2–8.7 evidence passes in one runtime using the approved laboratory. |
 | 6 | Resume the original path at Step 8B. | Complete 8B, 8C, and Steps 9–12 under their separate gates. |
 
 ### Exact next action
@@ -36,9 +36,9 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 7. Complete — Recovery 3 connected and reviewed the approved V2 laboratory on 2026-08-02.
 8. Complete — Recovery 4 retired the obsolete executable workflow through five approved units on 2026-08-02.
 9. Complete — Recovery 5 passed all five calibrated units and independently restored and verified the protected baseline on 2026-08-02.
-10. Next — start `sequential-substep-review` for Recovery 6. Recovery 6 has not started.
+10. Complete — Recovery 6 passed Steps 8.2a–8.7d in strengthened run `20260802-step8-recovery-v2-10`; the aggregate and adversarial gates passed and the protected baseline was independently restored on 2026-08-02.
 
-Recovery 3–4 is committed and pushed at `30ed384`. Recovery 5 is complete and remains uncommitted and unpushed.
+Recovery 3–4 is committed and pushed at `30ed384`; Recovery 5 is committed and pushed at `d2ef6af`. Recovery 6 is complete and remains uncommitted and unpushed.
 
 ### What the approval and transition authorization mean
 
@@ -143,8 +143,8 @@ Recommended checkpoints, each requiring explicit approval and never authorizing 
 | Recovery 3 | Complete — 2026-08-02 | Nothing; the connected V2 implementation and its focused review sequence are complete. |
 | Recovery 4 | Complete — 2026-08-02 | Nothing; obsolete normal routes, destructive repair, rejected executables, and misleading command bindings are retired or isolated. |
 | Recovery 5 | Complete — 2026-08-02 | Nothing; affected focused proof passes and the protected baseline is independently restored and verified. |
-| Recovery 6 | Not started | Nothing technical remains from Recovery 5; begin its separate reviewed execution sequence. |
-| Step 8B | Blocked | New Step 8.2–8.7 run passes. |
+| Recovery 6 | Complete — 2026-08-02 | Nothing; strengthened run `20260802-step8-recovery-v2-10` and independent restoration checks pass. |
+| Step 8B | Not started | Recovery is complete; Step 8B is now the next separately reviewed step. |
 
 ### Recovery 1 — Confirm what is current and what is obsolete
 
@@ -636,6 +636,77 @@ Run in this order:
 The existing substeps may be reused when their purpose still applies. Each one must be reassessed against the corrected laboratory before execution. New evidence must use one new runtime and one exact connected object chain. Old artifacts remain diagnostic history and cannot be reused.
 
 **Done when:** A new Step 8.2–8.7 run passes completely with the approved laboratory, Dashboard, Chat, reconnect, evidence validation, and source restoration.
+
+#### Approved Recovery 6 substeps
+
+The user preauthorized all six splits and their sequential execution without routine pauses. Each step retains four units after count calibration. Three would combine authoritative object proof, behavior or authorization, interaction/accessibility, and evidence closure; five would split shared viewport or artifact work without a distinct result. The 24 units below collectively cover Recovery 6 once, keep every surface in the same runtime, and reserve aggregate publication and restoration for Step 8.7.
+
+##### Step 8.2 — Connected V2 laboratory
+
+| Unit | Purpose and artifact | Dependency | Exit check | Status |
+| --- | --- | --- | --- | --- |
+| 8.2a | Bind the visible V2 laboratory to one fresh experiment and its exact source, poll, incident, route, delivery, conversation, message, and cursor chain. | Step 8.1 harness and Recovery 5 baseline. | Connected truth is visible without simulator or expected-counter substitution. | Complete |
+| 8.2b | Exercise a pending connected operation and a failed read while preserving the last committed Monitor truth. | 8.2a exact chain. | Pending and untrusted states are explicit; a healthy poll restores confirmed state without object drift. | Complete |
+| 8.2c | Verify tabs, history, controls, keyboard/focus, accessible names, reduced motion, overflow, console, and 1440/768/390 layouts. | 8.2a–8.2b states. | Structured checks and captures pass at all three viewports. | Complete |
+| 8.2d | Stage and independently inspect the laboratory artifact set and exact references. | 8.2a–8.2c. | Every laboratory artifact belongs to the fresh runtime and is ready for 8.7 byte binding. | Complete |
+
+##### Step 8.3 — Dashboard
+
+| Unit | Purpose and artifact | Dependency | Exit check | Status |
+| --- | --- | --- | --- | --- |
+| 8.3a | Bind Dashboard and incident detail to the exact connected incident, routing, delivery, and cursor chain. | 8.2 connected chain. | Open state and detail match the same Monitor objects without fixture substitution. | Complete |
+| 8.3b | Prove honest absence filtering and resolve the exact incident through the legal source action and scheduler path. | 8.3a open state. | The same incident resolves with no duplicate route, delivery, conversation, or message. | Complete |
+| 8.3c | Verify chart/detail interactions, keyboard/focus, names, reduced motion, overflow, console, and 1440/768/390 layouts. | 8.3a–8.3b lifecycle states. | Dashboard interaction and responsive checks pass at all three viewports. | Complete |
+| 8.3d | Stage and independently inspect Dashboard artifacts and provenance references. | 8.3a–8.3c. | Lifecycle, absence, detail, interaction, accessibility, console, and viewport evidence is complete for 8.7. | Complete |
+
+##### Step 8.4 — Chat list
+
+| Unit | Purpose and artifact | Dependency | Exit check | Status |
+| --- | --- | --- | --- | --- |
+| 8.4a | Bind the authorized list, ordering, unread state, alert metadata, and cursor to the exact conversation. | 8.2 chain. | The routed participant sees only the exact connected conversation and authoritative ordering. | Complete |
+| 8.4b | Authenticate a nonparticipant and prove list and direct-detail denial without data leakage. | 8.4a authorized state. | Unauthorized access fails closed and exposes no connected or fixture content. | Complete |
+| 8.4c | Verify filters, row/menu behavior, keyboard/focus, names, reduced motion, overflow, console, and 1440/768/390 layouts. | 8.4a–8.4b authorization states. | Chat-list interaction and responsive checks pass at all three viewports. | Complete |
+| 8.4d | Stage and independently inspect Chat-list artifacts and provenance references. | 8.4a–8.4c. | Authorization, identity, interaction, accessibility, console, and viewport evidence is complete for 8.7. | Complete |
+
+##### Step 8.5 — Chat detail
+
+| Unit | Purpose and artifact | Dependency | Exit check | Status |
+| --- | --- | --- | --- | --- |
+| 8.5a | Bind detail to the exact conversation, alert message, incident, delivery, receipt, and cursors. | 8.4 authorized conversation. | The exact message loads, receipt state is authoritative, and no fixture message appears. | Complete |
+| 8.5b | Verify alert jump/expansion, work-order copy target, message menu, and conversation search without object mutation. | 8.5a exact detail. | Every interaction targets the same alert message and preserves connected state. | Complete |
+| 8.5c | Verify history/composer keyboard/focus, names, reduced motion, overflow, console, and 1440/768/390 layouts. | 8.5a–8.5b. | Chat detail remains accessible and usable at all three viewports. | Complete |
+| 8.5d | Stage and independently inspect Chat-detail artifacts and provenance references. | 8.5a–8.5c. | Message, receipt, interaction, accessibility, console, and viewport evidence is complete for 8.7. | Complete |
+
+##### Step 8.6 — Disconnect and reconnect
+
+| Unit | Purpose and artifact | Dependency | Exit check | Status |
+| --- | --- | --- | --- | --- |
+| 8.6a | Capture the exact pre-disconnect runtime, object, authorization, ordering, read-state, and cursor baseline. | 8.2–8.5 accepted surfaces. | One complete invariant snapshot covers all four surfaces. | Complete |
+| 8.6b | Perform real reload/socket reconnects on laboratory, Dashboard, Chat list, and Chat detail. | 8.6a baseline. | Every surface returns through the same runtime and connected data path. | Complete |
+| 8.6c | Compare post-reconnect objects, cursors, authorization, ordering, read state, replay, and console output. | 8.6b reconnects. | Nothing is missing, duplicated, leaked, or mutated and applied-cursor replay is empty. | Complete |
+| 8.6d | Stage and independently inspect four surface reconnect records plus one aggregate comparison. | 8.6a–8.6c. | Reconnect evidence carries the exact runtime and stable-object references for 8.7. | Complete |
+
+##### Step 8.7 — Aggregate evidence and cleanup gate
+
+| Unit | Purpose and artifact | Dependency | Exit check | Status |
+| --- | --- | --- | --- | --- |
+| 8.7a | Revalidate aggregate manifest semantics for required surfaces, viewports, evidence kinds, reconnect proof, and exact reference classes. | Step 8.1 contract and 8.2–8.6 artifacts. | Omission, unclean state, or incomplete exact-chain coverage fails closed. | Complete |
+| 8.7b | Revalidate the serial aggregate command and its `finally` source-health behavior. | 8.7a semantics. | One command owns regressions, manifest validation, logs, and protected-source health. | Complete |
+| 8.7c | Finalize the fresh manifest, execute the aggregate command, and preserve only this run's evidence. | 8.7a–8.7b. | Bytes, provenance, cleanup, tests, type checks, build, diff, and source health pass. | Complete |
+| 8.7d | Run tamper, omission, reuse, and different-runtime attacks, then independently revalidate the untouched manifest and baseline. | 8.7c accepted run. | Every invalid variant fails; the original remains valid and the protected baseline is independently pristine. | Complete |
+
+#### Recovery 6 execution and review record
+
+- **Accepted run after second review:** `20260802-step8-recovery-v2-10`, experiment `7bdaa0cf-7df6-4824-a9a5-2d3b07417e2b`, with 37 byte-bound artifacts. It alone supplies the replacement evidence; `v2-1` through `v2-9`, including the formerly accepted but under-proved `v2-8`, are ignored diagnostics and are not counted.
+- **8.2 second review:** The first accepted record contradicted itself: history dismissal was false in interaction evidence but true in accessibility evidence, and early artifacts inherited a receipt created later. A rejected attempt to synthesize pending source rows correctly produced independent alerts, proving that such rows cannot be used as a no-duplicate test. The improvement uses the laboratory's real pending connected-operation state and requires true keyboard dismissal, ordered approved tabs, failed/healthy count equality, normal scheduling, responsive bounds, accessible names, reduced-motion review, console-review provenance, and capture-time object-reference snapshots. Failed and healthy counts both remained exactly `1/1/1/1/1`.
+- **8.3 second review:** The prior record asserted rather than proved chart interaction and singular lifecycle continuity. The improvement exercised the chart's selected state, honest empty search, detail keyboard dismissal, exact legal source action, normal scheduler resolution, and one incident/route/delivery/conversation/message chain; all three viewport bounds passed.
+- **8.4 second review:** The prior record omitted filter results, ordering/cursor proof, and row-menu keyboard behavior. The improvement exercised Todas, No leídas, and Fijadas; proved cursor `1` ordering; dismissed the row menu with Escape; and reconfirmed that an active nonparticipant saw zero list/detail data, no operational text, and no composer.
+- **8.5 second review:** The prior record did not exercise message-menu dismissal or conversation-search absence. The improvement bound the exact message and composite receipt, verified read and delivery counts, expanded the alert guide, copied OT `146293.2`, dismissed the message menu with Escape, proved the search empty state, and checked responsive element bounds.
+- **8.6 second review:** The prior reconnect files were self-asserted booleans without a reproducible comparison. The improvement hashes a normalized runtime, incident, conversation, message, receipt/read, ordering, cursor, and replay snapshot before and after all four reloads. The digests are identical, authorization/order/read state is stable, and applied-cursor replay after cursor `3` is empty.
+- **8.7 second review:** The validator previously accepted contradictory interaction records and temporally impossible receipt references. It now validates artifact-specific semantic claims, exact object binding, console-review provenance, reconnect digests, and receipt scope. The strengthened aggregate passed; omission, tamper, reuse, and different-runtime attacks all failed while the untouched manifest revalidated. The browser-result timeout remains configurable with a 90-minute default.
+- **Independent closure:** The protected dump reset passed, followed separately by baseline, health, MySQL application-driver, polling-query, readiness, typecheck, focused 20-test scenario, production build, and Git diff-integrity checks. The build review found a validation-only `*.connected.ts` file entering the production API build; excluding that diagnostic class from `tsconfig.build.json` restored the intended build boundary without changing runtime behavior.
+
+**Recovery 6 final decision:** Complete. The accepted replacement evidence uses the approved connected V2 laboratory and one exact runtime; the protected source is independently pristine. Stage 5 remains in progress, Step 8B has not started, and all Recovery 6 changes are uncommitted and unpushed.
 
 ## Part B — Work after recovery
 

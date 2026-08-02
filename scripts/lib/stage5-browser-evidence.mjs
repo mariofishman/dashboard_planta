@@ -109,6 +109,53 @@ function originOf(value) {
   try { return new URL(value).origin; } catch { return null; }
 }
 
+const exactArray = (actual, expected) => Array.isArray(actual)
+  && actual.length === expected.length
+  && actual.every((value, index) => value === expected[index]);
+
+export function browserEvidenceContentErrors(artifact, payload) {
+  const errors = [];
+  const hasReference = (type, id) => artifact.objectReferences?.some((reference) => reference.type === type && reference.id === id);
+  const requireTrue = (...fields) => {
+    for (const field of fields) if (payload[field] !== true) errors.push(`${artifact.artifactId} must prove ${field}`);
+  };
+  if (payload.artifactId !== artifact.artifactId) errors.push(`${artifact.artifactId} content artifactId mismatch`);
+  if (artifact.artifactKind === "console") {
+    if (payload.collectionMethod !== "browser-console-review") errors.push(`${artifact.artifactId} lacks browser console collection provenance`);
+    if (!Number.isInteger(payload.observedEntryCount) || payload.observedEntryCount < 0) errors.push(`${artifact.artifactId} lacks an observed console entry count`);
+  }
+  if (artifact.artifactId === "lab-interaction") {
+    requireTrue("normalScheduler", "pendingStateObserved", "historyKeyboardDismissed", "failedReadPreserved", "healthyRecoveryNoDuplicates");
+    if (!exactArray(payload.tabs, ["A02 · Movimientos", "A03 · Consumo OT", "A05 · Bobinas", "Integridad"])) errors.push("lab-interaction must prove the four approved tabs in order");
+  }
+  if (artifact.artifactId === "lab-accessibility") {
+    requireTrue("keyboardDismissal", "focusOrderVerified", "accessibleNamesVerified", "reducedMotionVerified");
+    if (!exactArray(payload.widths, [1440, 768, 390])) errors.push("lab-accessibility must cover 1440, 768, and 390 pixels");
+  }
+  if (artifact.artifactId === "dashboard-interaction") {
+    requireTrue("openDrilldown", "emptyState", "legalSourceResolution", "sameIncidentResolved", "singularChainPreserved", "chartInteractionVerified");
+    if (!hasReference("incident", payload.incidentId)) errors.push("dashboard-interaction incidentId is not bound to its artifact references");
+  }
+  if (artifact.artifactId === "dashboard-accessibility") requireTrue("dialogKeyboardDismissal", "focusOrderVerified", "accessibleNamesVerified", "reducedMotionVerified");
+  if (artifact.artifactId === "chat-list-interaction") {
+    requireTrue("filtersVerified", "rowOrderingVerified", "menuKeyboardDismissed", "directFailClosed", "authorizationStable");
+    if (payload.authorizedCount !== 1 || payload.nonparticipantCount !== 0 || payload.composerExposed !== false) errors.push("chat-list-interaction must prove participant and nonparticipant isolation");
+    if (!hasReference("conversation", payload.conversationId) || !hasReference("cursor", String(payload.messageCursor))) errors.push("chat-list-interaction conversation and cursor are not bound to its artifact references");
+  }
+  if (artifact.artifactId === "chat-list-accessibility") requireTrue("focusOrderVerified", "accessibleNamesVerified", "reducedMotionVerified", "neutralUnauthorizedCopy");
+  if (artifact.artifactId === "chat-detail-interaction") {
+    requireTrue("receiptAuthoritative", "alertExpanded", "messageMenuKeyboardDismissed", "searchEmptyStateVerified", "statePreserved");
+    if (typeof payload.copyTarget !== "string" || payload.copyTarget.length === 0) errors.push("chat-detail-interaction lacks the exact work-order copy target");
+    if (!hasReference("conversation", payload.conversationId) || !hasReference("message", payload.messageId) || !hasReference("receipt", payload.receiptId)) errors.push("chat-detail-interaction exact objects are not bound to its artifact references");
+  }
+  if (artifact.artifactId === "chat-detail-accessibility") requireTrue("focusOrderVerified", "accessibleNamesVerified", "reducedMotionVerified", "keyboardReachableActions");
+  if (artifact.artifactKind === "reconnect") {
+    requireTrue("sameRuntime", "stableObjects", "authorizationStable", "orderingStable", "readStateStable", "emptyAppliedCursorReplay");
+    if (typeof payload.preStateDigest !== "string" || payload.preStateDigest !== payload.postStateDigest) errors.push(`${artifact.artifactId} lacks equal pre/post state digests`);
+  }
+  return errors;
+}
+
 function semanticErrors(manifest, expectedIdentity) {
   const errors = [];
   const identity = manifest.identity;
@@ -161,6 +208,9 @@ function semanticErrors(manifest, expectedIdentity) {
     const referenceKeys = artifact.objectReferences.map(({ type, id }) => `${type}:${id}`);
     uniqueValues(referenceKeys, `artifact object references: ${artifact.artifactId}`, errors);
     if (!artifact.objectReferences.some(({ type, id }) => type === "experiment" && id === identity.experimentId)) errors.push(`artifact lacks the runtime experiment reference: ${artifact.artifactId}`);
+    if (artifact.surface !== "chat_detail" && artifact.artifactKind !== "reconnect" && artifact.objectReferences.some(({ type }) => type === "receipt")) {
+      errors.push(`artifact claims a receipt before receipt evidence is in scope: ${artifact.artifactId}`);
+    }
   }
   if (manifest.claim.accepted) {
     const surfaceArtifacts = manifest.artifacts.filter(({ surface }) => surface !== "runtime");
@@ -219,7 +269,12 @@ export async function validateStage5BrowserEvidence(manifest, { schema, artifact
         if (artifact.artifactKind === "accessibility" && parsed.noDocumentOverflow !== true) errors.push(`accessibility evidence does not prove no overflow: ${artifact.artifactId}`);
         if (artifact.artifactKind === "console" && (parsed.clean !== true || !Array.isArray(parsed.unexpected) || parsed.unexpected.length !== 0)) errors.push(`console evidence is not clean: ${artifact.artifactId}`);
         if (artifact.artifactKind === "reconnect" && (parsed.sameRuntime !== true || parsed.stableObjects !== true)) errors.push(`reconnect evidence is not stable: ${artifact.artifactId}`);
+        errors.push(...browserEvidenceContentErrors(artifact, parsed));
       } catch { errors.push(`artifact evidence is not valid JSON: ${artifact.artifactId}`); }
+    }
+    if (content && manifest.claim.accepted && artifact.artifactKind === "interaction") {
+      try { errors.push(...browserEvidenceContentErrors(artifact, JSON.parse(content.bytes.toString("utf8")))); }
+      catch { errors.push(`artifact evidence is not valid JSON: ${artifact.artifactId}`); }
     }
     const provenance = await containedFile(artifactRoot, artifact.provenancePath, `artifact provenance ${artifact.artifactId}`, errors);
     if (provenance) {

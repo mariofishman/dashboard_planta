@@ -8,6 +8,7 @@ import addFormats from "ajv-formats";
 import {
   browserArtifactProvenance,
   browserCleanupEvidence,
+  browserEvidenceContentErrors,
   browserRuntimeIdentitySnapshot,
   browserServiceIdentityDigest,
   canonicalJson,
@@ -213,4 +214,32 @@ test("JSON Schema compilation stays strict and canonicalization is deterministic
   addFormats(ajv);
   assert.equal(typeof ajv.compile(schema), "function");
   assert.equal(canonicalJson({ z: 1, a: { y: 2, b: 3 } }), canonicalJson({ a: { b: 3, y: 2 }, z: 1 }));
+});
+
+test("accepted structured evidence rejects unproved interaction and reconnect claims", () => {
+  const laboratory = { artifactId: "lab-interaction", artifactKind: "interaction" };
+  assert.ok(browserEvidenceContentErrors(laboratory, {
+    artifactId: "lab-interaction",
+    normalScheduler: true,
+    pendingStateObserved: true,
+    historyKeyboardDismissed: false,
+    failedReadPreserved: true,
+    healthyRecoveryNoDuplicates: true,
+    tabs: ["A02 · Movimientos", "A03 · Consumo OT", "A05 · Bobinas", "Integridad"],
+  }).includes("lab-interaction must prove historyKeyboardDismissed"));
+
+  const reconnect = { artifactId: "cross-surface-reconnect", artifactKind: "reconnect" };
+  const reconnectErrors = browserEvidenceContentErrors(reconnect, {
+    artifactId: "cross-surface-reconnect",
+    sameRuntime: true,
+    stableObjects: true,
+    authorizationStable: true,
+    orderingStable: true,
+    readStateStable: true,
+    emptyAppliedCursorReplay: false,
+    preStateDigest: "sha256:before",
+    postStateDigest: "sha256:after",
+  });
+  assert.ok(reconnectErrors.includes("cross-surface-reconnect must prove emptyAppliedCursorReplay"));
+  assert.ok(reconnectErrors.includes("cross-surface-reconnect lacks equal pre/post state digests"));
 });

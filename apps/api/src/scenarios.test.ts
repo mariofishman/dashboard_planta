@@ -209,6 +209,9 @@ it("applies the complete persistent, duplicate, visible-integration, and resolut
     assert.equal(first.actualMonitor.openIncidentCount, 1);
     assert.equal(first.actualMonitor.conversationLinkCount, 1);
     assert.equal(first.actualMonitor.alertMessageCount, 1);
+    const connectedRecord = first.records.find((record: { expected: { triggered: boolean } }) => record.expected.triggered);
+    assert.equal(connectedRecord.actual.incident.id, first.actualMonitor.latestIncident.id, `${code} V2 record must bind its composite incident condition key`);
+    assert.equal(connectedRecord.comparison.matches, true, `${code} V2 record must expose the committed Monitor lifecycle`);
 
     const incidentId = String(first.actualMonitor.latestIncident.id);
     const dashboard = await instance.app.inject({ method: "GET", url: "/api/incidents?status=open", headers: manager });
