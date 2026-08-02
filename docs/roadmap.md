@@ -16,7 +16,7 @@
 
 **Open integration register:** [EmusaSoft integration register](integrations/emusasoft/integration_register.md)
 
-**Current execution:** [Stage 5 corrective execution plan](delivery/phases/phase6/stage5_corrective_execution_plan.md)
+**Current execution:** [Stage 5 recovery and completion plan](delivery/phases/phase6/stage5_corrective_execution_plan.md)
 
 ## 1. Why Version Three exists
 
@@ -85,7 +85,7 @@ Phase 5 remains complete. Its dynamic routing behavior will receive additional e
 
 ## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-**Status:** In progress. Stages 1–4 are complete. Stage 5 corrective execution is current under the single linked authority file. Stage 6 remains pending.
+**Status:** In progress. Stages 1–4 are complete. Stage 5 recovery and completion work is current under the single linked authority file. Stage 6 remains pending.
 
 **Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 
