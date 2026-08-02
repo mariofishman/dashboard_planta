@@ -6,7 +6,7 @@
 
 **Branch:** `codex/phase6-stage5`
 
-**Latest pushed recovery checkpoint:** `5a9b28b`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
+**Latest pushed pre-Step-8B implementation checkpoint:** `27bd646`. The separate future instant-reset plan was added at `1b608b2`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
 
 **Current Stage 5 status:** In progress. Stage 5 is not accepted, Step 8 is not accepted, and Step 8B has not started.
 
