@@ -47,7 +47,7 @@ export interface SourceActionContract {
 }
 
 export interface SourceActionContractRegistry {
-  contractVersion: "1.0.0";
+  contractVersion: "1.1.0";
   sourceDatabase: "test_database";
   writerIdentity: "alertas_fake";
   actions: SourceActionContract[];
@@ -97,7 +97,7 @@ const operations = new Set<string>(["prepare", "correct", "sourceAction"]);
 export function validateSourceActionContracts(value: unknown): SourceActionContractRegistry {
   if (!value || typeof value !== "object") throw new Error("invalid_source_action_contract");
   const registry = value as Partial<SourceActionContractRegistry>;
-  if (registry.contractVersion !== "1.0.0" || registry.sourceDatabase !== "test_database" || registry.writerIdentity !== "alertas_fake") {
+  if (registry.contractVersion !== "1.1.0" || registry.sourceDatabase !== "test_database" || registry.writerIdentity !== "alertas_fake") {
     throw new Error("invalid_source_action_contract_header");
   }
   if (!Array.isArray(registry.actions) || registry.actions.length !== sourceActionIds.length) throw new Error("invalid_source_action_contract_count");

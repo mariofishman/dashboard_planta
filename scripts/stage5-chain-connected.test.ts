@@ -26,6 +26,19 @@ test("diagnostic connected rehearsal captures one authoritative source-to-Monito
   } });
   let createdId: number | null = null;
   try {
+    const acceptance = server.acceptance;
+    assert.ok(acceptance);
+    const runtime = await acceptance.runtime.create({
+      name: "Diagnostic connected chain",
+      businessTime: "2026-08-01T09:00:00.000Z",
+      pollingFrequencyMinutes: 60,
+      identity: {
+        runId: "diagnostic-chain-rehearsal",
+        manifestVersion: manifest.manifestVersion,
+        sourceActionContractVersion: manifest.sourceActionContractVersion,
+      },
+    });
+    assert.ok(runtime.experiment);
     const roster = await server.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: [
       { id: "manager", sysUserId: 9001, person: "María Torres", position: "Gerente de fábrica", operations: [], warehouseType: null, scope: "factory", group: null, validFrom: "2026-07-01", validTo: null, state: "active", setupComplete: true },
     ] } });
@@ -37,10 +50,10 @@ test("diagnostic connected rehearsal captures one authoritative source-to-Monito
     execution.actionSequence = 1;
     createdId = Number(execution.sourceDiff.after.find((record: { key: number }) => Number(record.key) !== templateId)?.key);
     assert.ok(createdId > 0);
-    server.acceptance!.source.replaceTracked!("A02", [createdId]);
-    const advance = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
-    assert.equal(advance.statusCode, 200, advance.body);
-    const poll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    acceptance.source.replaceTracked!("A02", [createdId]);
+    await acceptance.runtime.pause(runtime.experiment.id, false);
+    await acceptance.runtime.advance(runtime.experiment.id, 31);
+    const poll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(poll.statusCode, 200, poll.body);
     const polled = poll.json();
     assert.equal(polled.result.status, "healthy");
@@ -53,7 +66,7 @@ test("diagnostic connected rehearsal captures one authoritative source-to-Monito
     const query = server.acceptance!.registry.get("A02")!.query;
     const sourceRevision = String(polled.scenario.sourceRevision);
     const actionDefinition = manifest.actionDefinitions["a02.prepare_dispatch"];
-    const capture = createStage5ChainCapture({ testId: "A02-01", group: "A02", experimentId: "diagnostic-experiment", runId: "diagnostic-chain-rehearsal", manifestVersion: manifest.manifestVersion, sourceActionContractVersion: manifest.sourceActionContractVersion, startedAt });
+    const capture = createStage5ChainCapture({ testId: "A02-01", group: "A02", experimentId: runtime.experiment.id, runId: "diagnostic-chain-rehearsal", manifestVersion: manifest.manifestVersion, sourceActionContractVersion: manifest.sourceActionContractVersion, startedAt });
     capture.recordSection("laboratoryActions", captureStage5LaboratoryActions(["a02.prepare_dispatch"], { "a02.prepare_dispatch": actionDefinition }, [{ sequence: 1, actionId: "a02.prepare_dispatch", businessTime: polled.scenario.scenarioClock.currentAt, auditTime: new Date().toISOString() }]));
     capture.recordSection("sourceChain", captureStage5SourceChain([execution], { finalSourceRevision: sourceRevision, unrelatedRows: { before: execution.sourceDiff.unrelatedRows.before.digest, after: execution.sourceDiff.unrelatedRows.after.digest } }));
     capture.recordSection("readChain", captureStage5ReadChain(query, [{ cycleId: polled.result.cycleId, queryId: query.queryId, queryVersion: query.queryVersion, sourceAccount: "monitor_source_ro", pages: polled.result.pageEvidence, completeness: "complete", freshness: "fresh" }]));
@@ -63,7 +76,7 @@ test("diagnostic connected rehearsal captures one authoritative source-to-Monito
       messageIds: messageRows.map(({ id }) => String(id)), receiptIds: [], cursorStart: 0, cursorEnd: Number(messageRows.at(-1)?.cursor ?? 0) }));
     assertValidStage5CoreChain(capture.snapshot());
     for (const kind of ["scheduling", "recovery", "browser", "human"] as const) capture.attach({ attachmentId: `${kind}-diagnostic`, kind,
-      identity: { testId: "A02-01", runId: "diagnostic-chain-rehearsal", experimentId: "diagnostic-experiment" },
+      identity: { testId: "A02-01", runId: "diagnostic-chain-rehearsal", experimentId: runtime.experiment.id },
       artifactPaths: [`local-data/test-database/evidence/stage5/diagnostic/A02-01/${kind}.json`], payload: { diagnostic: true } });
     assert.equal(capture.snapshot().attachments.length, 4);
   } finally {

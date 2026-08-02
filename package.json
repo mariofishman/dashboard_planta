@@ -31,7 +31,6 @@
     "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts",
     "validate:phase6-stage4": "tsx scripts/validate-phase6-stage4.ts",
     "validate:phase6-stage5a": "./scripts/validate-phase6-stage5a.sh",
-    "validate:phase6-stage5": "./scripts/validate-phase6-stage5.sh",
     "validate:phase6-stage5-declarations": "node --test scripts/stage5-declaration-validator.test.mjs && node scripts/validate-stage5-declarations.mjs",
     "validate:phase6-stage5-fixtures": "node --test scripts/stage5-fixture-contract-validator.test.mjs scripts/stage5-fixture-runner.test.mjs && node scripts/validate-stage5-fixture-contracts.mjs",
     "validate:phase6-stage5-chain": "node --test scripts/stage5-chain-capture.test.mjs && tsx --test scripts/stage5-chain-connected.test.ts",

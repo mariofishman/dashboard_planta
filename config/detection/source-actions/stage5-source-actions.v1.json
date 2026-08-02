@@ -1,5 +1,5 @@
 {
-  "contractVersion": "1.0.0",
+  "contractVersion": "1.1.0",
   "sourceDatabase": "test_database",
   "writerIdentity": "alertas_fake",
   "actions": [
@@ -54,7 +54,7 @@
       "ruleCode": "A03",
       "naturalKey": "workOrderId",
       "invocation": { "operation": "sourceAction", "argument": "start_work_order" },
-      "mutations": [{ "table": "ordenes_trabajo", "fields": ["fecha_inicio_ejecucion", "fecha_actualizacion"] }],
+      "mutations": [{ "table": "ordenes_trabajo", "fields": ["codigo_orden_trabajo", "id_operacion", "id_equipo", "fecha_inicio_ejecucion", "fecha_actualizacion"] }],
       "preconditions": ["OT is not started, closed, cancelled, or deleted", "machine has no active OT"],
       "postconditions": ["OT has one actual start time and is the machine's only active OT"],
       "rejects": ["second active OT on the machine", "closed or cancelled OT reactivation"]
@@ -94,7 +94,7 @@
       "ruleCode": "A05",
       "naturalKey": "articleSerialId",
       "invocation": { "operation": "sourceAction", "argument": "declare_produced_reel" },
-      "mutations": [{ "table": "articulo_serial", "fields": ["tipo", "estado", "fecha_creacion", "fecha_actualizacion"] }],
+      "mutations": [{ "table": "articulo_serial", "fields": ["codigo_serial", "id_articulo", "id_orden_trabajo_origen", "id_ultimo_orden_trabajo_cierre", "tipo", "estado", "fecha_creacion", "fecha_actualizacion"] }],
       "preconditions": ["produced reel has a source OT"],
       "postconditions": ["declared reel kind is produced and remains keyed by articleSerialId"],
       "rejects": ["identity reuse as recurrence"]
@@ -104,7 +104,7 @@
       "ruleCode": "A05",
       "naturalKey": "articleSerialId",
       "invocation": { "operation": "sourceAction", "argument": "declare_remnant_reel" },
-      "mutations": [{ "table": "articulo_serial", "fields": ["tipo", "estado", "fecha_creacion", "fecha_actualizacion"] }],
+      "mutations": [{ "table": "articulo_serial", "fields": ["codigo_serial", "id_articulo", "id_orden_trabajo_origen", "id_ultimo_orden_trabajo_cierre", "tipo", "estado", "fecha_creacion", "fecha_actualizacion"] }],
       "preconditions": ["remnant reel has a closing OT"],
       "postconditions": ["declared reel kind is remnant and remains keyed by articleSerialId"],
       "rejects": ["identity reuse as recurrence"]

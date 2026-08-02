@@ -73,12 +73,13 @@ test("7.1a proves one real A02 poll is owned by the automatic due-time timer", {
     const created = await acceptance.runtime.create({
       name: "Step 7.1a automatic due-time ownership",
       businessTime,
-      frequencies: { A02: 1, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-1a", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const configured = await acceptance.runtime.configure(created.experiment!.id, 60, { A02: 1, A03: 60, A05: 60 });
+    const configured = await acceptance.runtime.configure(created.experiment!.id, 1, 1);
     const experimentId = configured.experiment!.id;
-    const realDeadline = configured.nextAutomaticTickAt!;
+    const running = await acceptance.runtime.pause(experimentId, false);
+    const realDeadline = running.nextAutomaticTickAt!;
     const dueAt = configured.experiment!.nextDue.A02;
     assert.equal(dueAt, "2026-08-01T09:01:00.000Z");
 
@@ -135,7 +136,7 @@ test("7.1a proves one real A02 poll is owned by the automatic due-time timer", {
   }
 });
 
-test("7.1c proves one delayed automatic timer executes every crossed poll in deterministic order", { timeout: 12_000 }, async () => {
+test("7.1c proves one delayed automatic timer executes every crossed shared poll in deterministic order", { timeout: 12_000 }, async () => {
   const server = await buildMonitorServer({
     config: {
       nodeEnv: "test",
@@ -169,18 +170,19 @@ test("7.1c proves one delayed automatic timer executes every crossed poll in det
     const created = await controlledRuntime.create({
       name: "Step 7.1c crossed automatic deadlines",
       businessTime: "2026-08-01T11:00:00.000Z",
-      frequencies: { A02: 1, A03: 2, A05: 3 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-1c", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const configured = await controlledRuntime.configure(created.experiment!.id, 60, { A02: 1, A03: 2, A05: 3 });
+    const configured = await controlledRuntime.configure(created.experiment!.id, 1, 1);
     const experimentId = configured.experiment!.id;
-    const firstTimerDeadline = configured.nextAutomaticTickAt!;
+    const running = await controlledRuntime.pause(experimentId, false);
+    const firstTimerDeadline = running.nextAutomaticTickAt!;
     controlledNow += 3_200;
 
     await waitFor(async () => {
       const row = await server.database.queryOne(`SELECT COUNT(*)::int AS count FROM monitor_scenario_runtime_event
         WHERE experiment_id=$1 AND event_type='poll_completed'`, [experimentId]);
-      return Number(row.count) >= 5 ? Number(row.count) : null;
+      return Number(row.count) >= 9 ? Number(row.count) : null;
     }, 7_000);
     await controlledRuntime.pause(experimentId, true);
     assert.equal(runtimeError, null);
@@ -188,13 +190,9 @@ test("7.1c proves one delayed automatic timer executes every crossed poll in det
     const allEvents = await server.database.queryAll(`SELECT id,event_type AS "eventType",rule_code AS "ruleCode",
       business_time AS "businessTime",payload,recorded_at AS "recordedAt" FROM monitor_scenario_runtime_event
       WHERE experiment_id=$1 ORDER BY sequence`, [experimentId]);
-    const expectedPolls = [
-      ["A02", "2026-08-01T11:01:00.000Z"],
-      ["A02", "2026-08-01T11:02:00.000Z"],
-      ["A03", "2026-08-01T11:02:00.000Z"],
-      ["A02", "2026-08-01T11:03:00.000Z"],
-      ["A05", "2026-08-01T11:03:00.000Z"],
-    ];
+    const expectedPolls = [1, 2, 3].flatMap((minute) =>
+      (["A02", "A03", "A05"] as const).map((code) => [code, `2026-08-01T11:0${minute}:00.000Z`]),
+    );
     assert.deepEqual(allEvents.map((event) => [event.eventType, event.ruleCode, iso(event.businessTime)]), expectedPolls
       .flatMap(([ruleCode, dueAt]) => [["poll_started", ruleCode, dueAt], ["poll_completed", ruleCode, dueAt]]));
     const allPayloads = allEvents.map((event) => payload(event.payload));
@@ -202,15 +200,15 @@ test("7.1c proves one delayed automatic timer executes every crossed poll in det
     assert.ok(allPayloads.every((item) => item.timerDeadline === firstTimerDeadline));
     assert.equal(new Set(allPayloads.map((item) => item.timerObservedAt)).size, 1);
     const events = allEvents.filter((event) => event.eventType === "poll_completed");
-    assert.equal(events.length, 5);
+    assert.equal(events.length, 9);
     assert.deepEqual(events.map((event) => [event.ruleCode, iso(event.businessTime)]), expectedPolls);
     const eventPayloads = events.map((event) => payload(event.payload));
     assert.ok(Date.parse(String(eventPayloads[0]!.timerObservedAt)) >= Date.parse(firstTimerDeadline) + 2_000);
     const cycleIds = eventPayloads.map((item) => String(item.cycleId));
-    assert.equal(new Set(cycleIds).size, 5);
+    assert.equal(new Set(cycleIds).size, 9);
     const cycles = await server.database.queryAll(`SELECT cycle_id AS "cycleId",status,source_revision AS "sourceRevision"
       FROM monitor_poll_cycle WHERE cycle_id=ANY($1::uuid[])`, [cycleIds]);
-    assert.equal(cycles.length, 5);
+    assert.equal(cycles.length, 9);
     assert.ok(cycles.every((cycle) => cycle.status === "healthy" && String(cycle.sourceRevision).startsWith("test_database.")));
     evidenceCase = {
       id: "7.1c", status: "passed", pollCycleIds: cycleIds,
@@ -229,7 +227,7 @@ test("7.1c proves one delayed automatic timer executes every crossed poll in det
   }
 });
 
-test("7.1b proves independent connected A02, A03, and A05 automatic cadences", { timeout: 12_000 }, async () => {
+test("7.1b proves one shared cadence polls connected A02, A03, and A05", { timeout: 12_000 }, async () => {
   const server = await buildMonitorServer({
     config: {
       nodeEnv: "development",
@@ -250,38 +248,39 @@ test("7.1b proves independent connected A02, A03, and A05 automatic cadences", {
     }
     const businessTime = "2026-08-01T10:00:00.000Z";
     const created = await acceptance.runtime.create({
-      name: "Step 7.1b independent automatic cadences",
+      name: "Step 7.1b shared automatic cadence",
       businessTime,
-      frequencies: { A02: 1, A03: 2, A05: 3 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-1b", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const configured = await acceptance.runtime.configure(created.experiment!.id, 60, { A02: 1, A03: 2, A05: 3 });
+    const configured = await acceptance.runtime.configure(created.experiment!.id, 1, 1);
     const experimentId = configured.experiment!.id;
+    await acceptance.runtime.pause(experimentId, false);
     await waitFor(async () => {
       const row = await server.database.queryOne(`SELECT COUNT(*)::int AS count FROM monitor_scenario_runtime_event
         WHERE experiment_id=$1 AND event_type='poll_completed'`, [experimentId]);
-      return Number(row.count) >= 11 ? Number(row.count) : null;
+      return Number(row.count) >= 18 ? Number(row.count) : null;
     }, 10_000);
     await acceptance.runtime.pause(experimentId, true);
 
     const events = await server.database.queryAll(`SELECT id,event_type AS "eventType",rule_code AS "ruleCode",
       business_time AS "businessTime",payload,recorded_at AS "recordedAt" FROM monitor_scenario_runtime_event
       WHERE experiment_id=$1 AND event_type='poll_completed' ORDER BY sequence`, [experimentId]);
-    assert.equal(events.length, 11);
+    assert.equal(events.length, 18);
     const matrix = Object.fromEntries((["A02", "A03", "A05"] as const).map((code) => [code, events
       .filter((event) => event.ruleCode === code)
       .map((event) => ({ dueAt: iso(event.businessTime), cycleId: String(payload(event.payload).cycleId) }))]));
     assert.deepEqual(Object.fromEntries(Object.entries(matrix).map(([code, items]) => [code, items.map((item) => item.dueAt)])), {
       A02: [1, 2, 3, 4, 5, 6].map((minute) => `2026-08-01T10:0${minute}:00.000Z`),
-      A03: [2, 4, 6].map((minute) => `2026-08-01T10:0${minute}:00.000Z`),
-      A05: [3, 6].map((minute) => `2026-08-01T10:0${minute}:00.000Z`),
+      A03: [1, 2, 3, 4, 5, 6].map((minute) => `2026-08-01T10:0${minute}:00.000Z`),
+      A05: [1, 2, 3, 4, 5, 6].map((minute) => `2026-08-01T10:0${minute}:00.000Z`),
     });
     const cycleIds = events.map((event) => String(payload(event.payload).cycleId));
-    assert.equal(new Set(cycleIds).size, 11);
+    assert.equal(new Set(cycleIds).size, 18);
     assert.ok(events.every((event) => payload(event.payload).trigger === "automatic_timer"));
     const cycles = await server.database.queryAll(`SELECT cycle_id AS "cycleId",query_id AS "queryId",status,source_revision AS "sourceRevision"
       FROM monitor_poll_cycle WHERE cycle_id=ANY($1::uuid[]) ORDER BY started_at`, [cycleIds]);
-    assert.equal(cycles.length, 11);
+    assert.equal(cycles.length, 18);
     assert.ok(cycles.every((cycle) => cycle.status === "healthy"));
     const expectedQueryByCode = Object.fromEntries((["A02", "A03", "A05"] as const)
       .map((code) => [code, acceptance.registry.get(code)!.query.queryId]));
@@ -297,7 +296,7 @@ test("7.1b proves independent connected A02, A03, and A05 automatic cadences", {
       queryIds: [...new Set(cycles.map((cycle) => String(cycle.queryId)))],
       runtimeEventIds: events.map((event) => String(event.id)), interruptionIds: [],
       timestamps: { dueAt: [...new Set(events.map((event) => iso(event.businessTime)))] }, objectIds: { experiments: [experimentId] },
-      assertions: { independentCadences: true, completeSixMinuteWindow: true, uniqueCycles: true },
+      assertions: { oneSharedCadence: true, completeSixMinuteWindow: true, uniqueCycles: true },
     };
   } finally {
     await server.close();
@@ -343,12 +342,13 @@ test("7.2a proves pause freezes automatic work and resume starts a fresh deadlin
     const created = await runtime.create({
       name: "Step 7.2a automatic pause and resume",
       businessTime: "2026-08-01T12:00:00.000Z",
-      frequencies: { A02: 1, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-2a", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const configured = await runtime.configure(created.experiment!.id, 60, { A02: 1, A03: 60, A05: 60 });
+    const configured = await runtime.configure(created.experiment!.id, 1, 1);
     const experimentId = configured.experiment!.id;
-    const cancelledDeadline = configured.nextAutomaticTickAt!;
+    const running = await runtime.pause(experimentId, false);
+    const cancelledDeadline = running.nextAutomaticTickAt!;
     const paused = await runtime.pause(experimentId, true);
     assert.equal(paused.experiment!.status, "paused");
     assert.equal(paused.nextAutomaticTickAt, null);
@@ -379,16 +379,17 @@ test("7.2a proves pause freezes automatic work and resume starts a fresh deadlin
     assert.equal(stopped.experiment!.businessTime, "2026-08-01T12:01:00.000Z");
     assert.equal(stopped.experiment!.nextDue.A02, "2026-08-01T12:02:00.000Z");
     const events = await new ScenarioExperimentRepository(server.database).runtimeEvents(experimentId);
-    assert.deepEqual(events.map((event) => [event.eventType, event.ruleCode, event.businessTime]), [
-      ["poll_started", "A02", "2026-08-01T12:01:00.000Z"],
-      ["poll_completed", "A02", "2026-08-01T12:01:00.000Z"],
-    ]);
+    assert.deepEqual(events.map((event) => [event.eventType, event.ruleCode, event.businessTime]),
+      (["A02", "A03", "A05"] as const).flatMap((code) => [
+        ["poll_started", code, "2026-08-01T12:01:00.000Z"],
+        ["poll_completed", code, "2026-08-01T12:01:00.000Z"],
+      ]));
     const completedPayload = payload(completed.payload);
     assert.equal(completedPayload.trigger, "automatic_timer");
     assert.equal(completedPayload.timerDeadline, resumed.nextAutomaticTickAt);
     assert.notEqual(completedPayload.timerDeadline, cancelledDeadline);
     assert.equal(new Set(events.filter((event) => event.eventType === "poll_completed")
-      .map((event) => payload(event.payload).cycleId)).size, 1);
+      .map((event) => payload(event.payload).cycleId)).size, 3);
     const cyclesAfterResume = await server.database.queryOne(
       "SELECT COUNT(*)::int AS count FROM monitor_poll_cycle WHERE query_id=$1", [entry.query.queryId],
     );
@@ -431,8 +432,10 @@ test("7.2b proves timer, manual poll, and controls share one non-overlapping run
     assert.ok(acceptance);
     const a02 = acceptance.registry.get("A02")!;
     const a03 = acceptance.registry.get("A03")!;
+    const a05 = acceptance.registry.get("A05")!;
     assert.ok(a02.adapter instanceof TestDatabaseSourceAdapter);
     assert.ok(a03.adapter instanceof TestDatabaseSourceAdapter);
+    assert.ok(a05.adapter instanceof TestDatabaseSourceAdapter);
     const automaticBlocked = new Promise<void>((resolveBlocked) => { releaseAutomatic = resolveBlocked; });
     let signalAutomaticStarted: (() => void) | null = null;
     const automaticStarted = new Promise<void>((resolveStarted) => { signalAutomaticStarted = resolveStarted; });
@@ -466,15 +469,16 @@ test("7.2b proves timer, manual poll, and controls share one non-overlapping run
     const created = await runtime.create({
       name: "Step 7.2b serialized runtime contention",
       businessTime: "2026-08-01T13:00:00.000Z",
-      frequencies: { A02: 1, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-2b", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const configured = await runtime.configure(created.experiment!.id, 60, { A02: 1, A03: 60, A05: 60 });
+    const configured = await runtime.configure(created.experiment!.id, 1, 1);
     const experimentId = configured.experiment!.id;
+    await runtime.pause(experimentId, false);
     await automaticStarted;
 
     const manualPoll = runtime.executeSerialized(() => scheduler.runScheduled(a03.query, a03.adapter));
-    const reconfigure = runtime.configure(experimentId, 60, { A02: 2, A03: 3, A05: 5 }).then((value) => {
+    const reconfigure = runtime.configure(experimentId, 1, 2).then((value) => {
       timeline.push("configure:completed");
       return value;
     });
@@ -489,28 +493,32 @@ test("7.2b proves timer, manual poll, and controls share one non-overlapping run
 
     assert.equal(maximumActivePolls, 1);
     assert.deepEqual(timeline, [
-      "A02:started", "A02:completed", "A03:started", "A03:completed", "configure:completed", "pause:completed",
+      "A02:started", "A02:completed", "A03:started", "A03:completed", "A05:started", "A05:completed",
+      "A03:started", "A03:completed", "configure:completed", "pause:completed",
     ]);
-    assert.equal(configuredAfterContention.experiment!.frequencies.A02, 2);
+    assert.equal(configuredAfterContention.experiment!.pollingFrequencyMinutes, 2);
     assert.equal(paused.experiment!.status, "paused");
     assert.equal(paused.nextAutomaticTickAt, null);
     const events = await new ScenarioExperimentRepository(server.database).runtimeEvents(experimentId);
-    assert.deepEqual(events.map((event) => [event.eventType, event.ruleCode, event.businessTime]), [
-      ["poll_started", "A02", "2026-08-01T13:01:00.000Z"],
-      ["poll_completed", "A02", "2026-08-01T13:01:00.000Z"],
-    ]);
-    const automaticCycleId = String(payload(events[1]!.payload).cycleId);
-    assert.notEqual(manualResult.cycleId, automaticCycleId);
+    assert.deepEqual(events.map((event) => [event.eventType, event.ruleCode, event.businessTime]),
+      (["A02", "A03", "A05"] as const).flatMap((code) => [
+        ["poll_started", code, "2026-08-01T13:01:00.000Z"],
+        ["poll_completed", code, "2026-08-01T13:01:00.000Z"],
+      ]));
+    const automaticCycleIds = events.filter((event) => event.eventType === "poll_completed")
+      .map((event) => String(payload(event.payload).cycleId));
+    assert.ok(automaticCycleIds.every((cycleId) => cycleId !== manualResult.cycleId));
+    const allCycleIds = [...automaticCycleIds, String(manualResult.cycleId)];
     const cycles = await server.database.queryAll(`SELECT cycle_id AS "cycleId",query_id AS "queryId",status
-      FROM monitor_poll_cycle WHERE cycle_id=ANY($1::uuid[])`, [[automaticCycleId, manualResult.cycleId]]);
-    assert.equal(cycles.length, 2);
-    assert.equal(new Set(cycles.map((cycle) => cycle.cycleId)).size, 2);
+      FROM monitor_poll_cycle WHERE cycle_id=ANY($1::uuid[])`, [allCycleIds]);
+    assert.equal(cycles.length, 4);
+    assert.equal(new Set(cycles.map((cycle) => cycle.cycleId)).size, 4);
     assert.ok(cycles.every((cycle) => cycle.status === "healthy"));
-    assert.deepEqual(new Set(cycles.map((cycle) => cycle.queryId)), new Set([a02.query.queryId, a03.query.queryId]));
+    assert.deepEqual(new Set(cycles.map((cycle) => cycle.queryId)), new Set([a02.query.queryId, a03.query.queryId, a05.query.queryId]));
     assert.equal(runtimeError, null);
     evidenceCase = {
-      id: "7.2b", status: "passed", pollCycleIds: [automaticCycleId, String(manualResult.cycleId)],
-      queryIds: [a02.query.queryId, a03.query.queryId], runtimeEventIds: events.map((event) => String(event.id)), interruptionIds: [],
+      id: "7.2b", status: "passed", pollCycleIds: allCycleIds,
+      queryIds: [a02.query.queryId, a03.query.queryId, a05.query.queryId], runtimeEventIds: events.map((event) => String(event.id)), interruptionIds: [],
       timestamps: { dueAt: [...new Set(events.map((event) => event.businessTime))] }, objectIds: { experiments: [experimentId] },
       assertions: { maximumOneActivePoll: true, authorityQueueOrdered: true, uniqueCycles: true },
     };
@@ -598,11 +606,12 @@ test("7.2c proves an exactly due poll completes before a racing canonical source
     const created = await runtime.create({
       name: "Step 7.2c exact poll and source-action boundary",
       businessTime: "2026-08-01T14:00:00.000Z",
-      frequencies: { A02: 1, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-2c", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const configured = await runtime.configure(created.experiment!.id, 60, { A02: 1, A03: 60, A05: 60 });
+    const configured = await runtime.configure(created.experiment!.id, 1, 1);
     const experimentId = configured.experiment!.id;
+    await runtime.pause(experimentId, false);
     await pollStarted;
 
     const action = runtime.executeBeforeSourceAction(() => actionService.execute({
@@ -621,23 +630,27 @@ test("7.2c proves an exactly due poll completes before a racing canonical source
     assert.equal(runtimeError, null);
     const events = await new ScenarioExperimentRepository(server.database).runtimeEvents(experimentId);
     assert.deepEqual(events.map((event) => [event.eventType, event.ruleCode, event.businessTime]), [
-      ["poll_started", "A02", "2026-08-01T14:01:00.000Z"],
-      ["poll_completed", "A02", "2026-08-01T14:01:00.000Z"],
+      ...(["A02", "A03", "A05"] as const).flatMap((code) => [
+        ["poll_started", code, "2026-08-01T14:01:00.000Z"],
+        ["poll_completed", code, "2026-08-01T14:01:00.000Z"],
+      ]),
       ["source_action", "A02", "2026-08-01T14:01:00.000Z"],
     ]);
     assert.equal(payload(events[0]!.payload).trigger, "automatic_timer");
     assert.equal(payload(events[1]!.payload).trigger, "automatic_timer");
-    assert.equal(payload(events[2]!.payload).actionId, "a02.prepare_dispatch");
-    assert.equal(payload(events[2]!.payload).sourceRevision, execution.sourceRevision);
-    assert.equal(events.filter((event) => event.eventType === "poll_completed").length, 1);
+    const sourceActionEvent = events.at(-1)!;
+    assert.equal(payload(sourceActionEvent.payload).actionId, "a02.prepare_dispatch");
+    assert.equal(payload(sourceActionEvent.payload).sourceRevision, execution.sourceRevision);
+    assert.equal(events.filter((event) => event.eventType === "poll_completed").length, 3);
     assert.equal(events.filter((event) => event.eventType === "source_action").length, 1);
     const createdRows = await connections.writer.query(`SELECT id FROM flujo_materiales_detalles WHERE id=?`, [createdFlowId]);
     assert.equal((createdRows[0] as unknown[]).length, 1);
     evidenceCase = {
-      id: "7.2c", status: "passed", pollCycleIds: [String(payload(events[1]!.payload).cycleId)], queryIds: [a02.query.queryId],
+      id: "7.2c", status: "passed", pollCycleIds: events.filter((event) => event.eventType === "poll_completed").map((event) => String(payload(event.payload).cycleId)),
+      queryIds: [...new Set(events.filter((event) => event.eventType === "poll_completed").map((event) => String(payload(event.payload).queryId)))],
       runtimeEventIds: events.map((event) => String(event.id)), interruptionIds: [],
       timestamps: { dueAt: [...new Set(events.map((event) => event.businessTime))] },
-      objectIds: { experiments: [experimentId], sourceActions: [String(events[2]!.id)] },
+      objectIds: { experiments: [experimentId], sourceActions: [String(sourceActionEvent.id)] },
       assertions: { pollCompletedBeforeAction: true, noOverlap: true, oneSourceMutation: true },
     };
   } finally {
@@ -691,13 +704,14 @@ test("7.3a proves restart preserves a future deadline without premature polling"
     const created = await original.create({
       name: "Step 7.3a future-deadline restart",
       businessTime: "2026-08-01T15:00:00.000Z",
-      frequencies: { A02: 1, A03: 2, A05: 3 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-3a", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const beforeRestart = await original.configure(created.experiment!.id, 3, { A02: 1, A03: 2, A05: 3 });
+    const beforeRestart = await original.configure(created.experiment!.id, 3, 1);
     const experimentId = beforeRestart.experiment!.id;
-    const deadline = beforeRestart.nextAutomaticTickAt!;
-    assert.ok(Date.parse(deadline) - Date.now() > 19_000);
+    const running = await original.pause(experimentId, false);
+    const deadline = running.nextAutomaticTickAt!;
+    assert.ok(Date.parse(deadline) - Date.now() > 2_500);
     const cyclesBefore = await server.database.queryOne(
       "SELECT COUNT(*)::int AS count FROM monitor_poll_cycle WHERE query_id=ANY($1::text[])", [queryIds],
     );
@@ -711,8 +725,8 @@ test("7.3a proves restart preserves a future deadline without premature polling"
     assert.equal(afterRestart.experiment!.runId, "step-7-3a");
     assert.equal(afterRestart.experiment!.businessTime, beforeRestart.experiment!.businessTime);
     assert.deepEqual(afterRestart.experiment!.nextDue, beforeRestart.experiment!.nextDue);
-    assert.deepEqual(afterRestart.experiment!.frequencies, beforeRestart.experiment!.frequencies);
-    assert.equal(afterRestart.experiment!.speed, beforeRestart.experiment!.speed);
+    assert.deepEqual(afterRestart.experiment!.pollingFrequencyMinutes, beforeRestart.experiment!.pollingFrequencyMinutes);
+    assert.equal(afterRestart.experiment!.secondsPerSimulatedMinute, beforeRestart.experiment!.secondsPerSimulatedMinute);
     assert.equal(afterRestart.nextAutomaticTickAt, deadline);
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 300));
     assert.deepEqual(await repository.runtimeEvents(experimentId), []);
@@ -767,12 +781,13 @@ test("7.3b proves restart recovers every missed deadline once in chronological o
     const created = await original.create({
       name: "Step 7.3b missed-deadline recovery",
       businessTime: "2026-08-01T16:00:00.000Z",
-      frequencies: { A02: 1, A03: 2, A05: 3 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-3b", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const configured = await original.configure(created.experiment!.id, 60, { A02: 1, A03: 2, A05: 3 });
+    const configured = await original.configure(created.experiment!.id, 1, 1);
     const experimentId = configured.experiment!.id;
-    const missedDeadline = configured.nextAutomaticTickAt!;
+    const running = await original.pause(experimentId, false);
+    const missedDeadline = running.nextAutomaticTickAt!;
     original.stop();
     original = null;
 
@@ -784,18 +799,14 @@ test("7.3b proves restart recovers every missed deadline once in chronological o
     assert.equal(initialized.nextAutomaticTickAt, missedDeadline);
     await waitFor(async () => {
       const events = await repository.runtimeEvents(experimentId);
-      return events.filter((event) => event.eventType === "poll_completed").length === 5 ? events : null;
+      return events.filter((event) => event.eventType === "poll_completed").length === 9 ? events : null;
     }, 7_000);
     await replacement.executeSerialized(async () => undefined);
     const recovered = await replacement.pause(experimentId, true);
 
-    const expectedPolls = [
-      ["A02", "2026-08-01T16:01:00.000Z"],
-      ["A02", "2026-08-01T16:02:00.000Z"],
-      ["A03", "2026-08-01T16:02:00.000Z"],
-      ["A02", "2026-08-01T16:03:00.000Z"],
-      ["A05", "2026-08-01T16:03:00.000Z"],
-    ];
+    const expectedPolls = [1, 2, 3].flatMap((minute) =>
+      (["A02", "A03", "A05"] as const).map((code) => [code, `2026-08-01T16:0${minute}:00.000Z`]),
+    );
     const events = await repository.runtimeEvents(experimentId);
     assert.deepEqual(events.map((event) => [event.eventType, event.ruleCode, event.businessTime]), expectedPolls
       .flatMap(([ruleCode, dueAt]) => [["poll_started", ruleCode, dueAt], ["poll_completed", ruleCode, dueAt]]));
@@ -805,10 +816,10 @@ test("7.3b proves restart recovers every missed deadline once in chronological o
     assert.ok(eventPayloads.every((item) => item.timerObservedAt === new Date(logicalNow).toISOString()));
     const completed = events.filter((event) => event.eventType === "poll_completed");
     const cycleIds = completed.map((event) => String(payload(event.payload).cycleId));
-    assert.equal(new Set(cycleIds).size, 5);
+    assert.equal(new Set(cycleIds).size, 9);
     const cycles = await server.database.queryAll(`SELECT cycle_id AS "cycleId",query_id AS "queryId",status,
       source_revision AS "sourceRevision" FROM monitor_poll_cycle WHERE cycle_id=ANY($1::uuid[])`, [cycleIds]);
-    assert.equal(cycles.length, 5);
+    assert.equal(cycles.length, 9);
     const expectedQueryByCode = Object.fromEntries((["A02", "A03", "A05"] as const)
       .map((code) => [code, acceptance.registry.get(code)!.query.queryId]));
     for (const event of completed) {
@@ -822,7 +833,7 @@ test("7.3b proves restart recovers every missed deadline once in chronological o
     assert.deepEqual(recovered.experiment!.nextDue, {
       A02: "2026-08-01T16:04:00.000Z",
       A03: "2026-08-01T16:04:00.000Z",
-      A05: "2026-08-01T16:06:00.000Z",
+      A05: "2026-08-01T16:04:00.000Z",
     });
     assert.equal(runtimeError, null);
     evidenceCase = {
@@ -881,12 +892,13 @@ test("7.3c proves a second restart does not replay recovery and continues normal
     const created = await original.create({
       name: "Step 7.3c recovery replay protection",
       businessTime: "2026-08-01T17:00:00.000Z",
-      frequencies: { A02: 1, A03: 2, A05: 3 },
+      pollingFrequencyMinutes: 1,
       identity: { runId: "step-7-3c", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
-    const configured = await original.configure(created.experiment!.id, 60, { A02: 1, A03: 2, A05: 3 });
+    const configured = await original.configure(created.experiment!.id, 1, 1);
     const experimentId = configured.experiment!.id;
-    const firstDeadline = configured.nextAutomaticTickAt!;
+    const running = await original.pause(experimentId, false);
+    const firstDeadline = running.nextAutomaticTickAt!;
     original.stop();
     original = null;
 
@@ -895,7 +907,7 @@ test("7.3c proves a second restart does not replay recovery and continues normal
     await recovery.initialize();
     await waitFor(async () => {
       const events = await repository.runtimeEvents(experimentId);
-      return events.filter((event) => event.eventType === "poll_completed").length === 5 ? events : null;
+      return events.filter((event) => event.eventType === "poll_completed").length === 9 ? events : null;
     }, 7_000);
     await recovery.executeSerialized(async () => undefined);
     const recovered = await recovery.status();
@@ -904,7 +916,7 @@ test("7.3c proves a second restart does not replay recovery and continues normal
     const recoveredEvents = await repository.runtimeEvents(experimentId);
     const recoveredCycleIds = recoveredEvents.filter((event) => event.eventType === "poll_completed")
       .map((event) => String(payload(event.payload).cycleId));
-    assert.equal(recoveredCycleIds.length, 5);
+    assert.equal(recoveredCycleIds.length, 9);
     recovery.stop();
     recovery = null;
 
@@ -919,29 +931,23 @@ test("7.3c proves a second restart does not replay recovery and continues normal
 
     await waitFor(async () => {
       const events = await repository.runtimeEvents(experimentId);
-      return events.filter((event) => event.eventType === "poll_completed").length === 7 ? events : null;
+      return events.filter((event) => event.eventType === "poll_completed").length === 12 ? events : null;
     }, 5_000);
     await continuation.executeSerialized(async () => undefined);
     const stopped = await continuation.pause(experimentId, true);
     const events = await repository.runtimeEvents(experimentId);
-    const expectedPolls = [
-      ["A02", "2026-08-01T17:01:00.000Z"],
-      ["A02", "2026-08-01T17:02:00.000Z"],
-      ["A03", "2026-08-01T17:02:00.000Z"],
-      ["A02", "2026-08-01T17:03:00.000Z"],
-      ["A05", "2026-08-01T17:03:00.000Z"],
-      ["A02", "2026-08-01T17:04:00.000Z"],
-      ["A03", "2026-08-01T17:04:00.000Z"],
-    ];
+    const expectedPolls = [1, 2, 3, 4].flatMap((minute) =>
+      (["A02", "A03", "A05"] as const).map((code) => [code, `2026-08-01T17:0${minute}:00.000Z`]),
+    );
     assert.deepEqual(events.map((event) => [event.eventType, event.ruleCode, event.businessTime]), expectedPolls
       .flatMap(([ruleCode, dueAt]) => [["poll_started", ruleCode, dueAt], ["poll_completed", ruleCode, dueAt]]));
     const completed = events.filter((event) => event.eventType === "poll_completed");
     const allCycleIds = completed.map((event) => String(payload(event.payload).cycleId));
-    assert.equal(new Set(allCycleIds).size, 7);
-    assert.deepEqual(allCycleIds.slice(0, 5), recoveredCycleIds);
+    assert.equal(new Set(allCycleIds).size, 12);
+    assert.deepEqual(allCycleIds.slice(0, 9), recoveredCycleIds);
     const cycles = await server.database.queryAll(`SELECT cycle_id AS "cycleId",query_id AS "queryId",status,
       source_revision AS "sourceRevision" FROM monitor_poll_cycle WHERE cycle_id=ANY($1::uuid[])`, [allCycleIds]);
-    assert.equal(cycles.length, 7);
+    assert.equal(cycles.length, 12);
     const expectedQueryByCode = Object.fromEntries((["A02", "A03", "A05"] as const)
       .map((code) => [code, acceptance.registry.get(code)!.query.queryId]));
     for (const event of completed) {
@@ -951,13 +957,13 @@ test("7.3c proves a second restart does not replay recovery and continues normal
       assert.equal(cycle.queryId, expectedQueryByCode[event.ruleCode]);
       assert.match(String(cycle.sourceRevision), new RegExp(`^test_database\\.${event.ruleCode}\\.v\\d+$`));
     }
-    assert.ok(events.slice(0, 10).every((event) => payload(event.payload).timerDeadline === firstDeadline));
-    assert.ok(events.slice(10).every((event) => payload(event.payload).timerDeadline === nextDeadline));
+    assert.ok(events.slice(0, 18).every((event) => payload(event.payload).timerDeadline === firstDeadline));
+    assert.ok(events.slice(18).every((event) => payload(event.payload).timerDeadline === nextDeadline));
     assert.equal(stopped.experiment!.businessTime, "2026-08-01T17:04:00.000Z");
     assert.deepEqual(stopped.experiment!.nextDue, {
       A02: "2026-08-01T17:05:00.000Z",
-      A03: "2026-08-01T17:06:00.000Z",
-      A05: "2026-08-01T17:06:00.000Z",
+      A03: "2026-08-01T17:05:00.000Z",
+      A05: "2026-08-01T17:05:00.000Z",
     });
     assert.equal(runtimeError, null);
     evidenceCase = {

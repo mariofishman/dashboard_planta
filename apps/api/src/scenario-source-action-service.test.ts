@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type { Principal } from "@monitor/contracts";
-import { loadSourceActionContracts, type ScenarioSource, type ScenarioSourceAction, type ScenarioStatus, type SourceActionContract, type SourceActionEvidence } from "@monitor/detection";
+import { loadSourceActionContracts, type ScenarioSource, type ScenarioSourceAction, type ScenarioSourceActionInput, type ScenarioStatus, type SourceActionContract, type SourceActionEvidence } from "@monitor/detection";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
 import { ScenarioSourceActionError, ScenarioSourceActionService } from "./scenario-source-action-service.js";
@@ -30,12 +30,12 @@ const sourceDiff = (table: string, field: string): SourceActionEvidence => ({
 });
 const consumptionDiff = sourceDiff("orden_trabajo_materiales", "cantidad_consumida");
 
-async function service(error?: string) {
-  const calls: Array<{ code: string; action: ScenarioSourceAction; key?: number }> = [];
+async function service(error?: string | Error) {
+  const calls: Array<{ code: string; action: ScenarioSourceAction; key?: number; input?: ScenarioSourceActionInput }> = [];
   const source = {
-    sourceAction: async (code: string, action: ScenarioSourceAction, key: number, _contract: SourceActionContract) => {
-      calls.push({ code, action, key });
-      if (error) throw new Error(error);
+    sourceAction: async (code: string, action: ScenarioSourceAction, key: number, _contract: SourceActionContract, input?: ScenarioSourceActionInput) => {
+      calls.push({ code, action, key, ...(input ? { input } : {}) });
+      if (error) throw typeof error === "string" ? new Error(error) : error;
       const mutation = _contract.mutations[0]!;
       return { status: status(code as "A02" | "A03" | "A05"), evidence: sourceDiff(mutation.table, mutation.fields[0]!) };
     },
@@ -53,10 +53,21 @@ describe("scenario source-action service", () => {
     const result = await subject.value.execute({ actionId: "a03.record_first_consumption", key: 12198 }, admin);
     assert.deepEqual(subject.calls, [{ code: "A03", action: "record_first_consumption", key: 12198 }]);
     assert.deepEqual(result, {
-      actionId: "a03.record_first_consumption", contractVersion: "1.0.0", ruleCode: "A03", writerIdentity: "alertas_fake",
+      actionId: "a03.record_first_consumption", contractVersion: "1.1.0", ruleCode: "A03", writerIdentity: "alertas_fake",
       naturalKey: { field: "workOrderId", value: 12198 }, sourceRevision: "test_database.A03.v2", performedBySysUserId: 9001,
       sourceDiff: consumptionDiff,
+      input: null,
     });
+  });
+
+  it("validates and preserves approved editable creation fields", async () => {
+    const subject = await service();
+    const input = { workOrderCode: "OT-LAB-12", operationId: 12, machineId: 8 };
+    const result = await subject.value.execute({ actionId: "a03.start_work_order", key: 12198, input }, admin);
+    assert.deepEqual(subject.calls, [{ code: "A03", action: "start_work_order", key: 12198, input }]);
+    assert.deepEqual(result.input, input);
+    await rejects(subject.value.execute({ actionId: "a03.start_work_order", key: 12198, input: { machineId: 0 } }, admin), 400, "invalid_source_action_input");
+    await rejects(subject.value.execute({ actionId: "a03.close_work_order", key: 12198, input: { machineId: 8 } }, admin), 400, "invalid_source_action_input");
   });
 
   it("enforces administrative access and A02 source-authority precedence", async () => {
@@ -88,6 +99,10 @@ describe("scenario source-action service", () => {
     await rejects(missing.value.execute({ actionId: "a03.close_work_order", key: 12198 }, admin), 404, "work_order_unavailable");
     const resetting = await service("test_database_reset_active");
     await rejects(resetting.value.execute({ actionId: "a03.close_work_order", key: 12198 }, admin), 503, "test_database_reset_active");
+    const staleReference = await service(Object.assign(new Error("foreign key conflict"), { code: "ER_NO_REFERENCED_ROW_2" }));
+    await rejects(staleReference.value.execute({ actionId: "a03.close_work_order", key: 12198 }, admin), 409, "source_action_reference_unavailable");
+    const duplicateIdentity = await service(Object.assign(new Error("duplicate identity"), { code: "ER_DUP_ENTRY" }));
+    await rejects(duplicateIdentity.value.execute({ actionId: "a03.close_work_order", key: 12198 }, admin), 409, "source_action_identity_conflict");
     const registry = await loadSourceActionContracts(root);
     const unavailable = new ScenarioSourceActionService({} as ScenarioSource, registry);
     await rejects(unavailable.execute({ actionId: "a03.close_work_order", key: 12198 }, admin), 501, "source_action_source_unavailable");

@@ -2,8 +2,8 @@ import type { CycleResult, DetectionQueryDefinition, DetectionSourceAdapter } fr
 import type { DetectionScheduler } from "./scheduler.js";
 import {
   ScenarioExperimentRepository,
-  type ExperimentFrequencies,
-  type ExperimentSpeed,
+  type ExperimentPollingFrequencyMinutes,
+  type ExperimentSecondsPerSimulatedMinute,
   type ScenarioDuePoll,
   type ScenarioExperiment,
   type ScenarioExperimentIdentity,
@@ -54,7 +54,7 @@ export class ScenarioExperimentRuntime {
     return this.serialized(async () => {
       const runtime = await this.repository.activeRuntime();
       if (runtime.experiment) await this.source.setBusinessTime(runtime.experiment.businessTime);
-      const nextTickAt = runtime.experiment?.status === "running" ? runtime.nextTickAt ?? this.nextDeadline(runtime.experiment.speed) : null;
+      const nextTickAt = runtime.experiment?.status === "running" ? runtime.nextTickAt ?? this.nextDeadline(runtime.experiment.secondsPerSimulatedMinute) : null;
       if (runtime.experiment && nextTickAt !== runtime.nextTickAt) await this.repository.setNextTick(runtime.experiment.id, nextTickAt);
       this.arm(runtime.experiment, nextTickAt);
       return this.describe(runtime.experiment, nextTickAt);
@@ -64,16 +64,15 @@ export class ScenarioExperimentRuntime {
   async create(input: {
     name: string;
     businessTime: string;
-    frequencies: ExperimentFrequencies;
+    pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes;
     identity: ScenarioExperimentIdentity;
   }): Promise<ScenarioRuntimeStatus> {
     return this.serialized(async () => {
-      const created = await this.repository.create(input.name, input.businessTime, input.frequencies, input.identity);
-      const nextTickAt = this.nextDeadline(created.speed);
-      const active = await this.repository.activate(created.id, nextTickAt);
+      const created = await this.repository.create(input.name, input.businessTime, input.pollingFrequencyMinutes, input.identity);
+      const active = await this.repository.activate(created.id, null);
       await this.source.setBusinessTime(active.businessTime);
-      this.arm(active, nextTickAt);
-      return this.describe(active, nextTickAt);
+      this.arm(active, null);
+      return this.describe(active, null);
     });
   }
 
@@ -82,11 +81,11 @@ export class ScenarioExperimentRuntime {
     return this.describe(runtime.experiment, runtime.nextTickAt);
   }
 
-  async configure(id: string, speed: ExperimentSpeed, frequencies: ExperimentFrequencies): Promise<ScenarioRuntimeStatus> {
+  async configure(id: string, secondsPerSimulatedMinute: ExperimentSecondsPerSimulatedMinute, pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes): Promise<ScenarioRuntimeStatus> {
     return this.serialized(async () => {
       await this.requireActive(id);
-      const experiment = await this.repository.configure(id, speed, frequencies);
-      const nextTickAt = experiment.status === "running" ? this.nextDeadline(experiment.speed) : null;
+      const experiment = await this.repository.configure(id, secondsPerSimulatedMinute, pollingFrequencyMinutes);
+      const nextTickAt = experiment.status === "running" ? this.nextDeadline(experiment.secondsPerSimulatedMinute) : null;
       await this.repository.setNextTick(id, nextTickAt);
       this.arm(experiment, nextTickAt);
       return this.describe(experiment, nextTickAt);
@@ -97,7 +96,7 @@ export class ScenarioExperimentRuntime {
     return this.serialized(async () => {
       await this.requireActive(id);
       const experiment = await this.repository.pause(id, paused);
-      const nextTickAt = paused ? null : this.nextDeadline(experiment.speed);
+      const nextTickAt = paused ? null : this.nextDeadline(experiment.secondsPerSimulatedMinute);
       await this.repository.setNextTick(id, nextTickAt);
       this.arm(experiment, nextTickAt);
       return this.describe(experiment, nextTickAt);
@@ -108,7 +107,7 @@ export class ScenarioExperimentRuntime {
     return this.serialized(async () => {
       await this.requireActive(id);
       const result = await this.advanceLocked(id, minutes, { trigger: "manual_advance" });
-      const nextTickAt = result.experiment.status === "running" ? this.nextDeadline(result.experiment.speed) : null;
+      const nextTickAt = result.experiment.status === "running" ? this.nextDeadline(result.experiment.secondsPerSimulatedMinute) : null;
       await this.repository.setNextTick(id, nextTickAt);
       this.arm(result.experiment, nextTickAt);
       return result;
@@ -181,7 +180,7 @@ export class ScenarioExperimentRuntime {
     return {
       experiment,
       automaticScheduling: this.automaticScheduling,
-      realMillisecondsPerSimulatedMinute: experiment ? 60_000 / experiment.speed : null,
+      realMillisecondsPerSimulatedMinute: experiment ? experiment.secondsPerSimulatedMinute * 1_000 : null,
       nextAutomaticTickAt,
     };
   }
@@ -201,7 +200,7 @@ export class ScenarioExperimentRuntime {
           this.onError(new Error("scenario_runtime_timer_ownership_changed"));
           return;
         }
-        const interval = this.interval(active.speed);
+        const interval = this.interval(active.secondsPerSimulatedMinute);
         const observedNow = this.now();
         if (observedNow < Date.parse(nextTickAt)) {
           this.arm(active, nextTickAt);
@@ -230,12 +229,12 @@ export class ScenarioExperimentRuntime {
     this.timer.unref?.();
   }
 
-  private interval(speed: ExperimentSpeed): number {
-    return 60_000 / speed;
+  private interval(secondsPerSimulatedMinute: ExperimentSecondsPerSimulatedMinute): number {
+    return secondsPerSimulatedMinute * 1_000;
   }
 
-  private nextDeadline(speed: ExperimentSpeed): string {
-    return new Date(this.now() + this.interval(speed)).toISOString();
+  private nextDeadline(secondsPerSimulatedMinute: ExperimentSecondsPerSimulatedMinute): string {
+    return new Date(this.now() + this.interval(secondsPerSimulatedMinute)).toISOString();
   }
 
   private serialized<T>(work: () => Promise<T>): Promise<T> {

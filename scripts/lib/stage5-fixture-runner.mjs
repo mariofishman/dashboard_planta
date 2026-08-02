@@ -56,8 +56,8 @@ export function buildStage5FixturePlans(registry, testId, runId, seedDocument) {
       experiment: {
         name: experimentProfile.experimentNameTemplate.replace("{runId}", runId).replace("{testId}", `${testId}${hasLanes ? ` ${laneId}` : ""}`),
         businessTime: experimentProfile.businessTime,
-        speed: experimentProfile.speed,
-        frequencies: experimentProfile.frequencies,
+        secondsPerSimulatedMinute: experimentProfile.secondsPerSimulatedMinute,
+        pollingFrequencyMinutes: experimentProfile.pollingFrequencyMinutes,
         identity: {
           runId: experimentProfile.runIdTemplate.replace("{runId}", runId).replace("{testId}", `${testId}${hasLanes ? `:${laneId}` : ""}`),
           manifestVersion: registry.manifestVersion,

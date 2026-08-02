@@ -28,7 +28,7 @@ async function fixture() {
     runtimeId: "runtime-1",
     captureNonce: "abcdefghijklmnop",
     manifestVersion: "2.0.0",
-    sourceActionContractVersion: "1.0.0",
+    sourceActionContractVersion: "1.1.0",
     startedAt,
     completedAt,
   };

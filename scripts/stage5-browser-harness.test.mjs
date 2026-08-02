@@ -15,7 +15,7 @@ const seed = createStage5BrowserHarnessSeed({
   runtimeId: "browser-runtime-1",
   captureNonce: "abcdefghijklmnop",
   manifestVersion: "2.0.0",
-  sourceActionContractVersion: "1.0.0",
+  sourceActionContractVersion: "1.1.0",
   startedAt: "2026-08-02T13:00:00.000Z",
   apiOrigin: "http://127.0.0.1:3010",
 });

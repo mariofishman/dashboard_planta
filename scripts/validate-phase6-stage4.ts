@@ -28,13 +28,13 @@ try {
   const fixtureKeys = { A02: ["materialFlowDetailId", fixtureSeedIds.A02], A03: ["workOrderId", fixtureSeedIds.A03], A05: ["articleSerialId", fixtureSeedIds.A05] } as const;
   for (const [code, scenario] of [["A02", "past_threshold"], ["A03", "past_threshold"], ["A05", "past_threshold_both"]] as const) {
     const beforeSourceAction = await monitorCounts();
-    let response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/prepare`, headers, payload: { scenario } });
+    let response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/prepare`, headers, payload: { scenario } });
     assert.equal(response.statusCode, 200, response.body);
     assert.deepEqual(await monitorCounts(), beforeSourceAction, `${code} source preparation wrote Monitor-owned state`);
     const [fixtureKey, fixtureId] = fixtureKeys[code];
     assert.equal(response.json().sourceState.rows[0]?.[fixtureKey], fixtureId, `${code} did not reuse its fixed source fixture`);
 
-    response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers });
+    response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers });
     assert.equal(response.statusCode, 200, response.body);
     const opened = response.json().scenario;
     assert.equal(response.json().result.status, "healthy", `${code} poll was not healthy`);
@@ -42,15 +42,15 @@ try {
     assert.equal(opened.actualMonitor.openIncidentCount, 1, `${code} open count`);
     const evidenceCount = opened.actualMonitor.evidenceCount;
 
-    response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers });
+    response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers });
     assert.equal(response.statusCode, 200, response.body);
     assert.equal(response.json().scenario.actualMonitor.evidenceCount, evidenceCount, `${code} duplicated unchanged evidence`);
 
     if (code === "A03") {
       for (const [fault, expectedStatus] of [["source_error", "source_error"], ["partial", "partial"], ["invalid_schema", "invalid_schema"], ["timeout", "timeout"]] as const) {
-        response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/fail-next-poll`, headers, payload: { fault } });
+        response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/fail-next-poll`, headers, payload: { fault } });
         assert.equal(response.statusCode, 200, response.body);
-        response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers });
+        response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers });
         assert.equal(response.statusCode, 200, response.body);
         assert.equal(response.json().result.status, expectedStatus, `${code} ${fault} did not fail the complete poll`);
         assert.equal(response.json().scenario.actualMonitor.latestIncident?.lifecycle, "open", `${code} ${fault} changed incident lifecycle`);
@@ -59,11 +59,18 @@ try {
     }
 
     const beforeCorrection = await monitorCounts();
-    response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/correct`, headers });
-    assert.equal(response.statusCode, 200, response.body);
-    assert.deepEqual(await monitorCounts(), beforeCorrection, `${code} source correction wrote Monitor-owned state`);
+    const correctionActions = code === "A02"
+      ? ["a02.receive"]
+      : code === "A03"
+        ? ["a03.record_first_consumption"]
+        : ["a05.register_weighing", "a05.register_movement"];
+    for (const actionId of correctionActions) {
+      response = await server.app.inject({ method: "POST", url: "/api/dev/source-actions", headers, payload: { actionId, key: fixtureId } });
+      assert.equal(response.statusCode, 200, response.body);
+    }
+    assert.deepEqual(await monitorCounts(), beforeCorrection, `${code} source action wrote Monitor-owned state`);
 
-    response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers });
+    response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers });
     assert.equal(response.statusCode, 200, response.body);
     assert.equal(response.json().result.status, "healthy", `${code} resolution poll was not healthy`);
     assert.equal(response.json().scenario.actualMonitor.latestIncident?.lifecycle, "resolved", `${code} did not resolve`);

@@ -20,7 +20,7 @@ const notApplicable = (reason) => ({ applicability: "not_applicable", notApplica
 function validResult(artifactPath) {
   return {
     schemaVersion: "1.0.0",
-    identity: { testId: "SH-01", group: "shared", status: "passed", experimentId: "exp-1", runId: "run-1", manifestVersion: "2.0.0", sourceActionContractVersion: "1.0.0", startedAt: timestamp, completedAt: timestamp },
+    identity: { testId: "SH-01", group: "shared", status: "passed", experimentId: "exp-1", runId: "run-1", manifestVersion: "2.0.0", sourceActionContractVersion: "1.1.0", startedAt: timestamp, completedAt: timestamp },
     expectation: { declared: manifest.tests[0].expected, observed: "Experiment starts empty and prior history remains queryable.", matched: true },
     laboratoryActions: { applicability: "required", items: [{ sequence: 1, actionId: "experiment.create", actionName: "Create durable experiment", invocationPath: "human_and_automation", endpoint: "POST /api/dev/scenario-runtime", writerIdentity: "not_applicable", businessTime: timestamp, auditTime: timestamp }] },
     sourceChain: notApplicable("no_source_action"), readChain: notApplicable("no_poll"), monitorChain: notApplicable("no_monitor_observation"),

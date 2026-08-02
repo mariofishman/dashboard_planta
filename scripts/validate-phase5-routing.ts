@@ -21,9 +21,9 @@ const assignment = (id: string, person: string, position: string, scope: string,
 });
 
 try {
-  const trigger = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager });
+  const trigger = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/trigger", headers: manager });
   assert.equal(trigger.statusCode, 200);
-  const advance = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
+  const advance = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
   assert.equal(advance.statusCode, 200);
   const workerGroup = workerGroupForIncident(advance.json().scenarioClock.currentAt, "Día");
   const roster = [
@@ -36,7 +36,7 @@ try {
   ];
   assert.equal((await instance.app.inject({ method: "PUT", url: "/api/roster/assignments", headers: manager, payload: { revision: 0, assignments: roster } })).statusCode, 200);
   for (const [url, payload] of [
-    ["/api/dev/scenarios/A02/poll", undefined],
+    ["/api/dev/test/scenarios/A02/poll", undefined],
   ] as const) {
     assert.equal((await instance.app.inject({ method: "POST", url, headers: manager, payload })).statusCode, 200);
   }

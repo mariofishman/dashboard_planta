@@ -16,11 +16,11 @@ const cleanup = {
   artifactPathTemplate: "local-data/test-database/evidence/stage5/{runId}/{testId}/cleanup.json",
 };
 const experiment = {
-  businessTime: "2026-08-01T09:00:00.000Z", speed: 1, frequencies: { A02: 3, A03: 3, A05: 3 },
+  businessTime: "2026-08-01T09:00:00.000Z", secondsPerSimulatedMinute: 1, pollingFrequencyMinutes: 3,
   runIdTemplate: "{runId}:{testId}", experimentNameTemplate: "Stage 5 {runId} {testId}", experimentIdentity: "unique_per_test", monitorIsolation: "fresh_per_test",
 };
 const validRegistry = {
-  registryVersion: "1.0.0", manifestVersion: "2.0.0", sourceActionContractVersion: "1.0.0", fixtureVersion: "1.0.0",
+  registryVersion: "1.0.0", manifestVersion: "2.0.0", sourceActionContractVersion: "1.1.0", fixtureVersion: "1.0.0",
   sourceRevision: "staging_emusa_core-20260723-025548", writerIdentity: "alertas_fake",
   profiles: { isolated_per_test: experiment, restore_verified: cleanup },
   contracts: [{

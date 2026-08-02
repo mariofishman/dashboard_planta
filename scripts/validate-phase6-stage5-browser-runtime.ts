@@ -116,7 +116,7 @@ try {
   const created = await acceptance.runtime.create({
     name: "Step 8.1 connected runtime diagnostic",
     businessTime: "2026-08-02T08:00:00.000Z",
-    frequencies: { A02: 60, A03: 60, A05: 60 },
+    pollingFrequencyMinutes: 60,
     identity: { runId, manifestVersion: declaration.manifestVersion, sourceActionContractVersion: declaration.sourceActionContractVersion },
   });
   const experiment = created.experiment;

@@ -2,7 +2,7 @@
   "manifestVersion": "2.0.0",
   "stage": "phase6-stage5b",
   "status": "declaration_only",
-  "sourceActionContractVersion": "1.0.0",
+  "sourceActionContractVersion": "1.1.0",
   "requiredCount": 34,
   "groupCounts": { "shared": 11, "A02": 9, "A03": 6, "A05": 8 },
   "excluded": [

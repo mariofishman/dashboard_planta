@@ -59,6 +59,8 @@ export interface ScenarioSourceActionOutcome {
   evidence: SourceActionEvidence;
 }
 
+export type ScenarioSourceActionInput = Record<string, string | number | null>;
+
 export interface ScenarioSource {
   supportedCases(code: string): ScenarioCase[];
   reset(code: string): Promise<ScenarioStatus>;
@@ -73,7 +75,7 @@ export interface ScenarioSource {
   consumeFault(code: ScenarioRuleCode): Promise<ScenarioFault | null>;
   rows(code: ScenarioRuleCode): Promise<{ rows: Record<string, unknown>[]; sourceRevision: string }>;
   status(code: string): Promise<ScenarioStatus>;
-  sourceAction?(code: string, action: ScenarioSourceAction, key: number, contract: SourceActionContract): Promise<ScenarioSourceActionOutcome>;
+  sourceAction?(code: string, action: ScenarioSourceAction, key: number, contract: SourceActionContract, input?: ScenarioSourceActionInput): Promise<ScenarioSourceActionOutcome>;
   replaceTracked?(code: ScenarioRuleCode, keys: number[]): void;
   recordExternalSourceChange?(code: ScenarioRuleCode, action: string): void;
   pollMetadata?(code: ScenarioRuleCode): { currentAt: string; sourceRevision: string };

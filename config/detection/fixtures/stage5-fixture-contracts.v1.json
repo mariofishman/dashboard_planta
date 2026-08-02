@@ -1,15 +1,15 @@
 {
   "registryVersion": "1.0.0",
   "manifestVersion": "2.0.0",
-  "sourceActionContractVersion": "1.0.0",
+  "sourceActionContractVersion": "1.1.0",
   "fixtureVersion": "1.0.0",
   "sourceRevision": "staging_emusa_core-20260723-025548",
   "writerIdentity": "alertas_fake",
   "profiles": {
     "isolated_per_test": {
       "businessTime": "2026-08-01T09:00:00.000Z",
-      "speed": 1,
-      "frequencies": { "A02": 3, "A03": 3, "A05": 3 },
+      "secondsPerSimulatedMinute": 1,
+      "pollingFrequencyMinutes": 3,
       "runIdTemplate": "{runId}:{testId}",
       "experimentNameTemplate": "Stage 5 {runId} {testId}",
       "experimentIdentity": "unique_per_test",
@@ -43,7 +43,7 @@
       "actions": [
         { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
         { "sequence": 2, "actionId": "experiment.pause", "keyRefs": [], "parameters": { "pauseStates": [true, false] } },
-        { "sequence": 3, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "speedCases": [1, 2, 3, 60], "frequencyCases": [{ "A02": 3, "A03": 6, "A05": 9 }, { "A02": 9, "A03": 3, "A05": 6 }] } }
+        { "sequence": 3, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "secondsPerSimulatedMinuteCases": [1, 2, 3, 60], "pollingFrequencyMinuteCases": [3, 6, 9] } }
       ],
       "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
     },
@@ -54,7 +54,7 @@
       "source": { "applicability": "not_applicable", "notApplicableReason": "Clock serialization and pause behavior do not require source mutation." },
       "actions": [
         { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
-        { "sequence": 2, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "speed": 1, "frequencies": { "A02": 3, "A03": 60, "A05": 60 } } },
+        { "sequence": 2, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "secondsPerSimulatedMinute": 1, "pollingFrequencyMinutes": 3 } },
         { "sequence": 3, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 27 } },
         { "sequence": 4, "actionId": "experiment.pause", "keyRefs": [], "parameters": { "pauseStates": [true, false] } }
       ],
@@ -82,7 +82,7 @@
       },
       "actions": [
         { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
-        { "sequence": 2, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "speed": 1, "frequencies": { "A02": 3, "A03": 60, "A05": 60 } } },
+        { "sequence": 2, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "secondsPerSimulatedMinute": 1, "pollingFrequencyMinutes": 3 } },
         { "sequence": 3, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
       ],
       "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"

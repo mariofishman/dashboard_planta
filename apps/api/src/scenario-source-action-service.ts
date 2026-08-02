@@ -4,6 +4,7 @@ import type {
   ScenarioRuleCode,
   ScenarioSource,
   ScenarioSourceAction,
+  ScenarioSourceActionInput,
   SourceActionContract,
   SourceActionContractRegistry,
   SourceActionEvidence,
@@ -52,13 +53,41 @@ export interface ScenarioSourceActionExecution {
   sourceRevision: string;
   performedBySysUserId: number;
   sourceDiff: SourceActionEvidence;
+  input: ScenarioSourceActionInput | null;
 }
 
 function requestObject(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new ScenarioSourceActionError(400, "invalid_source_action_request");
   const input = value as Record<string, unknown>;
-  if (Object.keys(input).some((key) => !["actionId", "key", "authority"].includes(key))) throw new ScenarioSourceActionError(400, "invalid_source_action_request");
+  if (Object.keys(input).some((key) => !["actionId", "key", "authority", "input"].includes(key))) throw new ScenarioSourceActionError(400, "invalid_source_action_request");
   return input;
+}
+
+const editableFields: Partial<Record<SourceActionId, Record<string, "string" | "positiveNumber" | "positiveInteger">>> = {
+  "a02.prepare_dispatch": { sku: "positiveInteger", uniqueCode: "string", materialName: "string", quantity: "positiveNumber", unitId: "positiveInteger", originWarehouseId: "positiveInteger", destinationWarehouseId: "positiveInteger", workOrderId: "positiveInteger" },
+  "a03.start_work_order": { workOrderCode: "string", operationId: "positiveInteger", machineId: "positiveInteger" },
+  "a05.declare_produced_reel": { serialCode: "string", sku: "positiveInteger", sourceWorkOrderId: "positiveInteger" },
+  "a05.declare_remnant_reel": { serialCode: "string", sku: "positiveInteger", sourceWorkOrderId: "positiveInteger" },
+};
+
+function editableInput(actionId: SourceActionId, value: unknown): ScenarioSourceActionInput | undefined {
+  if (value === undefined) return undefined;
+  const fields = editableFields[actionId];
+  if (!fields || !value || typeof value !== "object" || Array.isArray(value)) throw new ScenarioSourceActionError(400, "invalid_source_action_input");
+  const input = value as Record<string, unknown>;
+  if (Object.keys(input).some((key) => !fields[key])) throw new ScenarioSourceActionError(400, "invalid_source_action_input");
+  const result: ScenarioSourceActionInput = {};
+  for (const [field, kind] of Object.entries(fields)) {
+    const candidate = input[field];
+    if (candidate === undefined) continue;
+    if (kind === "string") {
+      if (typeof candidate !== "string" || !candidate.trim() || candidate.trim().length > 120) throw new ScenarioSourceActionError(400, "invalid_source_action_input");
+      result[field] = candidate.trim();
+    } else if (typeof candidate !== "number" || !Number.isFinite(candidate) || candidate <= 0 || (kind === "positiveInteger" && !Number.isSafeInteger(candidate))) {
+      throw new ScenarioSourceActionError(400, "invalid_source_action_input");
+    } else result[field] = candidate;
+  }
+  return result;
 }
 
 function naturalKey(value: unknown): number | undefined {
@@ -122,9 +151,10 @@ export class ScenarioSourceActionService {
     const key = naturalKey(input.key);
     if (key === undefined) throw new ScenarioSourceActionError(400, "source_action_key_required");
     authorizeContract(contract, a02Authority(input.authority));
+    const sourceInput = editableInput(contract.id, input.input);
     if (!this.source.sourceAction) throw new ScenarioSourceActionError(501, "source_action_source_unavailable");
     try {
-      const outcome = await this.source.sourceAction(contract.ruleCode, contract.invocation.argument as ScenarioSourceAction, key, contract);
+      const outcome = await this.source.sourceAction(contract.ruleCode, contract.invocation.argument as ScenarioSourceAction, key, contract, sourceInput);
       validateEvidence(contract, outcome.evidence, this.registry.writerIdentity);
       return {
         actionId: contract.id,
@@ -135,9 +165,13 @@ export class ScenarioSourceActionService {
         sourceRevision: outcome.status.sourceRevision,
         performedBySysUserId: principal.sysUserId,
         sourceDiff: outcome.evidence,
+        input: sourceInput ?? null,
       };
     } catch (error) {
       if (error instanceof ScenarioSourceActionError) throw error;
+      const databaseCode = error && typeof error === "object" && "code" in error ? String((error as { code: unknown }).code) : "";
+      if (["ER_NO_REFERENCED_ROW_2", "ER_ROW_IS_REFERENCED_2"].includes(databaseCode)) throw new ScenarioSourceActionError(409, "source_action_reference_unavailable");
+      if (databaseCode === "ER_DUP_ENTRY") throw new ScenarioSourceActionError(409, "source_action_identity_conflict");
       if (error instanceof Error && conflictErrors.has(error.message)) throw new ScenarioSourceActionError(409, error.message);
       if (error instanceof Error && notFoundErrors.has(error.message)) throw new ScenarioSourceActionError(404, error.message);
       if (error instanceof Error && unavailableErrors.has(error.message)) throw new ScenarioSourceActionError(503, error.message);

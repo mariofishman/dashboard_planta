@@ -52,7 +52,7 @@ async function authoritySnapshot(server: MonitorServer) {
 }
 
 async function poll(server: MonitorServer, code: ScenarioRuleCode) {
-  const response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+  const response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
   assert.equal(response.statusCode, 200, response.body);
   return response.json().result as {
     cycleId: string;
@@ -69,7 +69,7 @@ async function poll(server: MonitorServer, code: ScenarioRuleCode) {
 
 async function injectFault(server: MonitorServer, code: ScenarioRuleCode, fault: ScenarioFault) {
   const response = await server.app.inject({
-    method: "POST", url: `/api/dev/scenarios/${code}/fail-next-poll`, headers: manager, payload: { fault },
+    method: "POST", url: `/api/dev/test/scenarios/${code}/fail-next-poll`, headers: manager, payload: { fault },
   });
   assert.equal(response.statusCode, 200, response.body);
 }
@@ -206,7 +206,7 @@ test("6.1a establishes the connected healthy baseline through the real test_data
       assert.equal(entry.query.queryId, contract.queryId);
       assert.equal(entry.query.queryVersion, contract.queryVersion);
 
-      const response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+      const response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
       assert.equal(response.statusCode, 200, response.body);
       const result = response.json().result as {
         cycleId: string;
@@ -282,7 +282,7 @@ test("6.1b detects a direct approved fixture mutation only after a real-adapter 
     assert.notDeepEqual(mutated, original, "direct source mutation produced no source change");
     assert.deepEqual(await monitorSnapshot(server), monitorBefore, "direct source mutation changed Monitor before polling");
 
-    const response = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const response = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(response.statusCode, 200, response.body);
     const result = response.json().result as { cycleId: string; status: string; complete: boolean; fullEvaluation: boolean };
     assert.equal(result.status, "healthy");
@@ -397,7 +397,7 @@ test("6.1c keeps connected A02, A03, and A05 healthy with simulator consumption 
       A05: fixtureIds.A05.serialId,
     };
     for (const code of codes) {
-      const response = await server.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+      const response = await server.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
       assert.equal(response.statusCode, 200, response.body);
       const result = response.json().result as { cycleId: string; status: string; complete: boolean; fullEvaluation: boolean };
       assert.equal(result.status, "healthy");

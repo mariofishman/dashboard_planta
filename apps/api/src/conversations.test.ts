@@ -25,12 +25,12 @@ it("synchronizes one incident conversation across mock users, duplicates, reconn
   const manager = headers("plant-manager");
   const supervisor = headers("shift-supervisor");
   const operator = headers("machine-operator");
-  const trigger = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager });
+  const trigger = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/trigger", headers: manager });
   assert.equal(trigger.statusCode, 200, trigger.body);
-  const advance = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
+  const advance = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
   assert.equal(advance.statusCode, 200, advance.body);
   const incidentAt = advance.json().scenarioClock.currentAt;
-  const poll = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  const poll = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   assert.equal(poll.statusCode, 200, poll.body);
   assert.equal(poll.json().scenario.scenarioClock.currentAt, incidentAt);
   const incident = (await instance.app.inject({ url: "/api/incidents", headers: manager })).json().incidents

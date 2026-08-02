@@ -4,7 +4,7 @@ import { assertValidStage5CoreChain, captureStage5LaboratoryActions, captureStag
 
 const identity = Object.freeze({
   testId: "A02-01", group: "A02", experimentId: "experiment-1", runId: "run-1",
-  manifestVersion: "2.0.0", sourceActionContractVersion: "1.0.0", startedAt: "2026-08-01T12:00:00.000Z",
+  manifestVersion: "2.0.0", sourceActionContractVersion: "1.1.0", startedAt: "2026-08-01T12:00:00.000Z",
 });
 const attachment = (overrides = {}) => ({
   attachmentId: "browser-1", kind: "browser",

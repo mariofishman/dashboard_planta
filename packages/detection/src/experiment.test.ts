@@ -12,7 +12,8 @@ import type { ScenarioSource } from "./simulator.js";
 import type { CycleResult, DetectionQueryDefinition, DetectionSourceAdapter } from "./types.js";
 
 const migrationRoot = resolve(import.meta.dirname, "../../database/migrations");
-const frequencies = { A02: 3, A03: 6, A05: 9 } as const;
+const pollingFrequencyMinutes = 3;
+const legacyFrequencies = { A02: 3, A03: 6, A05: 9 } as const;
 const identity = (runId: string) => ({ runId, manifestVersion: "1.0.0", sourceActionContractVersion: "1.0.0" });
 const payload = (marker: string): ScenarioSnapshotPayloadV1 => ({
   source: { marker }, clock: { currentAt: "2026-08-01T09:00:00.000Z" }, poll: { status: "healthy" }, monitor: { incidentCount: 0 },
@@ -33,7 +34,7 @@ test("experiment identity, versioned snapshots, and paginated history survive mi
     for (const [index, id] of legacyIds.entries()) {
       await database.execute(`INSERT INTO monitor_scenario_experiment
         (id,name,status,business_time,speed,frequencies,next_due) VALUES ($1,$2,'running',$3,1,$4::jsonb,$5::jsonb)`, [
-        id, `Legacy ${index + 1}`, "2026-08-01T08:00:00.000Z", JSON.stringify(frequencies),
+        id, `Legacy ${index + 1}`, "2026-08-01T08:00:00.000Z", JSON.stringify(legacyFrequencies),
         JSON.stringify({ A02: "2026-08-01T08:03:00.000Z", A03: "2026-08-01T08:06:00.000Z", A05: "2026-08-01T08:09:00.000Z" }),
       ]);
     }
@@ -41,14 +42,16 @@ test("experiment identity, versioned snapshots, and paginated history survive mi
       (id,experiment_id,label,payload,captured_business_time) VALUES ($1,$2,'legacy-snapshot',$3::jsonb,$4)`,
     [randomUUID(), legacyIds[0], JSON.stringify({ unversioned: true }), "2026-08-01T08:00:00.000Z"]);
     await database.execute(await readFile(resolve(migrationRoot, "0014_phase6_stage5_experiment_history.sql"), "utf8"));
+    await database.execute(await readFile(resolve(migrationRoot, "0018_phase6_stage5_v2_experiment_contract.sql"), "utf8"));
 
     const legacyRows = await database.queryAll("SELECT id,run_id AS \"runId\" FROM monitor_scenario_experiment WHERE id=ANY($1::uuid[]) ORDER BY id", [legacyIds]);
     assert.equal(new Set(legacyRows.map((row) => row.runId)).size, 2);
     assert.ok(legacyRows.every((row) => row.runId === `legacy:${row.id}`));
+    assert.equal(Number((await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_scenario_experiment WHERE id=ANY($1::uuid[]) AND status='completed'", [legacyIds])).count), 2);
     assert.equal((await database.queryOne("SELECT schema_version AS version FROM monitor_scenario_snapshot WHERE experiment_id=$1", [legacyIds[0]])).version, "legacy");
 
     const repository = new ScenarioExperimentRepository(database);
-    const experiment = await repository.create("Current run", "2026-08-01T09:00:00.000Z", frequencies, identity("stage5-current"));
+    const experiment = await repository.create("Current run", "2026-08-01T09:00:00.000Z", pollingFrequencyMinutes, identity("stage5-current"));
     const first = await repository.snapshot(experiment.id, "before", payload("before"));
     const retry = await repository.snapshot(experiment.id, "before", payload("before"));
     assert.equal(retry.id, first.id);
@@ -58,8 +61,8 @@ test("experiment identity, versioned snapshots, and paginated history survive mi
     await repository.snapshot(experiment.id, "during", payload("during"));
     await repository.snapshot(experiment.id, "after", payload("after"));
     for (const testId of ["A02-00", "SH-01", "SH-05"]) await repository.record(experiment.id, testId, "passed", { testId }, "2026-08-01T09:00:00.000Z");
-    await repository.create("Later one", "2026-08-01T10:00:00.000Z", frequencies, identity("stage5-later-1"));
-    await repository.create("Later two", "2026-08-01T11:00:00.000Z", frequencies, identity("stage5-later-2"));
+    await repository.create("Later one", "2026-08-01T10:00:00.000Z", pollingFrequencyMinutes, identity("stage5-later-1"));
+    await repository.create("Later two", "2026-08-01T11:00:00.000Z", pollingFrequencyMinutes, identity("stage5-later-2"));
 
     await database.close();
     database = await createDatabaseRuntime({ mode: "pglite", pgliteDataDir: dataDir });
@@ -125,39 +128,44 @@ test("experiment runtime preserves cadence, serializes crossed polls, freezes wh
   try {
     const runtime = new ScenarioExperimentRuntime(repository, source, scheduler, registry, false);
     const created = await runtime.create({
-      name: "Manual runtime", businessTime: sourceClock, frequencies: { A02: 3, A03: 60, A05: 60 }, identity: identity("runtime-manual"),
+      name: "Manual runtime", businessTime: sourceClock, pollingFrequencyMinutes: 3, identity: identity("runtime-manual"),
     });
     const id = created.experiment!.id;
-    await runtime.pause(id, true);
-    for (const speed of [1, 2, 3, 60] as const) {
-      const configured = await runtime.configure(id, speed, { A02: 3, A03: 7, A05: 11 });
-      assert.equal(configured.realMillisecondsPerSimulatedMinute, 60_000 / speed);
+    for (const seconds of [1, 2, 3, 17, 60] as const) {
+      const configured = await runtime.configure(id, seconds, 3);
+      assert.equal(configured.realMillisecondsPerSimulatedMinute, seconds * 1_000);
       assert.equal(configured.nextAutomaticTickAt, null);
       assert.deepEqual(configured.experiment!.nextDue, {
-        A02: "2026-08-01T09:03:00.000Z", A03: "2026-08-01T09:07:00.000Z", A05: "2026-08-01T09:11:00.000Z",
+        A02: "2026-08-01T09:03:00.000Z", A03: "2026-08-01T09:03:00.000Z", A05: "2026-08-01T09:03:00.000Z",
       });
     }
-    await runtime.configure(id, 60, { A02: 3, A03: 60, A05: 60 });
+    await runtime.configure(id, 1, 3);
     await runtime.pause(id, false);
     const jumped = await runtime.advance(id, 29);
-    assert.deepEqual(jumped.polls.map(({ ruleCode, dueAt }) => [ruleCode, dueAt]), Array.from({ length: 9 }, (_, index) => [
-      "A02", `2026-08-01T09:${String((index + 1) * 3).padStart(2, "0")}:00.000Z`,
-    ]));
+    assert.deepEqual(jumped.polls.map(({ ruleCode, dueAt }) => [ruleCode, dueAt]), Array.from({ length: 9 }, (_, index) =>
+      ["A02", "A03", "A05"].map((ruleCode) => [ruleCode, `2026-08-01T09:${String((index + 1) * 3).padStart(2, "0")}:00.000Z`])).flat());
     const paused = await runtime.pause(id, true);
     const frozen = await runtime.advance(id, 10);
     assert.equal(frozen.experiment.businessTime, paused.experiment!.businessTime);
     assert.equal(frozen.polls.length, 0);
 
     const boundary = await runtime.create({
-      name: "Boundary runtime", businessTime: "2026-08-01T10:00:00.000Z", frequencies: { A02: 3, A03: 60, A05: 60 }, identity: identity("runtime-boundary"),
+      name: "Boundary runtime", businessTime: "2026-08-01T10:00:00.000Z", pollingFrequencyMinutes: 3, identity: identity("runtime-boundary"),
     });
     const boundaryId = boundary.experiment!.id;
+    await runtime.pause(boundaryId, false);
     await runtime.advance(boundaryId, 3);
     await runtime.executeBeforeSourceAction(async () => ({ actionId: "a02.receive", ruleCode: "A02", naturalKey: { value: 4202 } }));
     const events = await repository.runtimeEvents(boundaryId);
-    assert.deepEqual(events.map((event) => event.eventType), ["poll_started", "poll_completed", "source_action"]);
+    assert.deepEqual(events.map((event) => event.eventType), [
+      "poll_started", "poll_completed", "poll_started", "poll_completed", "poll_started", "poll_completed", "source_action",
+    ]);
     assert.ok(events.every((event) => event.businessTime === "2026-08-01T10:03:00.000Z"));
     assert.ok(events.every((event) => Date.parse(event.recordedAt) !== Date.parse(event.businessTime)));
+    const operationalEvents = await repository.operationalEvents("A02");
+    assert.deepEqual(operationalEvents.map((event) => [event.experimentId, event.experimentName, event.eventType]), [
+      [boundaryId, "Boundary runtime", "source_action"],
+    ]);
 
     const beforeRestart = await runtime.status();
     const restarted = new ScenarioExperimentRuntime(repository, source, scheduler, registry, false);
@@ -171,12 +179,13 @@ test("experiment runtime preserves cadence, serializes crossed polls, freezes wh
     const automaticFailure = new Promise<never>((_resolve, reject) => { rejectAutomaticPoll = reject; });
     const automatic = new ScenarioExperimentRuntime(repository, source, scheduler, registry, true, (error) => rejectAutomaticPoll?.(error));
     const autoCreated = await automatic.create({
-      name: "Automatic runtime", businessTime: "2026-08-01T11:00:00.000Z", frequencies: { A02: 1, A03: 60, A05: 60 }, identity: identity("runtime-automatic"),
+      name: "Automatic runtime", businessTime: "2026-08-01T11:00:00.000Z", pollingFrequencyMinutes: 1, identity: identity("runtime-automatic"),
     });
     const automaticId = autoCreated.experiment!.id;
     const automaticPoll = new Promise<void>((resolvePoll) => { automaticPollResolved = resolvePoll; });
-    const configured = await automatic.configure(automaticId, 60, { A02: 1, A03: 60, A05: 60 });
-    const firstDeadline = configured.nextAutomaticTickAt!;
+    await automatic.configure(automaticId, 1, 1);
+    await automatic.pause(automaticId, false);
+    const firstDeadline = (await automatic.status()).nextAutomaticTickAt!;
     let automaticTimeout: ReturnType<typeof setTimeout> | undefined;
     await Promise.race([
       automaticPoll,

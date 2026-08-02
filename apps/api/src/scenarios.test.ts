@@ -44,12 +44,12 @@ it("drives A02 through source changes, failure preservation, and resolution with
   assert.equal((await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: operator })).statusCode, 403);
   assert.equal((await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents.length, 0);
 
-  const reset = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/reset", headers: manager });
+  const reset = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/reset", headers: manager });
   assert.equal(reset.statusCode, 200, reset.body);
-  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager })).statusCode, 200);
+  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/trigger", headers: manager })).statusCode, 200);
   assert.equal((await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents.length, 0, "source actions cannot directly create incidents");
-  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } })).statusCode, 200);
-  const firstPoll = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } })).statusCode, 200);
+  const firstPoll = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   assert.equal(firstPoll.statusCode, 200);
   assert.equal(firstPoll.json().result.status, "healthy");
   let incidents = (await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents;
@@ -58,36 +58,36 @@ it("drives A02 through source changes, failure preservation, and resolution with
   assert.equal(incidents[0].lifecycle, "open");
   assert.equal(incidents[0].occurrence, 1);
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   assert.equal(Number((await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident_evidence")).count), 1, "unchanged polls do not append evidence");
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/correct", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/fail-next-poll", headers: manager, payload: { fault: "partial" } });
-  const failed = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/correct", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/fail-next-poll", headers: manager, payload: { fault: "partial" } });
+  const failed = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   assert.equal(failed.json().result.status, "partial");
   incidents = (await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents;
   assert.equal(incidents[0].lifecycle, "open", "an incomplete poll cannot resolve an incident");
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   incidents = (await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents;
   assert.equal(incidents[0].lifecycle, "resolved");
 
-  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/recur", headers: manager })).statusCode, 409);
+  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/recur", headers: manager })).statusCode, 409);
 });
 
 it("drives A03 and A05 through their local source thresholds and healthy resolution", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
   for (const [code, minutes] of [["A03", 15], ["A05", 30]] as const) {
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/reset`, headers: manager });
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/trigger`, headers: manager });
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/advance-time`, headers: manager, payload: { minutes } });
-    const opened = await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/reset`, headers: manager });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/trigger`, headers: manager });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/advance-time`, headers: manager, payload: { minutes } });
+    const opened = await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
     assert.equal(opened.json().result.status, "healthy");
     let incidents = (await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents;
     assert.equal(incidents.find((incident: { ruleCode: string }) => incident.ruleCode === code)?.lifecycle, "open");
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/correct`, headers: manager });
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/correct`, headers: manager });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
     incidents = (await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents;
     assert.equal(incidents.find((incident: { ruleCode: string }) => incident.ruleCode === code)?.lifecycle, "resolved");
   }
@@ -99,21 +99,21 @@ it("preserves every open scenario alert through every simulator read failure", a
   for (const code of ["A02", "A03", "A05"] as const) {
     const scenario = code === "A05" ? "past_threshold_both" : "past_threshold";
     for (const fault of ["timeout", "source_error", "partial", "invalid_schema"] as const) {
-      await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/reset`, headers: manager });
-      await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
-      await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/prepare`, headers: manager, payload: { scenario } });
-      await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
-      await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/correct`, headers: manager });
-      const scheduled = await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/fail-next-poll`, headers: manager, payload: { fault } });
+      await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/reset`, headers: manager });
+      await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
+      await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/prepare`, headers: manager, payload: { scenario } });
+      await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
+      await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/correct`, headers: manager });
+      const scheduled = await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/fail-next-poll`, headers: manager, payload: { fault } });
       assert.equal(scheduled.json().expectedResult.incidentLifecycle, "open");
       assert.match(scheduled.json().expectedResult.conversation, /conservan/);
-      const failed = await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+      const failed = await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
       assert.notEqual(failed.json().result.status, "healthy");
       const latest = (await instance.app.inject({ method: "GET", url: "/api/incidents", headers: manager })).json().incidents
         .filter((incident: { ruleCode: string }) => incident.ruleCode === code)
         .sort((a: { occurrence: number }, b: { occurrence: number }) => b.occurrence - a.occurrence)[0];
       assert.equal(latest.lifecycle, "open", `${code} ${fault} must preserve the open incident`);
-      await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+      await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
     }
   }
 });
@@ -122,7 +122,7 @@ it("exposes the threshold matrix, A05 reason variants, and one shared factory cl
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
   const prepare = async (code: string, scenario: string) => {
-    const response = await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/prepare`, headers: manager, payload: { scenario } });
+    const response = await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/prepare`, headers: manager, payload: { scenario } });
     assert.equal(response.statusCode, 200, response.body);
     return response.json();
   };
@@ -149,14 +149,14 @@ it("exposes the threshold matrix, A05 reason variants, and one shared factory cl
     }
   }
 
-  const rejectedSuppression = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/prepare", headers: manager, payload: { scenario: "suppressed_by_a07" } });
+  const rejectedSuppression = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A03/prepare", headers: manager, payload: { scenario: "suppressed_by_a07" } });
   assert.equal(rejectedSuppression.statusCode, 400, "A07 must not suppress A03");
 
   const before = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios;
   const a02Cases = before.find((item: { ruleCode: string }) => item.ruleCode === "A02").supportedCases;
   assert.deepEqual(a02Cases, ["clean_baseline", "before_threshold", "at_threshold", "past_threshold"]);
   const a03Clock = before.find((item: { ruleCode: string }) => item.ruleCode === "A03").scenarioClock.currentAt;
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 1 } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/advance-time", headers: manager, payload: { minutes: 1 } });
   const after = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios;
   assert.equal(Date.parse(after.find((item: { ruleCode: string }) => item.ruleCode === "A03").scenarioClock.currentAt), Date.parse(a03Clock) + 60_000, "all rules use one shared factory clock");
 });
@@ -166,23 +166,23 @@ it("keeps A05 open until weighing and movement are both complete in either order
   const manager = { authorization: "Bearer mock:plant-manager" };
 
   for (const [index, corrections] of [[1, ["weigh", "move"]], [2, ["move", "weigh"]]] as const) {
-    await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/prepare", headers: manager, payload: { scenario: "past_threshold_both" } });
-    await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
+    await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/prepare", headers: manager, payload: { scenario: "past_threshold_both" } });
+    await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
 
-    const partial = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/correct", headers: manager, payload: { correction: corrections[0] } });
+    const partial = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/correct", headers: manager, payload: { correction: corrections[0] } });
     assert.equal(partial.statusCode, 200, partial.body);
     assert.equal(partial.json().sourceState.evaluation.status, "triggered");
     assert.equal(partial.json().expectedResult.awaitingPoll, true);
     assert.deepEqual(partial.json().sourceState.evaluation.reasons, [corrections[0] === "weigh" ? "still_at_machine" : "not_weighed"]);
-    const preserved = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
+    const preserved = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
     assert.equal(preserved.json().scenario.expectedResult.awaitingPoll, false);
     assert.equal(preserved.json().scenario.actualMonitor.latestIncident.lifecycle, "open");
     assert.equal(preserved.json().scenario.actualMonitor.latestIncident.occurrence, index);
 
-    const complete = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/correct", headers: manager, payload: { correction: corrections[1] } });
+    const complete = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/correct", headers: manager, payload: { correction: corrections[1] } });
     assert.equal(complete.json().sourceState.evaluation.status, "clear");
     assert.equal(complete.json().expectedResult.incidentLifecycle, "resolved");
-    const resolved = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
+    const resolved = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
     assert.equal(resolved.json().scenario.actualMonitor.latestIncident.lifecycle, "resolved");
     assert.equal(resolved.json().scenario.actualMonitor.latestIncident.occurrence, index);
   }
@@ -201,9 +201,9 @@ it("applies the complete persistent, duplicate, visible-integration, and resolut
 
   for (const code of ["A02", "A03", "A05"] as const) {
     const scenario = code === "A05" ? "past_threshold_both" : "past_threshold";
-    assert.equal((await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/recur`, headers: manager })).statusCode, 409);
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/prepare`, headers: manager, payload: { scenario } });
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+    assert.equal((await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/recur`, headers: manager })).statusCode, 409);
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/prepare`, headers: manager, payload: { scenario } });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
     const first = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === code);
     assert.equal(first.comparison.matches, true, `${code} expected and actual state must match`);
     assert.equal(first.actualMonitor.openIncidentCount, 1);
@@ -216,19 +216,19 @@ it("applies the complete persistent, duplicate, visible-integration, and resolut
     const conversation = await instance.app.inject({ method: "GET", url: `/api/incidents/${incidentId}/conversation`, headers: manager });
     assert.equal(conversation.statusCode, 200, `${code} must be reachable through the incident conversation route`);
 
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
     const repeated = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === code);
     for (const field of ["incidentCount", "evidenceCount", "routingDecisionCount", "routingDeliveryCount", "conversationLinkCount", "alertMessageCount"] as const) {
       assert.equal(repeated.actualMonitor[field], first.actualMonitor[field], `${code} ${field} must not grow on an unchanged poll`);
     }
 
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/correct`, headers: manager });
-    await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/poll`, headers: manager });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/correct`, headers: manager });
+    await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/poll`, headers: manager });
     let state = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === code);
     assert.equal(state.actualMonitor.latestIncident.lifecycle, "resolved");
     assert.equal(state.actualMonitor.openIncidentCount, 0);
 
-    assert.equal((await instance.app.inject({ method: "POST", url: `/api/dev/scenarios/${code}/recur`, headers: manager })).statusCode, 409);
+    assert.equal((await instance.app.inject({ method: "POST", url: `/api/dev/test/scenarios/${code}/recur`, headers: manager })).statusCode, 409);
   }
 });
 
@@ -236,38 +236,38 @@ it("covers A02 transfer-end routing, independent A03 evaluation, A05 reel routin
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
-  let polled = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
+  let polled = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   assert.equal(polled.json().scenario.actualMonitor.primaryRole, "warehouse_dispatcher");
   let routing = await instance.app.inject({ method: "GET", url: `/api/internal/routing/${polled.json().scenario.actualMonitor.latestIncident.id}`, headers: manager });
   assert.equal(routing.json().requiredRoles.includes("warehouse_dispatcher"), true);
   assert.equal(routing.json().requiredRoles.includes("warehouse_supervisor"), true);
   assert.equal(routing.json().requiredRoles.includes("machine_operator"), true);
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/prepare", headers: manager, payload: { scenario: "past_threshold" } });
-  const a03 = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A03/prepare", headers: manager, payload: { scenario: "past_threshold" } });
+  const a03 = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A03/poll", headers: manager });
   assert.equal(a03.json().scenario.actualMonitor.latestIncident.lifecycle, "open");
   assert.equal(a03.json().scenario.sourceState.rows[0].strongerA07, undefined);
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/prepare", headers: manager, payload: { scenario: "past_threshold_produced" } });
-  polled = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/prepare", headers: manager, payload: { scenario: "past_threshold_produced" } });
+  polled = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
   routing = await instance.app.inject({ method: "GET", url: `/api/internal/routing/${polled.json().scenario.actualMonitor.latestIncident.id}`, headers: manager });
   assert.equal(routing.json().primaryRole, "process_operator");
   assert.equal(routing.json().requiredRoles.includes("process_supervisor"), true);
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/correct", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/prepare", headers: manager, payload: { scenario: "past_threshold_remnant" } });
-  polled = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/correct", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/prepare", headers: manager, payload: { scenario: "past_threshold_remnant" } });
+  polled = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
   routing = await instance.app.inject({ method: "GET", url: `/api/internal/routing/${polled.json().scenario.actualMonitor.latestIncident.id}`, headers: manager });
   assert.equal(routing.json().requiredRoles.includes("warehouse_dispatcher"), true);
   assert.equal(routing.json().requiredRoles.includes("warehouse_supervisor"), true);
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/correct", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/prepare", headers: manager, payload: { scenario: "movement_started" } });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/correct", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/prepare", headers: manager, payload: { scenario: "movement_started" } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   const open = (await instance.app.inject({ method: "GET", url: "/api/incidents?status=open", headers: manager })).json().incidents;
   assert.equal(open.some((item: { ruleCode: string }) => item.ruleCode === "A02"), true);
   assert.equal(open.some((item: { ruleCode: string }) => item.ruleCode === "A05"), false);
@@ -284,10 +284,10 @@ it("keeps source actions isolated from Monitor tables and separates simulated fr
     (SELECT COUNT(*)::int FROM monitor_conversation_incident) AS conversations,
     (SELECT COUNT(*)::int FROM monitor_message) AS messages`);
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
-  const advanced = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 60 } });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/correct", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/fail-next-poll", headers: manager, payload: { fault: "partial" } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
+  const advanced = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/advance-time", headers: manager, payload: { minutes: 60 } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/correct", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A03/fail-next-poll", headers: manager, payload: { fault: "partial" } });
   const after = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios;
   const a03After = after.find((item: { ruleCode: string }) => item.ruleCode === "A03");
   assert.equal(Date.parse(a03After.scenarioClock.currentAt) - Date.parse(a03.scenarioClock.currentAt), 60 * 60_000);
@@ -314,60 +314,41 @@ it("keeps evidence, routing, conversations, and alert cards idempotent and rejec
     assignment("leader", "Rosa Paredes", "Líder técnico", "operation", ["Impresión"]),
   ] } });
 
-  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/recur", headers: manager })).statusCode, 409);
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/recur", headers: manager })).statusCode, 409);
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   const first = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
   assert.equal(first.actualMonitor.openIncidentCount, 1);
   assert.equal(first.actualMonitor.conversationLinkCount, 1);
   assert.equal(first.actualMonitor.alertMessageCount, 1);
 
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   const repeated = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
   for (const field of ["incidentCount", "evidenceCount", "routingDecisionCount", "routingDeliveryCount", "conversationLinkCount", "alertMessageCount"] as const) {
     assert.equal(repeated.actualMonitor[field], first.actualMonitor[field], `${field} must not grow on an unchanged successful poll`);
   }
 
-  const injected = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/inject-monitor-fault", headers: manager, payload: { fault: "missing_open_incident_downstream" } });
-  assert.equal(injected.statusCode, 200, injected.body);
-  assert.equal(injected.json().incidentId, repeated.actualMonitor.latestIncident.id);
-  const incomplete = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
-  assert.equal(incomplete.comparison.matches, false, "missing conversation results cannot be labeled as matching");
-  assert.equal(incomplete.comparison.mismatches.includes("conversation_link_count"), true);
-  assert.equal(incomplete.comparison.mismatches.includes("alert_message_count"), true);
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
-  const repaired = (await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
-  assert.equal(repaired.actualMonitor.conversationLinkCount, 1, "an unchanged successful poll repairs a missing conversation link");
-  assert.equal(repaired.actualMonitor.alertMessageCount, 1, "an unchanged successful poll repairs a missing alert card");
-  assert.equal(repaired.actualMonitor.routingDecisionCount, first.actualMonitor.routingDecisionCount, "downstream repair reuses the routing decision");
-  assert.equal(repaired.actualMonitor.routingDeliveryCount, first.actualMonitor.routingDeliveryCount, "downstream repair does not duplicate deliveries");
-
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/correct", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
-  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/recur", headers: manager })).statusCode, 409);
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/correct", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
+  assert.equal((await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/recur", headers: manager })).statusCode, 409);
 });
 
-it("validates population preparation and Monitor fault-injection contracts", async () => {
+it("validates isolated population preparation contracts", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
-  const invalidPopulation = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare-population", headers: manager, payload: { population: "a02_mixed", keys: [1, 1, 2] } });
+  const invalidPopulation = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/prepare-population", headers: manager, payload: { population: "a02_mixed", keys: [1, 1, 2] } });
   assert.equal(invalidPopulation.statusCode, 400);
   assert.equal(invalidPopulation.json().error, "invalid_scenario_population");
-  const unavailablePopulation = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare-population", headers: manager, payload: { population: "a02_mixed", keys: [1, 2, 3] } });
+  const unavailablePopulation = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/prepare-population", headers: manager, payload: { population: "a02_mixed", keys: [1, 2, 3] } });
   assert.equal(unavailablePopulation.statusCode, 501);
-  const invalidFault = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/inject-monitor-fault", headers: manager, payload: { fault: "delete_everything" } });
-  assert.equal(invalidFault.statusCode, 400);
-  const missingIncident = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/inject-monitor-fault", headers: manager, payload: { fault: "missing_open_incident_downstream" } });
-  assert.equal(missingIncident.statusCode, 409);
-  assert.equal(missingIncident.json().error, "open_incident_unavailable");
 });
 
 it("publishes a simulator-created incident as a cursor-recoverable committed change", async () => {
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/trigger", headers: manager });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/advance-time", headers: manager, payload: { minutes: 31 } });
-  await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/poll", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/trigger", headers: manager });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/advance-time", headers: manager, payload: { minutes: 31 } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/poll", headers: manager });
   const changes = await instance.app.inject({ method: "GET", url: "/api/changes?after=0", headers: manager });
   assert.equal(changes.statusCode, 200);
   const matching = changes.json().changes.filter((change: { payload: { incidentId?: string } }) => change.payload.incidentId);
@@ -378,7 +359,7 @@ it("publishes a simulator-created incident as a cursor-recoverable committed cha
 
 it("rejects an unknown scenario rule with a usable 404", async () => {
   const instance = await scenarioServer();
-  const response = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A99/poll", headers: { authorization: "Bearer mock:plant-manager" } });
+  const response = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A99/poll", headers: { authorization: "Bearer mock:plant-manager" } });
   assert.equal(response.statusCode, 404);
   assert.equal(response.json().error, "unknown_scenario_rule");
 });
@@ -398,9 +379,6 @@ it("protects and validates the canonical source-action endpoint", async () => {
   const unavailable = await instance.app.inject({ method: "POST", url: "/api/dev/source-actions", headers: manager, payload: { actionId: "a03.close_work_order", key: 12198 } });
   assert.equal(unavailable.statusCode, 501);
   assert.equal(unavailable.json().error, "source_action_source_unavailable");
-  const retired = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/source-action", headers: manager, payload: { action: "close_work_order" } });
-  assert.equal(retired.statusCode, 410);
-  assert.equal(retired.json().error, "source_action_endpoint_replaced");
 });
 
 it("exposes durable experiment history and ordered runtime events to administrators", async () => {
@@ -408,24 +386,39 @@ it("exposes durable experiment history and ordered runtime events to administrat
   const manager = { authorization: "Bearer mock:plant-manager" };
   const operator = { authorization: "Bearer mock:machine-operator" };
   assert.equal((await instance.app.inject({ url: "/api/dev/scenario-experiments", headers: operator })).statusCode, 403);
+  const scenarioState = (await instance.app.inject({ url: "/api/dev/scenarios", headers: manager })).json().scenarios;
+  for (const item of scenarioState) {
+    const sourceKey = item.ruleCode === "A02" ? item.sourceState.rows[0].materialFlowDetailId : item.ruleCode === "A03" ? item.sourceState.rows[0].workOrderId : item.sourceState.rows[0].articleSerialId;
+    assert.equal(item.records[0].key, sourceKey);
+  }
   const created = await instance.app.inject({
     method: "POST", url: "/api/dev/scenario-runtime", headers: manager,
     payload: {
       name: "Historial visible", businessTime: "2026-08-01T09:00:00.000Z", runId: "api-visible-history",
-      manifestVersion: "stage5.v1", frequencies: { A02: 1, A03: 60, A05: 60 },
+      manifestVersion: "stage5.v2", pollingFrequencyMinutes: 1,
     },
   });
   assert.equal(created.statusCode, 200, created.body);
   const experimentId = created.json().experiment.id;
+  assert.equal(created.json().experiment.status, "paused");
+  const started = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/pause`, headers: manager, payload: { paused: false } });
+  assert.equal(started.statusCode, 200, started.body);
   const advanced = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/advance`, headers: manager, payload: { minutes: 1 } });
   assert.equal(advanced.statusCode, 200, advanced.body);
+  const captured = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-experiments/${experimentId}/snapshots`, headers: manager, payload: { label: "after-first-cycle" } });
+  assert.equal(captured.statusCode, 200, captured.body);
+  assert.equal(captured.json().label, "after-first-cycle");
+  assert.deepEqual(new Set(Object.keys(captured.json().payload)), new Set(["clock", "monitor", "poll", "source"]));
   const list = await instance.app.inject({ url: "/api/dev/scenario-experiments?limit=20", headers: manager });
   assert.equal(list.statusCode, 200, list.body);
   assert.equal(list.json().items[0].id, experimentId);
   const detail = await instance.app.inject({ url: `/api/dev/scenario-experiments/${experimentId}`, headers: manager });
   assert.equal(detail.statusCode, 200, detail.body);
   assert.equal(detail.json().experiment.runId, "api-visible-history");
-  assert.deepEqual(detail.json().events.map((event: { eventType: string }) => event.eventType), ["poll_started", "poll_completed"]);
+  assert.equal(detail.json().snapshots.items[0].id, captured.json().id);
+  assert.deepEqual(detail.json().events.map((event: { eventType: string }) => event.eventType), [
+    "poll_started", "poll_completed", "poll_started", "poll_completed", "poll_started", "poll_completed",
+  ]);
   assert.ok(detail.json().events.every((event: { businessTime: string; recordedAt: string }) => event.businessTime !== event.recordedAt));
   const invalidCursor = await instance.app.inject({ url: `/api/dev/scenario-experiments/${experimentId}?snapshotCursor=invalid`, headers: manager });
   assert.equal(invalidCursor.statusCode, 400);
@@ -444,6 +437,11 @@ it("executes the canonical source-action endpoint against test_database and rest
   });
   servers.push(instance);
   const manager = { authorization: "Bearer mock:plant-manager" };
+  const experiment = await instance.app.inject({ method: "POST", url: "/api/dev/scenario-runtime", headers: manager, payload: {
+    name: "Connected editable history", businessTime: "2026-08-01T09:00:00.000Z", runId: "connected-editable-history",
+    manifestVersion: "stage5.v2", pollingFrequencyMinutes: 3,
+  } });
+  assert.equal(experiment.statusCode, 200, experiment.body);
   const connections = await TestDatabaseConnections.create(repositoryRoot);
   const repository = await TestDatabaseScenarioRepository.create(connections, repositoryRoot);
   const workOrderId = repository.fixtureIds.A03.workOrderId;
@@ -459,7 +457,7 @@ it("executes the canonical source-action endpoint against test_database and rest
     await connections.writer.execute(`UPDATE ordenes_trabajo SET fecha_inicio_ejecucion=UTC_TIMESTAMP(),fecha_fin_ejecucion=NULL,
       fecha_eliminacion=NULL,eliminado=0 WHERE id=?`, [workOrderId]);
     await connections.writer.execute("UPDATE orden_trabajo_materiales SET cantidad_consumida=0 WHERE id=?", [materialId]);
-    const retiredCorrection = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/correct", headers: { authorization: "Bearer mock:plant-manager" } });
+    const retiredCorrection = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A03/correct", headers: { authorization: "Bearer mock:plant-manager" } });
     assert.equal(retiredCorrection.statusCode, 410);
     assert.equal(retiredCorrection.json().error, "source_action_endpoint_replaced");
     const response = await instance.app.inject({
@@ -475,19 +473,33 @@ it("executes the canonical source-action endpoint against test_database and rest
 
     const dispatch = await instance.app.inject({
       method: "POST", url: "/api/dev/source-actions", headers: { authorization: "Bearer mock:plant-manager" },
-      payload: { actionId: "a02.prepare_dispatch", key: flowId },
+      payload: { actionId: "a02.prepare_dispatch", key: flowId, input: { materialName: "Material laboratorio editable", quantity: 2 } },
     });
     assert.equal(dispatch.statusCode, 200, dispatch.body);
-    const dispatchRows = dispatch.json().scenario.sourceState.rows as Array<{ materialFlowDetailId: number; state: string }>;
+    const dispatchRows = dispatch.json().scenario.sourceState.rows as Array<{ materialFlowDetailId: number; state: string; materialName: string; quantity: number }>;
     createdFlowId = Number(dispatchRows.find((row) => Number(row.materialFlowDetailId) !== flowId)?.materialFlowDetailId);
     assert.ok(Number.isSafeInteger(createdFlowId) && createdFlowId > 0);
     assert.equal(dispatchRows.find((row) => Number(row.materialFlowDetailId) === createdFlowId)?.state, "TRANSITO");
+    assert.equal(dispatchRows.find((row) => Number(row.materialFlowDetailId) === createdFlowId)?.materialName, "Material laboratorio editable");
+    assert.equal(Number(dispatchRows.find((row) => Number(row.materialFlowDetailId) === createdFlowId)?.quantity), 2);
+    assert.equal(dispatch.json().scenario.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, true);
+    assert.equal(dispatch.json().scenario.records.find((record: { key: number }) => record.key === flowId)?.pendingPoll, false);
     const receipt = await instance.app.inject({
       method: "POST", url: "/api/dev/source-actions", headers: { authorization: "Bearer mock:plant-manager" },
       payload: { actionId: "a02.receive", key: createdFlowId },
     });
     assert.equal(receipt.statusCode, 200, receipt.body);
     assert.equal((receipt.json().scenario.sourceState.rows as Array<{ materialFlowDetailId: number; state: string }>).find((row) => Number(row.materialFlowDetailId) === createdFlowId)?.state, "RECIBIDO");
+    const history = await instance.app.inject({ url: "/api/dev/scenario-operational-history?code=A02&timingOutcome=on_time", headers: manager });
+    assert.equal(history.statusCode, 200, history.body);
+    assert.equal(history.json().items.some((item: { sourceKey: number; experimentName: string }) => item.sourceKey === createdFlowId && item.experimentName === "Connected editable history"), true);
+    const experimentId = experiment.json().experiment.id;
+    await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/pause`, headers: manager, payload: { paused: false } });
+    const advanced = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/advance`, headers: manager, payload: { minutes: 3 } });
+    assert.equal(advanced.statusCode, 200, advanced.body);
+    const afterPoll = await instance.app.inject({ url: "/api/dev/scenarios", headers: manager });
+    const a02AfterPoll = afterPoll.json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
+    assert.equal(a02AfterPoll.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, false);
 
     const [negativeBefore] = await connections.writer.query(`SELECT id,estado,fecha_recepcion,fecha_actualizacion
       FROM flujo_materiales_detalles WHERE id=?`, [createdFlowId]);
@@ -527,7 +539,7 @@ it("executes the canonical source-action endpoint against test_database and rest
       FROM ordenes_trabajo work_order JOIN orden_trabajo_materiales material ON material.id=? WHERE work_order.id=?`, [materialId, workOrderId]);
     assert.deepEqual(closedAfter, closedBefore, "closed A03 API attempts must not reactivate work or remove consumption");
 
-    const recurrence = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A05/recur", headers: manager });
+    const recurrence = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A05/recur", headers: manager });
     assert.equal(recurrence.statusCode, 409, recurrence.body);
     assert.equal(recurrence.json().error, "source_lifecycle_recurrence_unsupported");
   } finally {
@@ -565,11 +577,11 @@ it("prepares connected mixed populations through the shared API and restores eve
   servers.push(instance);
   const manager = { authorization: "Bearer mock:plant-manager" };
   try {
-    const a02 = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/prepare-population", headers: manager, payload: { population: "a02_mixed", keys: a02Keys } });
+    const a02 = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/prepare-population", headers: manager, payload: { population: "a02_mixed", keys: a02Keys } });
     assert.equal(a02.statusCode, 200, a02.body);
     assert.equal(a02.json().sourceState.rowCount, 3);
     assert.equal(a02.json().sourceState.rows.filter((row: { state: string }) => row.state === "TRANSITO").length, 2);
-    const a03 = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A03/prepare-population", headers: manager, payload: { population: "a03_mixed", keys: a03Keys } });
+    const a03 = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A03/prepare-population", headers: manager, payload: { population: "a03_mixed", keys: a03Keys } });
     assert.equal(a03.statusCode, 200, a03.body);
     assert.equal(a03.json().sourceState.rowCount, 4);
     assert.equal(a03.json().sourceState.rows.filter((row: { active: boolean }) => row.active).length, 3);
@@ -594,12 +606,12 @@ it("reroutes an open Phase 4B incident when the roster changes and protects diag
   const instance = await scenarioServer();
   const manager = { authorization: "Bearer mock:plant-manager" };
   const operator = { authorization: "Bearer mock:machine-operator" };
-  const trigger = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/trigger", headers: manager });
+  const trigger = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/trigger", headers: manager });
   assert.equal(trigger.statusCode, 200, trigger.body);
-  const advance = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
+  const advance = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
   assert.equal(advance.statusCode, 200, advance.body);
   const incidentAt = advance.json().scenarioClock.currentAt;
-  const poll = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  const poll = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   assert.equal(poll.statusCode, 200, poll.body);
   assert.equal(poll.json().scenario.scenarioClock.currentAt, incidentAt);
   const incident = (await instance.app.inject({ url: "/api/incidents", headers: manager })).json().incidents

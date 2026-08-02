@@ -103,7 +103,7 @@ try {
   const created = await acceptance.runtime.create({
     name: "Step 8 same-runtime browser acceptance",
     businessTime: "2026-08-02T08:00:00.000Z",
-    frequencies: { A02: 60, A03: 60, A05: 60 },
+    pollingFrequencyMinutes: 60,
     identity: { runId, manifestVersion: declaration.manifestVersion, sourceActionContractVersion: declaration.sourceActionContractVersion },
   });
   const experiment = created.experiment;
@@ -118,9 +118,9 @@ try {
   createdSourceId = Number(action.json().execution.sourceDiff.after.find((record: { key: number }) => Number(record.key) !== templateId)?.key);
   assert.ok(createdSourceId > 0);
   acceptance.source.replaceTracked!("A02", [createdSourceId]);
-  const advance = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/advance-time", headers: manager, payload: { minutes: 31 } });
-  assert.equal(advance.statusCode, 200, advance.body);
-  const poll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+  await acceptance.runtime.pause(experiment.id, false);
+  await acceptance.runtime.advance(experiment.id, 31);
+  const poll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   assert.equal(poll.statusCode, 200, poll.body);
   const cycleId = String(poll.json().result.cycleId);
   const incident = await server.database.queryOne("SELECT id FROM monitor_incident WHERE rule_code='A02' ORDER BY opened_at DESC LIMIT 1");

@@ -16,7 +16,7 @@ const root = resolve(import.meta.dirname, "../../..");
 describe("Stage 5 source-action contracts", () => {
   it("loads the complete versioned A02/A03/A05 registry", async () => {
     const registry = await loadSourceActionContracts(root);
-    assert.equal(registry.contractVersion, "1.0.0");
+    assert.equal(registry.contractVersion, "1.1.0");
     assert.equal(registry.sourceDatabase, "test_database");
     assert.equal(registry.writerIdentity, "alertas_fake");
     assert.deepEqual(registry.actions.map((action) => action.id), [...sourceActionIds]);

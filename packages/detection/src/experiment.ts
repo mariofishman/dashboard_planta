@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseRuntime } from "@monitor/database";
 import type { ScenarioRuleCode } from "./simulator.js";
 
-export type ExperimentSpeed = 1 | 2 | 3 | 60;
-export type ExperimentFrequencies = Record<ScenarioRuleCode, number>;
+export type ExperimentSecondsPerSimulatedMinute = number;
+export type ExperimentPollingFrequencyMinutes = number;
 
 export interface ScenarioExperimentIdentity {
   runId: string;
@@ -19,8 +19,8 @@ export interface ScenarioExperiment {
   name: string;
   status: "running" | "paused" | "completed";
   businessTime: string;
-  speed: ExperimentSpeed;
-  frequencies: ExperimentFrequencies;
+  secondsPerSimulatedMinute: ExperimentSecondsPerSimulatedMinute;
+  pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes;
   nextDue: Record<ScenarioRuleCode, string>;
   createdAt: string;
   updatedAt: string;
@@ -75,6 +75,11 @@ export interface ScenarioRuntimeEvent {
   recordedAt: string;
 }
 
+export interface ScenarioOperationalEvent extends ScenarioRuntimeEvent {
+  experimentName: string;
+  experimentStatus: ScenarioExperiment["status"];
+}
+
 export interface ScenarioActiveRuntime {
   experiment: ScenarioExperiment | null;
   nextTickAt: string | null;
@@ -109,8 +114,8 @@ function experimentRow(row: Record<string, unknown>): ScenarioExperiment {
   return {
     ...row,
     businessTime: isoTimestamp(row.businessTime),
-    speed: Number(row.speed),
-    frequencies: parseObject(row.frequencies),
+    secondsPerSimulatedMinute: Number(row.secondsPerSimulatedMinute),
+    pollingFrequencyMinutes: Number(row.pollingFrequencyMinutes),
     nextDue: parseObject(row.nextDue),
     createdAt: isoTimestamp(row.createdAt),
     updatedAt: isoTimestamp(row.updatedAt),
@@ -158,22 +163,24 @@ function snapshotPayload(value: Record<string, unknown>, schemaVersion: string):
 export class ScenarioExperimentRepository {
   constructor(private readonly database: DatabaseRuntime) {}
 
-  async create(name: string, businessTime: string, frequencies: ExperimentFrequencies, identity: ScenarioExperimentIdentity): Promise<ScenarioExperiment> {
+  async create(name: string, businessTime: string, pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes, identity: ScenarioExperimentIdentity): Promise<ScenarioExperiment> {
     if (!name.trim() || !Number.isFinite(Date.parse(businessTime)) || !nonEmpty(identity.runId)
       || !nonEmpty(identity.manifestVersion) || !nonEmpty(identity.sourceActionContractVersion)) throw new Error("invalid_scenario_experiment");
-    for (const code of codes) if (!Number.isInteger(frequencies[code]) || frequencies[code] < 1) throw new Error("invalid_scenario_frequency");
-    const nextDue = Object.fromEntries(codes.map((code) => [code, new Date(Date.parse(businessTime) + frequencies[code] * 60_000).toISOString()])) as Record<ScenarioRuleCode, string>;
+    if (!Number.isInteger(pollingFrequencyMinutes) || pollingFrequencyMinutes < 1 || pollingFrequencyMinutes > 99) throw new Error("invalid_scenario_frequency");
+    const nextDue = Object.fromEntries(codes.map((code) => [code, new Date(Date.parse(businessTime) + pollingFrequencyMinutes * 60_000).toISOString()])) as Record<ScenarioRuleCode, string>;
     const id = randomUUID();
     await this.database.execute(`INSERT INTO monitor_scenario_experiment
-      (id,run_id,manifest_version,source_action_contract_version,name,status,business_time,speed,frequencies,next_due)
-      VALUES ($1,$2,$3,$4,$5,'running',$6,1,$7::jsonb,$8::jsonb)`,
-    [id, identity.runId.trim(), identity.manifestVersion.trim(), identity.sourceActionContractVersion.trim(), name.trim(), businessTime, json(frequencies), json(nextDue)]);
+      (id,run_id,manifest_version,source_action_contract_version,name,status,business_time,speed,frequencies,next_due,seconds_per_simulated_minute,polling_frequency_minutes)
+      VALUES ($1,$2,$3,$4,$5,'paused',$6,1,$7::jsonb,$8::jsonb,1,$9)`,
+    [id, identity.runId.trim(), identity.manifestVersion.trim(), identity.sourceActionContractVersion.trim(), name.trim(), businessTime,
+      json({ A02: pollingFrequencyMinutes, A03: pollingFrequencyMinutes, A05: pollingFrequencyMinutes }), json(nextDue), pollingFrequencyMinutes]);
     return this.get(id);
   }
 
   async get(id: string): Promise<ScenarioExperiment> {
     const row = await this.database.queryOne(`SELECT id,run_id AS "runId",manifest_version AS "manifestVersion",
-      source_action_contract_version AS "sourceActionContractVersion",name,status,business_time AS "businessTime",speed,frequencies,next_due AS "nextDue",
+      source_action_contract_version AS "sourceActionContractVersion",name,status,business_time AS "businessTime",
+      seconds_per_simulated_minute AS "secondsPerSimulatedMinute",polling_frequency_minutes AS "pollingFrequencyMinutes",next_due AS "nextDue",
       created_at AS "createdAt",updated_at AS "updatedAt" FROM monitor_scenario_experiment WHERE id=$1`, [id]);
     if (!row.id) throw new Error("scenario_experiment_not_found");
     return experimentRow(row);
@@ -183,7 +190,8 @@ export class ScenarioExperimentRepository {
     const limit = historyLimit(options.limit);
     const cursor = historyCursor(options.cursor);
     const rows = await this.database.queryAll(`SELECT id,run_id AS "runId",manifest_version AS "manifestVersion",
-      source_action_contract_version AS "sourceActionContractVersion",name,status,business_time AS "businessTime",speed,frequencies,next_due AS "nextDue",
+      source_action_contract_version AS "sourceActionContractVersion",name,status,business_time AS "businessTime",
+      seconds_per_simulated_minute AS "secondsPerSimulatedMinute",polling_frequency_minutes AS "pollingFrequencyMinutes",next_due AS "nextDue",
       created_at AS "createdAt",updated_at AS "updatedAt" FROM monitor_scenario_experiment
       ${cursor ? "WHERE (created_at,id)<($2::timestamptz,$3::uuid)" : ""} ORDER BY created_at DESC,id DESC LIMIT $1`,
     cursor ? [limit + 1, cursor[0], cursor[1]] : [limit + 1]);
@@ -192,17 +200,22 @@ export class ScenarioExperimentRepository {
     return { items, nextCursor: rows.length > limit && last ? encodeCursor(cursorTimestamp(last.createdAt), last.id) : null };
   }
 
-  async configure(id: string, speed: ExperimentSpeed, frequencies: ExperimentFrequencies): Promise<ScenarioExperiment> {
-    if (![1, 2, 3, 60].includes(speed)) throw new Error("invalid_scenario_speed");
+  async configure(id: string, secondsPerSimulatedMinute: ExperimentSecondsPerSimulatedMinute, pollingFrequencyMinutes: ExperimentPollingFrequencyMinutes): Promise<ScenarioExperiment> {
+    if (!Number.isInteger(secondsPerSimulatedMinute) || secondsPerSimulatedMinute < 1 || secondsPerSimulatedMinute > 60) throw new Error("invalid_scenario_speed");
     const current = await this.get(id);
-    for (const code of codes) if (!Number.isInteger(frequencies[code]) || frequencies[code] < 1) throw new Error("invalid_scenario_frequency");
-    const nextDue = Object.fromEntries(codes.map((code) => [code, new Date(Date.parse(current.businessTime) + frequencies[code] * 60_000).toISOString()])) as Record<ScenarioRuleCode, string>;
-    await this.database.execute("UPDATE monitor_scenario_experiment SET speed=$2,frequencies=$3::jsonb,next_due=$4::jsonb,updated_at=now() WHERE id=$1", [id, speed, json(frequencies), json(nextDue)]);
+    if (!Number.isInteger(pollingFrequencyMinutes) || pollingFrequencyMinutes < 1 || pollingFrequencyMinutes > 99) throw new Error("invalid_scenario_frequency");
+    const nextDue = Object.fromEntries(codes.map((code) => [code, new Date(Date.parse(current.businessTime) + pollingFrequencyMinutes * 60_000).toISOString()])) as Record<ScenarioRuleCode, string>;
+    await this.database.execute(`UPDATE monitor_scenario_experiment SET seconds_per_simulated_minute=$2,polling_frequency_minutes=$3,
+      frequencies=$4::jsonb,next_due=$5::jsonb,updated_at=now() WHERE id=$1`, [id, secondsPerSimulatedMinute, pollingFrequencyMinutes,
+      json({ A02: pollingFrequencyMinutes, A03: pollingFrequencyMinutes, A05: pollingFrequencyMinutes }), json(nextDue)]);
     return this.get(id);
   }
 
   async pause(id: string, paused = true): Promise<ScenarioExperiment> {
-    await this.database.execute("UPDATE monitor_scenario_experiment SET status=$2,updated_at=now() WHERE id=$1", [id, paused ? "paused" : "running"]);
+    const current = await this.get(id);
+    const nextDue = paused ? current.nextDue : Object.fromEntries(codes.map((code) => [code,
+      new Date(Date.parse(current.businessTime) + current.pollingFrequencyMinutes * 60_000).toISOString()])) as Record<ScenarioRuleCode, string>;
+    await this.database.execute("UPDATE monitor_scenario_experiment SET status=$2,next_due=$3::jsonb,updated_at=now() WHERE id=$1", [id, paused ? "paused" : "running", json(nextDue)]);
     return this.get(id);
   }
 
@@ -263,6 +276,17 @@ export class ScenarioExperimentRepository {
     } as unknown as ScenarioRuntimeEvent));
   }
 
+  async operationalEvents(ruleCode: ScenarioRuleCode): Promise<ScenarioOperationalEvent[]> {
+    const rows = await this.database.queryAll(`SELECT event.id,event.experiment_id AS "experimentId",event.event_type AS "eventType",
+      event.rule_code AS "ruleCode",event.business_time AS "businessTime",event.payload,event.recorded_at AS "recordedAt",
+      experiment.name AS "experimentName",experiment.status AS "experimentStatus"
+      FROM monitor_scenario_runtime_event event JOIN monitor_scenario_experiment experiment ON experiment.id=event.experiment_id
+      WHERE event.event_type='source_action' AND event.rule_code=$1 ORDER BY event.recorded_at DESC,event.sequence DESC`, [ruleCode]);
+    return rows.map((row) => ({
+      ...row, payload: parseObject(row.payload), businessTime: isoTimestamp(row.businessTime), recordedAt: isoTimestamp(row.recordedAt),
+    } as unknown as ScenarioOperationalEvent));
+  }
+
   async planAdvance(id: string, minutes: number): Promise<{ experiment: ScenarioExperiment; targetTime: string; due: ScenarioDuePoll[] }> {
     const experiment = await this.get(id);
     if (!Number.isInteger(minutes) || minutes < 0) throw new Error("invalid_scenario_advance");
@@ -272,7 +296,7 @@ export class ScenarioExperimentRepository {
       let dueAt = experiment.nextDue[ruleCode];
       while (Date.parse(dueAt) <= Date.parse(targetTime)) {
         due.push({ ruleCode, dueAt });
-        dueAt = new Date(Date.parse(dueAt) + experiment.frequencies[ruleCode] * 60_000).toISOString();
+        dueAt = new Date(Date.parse(dueAt) + experiment.pollingFrequencyMinutes * 60_000).toISOString();
       }
     }
     due.sort((left, right) => Date.parse(left.dueAt) - Date.parse(right.dueAt) || codes.indexOf(left.ruleCode) - codes.indexOf(right.ruleCode));
@@ -289,7 +313,7 @@ export class ScenarioExperimentRepository {
   async completeDue(id: string, due: ScenarioDuePoll): Promise<ScenarioExperiment> {
     const current = await this.get(id);
     if (current.nextDue[due.ruleCode] !== due.dueAt || Date.parse(due.dueAt) > Date.parse(current.businessTime)) throw new Error("invalid_scenario_due_poll");
-    const nextDue = { ...current.nextDue, [due.ruleCode]: new Date(Date.parse(due.dueAt) + current.frequencies[due.ruleCode] * 60_000).toISOString() };
+    const nextDue = { ...current.nextDue, [due.ruleCode]: new Date(Date.parse(due.dueAt) + current.pollingFrequencyMinutes * 60_000).toISOString() };
     await this.database.execute("UPDATE monitor_scenario_experiment SET next_due=$2::jsonb,updated_at=now() WHERE id=$1", [id, json(nextDue)]);
     return this.get(id);
   }
@@ -304,7 +328,7 @@ export class ScenarioExperimentRepository {
     for (const code of codes) {
       if (Date.parse(nextDue[code]) <= Date.parse(businessTime)) {
         due.push(code);
-        do nextDue[code] = new Date(Date.parse(nextDue[code]) + current.frequencies[code] * 60_000).toISOString();
+        do nextDue[code] = new Date(Date.parse(nextDue[code]) + current.pollingFrequencyMinutes * 60_000).toISOString();
         while (Date.parse(nextDue[code]) <= Date.parse(businessTime));
       }
     }

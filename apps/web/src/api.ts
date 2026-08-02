@@ -71,6 +71,7 @@ export interface ScenarioStatus {
   sourceChangedAt: string;
   pendingFault: ScenarioFault | null;
   sourceState: { rowCount: number; rows: Record<string, unknown>[]; evaluation: { status: "clear" | "triggered"; reasons: string[] } };
+  records: ScenarioRecordStatus[];
   pollerState: { pendingFault: ScenarioFault | null; latestPoll: { status: string; sourceRevision: string | null; complete: boolean; fullEvaluation: boolean; errorCode: string | null; finishedAt: string } | null };
   expectedResult: { sourceCondition: "clear" | "triggered"; reasons: string[]; awaitingPoll: boolean; nextPoll: string; incidentLifecycle: string | null; occurrence: number | null; expectedCounts: { incidents: number; openIncidents: number; conversationLinks: number; alertMessages: number }; dashboard: string; conversation: string };
   actualMonitor: {
@@ -83,10 +84,24 @@ export interface ScenarioStatus {
   detectionDelayMilliseconds: number | null;
 }
 
+export interface ScenarioRecordStatus {
+  key: number;
+  row: Record<string, unknown>;
+  pendingPoll: boolean;
+  expected: { triggered: boolean; reasons: string[]; incidentLifecycle: string | null };
+  actual: {
+    incident: { id: string; lifecycle: IncidentLifecycle; occurrence: number; openedAt: string; resolvedAt: string | null; updatedAt: string } | null;
+    evidenceCount: number; deliveryCount: number; conversationCount: number; messageCount: number; latestChangeCursor: number | null;
+    deliveries: { id: string; recipientName: string; channel: string; state: string; sentAt: string | null }[];
+    conversationIds: string[]; messageIds: string[]; detectionDelayMilliseconds: number | null;
+  };
+  comparison: { matches: boolean; mismatches: string[] };
+}
+
 export interface ScenarioExperiment {
   id: string; runId: string; manifestVersion: string; sourceActionContractVersion: string; name: string;
-  status: "running" | "paused" | "completed"; businessTime: string; speed: 1 | 2 | 3 | 60;
-  frequencies: Record<ScenarioRuleCode, number>; nextDue: Record<ScenarioRuleCode, string>; createdAt: string; updatedAt: string;
+  status: "running" | "paused" | "completed"; businessTime: string; secondsPerSimulatedMinute: number;
+  pollingFrequencyMinutes: number; nextDue: Record<ScenarioRuleCode, string>; createdAt: string; updatedAt: string;
 }
 export interface ScenarioRuntimeStatus {
   experiment: ScenarioExperiment | null; automaticScheduling: boolean; realMillisecondsPerSimulatedMinute: number | null; nextAutomaticTickAt: string | null;
@@ -106,6 +121,13 @@ export interface ScenarioExperimentDetail {
   snapshots: { items: ScenarioSnapshot[]; nextCursor: string | null };
   results: { items: ScenarioAcceptanceResult[]; nextCursor: string | null };
   events: ScenarioRuntimeEvent[];
+}
+export interface ScenarioOperationalHistoryItem {
+  id: string; experimentId: string; experimentName: string; experimentStatus: ScenarioExperiment["status"];
+  ruleCode: ScenarioRuleCode; sourceKey: number; firstAt: string; lastAt: string; recordedAt: string;
+  actionIds: string[]; eventCount: number; input: Record<string, unknown> | null; evidence: Record<string, unknown>;
+  sourceState: string; durationMinutes: number | null; timingOutcome: "active" | "on_time" | "late";
+  terminalOutcome: string | null; incidentOutcome: IncidentLifecycle | "none";
 }
 
 export class ApiRequestError extends Error {
@@ -274,6 +296,30 @@ export async function scenarioRuntime(): Promise<ScenarioRuntimeStatus> {
   return responseJson<ScenarioRuntimeStatus>(await fetch("/api/dev/scenario-runtime", { credentials: "include" }));
 }
 
+export async function createScenarioExperiment(input: { name: string; businessTime: string; pollingFrequencyMinutes: number; runId: string; manifestVersion: string }): Promise<ScenarioRuntimeStatus> {
+  return responseJson(await fetch("/api/dev/scenario-runtime", {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(input),
+  }));
+}
+
+export async function configureScenarioExperiment(id: string, secondsPerSimulatedMinute: number, pollingFrequencyMinutes: number): Promise<ScenarioRuntimeStatus> {
+  return responseJson(await fetch(`/api/dev/scenario-runtime/${id}/config`, {
+    method: "PUT", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ secondsPerSimulatedMinute, pollingFrequencyMinutes }),
+  }));
+}
+
+export async function pauseScenarioExperiment(id: string, paused: boolean): Promise<ScenarioRuntimeStatus> {
+  return responseJson(await fetch(`/api/dev/scenario-runtime/${id}/pause`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ paused }),
+  }));
+}
+
+export async function advanceScenarioExperiment(id: string, minutes: number): Promise<{ experiment: ScenarioExperiment }> {
+  return responseJson(await fetch(`/api/dev/scenario-runtime/${id}/advance`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ minutes }),
+  }));
+}
+
 export async function scenarioExperiments(cursor?: string): Promise<{ items: ScenarioExperiment[]; nextCursor: string | null }> {
   const query = new URLSearchParams({ limit: "20" });
   if (cursor) query.set("cursor", cursor);
@@ -285,17 +331,28 @@ export async function scenarioExperiment(id: string, cursors: { snapshotCursor?:
   return responseJson<ScenarioExperimentDetail>(await fetch(`/api/dev/scenario-experiments/${id}${query.size ? `?${query}` : ""}`, { credentials: "include" }));
 }
 
-export async function scenarioAction(code: ScenarioRuleCode, action: "reset" | "trigger" | "prepare" | "advance-time" | "fail-next-poll" | "poll" | "recur", body?: Record<string, unknown>): Promise<ScenarioStatus> {
-  const init: RequestInit = { method: "POST", credentials: "include" };
-  if (body) { init.headers = { "content-type": "application/json" }; init.body = JSON.stringify(body); }
-  const result = await responseJson<ScenarioStatus | { scenario: ScenarioStatus }>(await fetch(`/api/dev/scenarios/${code}/${action}`, init));
-  return "scenario" in result ? result.scenario : result;
+export async function captureScenarioSnapshot(id: string, label: string): Promise<ScenarioSnapshot> {
+  return responseJson<ScenarioSnapshot>(await fetch(`/api/dev/scenario-experiments/${id}/snapshots`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }),
+  }));
 }
 
-export async function scenarioSourceAction(actionId: SourceActionId, key: number, authority?: A02SourceAuthority): Promise<ScenarioStatus> {
-  const payload = { actionId, key, ...(authority ? { authority } : {}) };
+export async function failScenarioNextPoll(code: ScenarioRuleCode): Promise<ScenarioStatus> {
+  return responseJson<ScenarioStatus>(await fetch(`/api/dev/test/scenarios/${code}/fail-next-poll`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ fault: "timeout" }),
+  }));
+}
+
+export async function scenarioSourceAction(actionId: SourceActionId, key: number, authority?: A02SourceAuthority, input?: Record<string, string | number>): Promise<ScenarioStatus> {
+  const payload = { actionId, key, ...(authority ? { authority } : {}), ...(input ? { input } : {}) };
   const result = await responseJson<{ scenario: ScenarioStatus }>(await fetch("/api/dev/source-actions", {
     method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
   }));
   return result.scenario;
+}
+
+export async function scenarioOperationalHistory(code: ScenarioRuleCode, filters: Record<string, string> = {}): Promise<ScenarioOperationalHistoryItem[]> {
+  const query = new URLSearchParams({ code, ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) });
+  const result = await responseJson<{ items: ScenarioOperationalHistoryItem[] }>(await fetch(`/api/dev/scenario-operational-history?${query}`, { credentials: "include" }));
+  return result.items;
 }

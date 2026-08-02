@@ -133,7 +133,7 @@ export async function assertCanonicalSourceActionIsolation(): Promise<void> {
       assignment("warehouse-supervisor", "Sofía Ramos", "Supervisor de almacén", "warehouse_group", [], "Materias primas"),
     ] } });
     assert.equal(roster.statusCode, 200, roster.body);
-    const seededPoll = await instance.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const seededPoll = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(seededPoll.statusCode, 200, seededPoll.body);
     assert.equal(seededPoll.json().result.status, "healthy");
     const conversations = await instance.app.inject({ method: "GET", url: "/api/conversations", headers: manager });

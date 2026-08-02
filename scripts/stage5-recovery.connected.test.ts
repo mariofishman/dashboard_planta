@@ -75,9 +75,10 @@ test("7.4b interrupts after incident commit and preserves the complete committed
     const experiment = await acceptance.runtime.create({
       name: "Step 7.4b after-incident-commit interruption",
       businessTime: "2026-08-01T18:00:00.000Z",
-      frequencies: { A02: 60, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 60,
       identity: { runId: "step-7-4b", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
+    await acceptance.runtime.pause(experiment.experiment!.id, false);
     const action = await server.app.inject({
       method: "POST", url: "/api/dev/source-actions", headers: manager,
       payload: { actionId: "a02.prepare_dispatch", key: templateId },
@@ -110,7 +111,7 @@ test("7.4b interrupts after incident commit and preserves the complete committed
     assert.equal(roster.statusCode, 200, roster.body);
 
     const armed = await acceptance.interruptions.arm("after_incident_commit");
-    const poll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const poll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(poll.statusCode, 200, poll.body);
     assert.equal(poll.json().result.status, "healthy");
     const cycleId = String(poll.json().result.cycleId);
@@ -221,9 +222,10 @@ test("7.4c later healthy polls repair downstream once without deleting interrupt
     const experiment = await acceptance.runtime.create({
       name: "Step 7.4c downstream repair",
       businessTime: "2026-08-01T19:00:00.000Z",
-      frequencies: { A02: 60, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 60,
       identity: { runId: "step-7-4c", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
+    await acceptance.runtime.pause(experiment.experiment!.id, false);
     const action = await server.app.inject({
       method: "POST", url: "/api/dev/source-actions", headers: manager,
       payload: { actionId: "a02.prepare_dispatch", key: templateId },
@@ -256,7 +258,7 @@ test("7.4c later healthy polls repair downstream once without deleting interrupt
     assert.equal(roster.statusCode, 200, roster.body);
 
     const armed = await acceptance.interruptions.arm("after_incident_commit");
-    const interruptedPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const interruptedPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(interruptedPoll.statusCode, 200, interruptedPoll.body);
     const interruptedCycleId = String(interruptedPoll.json().result.cycleId);
     const fired = await acceptance.interruptions.get(armed.id);
@@ -283,7 +285,7 @@ test("7.4c later healthy polls repair downstream once without deleting interrupt
       changes: await server.database.queryAll("SELECT event_id AS id FROM monitor_change_event WHERE scope_type='plant' AND payload->>'incidentId'=$1 ORDER BY cursor", [incidentId]),
     };
 
-    const repairPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const repairPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(repairPoll.statusCode, 200, repairPoll.body);
     assert.equal(repairPoll.json().result.status, "healthy");
     const repairCycleId = String(repairPoll.json().result.cycleId);
@@ -313,7 +315,7 @@ test("7.4c later healthy polls repair downstream once without deleting interrupt
     assert.deepEqual(repaired.transitions, committedIds.transitions);
     assert.deepEqual(repaired.changes, committedIds.changes);
 
-    const repeatedPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const repeatedPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(repeatedPoll.statusCode, 200, repeatedPoll.body);
     const repeatedCycleId = String(repeatedPoll.json().result.cycleId);
     assert.equal(new Set([interruptedCycleId, repairCycleId, repeatedCycleId]).size, 3);
@@ -390,9 +392,10 @@ test("7.5b-7.5d repair routing and delivery interruptions and preserve completed
     const experiment = await acceptance.runtime.create({
       name: "Step 7.5 routing and delivery recovery",
       businessTime: "2026-08-01T20:00:00.000Z",
-      frequencies: { A02: 60, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 60,
       identity: { runId: "step-7-5", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
+    await acceptance.runtime.pause(experiment.experiment!.id, false);
     const action = await server.app.inject({
       method: "POST", url: "/api/dev/source-actions", headers: manager,
       payload: { actionId: "a02.prepare_dispatch", key: templateId },
@@ -425,7 +428,7 @@ test("7.5b-7.5d repair routing and delivery interruptions and preserve completed
     assert.equal(roster.statusCode, 200, roster.body);
 
     const beforeDecision = await acceptance.interruptions.arm("before_routing_decision");
-    const firstPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const firstPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(firstPoll.statusCode, 200, firstPoll.body);
     const firstCycleId = String(firstPoll.json().result.cycleId);
     const beforeFired = await acceptance.interruptions.get(beforeDecision.id);
@@ -439,7 +442,7 @@ test("7.5b-7.5d repair routing and delivery interruptions and preserve completed
     { decisions: 0, deliveries: 0 });
 
     const afterDecision = await acceptance.interruptions.arm("after_routing_decision");
-    const secondPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const secondPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(secondPoll.statusCode, 200, secondPoll.body);
     const secondCycleId = String(secondPoll.json().result.cycleId);
     assert.notEqual(secondCycleId, firstCycleId);
@@ -459,7 +462,7 @@ test("7.5b-7.5d repair routing and delivery interruptions and preserve completed
     { decisions: 1, exact_decision: 1, deliveries: 0, conversations: 0, messages: 0 });
 
     const beforeDelivery = await acceptance.interruptions.arm("before_delivery_creation");
-    const thirdPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const thirdPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(thirdPoll.statusCode, 200, thirdPoll.body);
     const thirdCycleId = String(thirdPoll.json().result.cycleId);
     const beforeDeliveryFired = await acceptance.interruptions.get(beforeDelivery.id);
@@ -469,7 +472,7 @@ test("7.5b-7.5d repair routing and delivery interruptions and preserve completed
     assert.equal(Number((await server.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_notification_delivery WHERE incident_id=$1", [incidentId])).count), 0);
 
     const afterDelivery = await acceptance.interruptions.arm("after_delivery_creation");
-    const fourthPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const fourthPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(fourthPoll.statusCode, 200, fourthPoll.body);
     const fourthCycleId = String(fourthPoll.json().result.cycleId);
     const afterDeliveryFired = await acceptance.interruptions.get(afterDelivery.id);
@@ -483,7 +486,7 @@ test("7.5b-7.5d repair routing and delivery interruptions and preserve completed
     assert.equal(partialDeliveries[0]!.id, afterDeliveryFired?.context.deliveryId);
     assert.equal(partialDeliveries[0]!.routingDecisionId, decisionId);
 
-    const repairPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const repairPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(repairPoll.statusCode, 200, repairPoll.body);
     const repairCycleId = String(repairPoll.json().result.cycleId);
     assert.equal(new Set([firstCycleId, secondCycleId, thirdCycleId, fourthCycleId, repairCycleId]).size, 5);
@@ -502,7 +505,7 @@ test("7.5b-7.5d repair routing and delivery interruptions and preserve completed
       deliveries: await server.database.queryAll(`SELECT id,routing_decision_id AS "routingDecisionId",recipient_key AS "recipientKey",channel,state,attempt_count AS "attemptCount"
         FROM monitor_notification_delivery WHERE incident_id=$1 ORDER BY recipient_key,id`, [incidentId]),
     };
-    const replayPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const replayPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(replayPoll.statusCode, 200, replayPoll.body);
     const replayCycleId = String(replayPoll.json().result.cycleId);
     assert.equal(new Set([firstCycleId, secondCycleId, thirdCycleId, fourthCycleId, repairCycleId, replayCycleId]).size, 6);
@@ -577,9 +580,10 @@ test("7.6b-7.6c repair new and reused conversation transactions without duplicat
     const experiment = await acceptance.runtime.create({
       name: "Step 7.6b new-conversation recovery",
       businessTime: "2026-08-01T21:00:00.000Z",
-      frequencies: { A02: 60, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 60,
       identity: { runId: "step-7-6b", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
+    await acceptance.runtime.pause(experiment.experiment!.id, false);
     const action = await server.app.inject({
       method: "POST", url: "/api/dev/source-actions", headers: manager,
       payload: { actionId: "a02.prepare_dispatch", key: templateId },
@@ -624,7 +628,7 @@ test("7.6b-7.6c repair new and reused conversation transactions without duplicat
     for (const point of points) {
       const armed = await acceptance.interruptions.arm(point);
       interruptionIds.push(armed.id);
-      const poll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+      const poll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
       assert.equal(poll.statusCode, 200, poll.body);
       const cycleId = String(poll.json().result.cycleId);
       cycleIds.push(cycleId);
@@ -656,7 +660,7 @@ test("7.6b-7.6c repair new and reused conversation transactions without duplicat
     assert.equal(new Set(cycleIds).size, 4);
     assert.equal(new Set(interruptionIds).size, 4);
 
-    const repairPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const repairPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(repairPoll.statusCode, 200, repairPoll.body);
     const repairCycleId = String(repairPoll.json().result.cycleId);
     assert.equal(new Set([...cycleIds, repairCycleId]).size, 5);
@@ -688,7 +692,7 @@ test("7.6b-7.6c repair new and reused conversation transactions without duplicat
     assert.equal(repaired.links[0]!.conversationId, conversationId);
     assert.equal(repaired.messages[0]!.conversationId, conversationId);
 
-    const replayPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const replayPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(replayPoll.statusCode, 200, replayPoll.body);
     const replayCycleId = String(replayPoll.json().result.cycleId);
     assert.equal(new Set([...cycleIds, repairCycleId, replayCycleId]).size, 6);
@@ -711,9 +715,11 @@ test("7.6b-7.6c repair new and reused conversation transactions without duplicat
       Number(record.key) !== templateId && Number(record.key) !== createdFlowId)?.key);
     assert.ok(secondFlowId > 0);
     acceptance.source.replaceTracked("A02", [createdFlowId, secondFlowId]);
-    await acceptance.runtime.configure(experiment.experiment!.id, 60, { A02: 31, A03: 999, A05: 999 });
+    await acceptance.runtime.configure(experiment.experiment!.id, 60, 99);
     const reuseInterruption = await acceptance.interruptions.arm("after_alert_message_creation");
     await acceptance.runtime.advance(experiment.experiment!.id, 31);
+    const reuseInterruptedPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
+    assert.equal(reuseInterruptedPoll.statusCode, 200, reuseInterruptedPoll.body);
     const reuseFired = await acceptance.interruptions.get(reuseInterruption.id);
     assert.equal(reuseFired?.status, "fired");
     const reuseCycleId = String(reuseFired?.context.cycleId);
@@ -744,7 +750,7 @@ test("7.6b-7.6c repair new and reused conversation transactions without duplicat
     assert.equal(Number((await server.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_conversation_incident WHERE incident_id=$1", [secondIncidentId])).count), 0);
     assert.equal(Number((await server.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_message WHERE client_command_id=$1", [`incident:${secondIncidentId}`])).count), 0);
 
-    const reuseRepairPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const reuseRepairPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(reuseRepairPoll.statusCode, 200, reuseRepairPoll.body);
     const reuseRepairCycleId = String(reuseRepairPoll.json().result.cycleId);
     assert.notEqual(reuseRepairCycleId, reuseCycleId);
@@ -766,7 +772,7 @@ test("7.6b-7.6c repair new and reused conversation transactions without duplicat
     assert.ok(reused.messages.some((message) => message.clientCommandId === `incident:${secondIncidentId}`));
     assert.ok(reused.messages.some((message) => message.id === repaired.messages[0]!.id));
 
-    const reuseReplayPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const reuseReplayPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(reuseReplayPoll.statusCode, 200, reuseReplayPoll.body);
     const reuseReplayed = {
       conversations: await server.database.queryAll("SELECT id,participant_fingerprint AS \"participantFingerprint\" FROM monitor_conversation ORDER BY id"),
@@ -843,9 +849,10 @@ test("7.7c recovers connected incident publication exactly once across both inte
     const experiment = await acceptance.runtime.create({
       name: "Step 7.7c connected incident publication recovery",
       businessTime: "2026-08-01T22:00:00.000Z",
-      frequencies: { A02: 60, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 60,
       identity: { runId: "step-7-7c", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
+    await acceptance.runtime.pause(experiment.experiment!.id, false);
     const prepareDispatch = async () => {
       const response = await server.app.inject({
         method: "POST", url: "/api/dev/source-actions", headers: manager,
@@ -890,7 +897,7 @@ test("7.7c recovers connected incident publication exactly once across both inte
     const liveIncidents: Record<string, unknown>[] = [];
     socket.on("incident.changed", (event: Record<string, unknown>) => liveIncidents.push(event));
     const before = await acceptance.interruptions.arm("before_change_publication");
-    const beforePoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const beforePoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(beforePoll.statusCode, 200, beforePoll.body);
     const beforeFired = await acceptance.interruptions.get(before.id);
     assert.equal(beforeFired?.status, "fired");
@@ -917,14 +924,16 @@ test("7.7c recovers connected incident publication exactly once across both inte
     [firstIncidentId, firstChange.eventId, `incident:${firstIncidentId}`]);
     assert.deepEqual(firstObjects, { incidents: 1, evidence: 1, transitions: 1, changes: 1, routing: 0, conversations: 0, messages: 0 });
 
-    const repairFirst = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const repairFirst = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(repairFirst.statusCode, 200, repairFirst.body);
     secondFlowId = await prepareDispatch();
     acceptance.source.replaceTracked("A02", [firstFlowId, secondFlowId]);
-    await acceptance.runtime.configure(experiment.experiment!.id, 60, { A02: 31, A03: 999, A05: 999 });
+    await acceptance.runtime.configure(experiment.experiment!.id, 60, 99);
     const after = await acceptance.interruptions.arm("after_change_publication");
     const liveAfter = new Promise<Record<string, unknown>>((resolveEvent) => socket!.once("incident.changed", resolveEvent));
     await acceptance.runtime.advance(experiment.experiment!.id, 31);
+    const secondInterruptedPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
+    assert.equal(secondInterruptedPoll.statusCode, 200, secondInterruptedPoll.body);
     const emittedSecond = await liveAfter;
     const afterFired = await acceptance.interruptions.get(after.id);
     assert.equal(afterFired?.status, "fired");
@@ -1030,9 +1039,10 @@ test("7.7d recovers authorized alert-message publication without duplicating dow
     const experiment = await acceptance.runtime.create({
       name: "Step 7.7d connected alert-message publication recovery",
       businessTime: "2026-08-01T23:00:00.000Z",
-      frequencies: { A02: 60, A03: 60, A05: 60 },
+      pollingFrequencyMinutes: 60,
       identity: { runId: "step-7-7d", manifestVersion: "stage5.v1", sourceActionContractVersion: "stage5-source-actions.v1" },
     });
+    await acceptance.runtime.pause(experiment.experiment!.id, false);
     const prepareDispatch = async () => {
       const response = await server.app.inject({
         method: "POST", url: "/api/dev/source-actions", headers: manager,
@@ -1076,7 +1086,7 @@ test("7.7d recovers authorized alert-message publication without duplicating dow
     unauthorizedSocket = await connectTestSocket(baseUrl, "mock:machine-operator");
 
     const incidentBefore = await acceptance.interruptions.arm("before_change_publication");
-    const incidentPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const incidentPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(incidentPoll.statusCode, 200, incidentPoll.body);
     const incidentBeforeFired = await acceptance.interruptions.get(incidentBefore.id);
     assert.equal(incidentBeforeFired?.context.channel, "incident.changed");
@@ -1086,7 +1096,7 @@ test("7.7d recovers authorized alert-message publication without duplicating dow
     const liveMessages: Record<string, unknown>[] = [];
     authorizedSocket.on("message.created", (event: Record<string, unknown>) => liveMessages.push(event));
     const beforeMessage = await acceptance.interruptions.arm("before_change_publication");
-    const repairFirst = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const repairFirst = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(repairFirst.statusCode, 200, repairFirst.body);
     const beforeMessageFired = await acceptance.interruptions.get(beforeMessage.id);
     assert.equal(beforeMessageFired?.status, "fired");
@@ -1113,9 +1123,11 @@ test("7.7d recovers authorized alert-message publication without duplicating dow
 
     secondFlowId = await prepareDispatch();
     acceptance.source.replaceTracked("A02", [firstFlowId, secondFlowId]);
-    await acceptance.runtime.configure(experiment.experiment!.id, 60, { A02: 31, A03: 999, A05: 999 });
+    await acceptance.runtime.configure(experiment.experiment!.id, 60, 99);
     const secondIncidentBefore = await acceptance.interruptions.arm("before_change_publication");
     await acceptance.runtime.advance(experiment.experiment!.id, 31);
+    const secondIncidentPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
+    assert.equal(secondIncidentPoll.statusCode, 200, secondIncidentPoll.body);
     const secondIncidentFired = await acceptance.interruptions.get(secondIncidentBefore.id);
     assert.equal(secondIncidentFired?.status, "fired");
     assert.equal(secondIncidentFired?.context.channel, "incident.changed");
@@ -1124,7 +1136,7 @@ test("7.7d recovers authorized alert-message publication without duplicating dow
 
     const afterMessage = await acceptance.interruptions.arm("after_change_publication");
     const emittedMessagePromise = new Promise<Record<string, unknown>>((resolveEvent) => authorizedSocket!.once("message.created", resolveEvent));
-    const repairSecond = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const repairSecond = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(repairSecond.statusCode, 200, repairSecond.body);
     const emittedSecondMessage = await emittedMessagePromise;
     const afterMessageFired = await acceptance.interruptions.get(afterMessage.id);
@@ -1173,7 +1185,7 @@ test("7.7d recovers authorized alert-message publication without duplicating dow
     for (const event of authorizedReplayAll.messages) appliedMessageCursors.add(Number(event.cursor));
     assert.deepEqual(appliedMessageCursors, new Set([Number(firstMessageChange.cursor), Number(secondMessageChange.cursor)]));
 
-    const repeatPoll = await server.app.inject({ method: "POST", url: "/api/dev/scenarios/A02/poll", headers: manager });
+    const repeatPoll = await server.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
     assert.equal(repeatPoll.statusCode, 200, repeatPoll.body);
     assert.deepEqual(await server.database.queryAll(`SELECT i.id AS "incidentId",rd.id AS "routingDecisionId",
       d.id AS "deliveryId",ci.conversation_id AS "conversationId",m.id AS "messageId",ce.event_id AS "messageEventId"

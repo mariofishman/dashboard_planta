@@ -11,7 +11,7 @@ const seed: Stage5BrowserRuntimeSeed = {
   runtimeId: "browser-runtime-1",
   captureNonce: "abcdefghijklmnop",
   manifestVersion: "2.0.0",
-  sourceActionContractVersion: "1.0.0",
+  sourceActionContractVersion: "1.1.0",
   startedAt: "2026-08-02T13:00:00.000Z",
 };
 
@@ -24,8 +24,8 @@ function dependencies(overrides: { activeExperimentId?: string; runId?: string }
     name: "Browser diagnostic",
     status: "running" as const,
     businessTime: seed.startedAt,
-    speed: 1 as const,
-    frequencies: { A02: 1, A03: 1, A05: 1 },
+    secondsPerSimulatedMinute: 1,
+    pollingFrequencyMinutes: 1,
     nextDue: { A02: seed.startedAt, A03: seed.startedAt, A05: seed.startedAt },
     createdAt: seed.startedAt,
     updatedAt: seed.startedAt,
