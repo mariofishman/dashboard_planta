@@ -90,7 +90,7 @@ The audit did not find evidence of a second active A02, A03, or A05 rule path. T
 | Automatic scheduling, restart, interruption, and recovery without manual row deletion | Complete and pushed. |
 | Step 8.1 browser runtime and evidence foundation | Complete and reusable. |
 | Previous Step 8.2–8.7 browser run | Preserved as diagnostic history, not accepted evidence. |
-| Step 8B passive Dashboard and Chat previews | Not started. |
+| Step 8B passive Dashboard and Chat previews | Complete. The user accepted the implemented preview integration and focused UI changes on 2026-08-02, and automated passivity checks pass. Technical identifiers and links belong in Step 8C evidence rather than the preview. |
 | Step 8C final 34-case execution | Not started. |
 | Steps 9–12 final repeatability, review, commit, and merge | Not started. |
 
@@ -725,7 +725,7 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 
 | Remaining step | Outcome | Required approval or stop |
 | --- | --- | --- |
-| 8B | Add passive Dashboard and Chat previews to the approved laboratory and review them with the user. | User must accept the usefulness, accuracy, and passivity of the previews. |
+| 8B | Add passive Dashboard and Chat previews to the approved laboratory and review them with the user. | Complete. Focused human acceptance and automated passivity evidence were recorded on 2026-08-02. |
 | 8C | Execute the exact 34 connected acceptance cases and produce final result records. | All 34 must pass; no failures, skips, extras, or excluded cases. |
 | 9 | Run the complete finished version twice from clean starting states. | Both runs must pass without changing the tested version or reusing evidence. |
 | 10 | Review all final evidence and decide whether Stage 5 is genuinely complete. | Stop with documentation uncommitted for user review. |
@@ -739,17 +739,19 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 **Work:**
 
 - Add a read-only Dashboard preview showing the real Monitor incidents from the selected experiment.
-- Add a read-only Chat preview showing the real conversations and alert messages for the selected user.
-- Display the applicable incident, conversation, message, delivery, receipt, and update-position identifiers so the previews can be matched to the connected run.
-- Provide links to open the real Dashboard and Chat when interactive inspection is needed.
+- Add a read-only Chat preview showing the real alert messages and recipients for the selected transaction.
 - Read existing Monitor information; do not recalculate Dashboard or Chat business rules inside the laboratory.
 - Prevent the previews from sending messages, changing incidents or routing, marking conversations read, creating receipts, changing presence, or changing source state.
-- Compare the relevant Monitor records before and after loading, refreshing, switching users, and following links to prove the previews caused no change.
+- Compare the relevant Monitor records before and after loading, refreshing, changing selections or identities, and switching preview surfaces to prove the previews caused no change.
 - Perform one focused human review and record the user's acceptance or the exact correction required.
 
-**Done when:** Both previews show the correct connected objects and identifiers, their links work, automated checks prove no side effects, and the user accepts the integration.
+**Done when:** Both previews show the correct connected information, automated checks prove no side effects, and the user accepts the integration.
 
 **If a defect is found:** Correct it, rerun the affected Step 8 check, and repeat the focused human review. Do not continue to Step 8C with an unresolved mismatch.
+
+**Focused human acceptance — 2026-08-02:** The user explicitly accepted the Step 8B implementation and UI changes. This satisfies the focused human-review requirement for the reviewed version. The user subsequently decided that technical identifiers and direct links are unnecessary in the preview; Step 8C must record that traceability in its evidence instead.
+
+**Automated passivity evidence — 2026-08-02:** Repeated alert-preview opening, refresh, A02/A03/A05 selection changes, identity changes, session reads, Dashboard reads, and authenticated socket open/resume/disconnect left the complete Monitor table snapshot unchanged. A non-administrator remains unable to access the laboratory message projection. The connected run also left checksums unchanged for all five reset-managed `test_database` tables: `articulo_serial`, `balanza_carga_detalle_registros`, `flujo_materiales_detalles`, `orden_trabajo_materiales`, and `ordenes_trabajo`. Focused frontend checks confirm that preview selection and surface switching remain local and that the alert preview exposes only the read-only scenario-message API.
 
 ### Step 8C — Execute the exact 34 connected acceptance cases
 
@@ -762,6 +764,7 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 - Do not run or substitute the excluded cases `A02-08`, `A03-06`, or `A05-07`.
 - Give each case its own experiment, setup, result, cleanup, and restoration proof.
 - Trace each applicable result from the laboratory action, through the changed source record and read-only Monitor read, to the incident, routing, Dashboard, conversation, message, and Chat result.
+- Record the applicable incident, conversation, message, delivery, receipt, and update-position identifiers, together with direct Dashboard and Chat URLs, in the machine-readable and human-readable evidence rather than displaying them in the Step 8B preview.
 - Include the scheduling, recovery, browser, and Step 8B evidence required for that case.
 - Generate one machine-readable result file and one equivalent human-readable result file from the same validated information.
 - Fail the complete execution if any case is missing, duplicated, skipped, failed, excluded, tied to another runtime, missing evidence, or not cleaned up correctly.

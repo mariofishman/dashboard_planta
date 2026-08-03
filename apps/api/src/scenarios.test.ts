@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { afterEach, it } from "node:test";
+import { io as connectSocket } from "socket.io-client";
 import { TestDatabaseConnections, TestDatabaseScenarioRepository } from "@monitor/detection";
 import { loadConfig } from "./config.js";
 import { buildMonitorServer, type MonitorServer } from "./server.js";
@@ -30,10 +31,131 @@ async function scenarioServer() {
 
 afterEach(async () => { await Promise.all(servers.splice(0).map((instance) => instance.close())); });
 
+async function snapshotScenarioPreviewState(instance: MonitorServer) {
+  const tables = await instance.database.queryAll(`SELECT tablename
+    FROM pg_tables
+    WHERE schemaname='public' AND tablename LIKE 'monitor_%'
+    ORDER BY tablename`);
+  const snapshot: Record<string, unknown[]> = {};
+  for (const { tablename } of tables) {
+    const table = String(tablename);
+    if (!/^monitor_[a-z0-9_]+$/.test(table)) throw new Error(`unsafe_snapshot_table_${table}`);
+    snapshot[table] = await instance.database.queryAll(`SELECT row_to_json(snapshot_row) AS row
+      FROM (SELECT * FROM ${table}) snapshot_row
+      ORDER BY row_to_json(snapshot_row)::text`);
+  }
+  return snapshot;
+}
+
 it("locks the scenario laboratory out of production", () => {
   assert.throws(() => loadConfig({
     nodeEnv: "production", cookieSecret: "phase-4b-production-secret-with-enough-entropy", allowMockAuth: false, enableScenarioLab: true,
   }), /Scenario laboratory is local development and test only/);
+});
+
+it("keeps alert and dashboard previews passive across open, refresh, selection, and surface reads", async () => {
+  const instance = await scenarioServer();
+  const manager = { authorization: "Bearer mock:plant-manager" };
+  const operator = { authorization: "Bearer mock:machine-operator" };
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/prepare", headers: manager, payload: { scenario: "past_threshold" } });
+  await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
+  const scenarioResponse = await instance.app.inject({ method: "GET", url: "/api/dev/scenarios", headers: manager });
+  assert.equal(scenarioResponse.statusCode, 200, scenarioResponse.body);
+  const a02 = scenarioResponse.json().scenarios.find((scenario: { ruleCode: string }) => scenario.ruleCode === "A02");
+  const selected = a02.records.find((record: { actual?: { incident?: { id?: string } } }) => record.actual?.incident?.id);
+  assert.ok(Number.isSafeInteger(selected?.key), "the preview test requires one poll-created A02 source selection");
+
+  const before = await snapshotScenarioPreviewState(instance);
+  const alertUrl = `/api/dev/scenario-alert-messages?ruleCode=A02&sourceKey=${selected.key}`;
+  const otherSelectionUrl = `/api/dev/scenario-alert-messages?ruleCode=A02&sourceKey=${Number(selected.key) + 1}`;
+  for (const url of [
+    "/api/session",
+    alertUrl,
+    alertUrl,
+    otherSelectionUrl,
+    alertUrl,
+    "/api/session",
+    "/api/incidents?",
+    "/api/incidents?",
+  ]) {
+    const response = await instance.app.inject({ method: "GET", url, headers: manager });
+    assert.equal(response.statusCode, 200, `${url}: ${response.body}`);
+  }
+  assert.equal((await instance.app.inject({ method: "GET", url: "/api/session", headers: operator })).statusCode, 200);
+  assert.equal((await instance.app.inject({ method: "GET", url: "/api/incidents?", headers: operator })).statusCode, 200);
+  assert.equal((await instance.app.inject({ method: "GET", url: alertUrl, headers: operator })).statusCode, 403,
+    "a non-admin identity cannot turn the laboratory preview into a broader data read");
+  await instance.app.listen({ host: "127.0.0.1", port: 0 });
+  const address = instance.app.server.address();
+  if (!address || typeof address === "string") throw new Error("preview_passivity_server_did_not_bind");
+  const socket = connectSocket(`http://127.0.0.1:${address.port}`, {
+    auth: { token: "mock:plant-manager" }, transports: ["websocket"],
+  });
+  try {
+    await new Promise<Record<string, unknown>>((resolveReady, reject) => {
+      socket.once("session.ready", resolveReady);
+      socket.once("connect_error", reject);
+    });
+    const resumed = new Promise<Record<string, unknown>>((resolveReady) => socket.once("session.ready", resolveReady));
+    socket.emit("sync.resume", { cursor: 0 });
+    await resumed;
+  } finally {
+    socket.close();
+  }
+  const after = await snapshotScenarioPreviewState(instance);
+  assert.deepEqual(after, before,
+    "preview opening, refreshing, selecting another record, and switching to Dashboard must not mutate Monitor or simulator state");
+});
+
+it("keeps the connected preview passive against test_database", { skip: !connectedLabAvailable }, async () => {
+  const connections = await TestDatabaseConnections.create(repositoryRoot);
+  const source = await TestDatabaseScenarioRepository.create(connections, repositoryRoot);
+  const instance = await buildMonitorServer({
+    config: {
+      nodeEnv: "test", cookieSecret: "phase-6-preview-passivity-secret-with-enough-entropy", allowMockAuth: true,
+      enableScenarioLab: true, scenarioSource: "test_database", databaseMode: "pglite", pgliteDataDir: "memory://",
+    },
+  });
+  servers.push(instance);
+  const manager = { authorization: "Bearer mock:plant-manager" };
+  const checksumTables = [
+    "articulo_serial", "balanza_carga_detalle_registros", "flujo_materiales_detalles", "orden_trabajo_materiales", "ordenes_trabajo",
+  ];
+  const checksums = async () => {
+    const [rows] = await connections.writer.query(`CHECKSUM TABLE ${checksumTables.map((table) => `test_database.\`${table}\``).join(",")}`);
+    return rows;
+  };
+  try {
+    const latestSourceTimestamp = await source.latestSourceTimestamp();
+    const created = await instance.app.inject({ method: "POST", url: "/api/dev/scenario-runtime", headers: manager, payload: {
+      name: "Preview passivity", businessTime: latestSourceTimestamp, runId: "preview-passivity",
+      manifestVersion: "stage5.v2", pollingFrequencyMinutes: 3, sourceLookbackDays: -30,
+    } });
+    assert.equal(created.statusCode, 200, created.body);
+    const monitorBefore = await snapshotScenarioPreviewState(instance);
+    const sourceBefore = await checksums();
+    const selections = [
+      ["A02", source.fixtureIds.A02.flowId],
+      ["A03", source.fixtureIds.A03.workOrderId],
+      ["A05", source.fixtureIds.A05.serialId],
+    ] as const;
+    for (const [ruleCode, sourceKey] of selections) {
+      for (let refresh = 0; refresh < 2; refresh += 1) {
+        const response = await instance.app.inject({
+          method: "GET", url: `/api/dev/scenario-alert-messages?ruleCode=${ruleCode}&sourceKey=${sourceKey}`, headers: manager,
+        });
+        assert.equal(response.statusCode, 200, response.body);
+      }
+    }
+    for (const url of ["/api/session", "/api/incidents?", "/api/incidents?"]) {
+      const response = await instance.app.inject({ method: "GET", url, headers: manager });
+      assert.equal(response.statusCode, 200, `${url}: ${response.body}`);
+    }
+    assert.deepEqual(await snapshotScenarioPreviewState(instance), monitorBefore, "connected previews must not mutate Monitor tables");
+    assert.deepEqual(await checksums(), sourceBefore, "connected previews must not mutate any reset-managed test_database table");
+  } finally {
+    await connections.close();
+  }
 });
 
 it("drives A02 through source changes, failure preservation, and resolution without rewriting terminal source history", async () => {
