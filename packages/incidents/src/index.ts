@@ -101,6 +101,13 @@ const presentation: Record<SupportedRuleCode, { label: string; title: string; su
   A05: { label: "Error", title: "Bobina pendiente de pesar o mover", summary: "La bobina declarada requiere completar su pesaje o movimiento." },
 };
 
+const effectiveAtSql = (incidentAlias: string): string => `COALESCE((
+  SELECT NULLIF(e.evidence->>'sourceTimestamp','')::timestamptz
+  FROM monitor_incident_evidence e
+  WHERE e.incident_id=${incidentAlias}.id AND e.status='triggered' AND e.evidence ? 'sourceTimestamp'
+  ORDER BY e.observed_at ASC,e.id ASC LIMIT 1
+),${incidentAlias}.opened_at)`;
+
 export class IncidentService {
   constructor(
     private readonly database: DatabaseRuntime,
@@ -256,18 +263,18 @@ export class IncidentService {
       const p = `$${parameters.length}`;
       conditions.push(`(title ILIKE '%' || ${p} || '%' OR rule_code ILIKE '%' || ${p} || '%' OR work_order_code ILIKE '%' || ${p} || '%' OR machine_code ILIKE '%' || ${p} || '%' OR responsible_name ILIKE '%' || ${p} || '%')`);
     }
-    return this.database.queryAll(`SELECT id, rule_code AS "ruleCode", lifecycle, label, title, summary, plant_id AS "plantId",
-      work_order_id AS "workOrderId", work_order_code AS "workOrderCode", machine_code AS "machineCode", operation_name AS "operationName",
-      shift_name AS "shiftName", responsible_name AS "responsibleName", reasons, opened_at AS "openedAt", updated_at AS "updatedAt",
-      resolved_at AS "resolvedAt", occurrence FROM monitor_incident WHERE ${conditions.join(" AND ")} ORDER BY opened_at DESC`, parameters);
+    return this.database.queryAll(`SELECT i.id, i.rule_code AS "ruleCode", i.lifecycle, i.label, i.title, i.summary, i.plant_id AS "plantId",
+      i.work_order_id AS "workOrderId", i.work_order_code AS "workOrderCode", i.machine_code AS "machineCode", i.operation_name AS "operationName",
+      i.shift_name AS "shiftName", i.responsible_name AS "responsibleName", i.reasons, i.opened_at AS "openedAt", ${effectiveAtSql("i")} AS "effectiveAt", i.updated_at AS "updatedAt",
+      i.resolved_at AS "resolvedAt", i.occurrence FROM monitor_incident i WHERE ${conditions.join(" AND ")} ORDER BY "effectiveAt" DESC`, parameters);
   }
 
   async detail(id: string, plantIds: number[]): Promise<Record<string, unknown> | null> {
-    const incident = await this.database.queryOne(`SELECT id, rule_code AS "ruleCode", lifecycle, label, title, summary,
-      work_order_id AS "workOrderId", work_order_code AS "workOrderCode", machine_code AS "machineCode", operation_name AS "operationName",
-      shift_name AS "shiftName", responsible_name AS "responsibleName", reasons, opened_at AS "openedAt", updated_at AS "updatedAt",
-      resolved_at AS "resolvedAt", occurrence, correlation_key AS "correlationKey" FROM monitor_incident
-      WHERE id=$1 AND plant_id=ANY($2::bigint[])`, [id, plantIds]);
+    const incident = await this.database.queryOne(`SELECT i.id, i.rule_code AS "ruleCode", i.lifecycle, i.label, i.title, i.summary,
+      i.work_order_id AS "workOrderId", i.work_order_code AS "workOrderCode", i.machine_code AS "machineCode", i.operation_name AS "operationName",
+      i.shift_name AS "shiftName", i.responsible_name AS "responsibleName", i.reasons, i.opened_at AS "openedAt", ${effectiveAtSql("i")} AS "effectiveAt", i.updated_at AS "updatedAt",
+      i.resolved_at AS "resolvedAt", i.occurrence, i.correlation_key AS "correlationKey" FROM monitor_incident i
+      WHERE i.id=$1 AND i.plant_id=ANY($2::bigint[])`, [id, plantIds]);
     if (!incident.id) return null;
     const evidence = await this.database.queryAll(`SELECT id,status,reasons,evidence,observed_at AS "observedAt"
       FROM monitor_incident_evidence WHERE incident_id=$1 ORDER BY observed_at DESC`, [id]);

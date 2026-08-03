@@ -88,6 +88,12 @@ function editableInput(actionId: SourceActionId, value: unknown): ScenarioSource
       throw new ScenarioSourceActionError(400, "invalid_source_action_input");
     } else result[field] = candidate;
   }
+  if (actionId === "a02.prepare_dispatch"
+    && result.originWarehouseId !== undefined
+    && result.destinationWarehouseId !== undefined
+    && result.originWarehouseId === result.destinationWarehouseId) {
+    throw new ScenarioSourceActionError(400, "movement_warehouses_must_differ");
+  }
   return result;
 }
 
@@ -182,7 +188,12 @@ export class ScenarioSourceActionService {
       if (error instanceof Error && conflictErrors.has(error.message)) throw new ScenarioSourceActionError(409, error.message);
       if (error instanceof Error && notFoundErrors.has(error.message)) throw new ScenarioSourceActionError(404, error.message);
       if (error instanceof Error && unavailableErrors.has(error.message)) throw new ScenarioSourceActionError(503, error.message);
-      if (error instanceof Error && ["invalid_source_action", "unknown_scenario_rule"].includes(error.message)) throw new ScenarioSourceActionError(400, error.message);
+      if (error instanceof Error && [
+        "invalid_source_action",
+        "unknown_scenario_rule",
+        "movement_quantity_must_be_positive",
+        "movement_warehouses_must_differ",
+      ].includes(error.message)) throw new ScenarioSourceActionError(400, error.message);
       throw error;
     }
   }

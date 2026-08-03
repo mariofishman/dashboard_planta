@@ -290,12 +290,13 @@ type PendingMessage = { id: string; body: string; replyToMessageId: string | nul
 
 function payloadAlert(message: ConversationMessage): ChatAlertPresentation {
   const payload = message.payload;
+  const code = String(payload.ruleCode ?? payload.code ?? "Alerta");
   const age = String(payload.age ?? payload.unresolvedDuration ?? "Sin resolver");
   const payloadAgeMinutes = Number(payload.ageMinutes ?? payload.unresolvedAgeMinutes);
   const ageMinutes = Number.isFinite(payloadAgeMinutes) ? payloadAgeMinutes : unresolvedAgeMinutes(age);
   return {
     id: String(payload.id ?? `alert-${message.id}`),
-    code: String(payload.ruleCode ?? payload.code ?? "Alerta"),
+    code,
     shortName: String(payload.shortName ?? payload.title ?? "Alerta operativa"),
     age,
     ...(ageMinutes !== null ? { ageMinutes } : {}),
@@ -306,19 +307,25 @@ function payloadAlert(message: ConversationMessage): ChatAlertPresentation {
     ...(payload.machineCode ? { machineCode: String(payload.machineCode) } : {}),
     ...(payload.detectedAt ? { detectedAt: String(payload.detectedAt) } : payload.openedAt ? { detectedAt: time(String(payload.openedAt)) } : {}),
     ...(payload.blocking ? { blocking: String(payload.blocking) } : {}),
-    ...(Array.isArray(payload.resolution) ? { resolution: payload.resolution.map(String) } : {}),
+    resolution: Array.isArray(message.resolutionGuidance) ? message.resolutionGuidance : [],
   };
 }
 
-function AlertAttachment({ message, expanded, highlighted, register, onToggle, onCopyIdentifier }: { message: ConversationMessage; expanded: boolean; highlighted: boolean; register: (element: HTMLElement | null) => void; onToggle: () => void; onCopyIdentifier: (value: string) => void }) {
+export function AlertAttachment({ message, lifecycle = "open", expanded, highlighted, register, onToggle, onCopyIdentifier }: { message: ConversationMessage; lifecycle?: IncidentLifecycle | undefined; expanded: boolean; highlighted: boolean; register: (element: HTMLElement | null) => void; onToggle: () => void; onCopyIdentifier: (value: string) => void }) {
   const alert = payloadAlert(message);
+  const resolved = lifecycle === "resolved";
   const ageColor = unresolvedAgeTone(alert.ageMinutes) === "escalated" ? ui.color.unresolvedAgeEscalated : ui.color.unresolvedAgeRoutine;
+  const lifecyclePresentation = lifecycle === "resolved"
+    ? { label: "Resuelta", color: ui.color.lifecycleResolved }
+    : lifecycle === "closed_without_resolution"
+      ? { label: "Cerrada sin resolución", color: ui.color.lifecycleClosed }
+      : { label: `${alert.age}${alert.age === "Sin resolver" ? "" : " sin resolver"}`, color: ageColor };
   const fact = (label: string, value: string) => <Box key={label} component="div" sx={{ display: "flex", alignItems: "center", gap: "5px", px: "6px", py: "3px", borderRadius: ui.control.radius, bgcolor: "background.default" }}><Box component="dt" sx={{ color: "text.secondary", fontSize: "9px" }}>{label}</Box><Box component="dd" sx={{ m: 0, fontSize: "9px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{value}</Box></Box>;
-  return <Paper ref={register} component="section" tabIndex={0} variant="outlined" aria-labelledby={`${message.id}-alert-title`} onClick={(event) => { if (!(event.target as Element).closest("button")) onToggle(); }} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onToggle(); } }} sx={{ mt: .25, overflow: "hidden", borderRadius: "7.5px", borderColor: highlighted ? "primary.main" : "rgba(225,29,72,.22)", bgcolor: "background.paper", boxShadow: "0 2px 6px rgba(0,36,107,.07)", outline: highlighted ? `2px solid ${ui.color.action}` : undefined, outlineOffset: highlighted ? 2 : undefined }}>
-    <Stack direction="row" alignItems="center" gap={1} sx={{ minHeight: 34, pl: "7px", pr: "9px", borderBottom: "1px solid", borderColor: "divider", bgcolor: "rgba(225,29,72,.045)" }}>
-      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "5px", minHeight: 28, px: 1, border: "1px solid rgba(225,29,72,.7)", borderRadius: ui.control.radius, color: "error.main", fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap" }}><Box component="span" aria-hidden sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "currentColor" }}/>{alert.label}</Box>
+  return <Paper ref={register} component="section" tabIndex={0} variant="outlined" aria-labelledby={`${message.id}-alert-title`} onClick={(event) => { if (!(event.target as Element).closest("button")) onToggle(); }} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onToggle(); } }} sx={{ mt: .25, overflow: "hidden", borderRadius: "7.5px", borderColor: highlighted ? "primary.main" : resolved ? ui.color.alertResolvedBorder : ui.color.alertOpenBorder, bgcolor: "background.paper", boxShadow: "0 2px 6px rgba(0,36,107,.07)", outline: highlighted ? `2px solid ${ui.color.action}` : undefined, outlineOffset: highlighted ? 2 : undefined }}>
+    <Stack direction="row" alignItems="center" gap={1} sx={{ minHeight: 34, pl: "7px", pr: "9px", borderBottom: "1px solid", borderColor: "divider", bgcolor: resolved ? ui.color.alertResolvedHeader : ui.color.alertOpenHeader }}>
+      {!resolved && <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "5px", minHeight: 28, px: 1, border: `1px solid ${ui.color.alertOpenLabelBorder}`, borderRadius: ui.control.radius, color: "error.main", fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap" }}><Box component="span" aria-hidden sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "currentColor" }}/>{alert.label}</Box>}
       <Box component="span" sx={{ display: "inline-grid", placeItems: "center", minHeight: 28, px: 1, borderRadius: ui.control.radius, bgcolor: "rgba(0,0,0,.08)", fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap" }}>{alert.code}</Box>
-      <Typography component="span" fontWeight={700} sx={{ ml: "auto", color: ageColor, fontSize: "9px", lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{alert.age}{alert.age === "Sin resolver" ? "" : " sin resolver"}</Typography>
+      <Typography component="span" fontWeight={700} sx={{ ml: "auto", color: lifecyclePresentation.color, fontSize: "9px", lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{lifecyclePresentation.label}</Typography>
     </Stack>
     <Box sx={{ p: 1 }}>
       <Typography id={`${message.id}-alert-title`} variant="body2" fontWeight={700}>{alert.title}</Typography>
@@ -336,7 +343,7 @@ function AlertAttachment({ message, expanded, highlighted, register, onToggle, o
     {expanded && <Box sx={{ p: 1, borderTop: "1px solid", borderColor: "divider", bgcolor: "background.default" }}>
       {alert.blocking && <><Typography variant="caption" fontWeight={700}>Qué está bloqueando</Typography><Typography variant="caption" color="text.secondary" display="block" sx={{ mt: .25 }}>{alert.blocking}</Typography></>}
       <Typography variant="caption" fontWeight={700} display="block" sx={{ mt: alert.blocking ? 1 : 0 }}>Cómo resolverlo</Typography>
-      {alert.resolution?.length ? <Box component="ol" sx={{ my: .25, pl: 2.5, color: "text.secondary", fontSize: ui.typography.routine, lineHeight: 1.55 }}>{alert.resolution.map((step) => <li key={step}>{step}</li>)}</Box> : <Typography variant="caption" color="text.secondary">Revisa la evidencia y completa la corrección en el flujo operativo de EmusaSoft.</Typography>}
+      {alert.resolution?.length ? <Box component="ol" sx={{ my: .25, pl: 2.5, color: "text.secondary", fontSize: ui.typography.routine, lineHeight: 1.55 }}>{alert.resolution.map((step) => <li key={step}>{step}</li>)}</Box> : <Typography variant="caption" color="text.secondary">Esta alerta no tiene una guía de resolución aprobada en el catálogo.</Typography>}
     </Box>}
   </Paper>;
 }
@@ -449,6 +456,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
     [...fixtureMessages, ...messages, ...localMessages].forEach((message) => byId.set(message.id, message));
     return [...byId.values()].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
   }, [localMessages, messages, uiOnlyMessages]);
+  const latestMessageId = displayMessages.at(-1)?.id ?? null;
   const messageById = useMemo(() => new Map(displayMessages.map((message) => [message.id, message])), [displayMessages]);
   const visibleMessages = useMemo(() => {
     const query = historySearch.trim().toLocaleLowerCase("es-PE");
@@ -460,9 +468,12 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
   const unavailable = state !== "ready";
 
   useEffect(() => {
-    if (state !== "ready") return;
-    window.requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "auto" }));
-  }, [state]);
+    if (state !== "ready" || !latestMessageId) return;
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const viewport = scrollRef.current;
+      viewport?.scrollTo({ top: viewport.scrollHeight, behavior: smoothBehavior() });
+    }));
+  }, [latestMessageId, state]);
 
   const showToast = (message: string) => setToast(message);
   const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => setter((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -565,7 +576,6 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
       appendLocalMessage(draft.trim(), attachment);
       setDraft(""); setAttachment(null); setReplyTo(null);
       showToast(attachment?.mockOnly ? "Archivo añadido a la vista local" : "Mensaje añadido a la vista local");
-      window.requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: smoothBehavior() }));
       return;
     }
     const nextMessage: PendingMessage = { id: crypto.randomUUID(), body: draft.trim(), replyToMessageId: replyTo?.id ?? null, ...(attachment ? { payload: { attachment } } : {}) };
@@ -624,7 +634,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
               {!isMobile && !message.deletedAt && <IconButton size="small" aria-label="Acciones del mensaje" aria-haspopup="menu" onClick={(event) => { setSelectedMessage(message); setMessageMenuAnchor(event.currentTarget); }} sx={{ position: "absolute", top: 1, right: 1, width: 30, height: 30 }}><ExpandMoreRounded sx={{ fontSize: 17 }}/></IconButton>}
               {!outgoing && <Typography variant="caption" color={isTextBubble ? "primary.dark" : "primary.main"} fontWeight={700} display="block" sx={{ mb: isTextBubble ? "1px" : .15, mr: isAlert && !isMobile ? 4 : 0, ...(isTextBubble ? { lineHeight: 1.15 } : {}) }}>{message.senderName || "Monitor"}</Typography>}
               {quoted && <ButtonBase onClick={() => jumpToMessage(quoted.id)} aria-label={`Ir al mensaje citado de ${quoted.senderName}`} sx={{ position: "relative", display: "grid", width: "100%", textAlign: "left", justifyItems: "start", p: "6px 9px 6px 12px", mb: .5, borderRadius: "10px", bgcolor: "background.default", overflow: "hidden", "&::before": { position: "absolute", top: 6, left: 4, width: 3, height: 16, borderRadius: 2, bgcolor: "primary.main", content: "''" } }}><Typography variant="caption" color="primary.dark" fontWeight={700} sx={{ lineHeight: 1.2 }}>{quoted.senderName}</Typography><Typography variant="caption" color="text.secondary" noWrap sx={{ width: "100%", lineHeight: 1.3 }}>{textFromMessage(quoted)}</Typography></ButtonBase>}
-              {message.deletedAt ? <Typography variant="body2" color="text.secondary" fontStyle="italic">Mensaje eliminado</Typography> : isAlert ? <AlertAttachment message={message} expanded={expandedAlerts.has(message.id)} highlighted={flashMessageId === message.id} register={(element) => { if (element) alertRefs.current.set(message.id, element); else alertRefs.current.delete(message.id); }} onToggle={() => toggleSet(setExpandedAlerts, message.id)} onCopyIdentifier={(value) => void copyText(value, `OT ${value} copiada`)}/> : isAttachment ? renderAttachment(message) : <Typography variant="body2" component="span" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.body}</Typography>}
+              {message.deletedAt ? <Typography variant="body2" color="text.secondary" fontStyle="italic">Mensaje eliminado</Typography> : isAlert ? <AlertAttachment message={message} lifecycle={incidentLifecycles[String(message.payload.id)]} expanded={expandedAlerts.has(message.id)} highlighted={flashMessageId === message.id} register={(element) => { if (element) alertRefs.current.set(message.id, element); else alertRefs.current.delete(message.id); }} onToggle={() => toggleSet(setExpandedAlerts, message.id)} onCopyIdentifier={(value) => void copyText(value, `OT ${value} copiada`)}/> : isAttachment ? renderAttachment(message) : <Typography variant="body2" component="span" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.body}</Typography>}
               <Stack direction="row" justifyContent="flex-end" alignItems="center" gap={.5} sx={{ mt: "2px" }}>
                 {pinnedMessages.has(message.id) && <PushPinRounded
                   aria-label="Mensaje fijado"

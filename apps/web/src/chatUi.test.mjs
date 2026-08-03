@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   UI_ONLY_CONVERSATION_FIXTURES,
@@ -76,4 +77,26 @@ test("alert-message age color changes only at the approved two-hour threshold", 
   assert.equal(unresolvedAgeMinutes("2 h 14 min"), 134);
   assert.equal(unresolvedAgeTone(119), "routine");
   assert.equal(unresolvedAgeTone(120), "escalated");
+});
+
+test("resolved alert attachments use green lifecycle framing and hide the active-condition label", () => {
+  const source = readFileSync(new URL("./Chats.tsx", import.meta.url), "utf8");
+  assert.match(source, /resolved \? ui\.color\.alertResolvedBorder : ui\.color\.alertOpenBorder/);
+  assert.match(source, /resolved \? ui\.color\.alertResolvedHeader : ui\.color\.alertOpenHeader/);
+  assert.match(source, /\{!resolved && <Box component="span"/);
+});
+
+test("resolution guidance is supplied by Monitor instead of frontend constants", () => {
+  const chatUi = readFileSync(new URL("./chatUi.ts", import.meta.url), "utf8");
+  const chats = readFileSync(new URL("./Chats.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(chatUi, /ALERT_RESOLUTION_GUIDANCE|alertResolutionGuidance/);
+  assert.match(chats, /message\.resolutionGuidance/);
+});
+
+test("chat detail scrolls after the rendered latest message changes", () => {
+  const source = readFileSync(new URL("./Chats.tsx", import.meta.url), "utf8");
+  assert.match(source, /const latestMessageId = displayMessages\.at\(-1\)\?\.id \?\? null/);
+  assert.match(source, /\[latestMessageId, state\]/);
+  assert.match(source, /window\.requestAnimationFrame\(\(\) => window\.requestAnimationFrame/);
+  assert.match(source, /viewport\?\.scrollTo\(\{ top: viewport\.scrollHeight, behavior: smoothBehavior\(\) \}\)/);
 });

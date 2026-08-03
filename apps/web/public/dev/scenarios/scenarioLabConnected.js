@@ -25,6 +25,11 @@ let data = {
     pageSize: 50,
     reset: null,
     resetObserved: false,
+    sourceWindow: null,
+    sourceWindowInitialized: false,
+    historyMode: false,
+    historyByType: {},
+    historySelected: null,
   },
   refreshPromise = null,
   closureTarget = null,
@@ -40,7 +45,52 @@ const fmt = (v) =>
         hour12: false,
       }).format(new Date(v))
     : "—";
+const fmtCompact = (v) => {
+  if (!v) return "—";
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("es-PE", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(new Date(v))
+      .map(({ type, value }) => [type, value]),
+  );
+  return `${parts.day}-${parts.month.replace(".", "")} ${parts.hour}:${parts.minute}`;
+};
+const compactCell = (fullValue, displayedValue) => {
+  const node = document.createElement("span");
+  node.textContent = String(displayedValue);
+  node.title = String(fullValue);
+  return node.outerHTML;
+};
+const shortUniqueCode = (value) =>
+  compactCell(value, String(value).slice(-4));
+const shortSourceArea = (value) => {
+  const area = String(value).match(/\b(APP|AMP)\b/i)?.[1]?.toUpperCase();
+  return compactCell(value, area ?? value);
+};
+const shortMachineDestination = (value) => {
+  const candidate = String(value).split("·").at(-1)?.trim() ?? String(value);
+  const machine = /^(?:[A-Z]{1,4}\s*\d+)$/i.test(candidate)
+    ? candidate.replace(/\s+/g, "")
+    : value;
+  return compactCell(value, machine);
+};
 const businessTimeIsoValue = (value) => new Date(`${value}:00-05:00`).toISOString();
+const elapsedMinutesSince = (value) => {
+  const current = Date.parse(experiment()?.businessTime),
+    started = Date.parse(value);
+  return Number.isFinite(current) && Number.isFinite(started)
+    ? `${Math.max(0, Math.floor((current - started) / 60_000))} min`
+    : "—";
+};
+const limaDateTimeValue = (iso) =>
+  new Date(Math.ceil(Date.parse(iso) / 60_000) * 60_000 - 5 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 16);
 const val = (r, ...ks) => {
   for (const k of ks) if (r[k] != null && r[k] !== "") return r[k];
   return "—";
@@ -206,15 +256,17 @@ function actions(type, r) {
 function table(type, list, cols, empty) {
   if (!list.length) return '<div class="empty">' + empty + "</div>";
   return (
-    '<div class="scroll"><table><thead><tr><th class="leading-cell"><span class="sr-only">Inspección y estado</span></th>' +
-    cols.map((c) => "<th>" + c[0] + "</th>").join("") +
+    '<div class="scroll records-' + type + '"><table><thead><tr><th class="leading-cell"><span class="sr-only">Inspección y estado</span></th>' +
+    cols.map((c) => '<th class="' + (c[2] || "") + '">' + c[0] + "</th>").join("") +
     "<th>Acciones</th></tr></thead><tbody>" +
     list
       .map(
         (r) =>
           '<tr class="' +
           (data.selected?.key === r.key ? "selected" : "") +
-          '"><td class="leading-cell" data-label="Estado"><div class="row-leading"><button class="icon-button" data-inspect="' +
+          '" data-record-key="' + r.key + '" role="button" tabindex="0" aria-selected="' +
+          (data.selected?.key === r.key) +
+          '" aria-label="Seleccionar transacción ' + r.key + '"><td class="leading-cell" data-label="Estado"><div class="row-leading"><button class="icon-button" data-inspect="' +
           r.key +
           '">' +
           eye +
@@ -228,7 +280,7 @@ function table(type, list, cols, empty) {
           (r.incident?.status === "open" ? "!" : "✓") +
           "</span></div></td>" +
           cols
-            .map((c) => '<td data-label="' + c[0] + '">' + c[1](r) + "</td>")
+            .map((c) => '<td class="' + (c[2] || "") + '" data-label="' + c[0] + '">' + c[1](r) + "</td>")
             .join("") +
           '<td data-label="Acciones"><div class="actions">' +
           actions(type, r) +
@@ -237,6 +289,35 @@ function table(type, list, cols, empty) {
       .join("") +
     "</tbody></table></div>"
   );
+}
+function publishSelection() {
+  const selection = data.historyMode ? data.historySelected : data.selected;
+  const frame = document.querySelector('.setup-reserved iframe');
+  frame?.contentWindow?.postMessage({
+    type: "monitor-scenario-selection",
+    ruleCode: selection ? code() : null,
+    sourceKey: selection?.sourceKey ?? selection?.key ?? null,
+    experimentId: selection?.experimentId ?? undefined,
+  }, window.location.origin);
+}
+window.addEventListener("message", (event) => {
+  const frame = document.querySelector(".setup-reserved iframe"),
+    container = document.querySelector(".setup-reserved");
+  if (event.origin !== window.location.origin || event.source !== frame?.contentWindow || !container) return;
+  if (event.data?.type === "monitor-scenario-preview-ready") {
+    publishSelection();
+    return;
+  }
+  if (event.data?.type !== "monitor-scenario-preview-height") return;
+  const height = Number(event.data.height);
+  if (Number.isFinite(height) && height >= 56 && height <= 640) container.style.height = `${Math.ceil(height)}px`;
+});
+function focusSelectedRecord() {
+  if (!data.selected) return;
+  const row = document.querySelector(`[data-record-key="${data.selected.key}"]`);
+  if (!row) return;
+  row.scrollIntoView({ block: "center" });
+  row.querySelector("[data-inspect]")?.focus({ preventScroll: true });
 }
 function renderHeader() {
   const e = experiment(),
@@ -305,17 +386,22 @@ function renderAlert(type) {
         "No hay bobinas declaradas en este experimento.",
       ],
     }[type],
+    historyLabels = {
+      a02: ["Historial completo de movimientos", "No hay movimientos despachados en este experimento.", "Ver movimientos"],
+      a03: ["Historial completo de OTs", "No hay OTs iniciadas en este experimento.", "Ver OTs"],
+      a05: ["Historial completo de bobinas", "No hay bobinas declaradas en este experimento.", "Ver bobinas"],
+    }[type],
     cols =
       type === "a02"
         ? [
-            ["Movimiento", (r) => r.id],
+            ["OT", (r) => r.ot],
             ["SKU", (r) => r.sku],
-            ["Código único", (r) => r.unique || "No aplica"],
+            ["Código", (r) => r.unique ? shortUniqueCode(r.unique) : "No aplica", "compact-code"],
             ["Material", (r) => r.description],
             ["Cantidad", (r) => r.quantity + " " + r.unit],
-            ["Origen", (r) => r.origin],
-            ["Destino previsto", (r) => r.destination],
-            ["Despacho", (r) => fmt(r.dispatchedAt)],
+            ["Origen", (r) => shortSourceArea(r.origin), "compact-origin"],
+            ["Destino previsto", (r) => shortMachineDestination(r.destination), "compact-destination"],
+            ["Despacho", (r) => compactCell(fmt(r.dispatchedAt), fmtCompact(r.dispatchedAt)), "compact-date"],
             [
               "Tiempo",
               (r) =>
@@ -329,6 +415,7 @@ function renderAlert(type) {
               ["Operación", (r) => r.operation],
               ["Máquina", (r) => r.machine],
               ["Inicio", (r) => fmt(r.startedAt)],
+              ["Tiempo", (r) => elapsedMinutesSince(r.startedAt)],
               ["Consumos", (r) => (r.consumptionAt ? "1" : "0")],
               ["EmusaSoft", (r) => (r.active ? "ACTIVA" : "CERRADA")],
             ]
@@ -340,48 +427,64 @@ function renderAlert(type) {
               ["Máquina", (r) => r.machine],
               ["Destino", (r) => r.destination],
               ["Declaración", (r) => fmt(r.declaredAt)],
+              ["Tiempo", (r) => elapsedMinutesSince(r.declaredAt)],
               ["Pesada", (r) => (r.weighedAt ? "Sí" : "No")],
               ["Salida", (r) => (r.movedAt ? "Sí" : "No")],
             ];
+  const tableBlock = data.historyMode
+    ? '<div class="table-block"><div class="table-title"><h3>' +
+      historyLabels[0] +
+      '</h3><span class="count">' +
+      (data.historyByType[type]?.length ?? 0) +
+      "</span></div>" +
+      historyTable(type, data.historyByType[type] ?? [], historyLabels[1]) +
+      "</div>"
+    : '<div class="table-block"><div class="table-title"><h3>' +
+      labels[2] +
+      '</h3><span class="count">' +
+      pagination.totalRecords +
+      "</span></div>" +
+      table(type, list, cols, labels[3]) +
+      '<div class="pagination"><span>Página ' +
+      pagination.page +
+      " de " +
+      pagination.totalPages +
+      " · " +
+      pagination.totalRecords +
+      ' registros</span><button data-page="' +
+      (pagination.page - 1) +
+      '" ' +
+      (pagination.page <= 1 ? "disabled" : "") +
+      '>Anterior</button><button data-page="' +
+      (pagination.page + 1) +
+      '" ' +
+      (pagination.page >= pagination.totalPages ? "disabled" : "") +
+      ">Siguiente</button></div></div>";
   $("#tabContent").innerHTML =
     '<div class="section-head"><div><h2>' +
     labels[0] +
-    '</h2><p>Crea varios registros en momentos diferentes y deja que Monitor los evalúe independientemente.</p></div><div class="section-actions"><button id="historyButton">Ver historial</button><div class="split-action"><button class="primary" id="createButton" ' +
+    '</h2><p>Crea varios registros en momentos diferentes y deja que Monitor los evalúe independientemente.</p></div><div class="section-actions"><button id="historyButton" aria-pressed="' +
+    data.historyMode +
+    '">' +
+    (data.historyMode ? historyLabels[2] : "Ver historial") +
+    '</button><div class="split-action"><button class="primary" id="createButton" ' +
     (hasExperiment ? "" : "disabled") +
     ">" +
     labels[1] +
     '</button><button class="primary split-more" id="createOptions" ' +
     (hasExperiment ? "" : "disabled") +
     '>▼</button></div></div></div>' +
-    (type === "a02"
+    (type === "a02" && !data.historyMode
       ? '<div class="scenario-control"><label><span>Zona de influencia del usuario</span><select id="a02Permission"><option value="origin">Solo origen</option><option value="destination">Solo destino</option><option value="both">Origen y destino</option></select></label><p>El laboratorio permite recibir el material o simular que el emisor anuló el envío.</p></div>'
       : "") +
-    '<div class="table-block"><div class="table-title"><h3>' +
-    labels[2] +
-    '</h3><span class="count">' +
-    pagination.totalRecords +
-    "</span></div>" +
-    table(type, list, cols, labels[3]) +
-    '<div class="pagination"><span>Página ' +
-    pagination.page +
-    " de " +
-    pagination.totalPages +
-    " · " +
-    pagination.totalRecords +
-    ' registros</span><button data-page="' +
-    (pagination.page - 1) +
-    '" ' +
-    (pagination.page <= 1 ? "disabled" : "") +
-    '>Anterior</button><button data-page="' +
-    (pagination.page + 1) +
-    '" ' +
-    (pagination.page >= pagination.totalPages ? "disabled" : "") +
-    ">Siguiente</button></div>" +
-    "</div>";
+    tableBlock;
   bind();
 }
 async function sourceAction(action, key) {
   const authorityApplies = action === "a02.cancel" || action === "a02.reject";
+  const priorA02Keys = action === "a02.prepare_dispatch"
+    ? new Set((status("A02")?.records ?? []).map((record) => record.key))
+    : null;
   const execution = await api("/api/dev/source-actions", {
     method: "POST",
     body: JSON.stringify({
@@ -393,6 +496,22 @@ async function sourceAction(action, key) {
   if (action === "a02.prepare_dispatch") data.page = Number.MAX_SAFE_INTEGER;
   notify("Cambio guardado en el origen");
   await refresh(true);
+  if (action === "a02.prepare_dispatch") {
+    const naturalKey = Number(execution.naturalKey?.value);
+    const changedKey = execution.sourceDiff?.changes
+      ?.filter((change) => change.table === "flujo_materiales_detalles")
+      .map((change) => Number(change.key))
+      .find((candidate) => Number.isSafeInteger(candidate) && candidate !== naturalKey);
+    const created = status("A02")?.records.find((record) =>
+      !priorA02Keys?.has(record.key) || record.key === changedKey,
+    );
+    if (created) {
+      data.selected = created;
+      render();
+      publishSelection();
+      requestAnimationFrame(focusSelectedRecord);
+    }
+  }
   return execution;
 }
 function bind() {
@@ -424,8 +543,29 @@ function bind() {
             ? null
             : status(code()).records.find((r) => r.key === key);
         render();
+        publishSelection();
       }),
   );
+  $$('[data-record-key]').forEach((row) => {
+    const selectRow = () => {
+      const key = Number(row.dataset.recordKey);
+      data.selected =
+        data.selected?.key === key
+          ? null
+          : status(code()).records.find((record) => record.key === key);
+      render();
+      publishSelection();
+    };
+    row.onclick = (event) => {
+      if (event.target.closest("button, input, select, textarea, a")) return;
+      selectRow();
+    };
+    row.onkeydown = (event) => {
+      if (event.target !== row || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      selectRow();
+    };
+  });
   if ($("#a02Permission")) {
     $("#a02Permission").value = data.permission;
     $("#a02Permission").onchange = (e) => {
@@ -439,6 +579,8 @@ function bind() {
     createButton.disabled = true;
     createOptions.disabled = true;
     try {
+      data.historyMode = false;
+      data.historySelected = null;
       await createSource(data.tab);
     } catch (error) {
       notify("No se pudo crear: " + error.message);
@@ -458,7 +600,14 @@ function bind() {
         : "Editar datos antes de declarar la bobina",
   );
   createOptions.onclick = () => openConnectedEditor(data.tab);
-  $("#historyButton").onclick = () => openHistory(data.tab);
+  $("#historyButton").onclick = async () => {
+    try {
+      await toggleHistory(data.tab);
+    } catch (error) {
+      notify("No se pudo cargar el historial: " + error.message);
+    }
+  };
+  if (data.historyMode) bindHistoryRows(data.tab);
 }
 function renderDetail() {
   const box = $("#detailPanel"),
@@ -508,6 +657,7 @@ function render() {
   if (data.tab === "integrity") renderIntegrity();
   else renderAlert(data.tab);
   renderDetail();
+  publishSelection();
 }
 function reconcileSelectedRecord() {
   if (!data.selected) return;
@@ -515,6 +665,7 @@ function reconcileSelectedRecord() {
     (record) => record.key === data.selected.key,
   );
   data.selected = current || null;
+  publishSelection();
 }
 const resetRunning = (reset) =>
   ["validating", "restoring_source", "validating_source", "clearing_monitor"].includes(
@@ -540,7 +691,7 @@ function renderReset(reset) {
   }
   $("#cancelResetButton").disabled = running;
   $("#confirmResetButton").disabled = running;
-  $("#resetDatabaseButton").disabled = running;
+  $("#resetDatabaseButton").disabled = running || reset?.baselineClean === true;
 }
 async function refresh(force = false) {
   if (refreshPromise) {
@@ -557,14 +708,26 @@ async function refresh(force = false) {
       window.location.reload();
       return;
     }
-    const [s, r] = await Promise.all([
+    const [s, r, sourceWindow] = await Promise.all([
       api(
         `/api/dev/scenarios?page=${data.page}&pageSize=${data.pageSize}&activeOnly=true`,
       ),
       api("/api/dev/scenario-runtime"),
+      data.sourceWindow ? Promise.resolve(data.sourceWindow) : api("/api/dev/scenario-source-window"),
     ]);
     data.items = s.scenarios;
     data.runtime = r;
+    data.sourceWindow = sourceWindow;
+    if (!data.sourceWindowInitialized) {
+      const earliest = limaDateTimeValue(sourceWindow.earliestExperimentStartAt),
+        startTime = $("#startTime");
+      startTime.min = earliest;
+      startTime.value = earliest;
+      $("#sourceLookbackDays").value = r.experiment
+        ? Math.round((Date.parse(r.experiment.sourceCutoffAt) - Date.parse(r.experiment.initialBusinessTime)) / 86_400_000)
+        : sourceWindow.defaultSourceLookbackDays;
+      data.sourceWindowInitialized = true;
+    }
     reconcileSelectedRecord();
     if ($("#pollFailure")?.dataset.connectionError === "true") {
       $("#pollFailure").classList.add("hidden");
@@ -694,30 +857,331 @@ $("#recordForm").onsubmit = async (event) => {
   notify("Registro creado en el origen");
   await refresh(true);
 };
-async function openHistory(type) {
-  const p = await api(
+const historyHtml = (value) =>
+  String(value ?? "—")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+const historyValue = (item, ...keys) => {
+  for (const source of [item.currentSource, item.input, item.evidence]) {
+    if (!source) continue;
+    for (const key of keys)
+      if (source[key] != null && source[key] !== "") return source[key];
+  }
+  return null;
+};
+const historyStack = (primary, ...secondary) =>
+  '<div class="history-stack"><span class="history-primary">' +
+  historyHtml(primary) +
+  "</span>" +
+  secondary
+    .filter((value) => value != null && value !== "")
+    .map(
+      (value) =>
+        '<span class="history-secondary">' + historyHtml(value) + "</span>",
+    )
+    .join("") +
+  "</div>";
+const historyTimes = (...pairs) =>
+  '<div class="history-time">' +
+  pairs
+    .map(
+      ([label, value]) =>
+        "<span>" +
+        historyHtml(label) +
+        "</span><strong>" +
+        historyHtml(value) +
+        "</strong>",
+    )
+    .join("") +
+  "</div>";
+const historyActionAt = (item, ...actions) =>
+  [...(item.timeline || [])]
+    .reverse()
+    .find((event) => actions.includes(event.actionId))?.at || null;
+const historyIncident = (item) => {
+  const count = Number(item.incidentCount || 0);
+  if (!count) return historyStack("Sin alerta");
+  const label = count + " alerta" + (count === 1 ? "" : "s");
+  return historyStack(
+    label,
+    item.incidentOutcome === "open"
+      ? "Abierta"
+      : item.incidentOutcome === "resolved"
+        ? "Resuelta"
+        : "Cerrada sin resolución",
+  );
+};
+const historyLeading = (item) => {
+  let kind = "ok",
+    mark = "✓",
+    label = "Operación completada a tiempo sin alerta";
+  if (item.incidentOutcome === "open") {
+    kind = "alert";
+    mark = "!";
+    label = "Alerta abierta";
+  } else if (item.incidentOutcome === "closed_without_resolution") {
+    kind = "closed";
+    mark = "—";
+    label = "Cerrada sin resolución";
+  } else if (item.incidentOutcome === "resolved") {
+    kind = "closed";
+    mark = "!";
+    label = "Problema detectado y resuelto";
+  } else if (item.timingOutcome === "active") {
+    kind = "pending";
+    mark = "…";
+    label = "Operación todavía pendiente";
+  } else if (item.timingOutcome === "late") {
+    kind = "closed";
+    mark = "!";
+    label = "Operación completada tarde sin alerta";
+  }
+  return (
+    '<div class="row-leading history-leading"><button class="icon-button" data-history-inspect="' +
+    historyHtml(item.id) +
+    '" aria-label="Ver incidente" title="Ver incidente">' +
+    eye +
+    '</button><span class="row-symbol ' +
+    kind +
+    '" role="img" aria-label="' +
+    historyHtml(label) +
+    '" title="' +
+    historyHtml(label) +
+    '">' +
+    mark +
+    "</span></div>"
+  );
+};
+function historyCells(type, item) {
+  if (type === "a02") {
+    const terminalAt = historyActionAt(
+      item,
+      "a02.receive",
+      "a02.cancel",
+      "a02.reject",
+    );
+    const terminalLabel = item.actionIds.includes("a02.cancel")
+      ? "Anulación"
+      : item.actionIds.includes("a02.reject")
+        ? "Rechazo"
+        : "Recepción";
+    const quantity = historyValue(item, "quantity", "cantidad_entransito_uso");
+    const unit = historyValue(item, "unitSymbol", "unitId", "id_unidad_uso");
+    const sku = historyValue(item, "sku", "id_articulo");
+    const unique = historyValue(
+      item,
+      "uniqueItemCode",
+      "uniqueCode",
+      "codigo_serial",
+      "id_articulo_serial",
+    );
+    return [
+      [
+        "Registro",
+        historyStack(
+          item.sourceKey,
+          historyValue(item, "materialName", "nombre_articulo"),
+          [
+            quantity != null ? quantity + (unit != null ? " " + unit : "") : null,
+            sku != null ? "SKU " + sku : null,
+            unique,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+        ),
+        "history-record",
+      ],
+      [
+        "Ruta",
+        historyStack(
+          historyValue(item, "originWarehouseName", "originWarehouseId", "id_almacen_origen"),
+          "→ " +
+            (historyValue(item, "destinationWarehouseName", "destinationWarehouseId", "id_almacen_destino") ?? "—"),
+        ),
+        "history-context",
+      ],
+      [
+        "Fechas",
+        historyTimes(
+          ["Despacho", fmt(item.firstAt)],
+          [terminalAt ? terminalLabel : "Cierre", terminalAt ? fmt(terminalAt) : "Pendiente"],
+        ),
+        "history-timeline",
+      ],
+      ["Duración", item.durationMinutes == null ? "—" : item.durationMinutes + " min", "history-duration"],
+      ["A02", historyIncident(item), "history-alert"],
+    ];
+  }
+  if (type === "a03") {
+    const consumptionAt = historyActionAt(item, "a03.record_first_consumption");
+    const closureAt = historyActionAt(item, "a03.close_work_order", "a03.cancel_work_order");
+    return [
+      [
+        "Registro",
+        historyStack(
+          historyValue(item, "workOrderCode", "codigo_orden_trabajo") ?? item.sourceKey,
+          historyValue(item, "operationName", "operationId", "id_operacion"),
+        ),
+        "history-record",
+      ],
+      [
+        "Contexto",
+        historyStack(historyValue(item, "machineCode", "machineId", "id_equipo")),
+        "history-context",
+      ],
+      [
+        "Fechas",
+        historyTimes(
+          ["Inicio", fmt(item.firstAt)],
+          [consumptionAt ? "Consumo" : "Cierre OT", consumptionAt ? fmt(consumptionAt) : closureAt ? fmt(closureAt) : "Pendiente"],
+        ),
+        "history-timeline",
+      ],
+      ["Duración", item.durationMinutes == null ? "—" : item.durationMinutes + " min", "history-duration"],
+      ["A03", historyIncident(item), "history-alert"],
+    ];
+  }
+  const closeAt = historyActionAt(item, "a05.close_source_work_order");
+  const weighingAt = historyActionAt(item, "a05.register_weighing");
+  const movementAt = historyActionAt(item, "a05.register_movement", "a05.handoff_to_a02");
+  const workOrder = historyValue(
+    item,
+    "workOrderCode",
+    "sourceWorkOrderId",
+    "id_orden_trabajo_origen",
+    "id_ultimo_orden_trabajo_cierre",
+  );
+  const workOrderClosed = Boolean(
+    closeAt || historyValue(item, "sourceWorkOrderFinished") === true,
+  );
+  const destination = historyValue(
+    item,
+    "destinationWarehouseName",
+    "warehouseId",
+    "id_almacen",
+  );
+  const a02Movement = historyValue(item, "a02MovementId");
+  return [
+    [
+      "Registro",
+      historyStack(
+        historyValue(item, "serialCode", "codigo_serial") ?? item.sourceKey,
+        [
+          historyValue(item, "sourceReelType", "tipo"),
+          historyValue(item, "sku", "id_articulo") != null
+            ? "SKU " + historyValue(item, "sku", "id_articulo")
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      ),
+      "history-record",
+    ],
+    [
+      "Contexto",
+      historyStack(
+        workOrder ?? "OT no definida",
+        [
+          "OT " + (workOrderClosed ? "cerrada" : "activa"),
+          historyValue(item, "machineCode", "machineId"),
+          destination ?? "Destino no definido",
+          a02Movement != null ? "A02 " + a02Movement : null,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      ),
+      "history-context",
+    ],
+    [
+      "Fechas",
+      historyTimes(
+        ["Declaración", fmt(item.firstAt)],
+        ["Cierre OT", closeAt ? fmt(closeAt) : "Pendiente"],
+        ["Pesaje", weighingAt ? fmt(weighingAt) : "Pendiente"],
+        ["Salida", movementAt ? fmt(movementAt) : "Pendiente"],
+      ),
+      "history-timeline",
+    ],
+    [
+      "Duración",
+      weighingAt && movementAt && item.durationMinutes != null
+        ? item.durationMinutes + " min"
+        : "—",
+      "history-duration",
+    ],
+    ["A05", historyIncident(item), "history-alert"],
+  ];
+}
+function historyTable(type, items, empty) {
+  if (!items.length) return '<div class="empty">' + empty + "</div>";
+  const rows = items.map((item) => ({ item, cells: historyCells(type, item) }));
+  return (
+    '<div class="scroll history-table"><table><thead><tr><th class="leading-cell"><span class="sr-only">Inspección y estado</span></th>' +
+    rows[0].cells
+      .map(([label, , className]) => '<th class="' + className + '">' + label + "</th>")
+      .join("") +
+    "</tr></thead><tbody>" +
+    rows
+      .map(
+        ({ item, cells }) =>
+          '<tr class="' +
+          (data.historySelected?.id === item.id ? "selected" : "") +
+          '" data-history-record="' +
+          historyHtml(item.id) +
+          '" role="button" tabindex="0" aria-label="Seleccionar registro histórico ' +
+          historyHtml(item.sourceKey) +
+          '"><td class="leading-cell" data-label="Estado">' +
+          historyLeading(item) +
+          "</td>" +
+          cells
+            .map(
+              ([label, content, className]) =>
+                '<td class="' + className + '" data-label="' + label + '">' + content + "</td>",
+            )
+            .join("") +
+          "</tr>",
+      )
+      .join("") +
+    "</tbody></table></div>"
+  );
+}
+function selectHistoryRecord(type, id) {
+  const item = (data.historyByType[type] ?? []).find(
+    (candidate) => candidate.id === id,
+  );
+  data.historySelected = data.historySelected?.id === item?.id ? null : item ?? null;
+  render();
+  publishSelection();
+}
+function bindHistoryRows(type) {
+  $$('[data-history-record]').forEach((row) => {
+    row.onclick = () => selectHistoryRecord(type, row.dataset.historyRecord);
+    row.onkeydown = (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      selectHistoryRecord(type, row.dataset.historyRecord);
+    };
+  });
+}
+async function toggleHistory(type) {
+  if (data.historyMode) {
+    data.historyMode = false;
+    data.historySelected = null;
+    render();
+    publishSelection();
+    return;
+  }
+  const response = await api(
     "/api/dev/scenario-operational-history?code=" + type.toUpperCase(),
   );
-  $("#historyContent").innerHTML =
-    p.items
-      .map(
-        (i) =>
-          '<article class="evidence-item"><strong>#' +
-          i.sourceKey +
-          " · " +
-          i.experimentName +
-          "</strong><p>" +
-          fmt(i.firstAt) +
-          " → " +
-          fmt(i.lastAt) +
-          " · " +
-          i.sourceState +
-          " · " +
-          i.incidentOutcome +
-          "</p></article>",
-      )
-      .join("") || "<p>No hay registros todavía.</p>";
-  $("#historyDialog").showModal();
+  data.historyByType[type] = response.items;
+  data.historyMode = true;
+  data.historySelected = null;
+  data.selected = null;
+  render();
+  publishSelection();
 }
 function renderIntegrity() {
   const totals = {
@@ -843,6 +1307,8 @@ $$(".tab").forEach(
     (b.onclick = () => {
       data.tab = b.dataset.tab;
       data.selected = null;
+      data.historyMode = false;
+      data.historySelected = null;
       data.page = 1;
       refresh(true);
     }),
@@ -859,16 +1325,7 @@ $$("[data-jump]").forEach(
       await refresh(true);
     }),
 );
-$("#runButton").onclick = async () => {
-  const e = experiment();
-  if (!e) return;
-  await api("/api/dev/scenario-runtime/" + e.id + "/pause", {
-    method: "POST",
-    body: JSON.stringify({ paused: e.status === "running" }),
-  });
-  await refresh(true);
-};
-$("#newExperimentButton").onclick = async () => {
+async function createExperiment() {
   const r = await api("/api/dev/scenario-runtime", {
     method: "POST",
     body: JSON.stringify({
@@ -887,6 +1344,19 @@ $("#newExperimentButton").onclick = async () => {
       pollingFrequencyMinutes: Number($("#frequency").value),
     }),
   });
+  return r.experiment;
+}
+$("#runButton").onclick = async () => {
+  const existing = experiment(),
+    e = existing || (await createExperiment());
+  await api("/api/dev/scenario-runtime/" + e.id + "/pause", {
+    method: "POST",
+    body: JSON.stringify({ paused: existing?.status === "running" }),
+  });
+  await refresh(true);
+};
+$("#newExperimentButton").onclick = async () => {
+  await createExperiment();
   await refresh(true);
 };
 $("#snapshotButton").onclick = async () => {
@@ -917,6 +1387,24 @@ const configure = async () => {
 };
 $("#speed").onchange = configure;
 $("#frequency").onchange = configure;
+$("#sourceLookbackDays").onblur = async (event) => {
+  const e = experiment(),
+    sourceLookbackDays = Number(event.currentTarget.value);
+  if (!Number.isInteger(sourceLookbackDays) || sourceLookbackDays > 0 || sourceLookbackDays < -3650) {
+    notify("El seguimiento debe ser un número entero entre -3650 y 0 días");
+    return;
+  }
+  if (!e) return;
+  const currentLookbackDays = Math.round((Date.parse(e.sourceCutoffAt) - Date.parse(e.initialBusinessTime)) / 86_400_000);
+  if (sourceLookbackDays === currentLookbackDays) return;
+  await api("/api/dev/scenario-runtime/" + e.id + "/source-window", {
+    method: "PUT",
+    body: JSON.stringify({ sourceLookbackDays }),
+  });
+  data.page = 1;
+  data.selected = null;
+  await refresh(true);
+};
 $("#resetDatabaseButton").onclick = () => {
   data.resetObserved = false;
   $("#resetProgress").classList.add("hidden");

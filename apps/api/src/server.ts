@@ -211,7 +211,10 @@ export async function buildMonitorServer(options: {
   const detectionRunner = new DetectionRunner(detectionRepository, freshness, undefined, async ({ cycleId, query, rows, observedAt }) => {
     const rule = incidentRules.get(query.ruleCode);
     if (!rule) return;
-    await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt, contextFor: (row) => query.adapterKind === "simulator"
+    const sourceBusinessTime = scenarioSource?.pollMetadata?.(query.ruleCode as "A02" | "A03" | "A05")?.currentAt
+      ?? (scenarioSource ? (await scenarioSource.status(query.ruleCode)).scenarioClock.currentAt : null);
+    const incidentObservedAt = sourceBusinessTime ? new Date(sourceBusinessTime) : observedAt;
+    await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt: incidentObservedAt, contextFor: (row) => query.adapterKind === "simulator"
       ? scenarioContextFor(row)
       : query.adapterKind === "test_database" ? testDatabaseContextFor(row) : ({ plantId: 1 }) });
     const downstream = await database.queryAll(`SELECT i.id,i.lifecycle,i.plant_id AS "plantId"
@@ -223,7 +226,7 @@ export async function buildMonitorServer(options: {
       )`, [query.ruleCode]);
     for (const incident of downstream) {
       if (incident.lifecycle === "open") await routeAndAttachConversation(String(incident.id), Number(incident.plantId), cycleId);
-      else await conversationService.closeIncident(String(incident.id), observedAt);
+      else await conversationService.closeIncident(String(incident.id), incidentObservedAt);
     }
   });
   const detectionScheduler = new DetectionScheduler(detectionRunner, 2);

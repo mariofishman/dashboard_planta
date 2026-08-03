@@ -59,6 +59,19 @@ describe("Phase 4 incident lifecycle", () => {
     assert.deepEqual(rows, [{ occurrence: 1, lifecycle: "resolved" }, { occurrence: 2, lifecycle: "open" }]);
   });
 
+  it("uses authoritative source time as the effective incident time", async () => {
+    const observedAt = new Date("2026-07-22T18:01:00.000Z");
+    const sourceTimestamp = "2026-07-11T14:30:59.000Z";
+    const opened = await service.apply({ rule: a03, evidence: { ...triggered, sourceTimestamp }, context, observedAt });
+    assert.ok(opened);
+    const [summary] = await service.list({ plantIds: [1] });
+    assert.ok(summary);
+    assert.equal(new Date(String(summary.effectiveAt)).toISOString(), sourceTimestamp);
+    assert.equal(new Date(String(summary.openedAt)).toISOString(), observedAt.toISOString());
+    const detail = await service.detail(opened.incidentId, [1]);
+    assert.equal(new Date(String(detail?.effectiveAt)).toISOString(), sourceTimestamp);
+  });
+
   it("does nothing when evidence is insufficient", async () => {
     const change = await service.apply({ rule: a03, evidence: { ...triggered, consumptionCount: undefined }, context });
     assert.equal(change, null);

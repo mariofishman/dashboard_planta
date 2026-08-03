@@ -217,6 +217,14 @@ export class ScenarioExperimentRepository {
     return this.get(id);
   }
 
+  async setSourceLookbackDays(id: string, sourceLookbackDays: number): Promise<ScenarioExperiment> {
+    if (!Number.isInteger(sourceLookbackDays) || sourceLookbackDays > 0 || sourceLookbackDays < -3650) throw new Error("invalid_scenario_source_lookback");
+    const current = await this.get(id);
+    const sourceCutoffAt = new Date(Date.parse(current.initialBusinessTime) + sourceLookbackDays * 86_400_000).toISOString();
+    await this.database.execute("UPDATE monitor_scenario_experiment SET source_cutoff_at=$2,updated_at=now() WHERE id=$1", [id, sourceCutoffAt]);
+    return this.get(id);
+  }
+
   async pause(id: string, paused = true): Promise<ScenarioExperiment> {
     const current = await this.get(id);
     const nextDue = paused ? current.nextDue : Object.fromEntries(codes.map((code) => [code,

@@ -24,7 +24,7 @@ export type IncidentLifecycle = "open" | "resolved" | "closed_without_resolution
 export interface IncidentSummary {
   id: string; ruleCode: "A02" | "A03" | "A05"; lifecycle: IncidentLifecycle; label: string; title: string; summary: string;
   workOrderId: string | null; workOrderCode: string | null; machineCode: string | null; operationName: string | null;
-  shiftName: string | null; responsibleName: string | null; reasons: string[]; openedAt: string; updatedAt: string;
+  shiftName: string | null; responsibleName: string | null; reasons: string[]; openedAt: string; effectiveAt: string; updatedAt: string;
   resolvedAt: string | null; occurrence: number;
 }
 export interface IncidentDetail extends IncidentSummary {
@@ -44,6 +44,15 @@ export interface ConversationMessage {
   id: string; cursor: number; senderSysUserId: number | null; senderName: string; kind: "text" | "alert" | "attachment";
   body: string; payload: Record<string, unknown>; replyToMessageId: string | null; sentAt: string; editedAt: string | null; deletedAt: string | null;
   deliveredCount: number; readCount: number;
+  resolutionGuidance?: string[];
+}
+export interface ScenarioAlertRecipient { name: string; role: string }
+export interface ScenarioAlertMessageItem {
+  message: ConversationMessage;
+  lifecycle: IncidentLifecycle;
+  ruleCode: ScenarioRuleCode;
+  sourceKey: number;
+  recipients: ScenarioAlertRecipient[];
 }
 
 export type ScenarioRuleCode = "A02" | "A03" | "A05";
@@ -125,7 +134,8 @@ export interface ScenarioExperimentDetail {
 export interface ScenarioOperationalHistoryItem {
   id: string; experimentId: string; experimentName: string; experimentStatus: ScenarioExperiment["status"];
   ruleCode: ScenarioRuleCode; sourceKey: number; firstAt: string; lastAt: string; recordedAt: string;
-  actionIds: string[]; eventCount: number; input: Record<string, unknown> | null; evidence: Record<string, unknown>;
+  actionIds: string[]; eventCount: number; timeline: { actionId: SourceActionId; at: string }[]; input: Record<string, unknown> | null; evidence: Record<string, unknown>;
+  currentSource: Record<string, unknown> | null; incidentCount: number;
   sourceState: string; durationMinutes: number | null; timingOutcome: "active" | "on_time" | "late";
   terminalOutcome: string | null; incidentOutcome: IncidentLifecycle | "none";
 }
@@ -215,6 +225,11 @@ export async function conversations(search = "", before?: string, scope: "mine" 
 export async function conversationMessages(id: string, before?: number): Promise<{ messages: ConversationMessage[]; nextCursor: number | null; writableUntil: string | null; title: string; participantCount: number; participantNames: string }> {
   const query = before ? `?before=${before}` : "";
   return responseJson(await fetch(`/api/conversations/${id}/messages${query}`, { credentials: "include" }));
+}
+
+export async function scenarioAlertMessages(selection?: { ruleCode: ScenarioRuleCode; sourceKey: number; experimentId?: string }): Promise<{ items: ScenarioAlertMessageItem[] }> {
+  const query = selection ? `?${new URLSearchParams({ ruleCode: selection.ruleCode, sourceKey: String(selection.sourceKey), ...(selection.experimentId ? { experimentId: selection.experimentId } : {}) })}` : "";
+  return responseJson(await fetch(`/api/dev/scenario-alert-messages${query}`, { credentials: "include" }));
 }
 
 export async function sendConversationMessage(id: string, body: string, clientCommandId: string, replyToMessageId?: string | null, payload?: Record<string, unknown>) {

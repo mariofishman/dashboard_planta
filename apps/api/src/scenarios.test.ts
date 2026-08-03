@@ -57,6 +57,8 @@ it("drives A02 through source changes, failure preservation, and resolution with
   assert.equal(incidents[0].ruleCode, "A02");
   assert.equal(incidents[0].lifecycle, "open");
   assert.equal(incidents[0].occurrence, 1);
+  assert.equal(new Date(incidents[0].openedAt).toISOString(), firstPoll.json().scenario.scenarioClock.currentAt,
+    "scenario incidents must use the database-poll business time, not the wall-clock load time");
 
   await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/poll", headers: manager });
   assert.equal(Number((await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident_evidence")).count), 1, "unchanged polls do not append evidence");
@@ -437,6 +439,66 @@ it("exposes durable experiment history and ordered runtime events to administrat
 it("keeps every canonical source action isolated from Monitor until polling", { skip: !connectedLabAvailable },
   assertCanonicalSourceActionIsolation);
 
+it("derives and enforces the earliest experiment start from the latest connected source transaction", { skip: !connectedLabAvailable }, async () => {
+  const instance = await buildMonitorServer({
+    config: {
+      nodeEnv: "test", cookieSecret: "phase-6-source-window-secret-with-enough-entropy", allowMockAuth: true,
+      enableScenarioLab: true, scenarioSource: "test_database", databaseMode: "pglite", pgliteDataDir: "memory://",
+    },
+  });
+  servers.push(instance);
+  const manager = { authorization: "Bearer mock:plant-manager" };
+  const connections = await TestDatabaseConnections.create(repositoryRoot);
+  const repository = await TestDatabaseScenarioRepository.create(connections, repositoryRoot);
+  try {
+    const expected = await repository.latestSourceTimestamp();
+    const response = await instance.app.inject({ url: "/api/dev/scenario-source-window", headers: manager });
+    assert.equal(response.statusCode, 200, response.body);
+    assert.equal(response.json().earliestExperimentStartAt, expected);
+    assert.equal(response.json().defaultSourceLookbackDays, -30);
+    const cleanReset = await instance.app.inject({ url: "/api/dev/test-database-reset", headers: manager });
+    assert.equal(cleanReset.json().baselineClean, true);
+    const rejected = await instance.app.inject({ method: "POST", url: "/api/dev/scenario-runtime", headers: manager, payload: {
+      name: "Before source baseline", businessTime: new Date(Date.parse(expected) - 1).toISOString(), runId: "before-source-baseline",
+      manifestVersion: "stage5.v2", pollingFrequencyMinutes: 3, sourceLookbackDays: -30,
+    } });
+    assert.equal(rejected.statusCode, 400, rejected.body);
+    assert.equal(rejected.json().error, "scenario_experiment_before_source_baseline");
+    const created = await instance.app.inject({ method: "POST", url: "/api/dev/scenario-runtime", headers: manager, payload: {
+      name: "Source window", businessTime: expected, runId: "source-window",
+      manifestVersion: "stage5.v2", pollingFrequencyMinutes: 3, sourceLookbackDays: -30,
+    } });
+    assert.equal(created.statusCode, 200, created.body);
+    const scenarios = (await instance.app.inject({ url: "/api/dev/scenarios?page=1&pageSize=50&activeOnly=true", headers: manager })).json().scenarios;
+    const a02 = scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
+    const a05 = scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A05");
+    assert.ok(a02.pagination.totalRecords > 100, "the paused experiment must expose the connected A02 window before its first poll");
+    assert.ok(a05.pagination.totalRecords > 100, "the paused experiment must expose the connected A05 window before its first poll");
+    assert.equal(a02.sourceState.rows.length, 50);
+    assert.equal(a05.sourceState.rows.length, 50);
+    const firstPageDispatches = a02.sourceState.rows.map((row: { dispatchedAt: string }) => Date.parse(row.dispatchedAt));
+    assert.deepEqual(firstPageDispatches, [...firstPageDispatches].sort((left, right) => right - left), "A02 presents the newest dispatches first");
+    const oldestPage = (await instance.app.inject({
+      url: `/api/dev/scenarios?page=${a02.pagination.totalPages}&pageSize=50&activeOnly=true`, headers: manager,
+    })).json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
+    assert.ok(Date.parse(oldestPage.sourceState.rows[0].dispatchedAt) <= firstPageDispatches.at(-1)!, "the final A02 page contains older dispatches than the first page");
+    const experimentId = created.json().experiment.id;
+    const narrowed = await instance.app.inject({ method: "PUT", url: `/api/dev/scenario-runtime/${experimentId}/source-window`, headers: manager, payload: { sourceLookbackDays: -3 } });
+    assert.equal(narrowed.statusCode, 200, narrowed.body);
+    const narrowedScenarios = (await instance.app.inject({ url: "/api/dev/scenarios?page=1&pageSize=50&activeOnly=true", headers: manager })).json().scenarios;
+    const narrowedA02 = narrowedScenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
+    assert.ok(narrowedA02.pagination.totalRecords < a02.pagination.totalRecords, "shortening the source window must reduce the connected A02 record count");
+    const running = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/pause`, headers: manager, payload: { paused: false } });
+    assert.equal(running.statusCode, 200, running.body);
+    const beforeFirstPoll = (await instance.app.inject({ url: "/api/dev/scenarios?page=1&pageSize=50&activeOnly=true", headers: manager })).json().scenarios;
+    assert.ok(beforeFirstPoll.every((item: { expectedResult: { awaitingPoll: boolean } }) => item.expectedResult.awaitingPoll === false),
+      "starting an unchanged source window must not report a pending source change");
+    await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/pause`, headers: manager, payload: { paused: true } });
+  } finally {
+    await connections.close();
+  }
+});
+
 it("executes the canonical source-action endpoint against test_database and restores its fixture", { skip: !connectedLabAvailable }, async () => {
   const instance = await buildMonitorServer({
     config: {
@@ -493,7 +555,9 @@ it("executes the canonical source-action endpoint against test_database and rest
     assert.equal(createdEvidence?.estado, "TRANSITO");
     assert.equal(createdEvidence?.nombre_articulo, "Material laboratorio editable");
     assert.equal(Number(createdEvidence?.cantidad_entransito_uso), 2);
-    const dispatchStatus = await instance.app.inject({ url: `/api/dev/scenarios?page=${Number.MAX_SAFE_INTEGER}&pageSize=50&activeOnly=true`, headers: manager });
+    const dirtyReset = await instance.app.inject({ url: "/api/dev/test-database-reset", headers: manager });
+    assert.equal(dirtyReset.json().baselineClean, false, "a source mutation must enable the database reset control");
+    const dispatchStatus = await instance.app.inject({ url: "/api/dev/scenarios?page=1&pageSize=50&activeOnly=true", headers: manager });
     const dispatchScenario = dispatchStatus.json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
     assert.equal(dispatchScenario.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, true);
     const receipt = await instance.app.inject({
@@ -505,7 +569,13 @@ it("executes the canonical source-action endpoint against test_database and rest
     assert.equal(receivedEvidence?.estado, "RECIBIDO");
     const history = await instance.app.inject({ url: "/api/dev/scenario-operational-history?code=A02&timingOutcome=on_time", headers: manager });
     assert.equal(history.statusCode, 200, history.body);
-    assert.equal(history.json().items.some((item: { sourceKey: number; experimentName: string }) => item.sourceKey === createdFlowId && item.experimentName === "Connected editable history"), true);
+    const historyItem = history.json().items.find((item: { sourceKey: number; experimentName: string }) =>
+      item.sourceKey === createdFlowId && item.experimentName === "Connected editable history");
+    assert.ok(historyItem);
+    assert.deepEqual(historyItem.timeline.map((event: { actionId: string }) => event.actionId), ["a02.prepare_dispatch", "a02.receive"]);
+    assert.equal(historyItem.currentSource.materialName, "Material laboratorio editable");
+    assert.equal(historyItem.currentSource.state, "RECIBIDO");
+    assert.equal(historyItem.incidentCount, 0);
     const experimentId = experiment.json().experiment.id;
     await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/pause`, headers: manager, payload: { paused: false } });
     const armedFailure = await instance.app.inject({ method: "POST", url: "/api/dev/test/scenarios/A02/fail-next-poll", headers: manager, payload: { fault: "partial" } });
@@ -513,7 +583,7 @@ it("executes the canonical source-action endpoint against test_database and rest
     const failedAdvance = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/advance`, headers: manager, payload: { minutes: 3 } });
     assert.equal(failedAdvance.statusCode, 200, failedAdvance.body);
     assert.equal(failedAdvance.json().polls.find((poll: { ruleCode: string }) => poll.ruleCode === "A02")?.result.status, "partial");
-    const afterFailedPoll = await instance.app.inject({ url: `/api/dev/scenarios?page=${Number.MAX_SAFE_INTEGER}&pageSize=50&activeOnly=true`, headers: manager });
+    const afterFailedPoll = await instance.app.inject({ url: "/api/dev/scenarios?page=1&pageSize=50&activeOnly=true", headers: manager });
     const a02AfterFailedPoll = afterFailedPoll.json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
     assert.equal(a02AfterFailedPoll.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, true,
       "an incomplete poll must not acknowledge a source action");
@@ -521,7 +591,7 @@ it("executes the canonical source-action endpoint against test_database and rest
     assert.equal(failedEvents.json().events.some((event: { eventType: string; ruleCode: string }) => event.eventType === "poll_failed" && event.ruleCode === "A02"), true);
     const advanced = await instance.app.inject({ method: "POST", url: `/api/dev/scenario-runtime/${experimentId}/advance`, headers: manager, payload: { minutes: 3 } });
     assert.equal(advanced.statusCode, 200, advanced.body);
-    const afterPoll = await instance.app.inject({ url: `/api/dev/scenarios?page=${Number.MAX_SAFE_INTEGER}&pageSize=50`, headers: manager });
+    const afterPoll = await instance.app.inject({ url: "/api/dev/scenarios?page=1&pageSize=50", headers: manager });
     const a02AfterPoll = afterPoll.json().scenarios.find((item: { ruleCode: string }) => item.ruleCode === "A02");
     assert.equal(a02AfterPoll.records.find((record: { key: number }) => record.key === createdFlowId)?.pendingPoll, false);
 

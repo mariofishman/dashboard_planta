@@ -76,6 +76,11 @@
   --semantic-color-lifecycle-resolved: var(--color-success);
   --semantic-color-lifecycle-open: var(--color-danger);
   --semantic-color-lifecycle-closed: var(--color-warning);
+  --semantic-color-alert-open-border: rgba(225, 29, 72, 0.22);
+  --semantic-color-alert-open-header: rgba(225, 29, 72, 0.045);
+  --semantic-color-alert-open-label-border: rgba(225, 29, 72, 0.7);
+  --semantic-color-alert-resolved-border: rgba(0, 138, 73, 0.22);
+  --semantic-color-alert-resolved-header: rgba(0, 138, 73, 0.045);
   --semantic-color-unresolved-age-routine: var(--color-text-muted);
   --semantic-color-unresolved-age-escalated: var(--color-danger-deep);
 

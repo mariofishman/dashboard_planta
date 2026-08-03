@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { access, readFile, stat } from "node:fs/promises";
+import { access, readFile, readdir, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import mysql, { type Pool, type PoolConnection, type RowDataPacket } from "mysql2/promise";
 import type {
@@ -29,6 +29,13 @@ import {
 import type { DetectionQueryDefinition, DetectionSourceAdapter, SourcePage } from "./types.js";
 
 const codes: ScenarioRuleCode[] = ["A02", "A03", "A05"];
+const resetMutationTables = [
+  "articulo_serial",
+  "balanza_carga_detalle_registros",
+  "flujo_materiales_detalles",
+  "orden_trabajo_materiales",
+  "ordenes_trabajo",
+] as const;
 export interface TestDatabaseFixtureSeeds { A02: number; A03: number; A05: number }
 interface TestDatabaseFixtureDocument extends TestDatabaseFixtureSeeds { fixtureVersion: string; sourceRevision: string }
 interface QueryContractDocument {
@@ -377,9 +384,10 @@ export class TestDatabaseSourceAdapter implements DetectionSourceAdapter {
       Number(row[input.query.keyField]),
       String(row.sourceTimestamp),
     ));
-    const rows = await Promise.all(trackedRows.map(async (row) => ({
-      ...row, ...await this.routingContext(Number(row[input.query.keyField])),
-    })));
+    const routingByKey = await this.routingContextBatch(trackedRows.map((row) => Number(row[input.query.keyField])));
+    const rows = trackedRows.map((row) => ({
+      ...row, ...(routingByKey.get(Number(row[input.query.keyField])) ?? {}),
+    }));
     const complete = rawRows.length < input.limit;
     const last = allRows.at(-1);
     const normal: SourcePage = {
@@ -403,24 +411,30 @@ export class TestDatabaseSourceAdapter implements DetectionSourceAdapter {
     return normal;
   }
 
-  private async routingContext(key: number): Promise<Record<string, unknown>> {
+  private async routingContextBatch(keys: number[]): Promise<Map<number, Record<string, unknown>>> {
+    if (keys.length === 0) return new Map();
     const sql = this.code === "A02"
-      ? `SELECT COALESCE(e.codigo,'Sin máquina') AS machineCode,COALESCE(o.nombre,'Sin operación') AS operationName,
+      ? `SELECT f.id AS routingKey,COALESCE(e.codigo,'Sin máquina') AS machineCode,COALESCE(o.nombre,'Sin operación') AS operationName,
           'Día' AS shiftName,'Almacén de materia prima' AS responsibleName,'Materias primas' AS warehouseType
         FROM flujo_materiales_detalles f JOIN ordenes_trabajo ot ON ot.id=f.id_orden_trabajo
-        LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion WHERE f.id=?`
+        LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion WHERE f.id IN (?)`
       : this.code === "A03"
-        ? `SELECT COALESCE(e.codigo,'Sin máquina') AS machineCode,COALESCE(o.nombre,'Sin operación') AS operationName,
+        ? `SELECT ot.id AS routingKey,COALESCE(e.codigo,'Sin máquina') AS machineCode,COALESCE(o.nombre,'Sin operación') AS operationName,
             'Día' AS shiftName,'Operación de máquina' AS responsibleName
-          FROM ordenes_trabajo ot LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion WHERE ot.id=?`
-        : `SELECT CASE WHEN s.tipo='PRODUCTO_EN_PROCESO' THEN 'produced' ELSE 'remnant' END AS reelKind,
+          FROM ordenes_trabajo ot LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion WHERE ot.id IN (?)`
+        : `SELECT s.id AS routingKey,CASE WHEN s.tipo='PRODUCTO_EN_PROCESO' THEN 'produced' ELSE 'remnant' END AS reelKind,
             COALESCE(e.codigo,'Sin máquina') AS machineCode,COALESCE(o.nombre,'Sin operación') AS operationName,
             'Día' AS shiftName,'Equipo de procesos' AS responsibleName,
             CASE WHEN s.tipo='PRODUCTO_EN_PROCESO' THEN 'Productos en proceso' ELSE 'Materias primas' END AS warehouseType
           FROM articulo_serial s JOIN ordenes_trabajo ot ON ot.id=COALESCE(s.id_orden_trabajo_origen,s.id_ultimo_orden_trabajo_cierre)
-          LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion WHERE s.id=?`;
-    const [rows] = await this.connections.monitor.query<RowDataPacket[]>(sql, [key]);
-    return rows[0] ? normalizeRow(rows[0]) : {};
+          LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion WHERE s.id IN (?)`;
+    const [rows] = await this.connections.monitor.query<RowDataPacket[]>(sql, [keys]);
+    return new Map(rows.map((rawRow) => {
+      const row = normalizeRow(rawRow);
+      const key = Number(row.routingKey);
+      delete row.routingKey;
+      return [key, row];
+    }));
   }
 }
 
@@ -436,6 +450,7 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
   private constructor(
     private readonly connections: TestDatabaseConnections,
     readonly fixtureIds: FixtureIds,
+    private baselineClean: boolean,
   ) {
     for (const code of codes) {
       const now = new Date().toISOString();
@@ -474,6 +489,17 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     const [warehouseRows] = await connections.writer.query<RowDataPacket[]>(`SELECT id FROM almacenes
       WHERE id<>? AND (id_equipo IS NULL OR id_equipo<>?) ORDER BY id LIMIT 1`, [a05.originWarehouseId, a05.equipmentId]);
     if (!warehouseRows[0]) throw new Error("test_database_moved_warehouse_unavailable");
+    const evidenceDirectory = resolve(repositoryRoot, "local-data/test-database/evidence");
+    const checksumFiles = (await readdir(evidenceDirectory)).filter((name) => /^table-checksums-\d{8}T\d{6}Z\.tsv$/.test(name)).sort();
+    const latestChecksumFile = checksumFiles.at(-1);
+    let baselineClean = false;
+    if (latestChecksumFile) {
+      const expected = new Map((await readFile(resolve(evidenceDirectory, latestChecksumFile), "utf8")).trim().split("\n")
+        .map((line) => line.split("\t") as [string, string]));
+      const [actualRows] = await connections.writer.query<RowDataPacket[]>(`CHECKSUM TABLE ${resetMutationTables
+        .map((table) => `test_database.\`${table}\``).join(",")}`);
+      baselineClean = actualRows.every((row) => expected.get(String(row.Table)) === String(row.Checksum));
+    }
     const repository = new TestDatabaseScenarioRepository(connections, {
       A02: { flowId: Number(a02Rows[0].flowId) },
       A03: { workOrderId: Number(a03Rows[0].workOrderId), materialId: Number(a03Rows[0].materialId) },
@@ -481,15 +507,33 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
         serialId: Number(a05.serialId), originWarehouseId: Number(a05.originWarehouseId),
         movedWarehouseId: Number(warehouseRows[0].id),
       },
-    });
+    }, baselineClean);
     for (const code of codes) repository.touch(code, "reset", "clean_baseline");
     return repository;
   }
 
   supportedCases(code: string): ScenarioCase[] { return cases[asCode(code)]; }
+  isBaselineClean(): boolean { return this.baselineClean; }
   tracks(code: ScenarioRuleCode, key: number, sourceTimestamp?: string): boolean {
     if (this.trackingOverrides.has(code) || !this.sourceCutoffAt) return this.tracked.get(code)!.has(key);
     return Boolean(sourceTimestamp) && Date.parse(String(sourceTimestamp)) >= Date.parse(this.sourceCutoffAt);
+  }
+  async latestSourceTimestamp(): Promise<string> {
+    await this.connections.requireReady();
+    const [rows] = await this.connections.monitor.query<RowDataPacket[]>(`SELECT MAX(source_time) AS latestSourceTimestamp FROM (
+      SELECT MAX(f.fecha_creacion) AS source_time FROM flujo_materiales_detalles f
+        WHERE f.id_orden_trabajo_material IS NOT NULL AND f.fecha_eliminacion IS NULL
+      UNION ALL
+      SELECT MAX(ot.fecha_inicio_ejecucion) AS source_time FROM ordenes_trabajo ot
+        WHERE ot.fecha_eliminacion IS NULL AND ot.eliminado=0
+      UNION ALL
+      SELECT MAX(s.fecha_creacion) AS source_time FROM articulo_serial s
+        WHERE s.fecha_eliminacion IS NULL
+    ) source_times`);
+    const value = rows[0]?.latestSourceTimestamp;
+    const timestamp = value instanceof Date ? value : new Date(String(value ?? ""));
+    if (!Number.isFinite(timestamp.getTime())) throw new Error("test_database_latest_source_timestamp_unavailable");
+    return timestamp.toISOString();
   }
   replaceTracked(code: ScenarioRuleCode, keys: number[]): void {
     this.tracked.set(code, new Set(keys));
@@ -602,14 +646,27 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     await this.connections.requireReady();
     const tracked = this.tracked.get(code)!;
     if (code === "A02" && action === "prepare_dispatch") {
-      const [rows] = await this.connections.monitor.query<RowDataPacket[]>(`SELECT flow.id
+      const [[rows], [generatedRows]] = await Promise.all([
+        this.connections.monitor.query<RowDataPacket[]>(`SELECT flow.id
         FROM flujo_materiales_detalles flow
         JOIN ordenes_trabajo work_order ON work_order.id=flow.id_orden_trabajo
         WHERE flow.fecha_eliminacion IS NULL
           AND flow.id_orden_trabajo_material IS NOT NULL
+          AND flow.cantidad_entransito_uso>0
+          AND flow.id_almacen_origen IS NOT NULL
+          AND flow.id_almacen_destino IS NOT NULL
+          AND flow.id_almacen_origen<>flow.id_almacen_destino
+          AND COALESCE(flow.observacion,'') NOT LIKE 'MONITOR-STAGE5-%'
           AND work_order.fecha_eliminacion IS NULL AND work_order.eliminado=0
-        ORDER BY flow.id LIMIT 1`);
-      return Number(rows[0]?.id) || null;
+        ORDER BY flow.id LIMIT 500`),
+        this.connections.monitor.query<RowDataPacket[]>(`SELECT COUNT(*) AS generatedCount
+          FROM flujo_materiales_detalles
+          WHERE observacion='MONITOR-STAGE5-A02-DISPATCH' AND fecha_eliminacion IS NULL`),
+      ]);
+      if (rows.length === 0) return null;
+      const generatedCount = Number(generatedRows[0]?.generatedCount ?? 0);
+      const candidate = rows[generatedCount % rows.length];
+      return Number(candidate?.id) || null;
     }
     if (code === "A03" && action === "start_work_order") {
       const [rows] = await this.connections.monitor.query<RowDataPacket[]>(`SELECT candidate.id
@@ -696,8 +753,16 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     const state = this.state(ruleCode);
     if (ruleCode === "A02" && action === "prepare_dispatch") {
         const templateId = key ?? this.fixtureIds.A02.flowId;
-        const [templateRows] = await connection.query<RowDataPacket[]>("SELECT estado FROM flujo_materiales_detalles WHERE id=? FOR UPDATE", [templateId]);
+        const [templateRows] = await connection.query<RowDataPacket[]>(`SELECT estado,cantidad_entransito_uso AS quantity,
+          id_almacen_origen AS originWarehouseId,id_almacen_destino AS destinationWarehouseId
+          FROM flujo_materiales_detalles WHERE id=? FOR UPDATE`, [templateId]);
         if (!templateRows[0]) throw new Error("movement_unavailable");
+        const quantity = Number(input.quantity ?? templateRows[0].quantity);
+        const originWarehouseId = Number(input.originWarehouseId ?? templateRows[0].originWarehouseId);
+        const destinationWarehouseId = Number(input.destinationWarehouseId ?? templateRows[0].destinationWarehouseId);
+        if (!Number.isFinite(quantity) || quantity <= 0) throw new Error("movement_quantity_must_be_positive");
+        if (!Number.isSafeInteger(originWarehouseId) || !Number.isSafeInteger(destinationWarehouseId)
+          || originWarehouseId === destinationWarehouseId) throw new Error("movement_warehouses_must_differ");
         await connection.execute(`INSERT INTO flujo_materiales_detalles
           (id_articulo,nombre_articulo,id_unidad_uso,cantidad_entransito_uso,id_unidad_inventario,cantidad_entransito_inventario,costo_promedio,
            id_articulo_serial,id_lote,id_almacen_origen,id_almacen_destino,id_ubicacion_almacen_origen,id_ubicacion_almacen_destino,observacion,
@@ -910,6 +975,7 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     this.tracked.set("A02", new Set([this.fixtureIds.A02.flowId]));
     this.tracked.set("A03", new Set([this.fixtureIds.A03.workOrderId]));
     this.tracked.set("A05", new Set([this.fixtureIds.A05.serialId]));
+    this.baselineClean = true;
     for (const code of codes) this.touch(code, "reset", "clean_baseline");
   }
 
@@ -984,7 +1050,7 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
         LEFT JOIN unidades unit ON unit.id=f.id_unidad_uso LEFT JOIN almacenes origin_warehouse ON origin_warehouse.id=f.id_almacen_origen
         LEFT JOIN almacenes destination_warehouse ON destination_warehouse.id=f.id_almacen_destino
         WHERE f.id_orden_trabajo_material IS NOT NULL AND f.fecha_eliminacion IS NULL
-          AND ${cutoff ? "f.fecha_creacion>=?" : `f.id IN (${placeholders})`} ORDER BY f.id`, cutoff ? [currentAt, cutoff] : [currentAt, ...keys]);
+          AND ${cutoff ? "f.fecha_creacion>=? AND f.fecha_creacion<=?" : `f.id IN (${placeholders})`} ORDER BY f.id`, cutoff ? [currentAt, cutoff, currentAt] : [currentAt, ...keys]);
       return { rows: rows.map((row) => normalizeRow(row)), sourceRevision: this.revision(code) };
     }
     if (code === "A03") {
@@ -998,7 +1064,7 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
         FROM ordenes_trabajo ot LEFT JOIN orden_trabajo_materiales material ON material.id_orden_trabajo=ot.id
         LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion
         WHERE ot.fecha_eliminacion IS NULL AND ot.eliminado=0
-          AND ${cutoff ? "ot.fecha_inicio_ejecucion>=?" : `ot.id IN (${placeholders})`} GROUP BY ot.id ORDER BY ot.id`, cutoff ? [currentAt, cutoff] : [currentAt, ...keys]);
+          AND ${cutoff ? "ot.fecha_inicio_ejecucion>=? AND ot.fecha_inicio_ejecucion<=?" : `ot.id IN (${placeholders})`} GROUP BY ot.id ORDER BY ot.id`, cutoff ? [currentAt, cutoff, currentAt] : [currentAt, ...keys]);
       return { rows: rows.map((row) => normalizeRow(row)), sourceRevision: this.revision(code) };
     }
     const [rows] = await this.connections.writer.query<RowDataPacket[]>(`SELECT s.id AS articleSerialId,TIMESTAMPDIFF(MINUTE,s.fecha_creacion,?) AS declaredAgeMinutes,
@@ -1011,7 +1077,11 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
       FROM articulo_serial s JOIN ordenes_trabajo ot ON ot.id=COALESCE(s.id_orden_trabajo_origen,s.id_ultimo_orden_trabajo_cierre)
       LEFT JOIN almacenes warehouse ON warehouse.id=s.id_almacen LEFT JOIN equipos e ON e.id=ot.id_equipo LEFT JOIN operaciones o ON o.id=ot.id_operacion
       WHERE s.fecha_eliminacion IS NULL
-        AND ${cutoff ? "s.fecha_creacion>=?" : `s.id IN (${placeholders})`} ORDER BY s.id`, cutoff ? [currentAt, cutoff] : [currentAt, ...keys]);
+        AND s.estado IN ('CONFIRMAR_PESO','DISPONIBLE')
+        AND ((s.tipo='PRODUCTO_EN_PROCESO' AND s.id_orden_trabajo_origen IS NOT NULL)
+          OR (s.tipo IN ('ARTICULO','SALDO','SOBRANTE') AND s.id_ultimo_orden_trabajo_cierre IS NOT NULL))
+        AND ot.eliminado=0
+        AND ${cutoff ? "s.fecha_creacion>=? AND s.fecha_creacion<=?" : `s.id IN (${placeholders})`} ORDER BY s.id`, cutoff ? [currentAt, cutoff, currentAt] : [currentAt, ...keys]);
     return { rows: rows.map((row) => normalizeRow(row)), sourceRevision: this.revision(code) };
   }
 
@@ -1124,7 +1194,11 @@ export class TestDatabaseScenarioRepository implements ScenarioSource {
     state.lastActionRecordedAt = recordedAt;
     if (selected) state.selectedCase = selected;
     state.pendingFault = null;
-    if (changed) { state.revision += 1; state.sourceChangedAt = recordedAt; }
+    if (changed) {
+      state.revision += 1;
+      state.sourceChangedAt = recordedAt;
+      if (action !== "reset") this.baselineClean = false;
+    }
   }
 }
 

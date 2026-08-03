@@ -141,6 +141,9 @@ test("experiment runtime preserves cadence, serializes crossed polls, freezes wh
     });
     assert.equal(sourceCutoff, created.experiment!.sourceCutoffAt);
     const id = created.experiment!.id;
+    const narrowed = await runtime.setSourceLookbackDays(id, -3);
+    assert.equal(narrowed.experiment!.sourceCutoffAt, "2026-07-29T09:00:00.000Z");
+    assert.equal(sourceCutoff, narrowed.experiment!.sourceCutoffAt);
     for (const seconds of [1, 2, 3, 17, 60] as const) {
       const configured = await runtime.configure(id, seconds, 3);
       assert.equal(configured.realMillisecondsPerSimulatedMinute, seconds * 1_000);

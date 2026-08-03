@@ -137,6 +137,18 @@ describe("Phase 6 conversations", () => {
     assert.equal(Number(listAfterRead.conversations[0]!.unreadCount), 0);
   });
 
+  it("reads alert resolution guidance from Monitor persistence", async () => {
+    const { service, ana, principal, incident } = await setup();
+    const attached = await incident("00000000-0000-4000-8000-000000000014");
+    const page = await service.messages(attached!.conversationId, principal(ana));
+    const alert = (page.messages as Array<Record<string, unknown>>).find((message) => message.kind === "alert");
+    assert.ok(alert);
+    assert.deepEqual(alert.resolutionGuidance, [
+      "Registra la recepción real del material, o corrige, cancela o rechaza el movimiento.",
+      "Si no puede reconstruirse el traspaso anterior desde los registros de origen, cierra sin resolución conservando el último estado y destino registrados; no infieras la llegada ni la ubicación física.",
+    ]);
+  });
+
   it("keeps the administrator inbox participant-only until all conversations is requested", async () => {
     const { service, ana, carlos, maria, principal, incident } = await setup();
     await incident("00000000-0000-4000-8000-000000000012", [ana, carlos]);

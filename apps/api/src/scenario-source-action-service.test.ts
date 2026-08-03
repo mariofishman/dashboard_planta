@@ -69,6 +69,10 @@ describe("scenario source-action service", () => {
     assert.deepEqual(result.input, input);
     await rejects(subject.value.execute({ actionId: "a03.start_work_order", key: 12198, input: { machineId: 0 } }, admin), 400, "invalid_source_action_input");
     await rejects(subject.value.execute({ actionId: "a03.close_work_order", key: 12198, input: { machineId: 8 } }, admin), 400, "invalid_source_action_input");
+    await rejects(subject.value.execute({
+      actionId: "a02.prepare_dispatch", key: 12198,
+      input: { originWarehouseId: 7, destinationWarehouseId: 7 },
+    }, admin), 400, "movement_warehouses_must_differ");
   });
 
   it("resolves a fresh source candidate for connected creation actions", async () => {

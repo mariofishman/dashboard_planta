@@ -54,8 +54,9 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
         && event.payload.complete === true && event.payload.fullEvaluation === true) latestSuccessfulPollIndex = index;
     });
     const pendingRecordKeys = new Set<number>();
-    for (const event of runtimeEvents.slice(latestSuccessfulPollIndex + 1)
-      .filter((candidate) => candidate.ruleCode === code && candidate.eventType === "source_action")) {
+    const pendingSourceActions = runtimeEvents.slice(latestSuccessfulPollIndex + 1)
+      .filter((candidate) => candidate.ruleCode === code && candidate.eventType === "source_action");
+    for (const event of pendingSourceActions) {
       const actionId = String(event.payload.actionId ?? "");
       const naturalKeyValue = Number((event.payload.naturalKey as Record<string, unknown> | undefined)?.value);
       if (actionId !== "a02.prepare_dispatch" && Number.isSafeInteger(naturalKeyValue)) pendingRecordKeys.add(naturalKeyValue);
@@ -68,15 +69,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
         if (item.table === primaryTable && Number.isSafeInteger(key)) pendingRecordKeys.add(key);
       }
     }
-    const currentSource = await options.source.status(code);
-    const source = pristineExperiment ? {
-      ...currentSource,
-      sourceState: {
-        ...currentSource.sourceState,
-        rows: [],
-        evaluation: { status: "clear", reasons: [] },
-      },
-    } : currentSource;
+    const source = await options.source.status(code);
     const activeRows = source.sourceState.rows.filter((row) => {
       const key = recordKey(code, row);
       if (pendingRecordKeys.has(key)) return true;
@@ -84,7 +77,13 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
       if (code === "A03") return row.active === true && Number(row.consumptionCount) === 0;
       return row.notWeighed === true || row.movedFromMachine !== true;
     });
-    const visibleRows = activeOnly ? activeRows : source.sourceState.rows;
+    const visibleRows = [...(activeOnly ? activeRows : source.sourceState.rows)];
+    if (code === "A02") visibleRows.sort((left, right) => {
+      const timestampDifference = Date.parse(String(right.dispatchedAt)) - Date.parse(String(left.dispatchedAt));
+      return Number.isFinite(timestampDifference) && timestampDifference !== 0
+        ? timestampDifference
+        : recordKey(code, right) - recordKey(code, left);
+    });
     const totalRecords = visibleRows.length;
     const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
     const page = Math.min(requestedPage, totalPages);
@@ -203,7 +202,9 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
       expectedResult: {
         sourceCondition: source.sourceState.evaluation.status,
         reasons: source.sourceState.evaluation.reasons,
-        awaitingPoll: sourceChangePending || pendingFailure,
+        awaitingPoll: pendingSourceActions.length > 0
+          || (!activeRuntime.experiment && sourceChangePending && source.lastAction !== "reset")
+          || pendingFailure,
         nextPoll: expectedAction,
         incidentLifecycle: nextLifecycle,
         occurrence: expectedOccurrence,
@@ -232,6 +233,57 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
   const all = async (page = 1, pageSize = 50, activeOnly = false) => Promise.all(codes.map((code) => status(code, page, pageSize, activeOnly)));
   const guard = { preHandler: app.requireScopes(["monitor:admin"]) };
 
+  app.get<{ Querystring: { ruleCode?: string; sourceKey?: string; experimentId?: string } }>("/api/dev/scenario-alert-messages", guard, async (request, reply) => {
+    if (!request.query.ruleCode || !codes.includes(request.query.ruleCode as ScenarioCode)
+      || !request.query.sourceKey || !Number.isSafeInteger(Number(request.query.sourceKey))) {
+      return reply.code(400).send({ error: "scenario_alert_selection_required" });
+    }
+    const selectedRuleCode = request.query.ruleCode as ScenarioCode;
+    const selectedSourceKey = Number(request.query.sourceKey);
+    const active = request.query.experimentId ? null : await options.experiments.activeRuntime();
+    const experimentId = request.query.experimentId ?? active?.experiment?.id;
+    if (!experimentId) return { items: [] };
+    const events = await options.experiments.runtimeEvents(experimentId);
+    const cycleIds = [...new Set(events
+      .filter((event) => event.eventType === "poll_completed" && typeof event.payload.cycleId === "string")
+      .map((event) => String(event.payload.cycleId)))];
+    if (cycleIds.length === 0) return { items: [] };
+    const rows = await options.database.queryAll(`SELECT m.id,m.cursor,m.sender_sys_user_id AS "senderSysUserId",
+      m.sender_name AS "senderName",m.kind,m.body,m.payload,m.reply_to_message_id AS "replyToMessageId",
+      m.sent_at AS "sentAt",m.edited_at AS "editedAt",m.deleted_at AS "deletedAt",
+      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=m.id AND r.delivered_at IS NOT NULL) AS "deliveredCount",
+      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=m.id AND r.read_at IS NOT NULL) AS "readCount",
+      i.lifecycle,i.rule_code AS "ruleCode",i.condition_key AS "conditionKey",g.steps AS "resolutionGuidance",
+      (SELECT rd.resolved_recipients FROM monitor_routing_decision rd
+        WHERE rd.incident_id=i.id ORDER BY rd.evaluated_at DESC LIMIT 1) AS recipients
+      FROM monitor_message m
+      JOIN monitor_incident i ON m.kind='alert' AND m.payload->>'id'=i.id::text
+      LEFT JOIN monitor_alert_guidance g ON g.rule_code=i.rule_code
+      WHERE i.rule_code=$2 AND i.condition_key=$3
+      AND EXISTS (SELECT 1 FROM monitor_incident_evidence e WHERE e.incident_id=i.id AND e.cycle_id=ANY($1::uuid[]))
+      ORDER BY m.sent_at DESC,m.cursor DESC LIMIT 12`, [cycleIds, selectedRuleCode, incidentConditionKey(selectedRuleCode, selectedSourceKey)]);
+    return { items: rows.flatMap(({ lifecycle, ruleCode, conditionKey, resolutionGuidance, recipients, ...message }) => {
+      const sourceKey = Number(String(conditionKey).split(":").at(-1));
+      const guidance = (typeof resolutionGuidance === "string" ? JSON.parse(resolutionGuidance) : resolutionGuidance) as unknown;
+      const routed = (typeof recipients === "string" ? JSON.parse(recipients) : recipients) as unknown;
+      return codes.includes(ruleCode as ScenarioCode) && Number.isSafeInteger(sourceKey)
+        ? [{
+          message: { ...message, resolutionGuidance: Array.isArray(guidance) ? guidance.filter((step): step is string => typeof step === "string") : [] },
+          lifecycle,
+          ruleCode,
+          sourceKey,
+          recipients: Array.isArray(routed) ? routed.flatMap((recipient) => {
+            if (!recipient || typeof recipient !== "object") return [];
+            const candidate = recipient as Record<string, unknown>;
+            return typeof candidate.name === "string" && typeof candidate.role === "string"
+              ? [{ name: candidate.name, role: candidate.role }]
+              : [];
+          }) : [],
+        }]
+        : [];
+    }) };
+  });
+
   app.get<{ Querystring: { page?: string; pageSize?: string; activeOnly?: string } }>("/api/dev/scenarios", guard, async (request, reply) => {
     const page = request.query.page === undefined ? 1 : Number(request.query.page);
     const pageSize = request.query.pageSize === undefined ? 50 : Number(request.query.pageSize);
@@ -245,9 +297,13 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
   });
 
   app.get("/api/dev/scenario-runtime", guard, async () => options.runtime.status());
+  app.get("/api/dev/scenario-source-window", guard, async (_request, reply) => {
+    if (!options.source.latestSourceTimestamp) return reply.code(501).send({ error: "scenario_source_window_unavailable" });
+    return { earliestExperimentStartAt: await options.source.latestSourceTimestamp(), defaultSourceLookbackDays: -30 };
+  });
   app.get("/api/dev/test-database-reset", guard, async (_request, reply) => {
     if (!options.reset) return reply.code(404).send({ error: "test_database_reset_unavailable" });
-    return options.reset.status();
+    return { ...options.reset.status(), baselineClean: options.source.isBaselineClean?.() ?? false };
   });
   app.post<{ Body: { confirmation?: unknown } }>("/api/dev/test-database-reset", guard, async (request, reply) => {
     if (!options.reset) return reply.code(404).send({ error: "test_database_reset_unavailable" });
@@ -289,7 +345,11 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     if ((request.query.from && !Number.isFinite(Date.parse(request.query.from))) || (request.query.to && !Number.isFinite(Date.parse(request.query.to)))) {
       return reply.code(400).send({ error: "invalid_scenario_history_time_filter" });
     }
-    const events = await options.experiments.operationalEvents(code);
+    const [events, currentSourceStatus] = await Promise.all([
+      options.experiments.operationalEvents(code),
+      options.source.status(code),
+    ]);
+    const currentSourceByKey = new Map(currentSourceStatus.sourceState.rows.map((row) => [recordKey(code, row), row]));
     const primaryTable = code === "A02" ? "flujo_materiales_detalles" : code === "A03" ? "ordenes_trabajo" : "articulo_serial";
     const records = new Map<string, Record<string, unknown>>();
     for (const event of [...events].reverse()) {
@@ -313,6 +373,7 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
         id, experimentId: event.experimentId, experimentName: event.experimentName, experimentStatus: event.experimentStatus,
         ruleCode: code, sourceKey, firstAt, lastAt: event.businessTime, recordedAt: event.recordedAt,
         actionIds: [...((existing?.actionIds as string[] | undefined) ?? []), actionId], eventCount: Number(existing?.eventCount ?? 0) + 1,
+        timeline: [...((existing?.timeline as { actionId: string; at: string }[] | undefined) ?? []), { actionId, at: event.businessTime }],
         input: payload.input ?? existing?.input ?? null, evidence: evidence ?? existing?.evidence ?? {},
         sourceState: evidence?.estado ?? evidence?.tipo ?? actionId, durationMinutes,
         timingOutcome: terminal ? (Number(durationMinutes) <= threshold ? "on_time" : "late") : "active",
@@ -326,8 +387,15 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
     for (const record of records.values()) {
       const evidence = record.evidence as Record<string, unknown>;
       const sourceKey = String(record.sourceKey);
-      const incident = await options.database.queryOne(`SELECT lifecycle FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2 ORDER BY occurrence DESC LIMIT 1`, [code, incidentConditionKey(code, sourceKey)]);
-      const item: Record<string, unknown> = { ...record, incidentOutcome: incident.lifecycle ? String(incident.lifecycle) : "none" };
+      const incident = await options.database.queryOne(`SELECT COUNT(*)::int AS "incidentCount",
+        (SELECT lifecycle FROM monitor_incident latest WHERE latest.rule_code=$1 AND latest.condition_key=$2 ORDER BY occurrence DESC LIMIT 1) AS lifecycle
+        FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2`, [code, incidentConditionKey(code, sourceKey)]);
+      const item: Record<string, unknown> = {
+        ...record,
+        currentSource: currentSourceByKey.get(Number(record.sourceKey)) ?? null,
+        incidentCount: Number(incident.incidentCount ?? 0),
+        incidentOutcome: incident.lifecycle ? String(incident.lifecycle) : "none",
+      };
       const input = (item.input && typeof item.input === "object" ? item.input : {}) as Record<string, unknown>;
       const exact = (query: string | undefined, values: unknown[]) => !query || values.some((value) => String(value ?? "").toLowerCase() === query.toLowerCase());
       if (request.query.experimentId && String(item.experimentId) !== request.query.experimentId
@@ -371,6 +439,10 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
       return reply.code(400).send({ error: "invalid_scenario_experiment" });
     }
     try {
+      if (options.source.latestSourceTimestamp) {
+        const earliest = Date.parse(await options.source.latestSourceTimestamp());
+        if (Date.parse(body.businessTime) < earliest) return reply.code(400).send({ error: "scenario_experiment_before_source_baseline" });
+      }
       return await options.runtime.create({
         name: body.name,
         businessTime: body.businessTime,
@@ -394,6 +466,15 @@ export async function scenarioRoutes(app: FastifyInstance, options: {
       return await options.runtime.configure(request.params.id, request.body.secondsPerSimulatedMinute, request.body.pollingFrequencyMinutes);
     } catch (error) {
       if (error instanceof Error && ["invalid_scenario_speed", "invalid_scenario_frequency"].includes(error.message)) return reply.code(400).send({ error: error.message });
+      if (error instanceof Error && ["scenario_experiment_not_active", "scenario_experiment_not_found"].includes(error.message)) return reply.code(404).send({ error: error.message });
+      throw error;
+    }
+  });
+  app.put<{ Params: { id: string }; Body: { sourceLookbackDays?: unknown } }>("/api/dev/scenario-runtime/:id/source-window", guard, async (request, reply) => {
+    if (!validSourceLookbackDays(request.body?.sourceLookbackDays)) return reply.code(400).send({ error: "invalid_scenario_source_lookback" });
+    try { return await options.runtime.setSourceLookbackDays(request.params.id, request.body.sourceLookbackDays); }
+    catch (error) {
+      if (error instanceof Error && error.message === "invalid_scenario_source_lookback") return reply.code(400).send({ error: error.message });
       if (error instanceof Error && ["scenario_experiment_not_active", "scenario_experiment_not_found"].includes(error.message)) return reply.code(404).send({ error: error.message });
       throw error;
     }

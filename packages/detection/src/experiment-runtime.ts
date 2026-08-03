@@ -97,6 +97,16 @@ export class ScenarioExperimentRuntime {
     });
   }
 
+  async setSourceLookbackDays(id: string, sourceLookbackDays: number): Promise<ScenarioRuntimeStatus> {
+    return this.serialized(async () => {
+      await this.requireActive(id);
+      const experiment = await this.repository.setSourceLookbackDays(id, sourceLookbackDays);
+      await this.source.setSourceCutoffAt?.(experiment.sourceCutoffAt);
+      const runtime = await this.repository.activeRuntime();
+      return this.describe(experiment, runtime.nextTickAt);
+    });
+  }
+
   async pause(id: string, paused: boolean): Promise<ScenarioRuntimeStatus> {
     return this.serialized(async () => {
       await this.requireActive(id);

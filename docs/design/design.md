@@ -26,6 +26,8 @@ Use semantic tokens rather than primitive colors in product code:
 - `semantic.color.canvas`, `surface`, and `border` — page hierarchy and separation.
 - `semantic.color.textPrimary`, `textSecondary`, and inverse variants — readable content hierarchy.
 - `semantic.color.lifecycleOpen`, `lifecycleResolved`, and `lifecycleClosed` — incident lifecycle only.
+- `semantic.color.alertOpenBorder`, `alertOpenHeader`, and `alertOpenLabelBorder` — open structured-chat alert framing and descriptive-label border.
+- `semantic.color.alertResolvedBorder` and `alertResolvedHeader` — resolved structured-chat alert framing.
 - `semantic.color.unresolvedAgeRoutine` and `unresolvedAgeEscalated` — unresolved-duration text in structured chat alert objects before and from the approved two-hour threshold.
 - `color.chart.*` — ordered data-series separation, never decoration.
 

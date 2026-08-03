@@ -72,6 +72,8 @@ export interface ScenarioSource {
   advanceTime(code: string, minutes: number): Promise<ScenarioStatus>;
   setBusinessTime(currentAt: string): Promise<void>;
   setSourceCutoffAt?(cutoffAt: string | null): Promise<void>;
+  latestSourceTimestamp?(): Promise<string>;
+  isBaselineClean?(): boolean;
   failNextPoll(code: string, fault: ScenarioFault): Promise<ScenarioStatus>;
   consumeFault(code: ScenarioRuleCode): Promise<ScenarioFault | null>;
   rows(code: ScenarioRuleCode): Promise<{ rows: Record<string, unknown>[]; sourceRevision: string }>;

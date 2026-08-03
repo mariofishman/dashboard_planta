@@ -234,14 +234,21 @@ export class ConversationService {
     const limit = Math.min(100, Math.max(1, options.limit ?? 50));
     const participants = await this.database.queryOne(`SELECT COUNT(*)::int AS count,string_agg(display_name,', ' ORDER BY display_name) AS names
       FROM monitor_conversation_participant WHERE conversation_id=$1 AND removed_at IS NULL`, [conversationId]);
-    const rows = await this.database.queryAll(`SELECT id,cursor,sender_sys_user_id AS "senderSysUserId",sender_name AS "senderName",kind,body,payload,
-      reply_to_message_id AS "replyToMessageId",sent_at AS "sentAt",edited_at AS "editedAt",deleted_at AS "deletedAt",
-      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=monitor_message.id AND r.delivered_at IS NOT NULL) AS "deliveredCount",
-      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=monitor_message.id AND r.read_at IS NOT NULL) AS "readCount"
-      FROM monitor_message WHERE conversation_id=$1 AND ($2::bigint IS NULL OR cursor<$2) ORDER BY cursor DESC LIMIT $3`,
+    const rows = await this.database.queryAll(`SELECT m.id,m.cursor,m.sender_sys_user_id AS "senderSysUserId",m.sender_name AS "senderName",m.kind,m.body,m.payload,
+      m.reply_to_message_id AS "replyToMessageId",m.sent_at AS "sentAt",m.edited_at AS "editedAt",m.deleted_at AS "deletedAt",
+      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=m.id AND r.delivered_at IS NOT NULL) AS "deliveredCount",
+      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=m.id AND r.read_at IS NOT NULL) AS "readCount",
+      g.steps AS "resolutionGuidance"
+      FROM monitor_message m
+      LEFT JOIN monitor_alert_guidance g ON m.kind='alert' AND g.rule_code=COALESCE(m.payload->>'ruleCode',m.payload->>'code')
+      WHERE m.conversation_id=$1 AND ($2::bigint IS NULL OR m.cursor<$2) ORDER BY m.cursor DESC LIMIT $3`,
     [conversationId, options.before ?? null, limit + 1]);
     return {
-      messages: rows.slice(0, limit).reverse().map((row) => ({ ...row, payload: json(row.payload) })),
+      messages: rows.slice(0, limit).reverse().map((row) => ({
+        ...row,
+        payload: json(row.payload),
+        resolutionGuidance: row.resolutionGuidance ? json<string[]>(row.resolutionGuidance) : [],
+      })),
       nextCursor: rows.length > limit ? Number(rows[limit - 1]!.cursor) : null,
       writableUntil: conversation.writable_until ? String(conversation.writable_until) : null,
       title: String(conversation.title),
