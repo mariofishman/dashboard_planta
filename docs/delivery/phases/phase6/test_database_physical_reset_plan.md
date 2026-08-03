@@ -4,7 +4,7 @@
 
 **Planned branch:** `codex/phase6-test-database-reset-performance`
 
-**Status:** Discovery approved; implementation has not started.
+**Status:** Implementation and local verification complete from committed checkpoint `81bd9ed`; pending separate review and acceptance.
 
 ## Branch instruction
 
@@ -73,7 +73,7 @@ The physical template is not the active database and is never mounted as the liv
 8. Never run MySQL directly from the sealed template archive.
 9. Never expose a prepared volume to the laboratory. After complete validation, shut it down cleanly, remove its validator container, and seal its exact volume identity in external state.
 10. Preserve the previous dirty volume until the promoted database passes all routine safety checks. Delete it only after success.
-11. Publish readiness last. A failure leaves application accounts locked and readiness absent.
+11. Publish readiness last. A failed replacement first restores the preserved previous working volume and its application access. Only a failed replacement plus failed rollback leaves application accounts locked and readiness absent.
 12. Never attempt to repair questionable physical database files in place and then call them the accepted baseline. Discard the failed copy and rebuild from a trusted source.
 13. Background template and standby work must use candidate-specific state and evidence directories. It must never remove, replace, or trust the active runtime's public readiness file.
 
@@ -116,7 +116,7 @@ A physical InnoDB rebuild is not required to produce byte-identical files becaus
 4. Run the original full SQL restore into the temporary instance, including its exact transformation and warning-profile checks.
 5. Run the complete existing baseline validation: runtime, schema, tables, views, rows, auto-increments, enums, permissions, application capabilities, relationships, and table checksums.
 6. Relock application accounts, keep candidate-local readiness absent, and shut MySQL down cleanly with a bounded timeout. Abort if clean shutdown cannot be proved. Do not modify the live runtime's public readiness.
-7. Mount the stopped volume read-only in a disposable archive helper using the pinned image. Generate the file inventory and `template.tar.zst` without following links or accepting unexpected file types.
+7. Mount the stopped volume read-only in a disposable archive helper using the pinned image. Generate the file inventory and `template.tar.zst` without following links or accepting unexpected file types. Exclude only the exact MySQL-created `./mysql.sock -> /var/run/mysqld/mysqld.sock` runtime symlink; reject every other link or special file.
 8. Run the compression-format test and verify the archive and inventory digests. Then remove the first temporary volume before allocating the verification volume so the initial 16.5 GB of free Colima space is not exhausted.
 9. Verify the archive by extracting it into a second temporary volume, verifying every inventoried file, starting MySQL, and rerunning complete validation.
 10. Shut the verification instance down cleanly. Write the final manifest and certification marker, set restrictive permissions, and atomically publish the derived directory.
@@ -129,16 +129,16 @@ Run this automatically after template certification, after every successful rese
 
 1. Acquire an atomic preparation lock and refuse concurrent preparation.
 2. Verify the external trust anchors, archive size and digest, manifest schema, pinned image, binary-log policy, and available disk before creating anything.
-3. Create a unique candidate Docker volume. Extract `template.tar.zst` into it with a single low-priority decompression worker.
+3. Create a unique candidate Docker volume with the approved candidate role, attempt, and template-digest labels. Docker volume labels are immutable after creation, so external seal publication—not a later label mutation—promotes the candidate to sealed status.
 4. Verify the extracted file inventory before MySQL starts.
 5. Start an isolated validator container with no published port. Use the same structural MySQL settings as the live runtime; resource-only validation settings may be lower so the live laboratory remains responsive.
 6. Confirm root credential compatibility without exposing credentials.
 7. Run the complete baseline and capability validation while the active dirty database remains available.
 8. Relock the application accounts, keep candidate-local readiness absent, and shut the validator down cleanly. Candidate validation must write only to its attempt-specific evidence directory and must not update the live runtime's `latest` evidence pointers.
 9. Remove the validator container and verify the candidate volume has no container references or mounts.
-10. Apply the approved sealed-standby Docker labels. Write an external sealed-standby record containing the exact volume name, Docker labels, template and manifest digests, validation-evidence digest, validation time, and clean-shutdown proof. Publish this record atomically only after every step succeeds.
+10. Verify the candidate's creation-time Docker labels. Write an external sealed-standby record containing the exact volume name, Docker labels, template and manifest digests, validation-evidence digest, validation time, and clean-shutdown proof. Publish this record atomically only after every step succeeds.
 11. On failure, remove the candidate volume, preserve value-free diagnostics, keep any previously sealed standby, and leave the active database unchanged.
-12. Redirect all detached-process output before the API reset child exits. Use the preparation lock and state record rather than trusting a PID alone.
+12. Redirect all detached-process output before the API reset child exits. On the approved macOS/Colima host, use a one-shot LaunchAgent with `KeepAlive=false` so preparation survives the reset shell without restarting after completion or failure. Use the preparation lock and state record rather than trusting a PID alone.
 
 Background preparation may consume CPU, memory, and disk, but must run at low priority. Benchmark the chosen resource limits and prove that preparation cannot exhaust the 8 GB Colima runtime or make the live laboratory unusable.
 
@@ -185,7 +185,7 @@ If the prepared copy is missing, corrupt, blocked, or fails a quick check:
 6. If physical reconstruction or promotion still fails, create another new candidate volume and invoke the protected SQL reconstruction there with binary logging disabled. Never run fallback reconstruction inside the preserved dirty volume.
 7. Run complete validation on the SQL-restored candidate, shut it down cleanly, and promote it through the same volume-switch sequence.
 8. Publish readiness and delete the dirty volume only after one recovery path succeeds.
-9. If every recovery path fails, leave readiness absent, accounts locked, and the dirty volume preserved for diagnosis. Report the exact failed phase without exposing data or credentials.
+9. If every clean recovery path fails, recreate the public runtime around the preserved dirty volume, verify its quick application capabilities, unlock its accounts, and republish readiness. Report that the reset failed and the previous working database was restored. Only if that rollback also fails may readiness remain absent and accounts locked.
 
 The slow SQL fallback is successful recovery, not a performance pass, and may take approximately two-and-a-half minutes.
 
@@ -212,7 +212,9 @@ Backends must not unlock accounts, publish readiness, remove lifecycle locks, or
 - `scripts/test-database-runtime.sh`
 - `scripts/test-database-validate.sh`
 - `scripts/test-database-restore-full.sh`
+- `scripts/test-database-driver-probe.mjs`
 - New physical-template, standby-preparation, manifest, and contract-test scripts under `scripts/`
+- Canonical runtime-path readers and connected-test availability gates in `packages/detection/`, `apps/api/`, and the Stage 5 connected scripts
 - `package.json` commands
 - `docs/delivery/phases/phase6/test_database.md`
 - The ignored physical template under `local-data/database/derived/`
@@ -286,7 +288,8 @@ Cover at minimum:
 - crash after stopping the dirty database but before promotion;
 - quick-check failure followed by successful physical recovery;
 - physical recovery failure followed by successful SQL fallback;
-- total recovery failure preserving the dirty volume while accounts remain locked and readiness remains absent;
+- total clean-recovery failure restoring the preserved dirty volume and its application access;
+- rollback failure preserving the dirty volume while accounts remain locked and readiness remains absent;
 - successful reset publishing readiness last and deleting the dirty volume only after complete success;
 - background preparation starting after success without retaining API child output descriptors;
 - unchanged API coordinator, reset route, laboratory UI, and Stage 8B files.
@@ -328,7 +331,7 @@ The branch is acceptable only when all of the following are true:
 - The old dirty volume survives every failed switch and is deleted only after success.
 - Every accepted healthy reset makes the laboratory usable within 30 seconds.
 - Missing or failed preparation waits or rebuilds physically before automatically using the protected SQL fallback.
-- Failure leaves readiness absent and application accounts locked.
+- Failed clean replacement restores the preserved previous working database; only failed replacement plus failed rollback leaves readiness absent and application accounts locked.
 - Background preparation runs at low priority, completes before the next expected reset, and does not make the laboratory unusable.
 - Normal and recovery paths restore the same schema, rows, permissions, relationships, and application capabilities.
 - The final filesystem and Docker environment contain only the active volume, one sealed standby, one sealed physical template archive, protected SQL sources, required evidence, and no stale temporary resources.

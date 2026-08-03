@@ -3,10 +3,12 @@ set -euo pipefail
 source "$(cd "$(dirname "$0")" && pwd)/test-database-common.sh"
 
 mode="${1:-health}"
-[[ "$mode" =~ ^(health|baseline|pre-unlock)$ ]] || die "usage: $0 {health|baseline|pre-unlock}"
+[[ "$mode" =~ ^(health|baseline|pre-unlock|quick-locked|quick-capability)$ ]] || die "usage: $0 {health|baseline|pre-unlock|quick-locked|quick-capability}"
 require_safe_target
-require_protected_dump
 require_running_attested_runtime
+if [[ "$mode" != "quick-locked" && "$mode" != "quick-capability" ]]; then
+  require_protected_dump
+fi
 if [[ "$mode" == "health" ]]; then
   [[ -s "$test_db_ready" ]] || die "database is not marked ready; run a successful guarded reset"
 fi
@@ -29,6 +31,39 @@ expect_root_value() {
   [[ "$actual" == "$expected" ]] || die "$label: expected $expected, found $actual"
   echo "$label=$actual" >> "$report"
 }
+
+if [[ "$mode" == "quick-locked" ]]; then
+  echo "validated_at=$timestamp" >> "$report"
+  echo "mode=$mode" >> "$report"
+  expect_root_value version "SELECT VERSION()" "8.0.43"
+  expect_root_value database_present "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='$TEST_DB_NAME'" "1"
+  expect_root_value application_accounts_locked "SELECT COUNT(*) FROM mysql.user WHERE user IN ('alertas_fake','monitor_source_ro') AND account_locked='Y'" "2"
+  cp "$report" "$latest"
+  echo "Validation passed ($mode): $latest"
+  exit 0
+fi
+
+if [[ "$mode" == "quick-capability" ]]; then
+  echo "validated_at=$timestamp" >> "$report"
+  echo "mode=$mode" >> "$report"
+  expect_root_value application_accounts_unlocked "SELECT COUNT(*) FROM mysql.user WHERE user IN ('alertas_fake','monitor_source_ro') AND account_locked='N'" "2"
+  mysql_in_container writer --database="$TEST_DB_NAME" <<'SQL'
+START TRANSACTION;
+INSERT INTO `_prisma_migrations` (`id`,`checksum`,`migration_name`,`started_at`,`applied_steps_count`) VALUES ('monitor-quick-writer-proof','monitor-quick-writer-proof','monitor-quick-writer-proof',CURRENT_TIMESTAMP(3),0);
+DELETE FROM `_prisma_migrations` WHERE `id`='monitor-quick-writer-proof';
+ROLLBACK;
+SQL
+  mysql_query monitor "SELECT COUNT(*) FROM $TEST_DB_NAME._prisma_migrations" >/dev/null
+  if mysql_query monitor "UPDATE $TEST_DB_NAME._prisma_migrations SET checksum=checksum WHERE 1=0" >/dev/null 2>"$test_db_evidence/quick-monitor-denial-$timestamp.txt"; then
+    die "Monitor write unexpectedly succeeded"
+  fi
+  grep -Eq 'ERROR (1044|1142|1143).*denied' "$test_db_evidence/quick-monitor-denial-$timestamp.txt" || die "Monitor quick write failure was not access denied"
+  echo "writer_transaction=passed" >> "$report"
+  echo "monitor_read_and_denial=passed" >> "$report"
+  cp "$report" "$latest"
+  echo "Validation passed ($mode): $latest"
+  exit 0
+fi
 
 echo "validated_at=$timestamp" >> "$report"
 echo "mode=$mode" >> "$report"

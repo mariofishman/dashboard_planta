@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { after, before, describe, it } from "node:test";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { ScenarioSourceAction } from "./simulator.js";
@@ -8,8 +8,10 @@ import { a02TerminalActionFor, loadSourceActionContracts, sourceActionIds, type 
 import { TestDatabaseConnections, TestDatabaseScenarioRepository } from "./test-database.js";
 
 const root = resolve(import.meta.dirname, "../../..");
-const runtimeAvailable = existsSync(resolve(root, "local-data/test-database/state/ready"))
-  && existsSync(resolve(root, "local-data/test-database/secrets/writer.host.cnf"));
+const protectedDump = process.env.TEST_DB_DUMP ?? "/Users/mariofishman/projects/dashboard_planta/local-data/database/staging_emusa_core-20260723-025548.sql";
+const testDatabaseRuntime = process.env.TEST_DB_RUNTIME_ROOT ?? resolve(dirname(dirname(protectedDump)), "test-database");
+const runtimeAvailable = existsSync(resolve(testDatabaseRuntime, "state/ready"))
+  && existsSync(resolve(testDatabaseRuntime, "secrets/writer.host.cnf"));
 
 describe("connected Stage 5 source actions", { skip: !runtimeAvailable }, () => {
   let connections: TestDatabaseConnections;
