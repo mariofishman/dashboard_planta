@@ -2,7 +2,7 @@
 
 **Role:** Phase 6 status index; the linked Stage 5 recovery and completion plan is the sole Stage 5 execution and evidence authority
 
-**Status:** In progress; Stages 1–4 complete; Stage 5 Recovery 1–6 complete; Step 8B is next; Stage 6 is pending
+**Status:** In progress; Stages 1–4 complete; Stage 5 is complete on its branch by explicit product decision, with its final-ledger limitation and Step 9 waiver recorded; Step 11 publication is current; Stage 6 pending
 
 **Project sequencing authority:** [`../../../roadmap.md`](../../../roadmap.md)
 
@@ -16,7 +16,7 @@ The three prerequisite workstreams are complete within their separate scopes:
 - the guarded, resettable local `test_database`; and
 - the approved standalone `alertas_fake` Stage 2 laboratory and its 34 valid tests.
 
-They have not yet passed the complete Stage 5 connected-acceptance gate. Commit `165abc1` remains a preserved pre-recovery checkpoint; its useful implementation has now been corrected and revalidated through Recovery 1–6. Step 8B, Step 8C, and Steps 9–12 remain. Phase 7 remains blocked until Stage 5 and Stage 6 complete.
+Commit `165abc1` remains a preserved pre-recovery checkpoint; its useful implementation was corrected and revalidated through Recovery 1–6. Step 8B is complete and approved. On 2026-08-05, all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final evidence ledger failed validation. The product manager explicitly accepted that limitation, waived Step 9's two additional complete runs, and completed the Step 10 evidence review. Stage 5 is therefore complete on this branch without claiming that the missing evidence passed. Step 11 publication is current, Step 12 merge requires separate approval, and Stage 6 remains pending.
 
 The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It originally connected that correct boundary behind the older scenario-screen composition. Recovery 3 later connected the approved tabbed V2 laboratory on `/dev/scenarios`, and Recovery 6 produced the passing replacement Step 8.2–8.7 evidence. The earlier browser run remains diagnostic history and is invalid for acceptance.
 
@@ -28,12 +28,12 @@ The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete on
 | 2 — Approve the standalone laboratory | Complete — 2026-07-31 | Review the V2 laboratory one test at a time. | All 34 valid tests pass and are user-approved; invalid/deferred recurrence cases remain explicitly excluded. |
 | 3 — Inspect the `test_database` handoff | Complete — 2026-07-31 | Verified the merged runtime, reset safeguards, readiness contract, credentials, Node driver access, and A02/A03/A05 source mappings. | **Ready with exact gaps.** The evidence, approved mappings, corrections, and Stage 4 gaps are recorded in the Stage 3 handoff. |
 | 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected the older `/dev/scenarios` composition to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. This did not connect or accept the approved V2 interface. |
-| 5 — Run connected acceptance | **Recovery complete; Step 8B next** | Follow the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). | The plan's Stage 5 exit assertions pass and the user accepts the evidence. |
+| 5 — Run connected acceptance | **Complete on branch by product decision; publication in progress** | Step 8B is approved; all 34 Step 8C cases executed; the final ledger limitation and Step 9 waiver are explicitly accepted; Step 10 is complete. | Commit and push the completed branch, then obtain separate approval for merge. |
 | 6 — Finalize Phase 6 | Pending | Audit the accepted Stage 5 evidence, reconcile authority and implementation, document Phase 10 exclusions, and decide whether the old operational source simulator can be retired. | The Phase 6 exit gate passes and the user accepts the integrated local result. |
 
-## Immediate next action — Step 8B
+## Immediate next action — Step 11 commit and push
 
-Use the single [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md). Recovery 1–6 and the replacement Step 8.2–8.7 evidence are complete. Step 8B, the passive Dashboard and Chat previews, is the next separately reviewed step. Prior Step 8.2–8.7 artifacts remain ignored diagnostic history and cannot be counted as acceptance evidence.
+Commit and push only the approved Stage 5 changes on `codex/phase6-stage5`. Run `step8c-full-20260805-sequential-r2` executed all 34 approved cases and restored the source, but its ledger failed evidence-format validation. The product manager accepted that limitation, waived Step 9, completed Step 10, and authorized Step 11. Do not claim that the invalid ledger or repeatability evidence passed. Do not merge without separate approval.
 
 ## Supporting specifications and evidence
 

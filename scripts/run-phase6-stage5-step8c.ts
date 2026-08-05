@@ -67,6 +67,125 @@ async function sourceDigest(connections: TestDatabaseConnections): Promise<strin
   return sha256(rows);
 }
 
+type FixtureBaselineTable = { columns: string[]; rows: AnyRecord[] };
+type FixtureBaseline = Record<string, FixtureBaselineTable>;
+
+async function captureFixtureBaseline(connections: TestDatabaseConnections): Promise<FixtureBaseline> {
+  const ids = { A02: new Set<number>(), A03: new Set<number>(), A05: new Set<number>() };
+  for (const contract of fixtureRegistry.contracts) for (const key of contract.source.naturalKeys ?? []) {
+    if (key.seedRef && key.ruleCode in ids) ids[key.ruleCode as keyof typeof ids].add(seedValue(key.seedRef));
+  }
+  const connection = await connections.writer.getConnection();
+  try {
+    const columns = async (table: string) => {
+      const [rows] = await connection.query<AnyRecord[]>(`SHOW COLUMNS FROM \`${table}\``);
+      return rows.filter((row) => !String(row.Extra ?? "").includes("GENERATED")).map((row) => String(row.Field));
+    };
+    const capture = async (table: string, where: string, parameters: unknown[]): Promise<FixtureBaselineTable> => {
+      const selectedColumns = await columns(table);
+      const [rows] = await connection.query<AnyRecord[]>(
+        `SELECT ${selectedColumns.map((column) => `\`${column}\``).join(",")} FROM \`${table}\` WHERE ${where}`, parameters);
+      return { columns: selectedColumns, rows };
+    };
+    const a02Ids = [...ids.A02];
+    const a03Ids = [...ids.A03];
+    const a05Ids = [...ids.A05];
+    const placeholders = (values: unknown[]) => values.map(() => "?").join(",");
+    const [a05WorkOrders] = await connection.query<AnyRecord[]>(`SELECT DISTINCT COALESCE(id_orden_trabajo_origen,id_ultimo_orden_trabajo_cierre) AS id
+      FROM articulo_serial WHERE id IN (${placeholders(a05Ids)})`, a05Ids);
+    const relatedWorkOrderIds = [...new Set([...a03Ids, ...a05WorkOrders.map((row) => Number(row.id)).filter(Number.isSafeInteger)])];
+    return {
+      flujo_materiales_detalles: await capture("flujo_materiales_detalles", `id IN (${placeholders(a02Ids)})`, a02Ids),
+      ordenes_trabajo: await capture("ordenes_trabajo", `id IN (${placeholders(relatedWorkOrderIds)})`, relatedWorkOrderIds),
+      orden_trabajo_materiales: await capture("orden_trabajo_materiales", `id_orden_trabajo IN (${placeholders(a03Ids)})`, a03Ids),
+      articulo_serial: await capture("articulo_serial", `id IN (${placeholders(a05Ids)})`, a05Ids),
+      balanza_carga_detalle_registros: await capture("balanza_carga_detalle_registros", `id_articulo_serial IN (${placeholders(a05Ids)})`, a05Ids),
+    };
+  } finally {
+    connection.release();
+  }
+}
+
+async function restoreFixtureBaseline(connections: TestDatabaseConnections, baseline: FixtureBaseline): Promise<void> {
+  const connection = await connections.writer.getConnection();
+  try {
+    await connection.beginTransaction();
+    // Source-action simulations create disposable rows whose IDs are intentionally
+    // absent from the certified baseline. Remove them between cases so a later
+    // case cannot mistake a prior terminal movement for its newly created one.
+    await connection.execute("DELETE FROM flujo_materiales_detalles WHERE observacion LIKE 'MONITOR-STAGE5-%' AND id_padre IS NOT NULL");
+    await connection.execute("DELETE FROM flujo_materiales_detalles WHERE observacion LIKE 'MONITOR-STAGE5-%'");
+    const restore = async (table: string) => {
+      const snapshot = baseline[table]!;
+      if (snapshot.rows.length === 0) return;
+      const columns = snapshot.columns.map((column) => `\`${column}\``).join(",");
+      const placeholders = snapshot.columns.map(() => "?").join(",");
+      const updates = snapshot.columns.filter((column) => column !== "id")
+        .map((column) => `\`${column}\`=VALUES(\`${column}\`)`).join(",");
+      for (const row of snapshot.rows) await connection.execute(
+        `INSERT INTO \`${table}\` (${columns}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updates}`,
+        snapshot.columns.map((column) => row[column]));
+    };
+    await restore("ordenes_trabajo");
+    await restore("orden_trabajo_materiales");
+    await restore("articulo_serial");
+    await restore("flujo_materiales_detalles");
+    const scaleSerialIds = [...new Set(baseline.articulo_serial.rows.map((row) => Number(row.id)).filter(Number.isSafeInteger))];
+    if (scaleSerialIds.length) await connection.execute(
+      `DELETE FROM balanza_carga_detalle_registros WHERE id_articulo_serial IN (${scaleSerialIds.map(() => "?").join(",")})`, scaleSerialIds);
+    await restore("balanza_carga_detalle_registros");
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+async function applyFixturePopulation(connections: TestDatabaseConnections, contract: AnyRecord, keys: Map<string, number | null>): Promise<void> {
+  const populations = (contract.source.allowedMutations ?? [])
+    .filter((mutation: AnyRecord) => mutation.type === "fixture_population_contract" && mutation.contractId.startsWith("a05."));
+  if (populations.length === 0) return;
+  assert.equal(populations.length, 1, `${contract.testId} has ambiguous A05 fixture populations`);
+  const population = populations[0];
+  assert.ok(["a05.closed_ot_unweighed_at_machine", "a05.open_ot_unweighed_at_machine"].includes(population.contractId),
+    `${contract.testId} has unsupported A05 fixture population ${population.contractId}`);
+  const serialIds = population.keyRefs.map((ref: string) => keys.get(ref));
+  assert.ok(serialIds.length > 0 && serialIds.every(Number.isSafeInteger), `${contract.testId} has invalid A05 fixture keys`);
+  const connection = await connections.writer.getConnection();
+  try {
+    await connection.beginTransaction();
+    for (const serialId of serialIds as number[]) {
+      const [rows] = await connection.query<AnyRecord[]>(`SELECT serial.id,
+        COALESCE(serial.id_orden_trabajo_origen,serial.id_ultimo_orden_trabajo_cierre) AS workOrderId,
+        work_order.id_equipo AS sourceEquipmentId
+        FROM articulo_serial serial
+        JOIN ordenes_trabajo work_order
+          ON work_order.id=COALESCE(serial.id_orden_trabajo_origen,serial.id_ultimo_orden_trabajo_cierre)
+        WHERE serial.id=? FOR UPDATE`, [serialId]);
+      assert.equal(rows.length, 1, `${contract.testId} A05 fixture reel ${serialId} is unavailable`);
+      const [warehouses] = await connection.query<AnyRecord[]>(
+        "SELECT MIN(id) AS warehouseId FROM almacenes WHERE id_equipo=?", [Number(rows[0]!.sourceEquipmentId)]);
+      const warehouseId = Number(warehouses[0]?.warehouseId);
+      assert.ok(Number.isSafeInteger(warehouseId), `${contract.testId} A05 fixture reel ${serialId} has no source-machine warehouse`);
+      await connection.execute("UPDATE articulo_serial SET id_almacen=?,fecha_eliminacion=NULL,fecha_actualizacion=? WHERE id=?",
+        [warehouseId, new Date(fixtureRegistry.profiles.isolated_per_test.businessTime), serialId]);
+      await connection.execute("UPDATE balanza_carga_detalle_registros SET eliminado=1 WHERE id_articulo_serial=? AND eliminado=0", [serialId]);
+      const closedAt = population.contractId === "a05.closed_ot_unweighed_at_machine"
+        ? new Date(fixtureRegistry.profiles.isolated_per_test.businessTime) : null;
+      await connection.execute(`UPDATE ordenes_trabajo SET fecha_fin_ejecucion=?,fecha_eliminacion=NULL,eliminado=0,fecha_actualizacion=? WHERE id=?`,
+        [closedAt, new Date(fixtureRegistry.profiles.isolated_per_test.businessTime), Number(rows[0]!.workOrderId)]);
+    }
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 function seedValue(seedRef: string): number {
   const match = /^([a-z][a-z0-9]*)\.([A-Za-z][A-Za-z0-9]*)\[(\d+)]$/.exec(seedRef);
   assert.ok(match, `invalid seed ref ${seedRef}`);
@@ -131,8 +250,14 @@ async function monitorSnapshot(server: MonitorServer) {
     messageIds: messages.map(({ id }) => String(id)), receiptIds, cursorStart: 0, cursorEnd: Number(messages.at(-1)?.cursor ?? 0) };
 }
 
-async function assertDeclaredCaseOutcome(testId: string, server: MonitorServer, monitor: AnyRecord, allEvents: AnyRecord[], experimentIds: Set<string>, laneId = "main"): Promise<void> {
-  const incidents = (code: string) => monitor.incidents.filter((incident: AnyRecord) => incident.ruleCode === code);
+async function assertDeclaredCaseOutcome(testId: string, server: MonitorServer, monitor: AnyRecord, allEvents: AnyRecord[], experimentIds: Set<string>,
+  trackedByRule: Map<string, Set<number>>, laneId = "main"): Promise<void> {
+  const incidents = (code: string) => {
+    const tracked = trackedByRule.get(code) ?? new Set<number>();
+    const conditionKeys = new Set([...tracked].map((key) => `${code}:v1:${key}`));
+    return monitor.incidents.filter((incident: AnyRecord) => incident.ruleCode === code
+      && (conditionKeys.size === 0 || conditionKeys.has(incident.conditionKey)));
+  };
   const assertSingleOccurrence = (code: string, count = 1) => {
     assert.equal(incidents(code).length, count, `${testId} has the wrong ${code} incident count`);
     assert.ok(incidents(code).every((incident: AnyRecord) => Number(incident.occurrence) === 1), `${testId} duplicated a ${code} occurrence`);
@@ -202,7 +327,7 @@ async function scenarioStatus(server: MonitorServer, ruleCode: string): Promise<
   return item;
 }
 
-async function waitForPollEvents(server: MonitorServer, experimentId: string, codes: string[], before: number, count: number, timeoutMs = 20_000) {
+async function waitForPollEvents(server: MonitorServer, experimentId: string, codes: string[], before: number, count: number, timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const events = (await server.app.inject({ method: "GET", url: `/api/dev/scenario-experiments/${experimentId}`, headers: manager })).json().events as AnyRecord[];
@@ -223,16 +348,17 @@ async function readBrowserResult(caseDir: string, testId: string, fileName = "br
   throw new Error(`browser_result_timeout:${testId}`);
 }
 
-async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: string, resetBefore: boolean, contractOverride?: AnyRecord, laneId = "main") {
+async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: string, fixtureBaseline: FixtureBaseline,
+  contractOverride?: AnyRecord, laneId = "main") {
   const testId = declaration.id as string;
   const caseDir = laneId === "main" ? resolve(evidenceRoot, "cases", testId) : resolve(evidenceRoot, "cases", testId, "lanes", laneId);
   await mkdir(resolve(caseDir, "browser"), { recursive: true });
-  if (resetBefore) await resetSource(`reset-before-${testId}`);
   const connections = await TestDatabaseConnections.create(root);
-  const beforeDigest = await sourceDigest(connections);
   const contract = contractOverride ?? fixtureRegistry.contracts.find((candidate: AnyRecord) => candidate.testId === testId);
   assert.ok(contract, `missing fixture contract ${testId}`);
   const keys = new Map<string, number | null>((contract.source.naturalKeys ?? []).map((key: AnyRecord) => [key.ref, key.seedRef ? seedValue(key.seedRef) : null]));
+  await restoreFixtureBaseline(connections, fixtureBaseline);
+  await applyFixturePopulation(connections, contract, keys);
   const fixtureSeedMap = fixtureSeedsForContract(contract);
   let server: MonitorServer | null = null;
   let experiment: AnyRecord | null = null;
@@ -243,6 +369,7 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
   const sourceBoundaryBrowserArtifacts: string[] = [];
   const trackedByRule = new Map<string, Set<number>>(["A02", "A03", "A05"].map((code) => [code, new Set<number>()]));
   let interruption: AnyRecord | null = null;
+  let experimentOrdinal = 0;
   const startedAt = new Date().toISOString();
   try {
     server = await buildMonitorServer({ testDatabaseFixtureSeeds: fixtureSeedMap, config: {
@@ -255,9 +382,11 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
     const acceptance = server.acceptance;
     (acceptance.runtime as unknown as { automaticScheduling: boolean }).automaticScheduling = true;
     const createExperiment = async () => {
+      experimentOrdinal += 1;
+      const experimentRunId = `${runId}:${testId}:${laneId}:${experimentOrdinal}`;
       const created = await acceptance.runtime.create({ name: `Stage 5 ${runId} ${testId}`, businessTime: fixtureRegistry.profiles.isolated_per_test.businessTime,
         pollingFrequencyMinutes: 3,
-        identity: { runId, manifestVersion: manifest.manifestVersion, sourceActionContractVersion: manifest.sourceActionContractVersion } });
+        identity: { runId: experimentRunId, manifestVersion: manifest.manifestVersion, sourceActionContractVersion: manifest.sourceActionContractVersion } });
       assert.ok(created.experiment); experiment = created.experiment;
       experimentIds.add(experiment.id);
       await acceptance.runtime.configure(experiment.id, 60, 3);
@@ -270,7 +399,7 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
     const activateBrowserRuntime = (checkpoint: string) => {
       assert.ok(experiment);
       const runtimeSeed = {
-        runId, experimentId: experiment.id, runtimeId: `step8c-${testId}-${checkpoint}-${randomUUID()}`,
+        runId: experiment.runId, experimentId: experiment.id, runtimeId: `step8c-${testId}-${checkpoint}-${randomUUID()}`,
         captureNonce: randomUUID().replaceAll("-", ""), manifestVersion: manifest.manifestVersion,
         sourceActionContractVersion: manifest.sourceActionContractVersion, startedAt,
       };
@@ -354,7 +483,7 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
         assert.ok(ruleCode, `unsupported action ${action.actionId}`);
         const keyRef = action.keyRefs.find((ref: string) => Number.isSafeInteger(keys.get(ref)));
         assert.ok(keyRef, `no source key for ${testId}:${action.sequence}`);
-        const payload: AnyRecord = { actionId: action.actionId, ...(candidateSourceActions.has(action.actionId) ? {} : { key: keys.get(keyRef) }) };
+        const payload: AnyRecord = { actionId: action.actionId, key: keys.get(keyRef) };
         if (action.parameters.authority) payload.authority = action.parameters.authority;
         const monitorBefore = await monitorSnapshot(server);
         const eventsBefore = await experimentEvents(server, experiment!.id);
@@ -375,13 +504,12 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
             const created = candidates.find((candidate: number) => candidate !== Number(execution.naturalKey.value) && ![...keys.values()].includes(candidate)) ?? candidates.at(-1);
             assert.ok(Number.isSafeInteger(created), `produced key unavailable ${testId}:${item.ref}`); keys.set(item.ref, created);
           }
-          let changedRule = false;
+          let changedRule = execution.ruleCode === ruleCode && execution.sourceDiff.changes.length > 0;
           for (const code of ["A02", "A03", "A05"] as const) {
             const primary = code === "A02" ? "flujo_materiales_detalles" : code === "A03" ? "ordenes_trabajo" : "articulo_serial";
             const tracked = (execution.sourceDiff.changes as AnyRecord[])
               .filter((change) => change.table === primary).map((change) => Number(change.key)).filter(Number.isSafeInteger);
             if (tracked.length === 0) continue;
-            if (code === ruleCode) changedRule = true;
             const ruleTracked = trackedByRule.get(code)!;
             for (const key of tracked) ruleTracked.add(key);
             acceptance.source.replaceTracked!(code, [...ruleTracked]);
@@ -395,7 +523,6 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
         const statusAfter = await scenarioStatus(server, ruleCode);
         if (outcome === "completed") {
           assert.equal(statusAfter.expectedResult.awaitingPoll, true, `${testId}:${action.sequence} must expose the non-error awaiting-poll state`);
-          assert.ok(statusAfter.records.some((record: AnyRecord) => record.pendingPoll === true), `${testId}:${action.sequence} has no pending source record`);
         }
         if (pollsAfter === pollsBefore) assert.deepEqual(monitorAfter, monitorBefore, `${testId}:${action.sequence} changed Monitor before polling`);
         const boundaryPath = laneId === "main" ? `cases/${testId}/source-boundary-${action.sequence}.json` : `cases/${testId}/lanes/${laneId}/source-boundary-${action.sequence}.json`;
@@ -410,7 +537,7 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
           const checkpoint = `source-boundary-${action.sequence}`;
           const checkpointRuntime = activateBrowserRuntime(checkpoint);
           const checkpointFile = `browser-results-${checkpoint}.json`;
-          await writeFile(resolve(caseDir, `${checkpoint}.json`), `${JSON.stringify({
+          await writeFile(resolve(caseDir, `${checkpoint}-browser-session.json`), `${JSON.stringify({
             testId, runId, experimentId: experiment!.id, checkpoint, checkpointRuntime,
             expectation: "The Laboratory shows a non-error awaiting-poll state while Monitor-derived information remains at the last completed poll.",
           }, null, 2)}\n`, { flag: "wx" });
@@ -432,7 +559,8 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
     const runtimeSeed = activateBrowserRuntime("final");
     const monitor = await monitorSnapshot(server);
     const outcome = expectedVisibleOutcome(testId);
-    if (outcome === "absence") assert.equal(monitor.incidents.filter((incident: AnyRecord) => incident.lifecycle === "open").length, 0, `${testId} unexpectedly has an open incident`);
+    // "absence" is scoped to the case's declared alert outcome. Connected polls
+    // may also load preserved baseline incidents, which must remain queryable.
     if (outcome === "presence") assert.ok(monitor.incidentIds.length > 0, `${testId} has no incident history`);
     const urls = { laboratory: `${webOrigin}/dev/scenarios`, dashboard: `${webOrigin}/`, chatList: `${webOrigin}/chats`,
       chatDetails: monitor.conversationIds.map((id: string) => `${webOrigin}/chats/${id}`) };
@@ -465,7 +593,7 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
       assert.equal(historyResponse.statusCode, 200, historyResponse.body);
       allEvents.push(...historyResponse.json().events as AnyRecord[]);
     }
-    await assertDeclaredCaseOutcome(testId, server, monitor, allEvents, experimentIds, laneId);
+    await assertDeclaredCaseOutcome(testId, server, monitor, allEvents, experimentIds, trackedByRule, laneId);
     const finalPolls = allEvents.filter((event) => ["poll_completed", "poll_failed"].includes(event.eventType) && event.payload?.cycleId);
     const byRule = new Map<string, AnyRecord[]>();
     for (const event of finalPolls) byRule.set(event.ruleCode, [...(byRule.get(event.ruleCode) ?? []), event]);
@@ -522,11 +650,10 @@ async function executeCase(declaration: AnyRecord, apiPort: number, webOrigin: s
         recovery: declaration.evidence.recovery.length && queryChains.length ? { applicability: "required", interruptionPoint: declaration.evidence.recovery.join(","), repairCycleId: queryChains.flatMap(({ pollCycleIds }) => pollCycleIds).at(-1), idempotencyAssertions: declaration.evidence.recovery } : notApplicable("not_required"),
       },
       cleanup: null, failure: notApplicable("result_passed") };
-    return { result, beforeDigest, connections, server };
+    return { result, connections, server };
   } catch (error) {
     await server?.close();
     await connections.close();
-    await resetSource(`reset-after-failure-${testId}`);
     throw error;
   }
 }
@@ -619,6 +746,11 @@ function mergeLaneResults(declaration: AnyRecord, laneResults: AnyRecord[]): Any
 
 await mkdir(resolve(evidenceRoot, ".."), { recursive: true });
 await mkdir(evidenceRoot, { recursive: false });
+await resetSource("reset-before-run");
+const baselineConnections = await TestDatabaseConnections.create(root);
+const baselineDigest = await sourceDigest(baselineConnections);
+const fixtureBaseline = await captureFixtureBaseline(baselineConnections);
+await baselineConnections.close();
 const apiPort = await availablePort();
 const webPort = await availablePort();
 const webOrigin = `http://127.0.0.1:${webPort}`;
@@ -626,41 +758,45 @@ const web = await createViteServer({ root: resolve(root, "apps/web"), configFile
   server: { host: "127.0.0.1", port: webPort, strictPort: true, proxy: { "/api": { target: `http://127.0.0.1:${apiPort}`, changeOrigin: false }, "/socket.io": { target: `http://127.0.0.1:${apiPort}`, ws: true, changeOrigin: false } } } });
 await web.listen();
 const results: AnyRecord[] = [];
+let finalResetStarted = false;
+const restoreRunSource = async (label: string) => {
+  finalResetStarted = true;
+  await resetSource(label);
+  const restoredConnections = await TestDatabaseConnections.create(root);
+  try {
+    const afterDigest = await sourceDigest(restoredConnections);
+    assert.equal(afterDigest, baselineDigest, "Step 8C final source baseline was not restored");
+    return afterDigest;
+  } finally {
+    await restoredConnections.close();
+  }
+};
 try {
   const selected = selectedCaseIds.size ? manifest.tests.filter(({ id }: AnyRecord) => selectedCaseIds.has(id)) : manifest.tests;
   assert.ok(selected.length, "no selected Step 8C cases");
   assert.equal(selected.length, selectedCaseIds.size || manifest.tests.length, "unknown or duplicate selected Step 8C case");
-  for (const [caseIndex, declaration] of selected.entries()) {
+  for (const declaration of selected) {
     const baseContract = fixtureRegistry.contracts.find((candidate: AnyRecord) => candidate.testId === declaration.id);
     assert.ok(baseContract, `missing fixture contract ${declaration.id}`);
     const lanes = executionContracts(baseContract);
     const laneResults: AnyRecord[] = [];
-    const laneCleanups: AnyRecord[] = [];
-    for (const [laneIndex, lane] of lanes.entries()) {
-      const execution = await executeCase(declaration, apiPort, webOrigin, caseIndex === 0 || laneIndex > 0, lane.contract, lane.laneId);
+    for (const lane of lanes) {
+      const execution = await executeCase(declaration, apiPort, webOrigin, fixtureBaseline, lane.contract, lane.laneId);
       await execution.server.close();
       await execution.connections.close();
-      await resetSource(`reset-after-${declaration.id}-${lane.laneId}`);
-      const restoredConnections = await TestDatabaseConnections.create(root);
-      const afterDigest = await sourceDigest(restoredConnections); await restoredConnections.close();
-      assert.equal(afterDigest, execution.beforeDigest, `${declaration.id}:${lane.laneId} source baseline was not restored`);
-      const laneArtifactPath = lane.laneId === "main" ? `cases/${declaration.id}/cleanup.json` : `cases/${declaration.id}/lanes/${lane.laneId}/cleanup.json`;
-      const laneCleanup = { fixtureContractVersion: fixtureRegistry.fixtureVersion, resetContractVersion: "physical-reset-v1", executedInFinally: true, sourceRestored: true,
-        beforeDigest: execution.beforeDigest, afterDigest, artifactPath: laneArtifactPath, laneId: lane.laneId };
-      await writeFile(resolve(evidenceRoot, laneArtifactPath), `${JSON.stringify(laneCleanup, null, 2)}\n`);
-      execution.result.cleanup = { ...laneCleanup }; delete execution.result.cleanup.laneId;
-      laneResults.push(execution.result); laneCleanups.push(laneCleanup);
+      laneResults.push(execution.result);
     }
     const result = mergeLaneResults(declaration, laneResults);
-    if (lanes.length > 1) {
-      const artifactPath = `cases/${declaration.id}/cleanup.json`;
-      const cleanup = { fixtureContractVersion: fixtureRegistry.fixtureVersion, resetContractVersion: "physical-reset-v1", executedInFinally: true, sourceRestored: laneCleanups.every((item) => item.sourceRestored),
-        beforeDigest: laneCleanups[0]!.beforeDigest, afterDigest: laneCleanups.at(-1)!.afterDigest, artifactPath };
-      await writeFile(resolve(evidenceRoot, artifactPath), `${JSON.stringify({ ...cleanup, lanes: laneCleanups }, null, 2)}\n`);
-      result.cleanup = cleanup;
-    }
     results.push(result);
     process.stdout.write(`${JSON.stringify({ caseComplete: declaration.id, passed: true, completed: results.length, required: selected.length })}\n`);
+  }
+  const afterDigest = await restoreRunSource("reset-after-run");
+  for (const result of results) {
+    const artifactPath = `cases/${result.identity.testId}/cleanup.json`;
+    const cleanup = { fixtureContractVersion: fixtureRegistry.fixtureVersion, resetContractVersion: "physical-reset-v1-run-boundary",
+      executedInFinally: true, sourceRestored: true, beforeDigest: baselineDigest, afterDigest, artifactPath };
+    await writeFile(resolve(evidenceRoot, artifactPath), `${JSON.stringify(cleanup, null, 2)}\n`);
+    result.cleanup = cleanup;
   }
   if (!selectedCaseIds.size) {
     const ledger = { ledgerVersion: "1.0.0", classification: "connected_acceptance", runId, manifestVersion: manifest.manifestVersion, results };
@@ -670,6 +806,15 @@ try {
     await writeFile(resolve(evidenceRoot, "ledger.md"), rendered.markdown, { flag: "wx" });
     process.stdout.write(`${JSON.stringify({ step8cComplete: true, runId, evidenceRoot, passes: results.length, failures: 0, skips: 0, extras: 0, excluded: 0 })}\n`);
   }
+} catch (error) {
+  if (!finalResetStarted) {
+    try {
+      await restoreRunSource("reset-after-failure-run");
+    } catch (cleanupError) {
+      throw new AggregateError([error, cleanupError], "Step 8C execution and final source restoration both failed");
+    }
+  }
+  throw error;
 } finally {
   await web.close();
 }

@@ -8,7 +8,7 @@
 
 **Latest pushed pre-Step-8B implementation checkpoint:** `27bd646`. The separate future instant-reset plan was added at `1b608b2`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
 
-**Current Stage 5 status:** In progress. Stage 5 is not accepted, Step 8 is not accepted, and Step 8B has not started.
+**Current Stage 5 status:** Complete on the Stage 5 branch by explicit product decision on 2026-08-05. Step 8B is complete and user-approved; all 34 Step 8C case bodies executed successfully; the product manager accepted the unresolved final-ledger limitation, waived Step 9's duplicate runs, and completed the Step 10 evidence review. Step 11 publication is authorized; Step 12 merge remains separate and has not started.
 
 ## Start here
 
@@ -23,7 +23,7 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 | 3 | Complete Recovery 3–4. | The approved V2 laboratory is connected and the obsolete executable workflow cannot be mistaken for current Stage 5 behavior. |
 | 4 | Complete Recovery 5. | Complete — every affected focused check passes and the development baseline is independently restored and verified. |
 | 5 | Complete Recovery 6. | Complete — new Step 8.2–8.7 evidence passes in one runtime using the approved laboratory. |
-| 6 | Resume the original path at Step 8B. | Complete 8B, 8C, and Steps 9–12 under their separate gates. |
+| 6 | Resume the original path at Step 8B. | Step 8B is complete and approved. Step 8C executed all 34 cases; the product manager accepted its unresolved ledger limitation, waived Step 9, and completed Step 10. Step 11 is authorized; Step 12 has not started. |
 
 ### Exact next action
 
@@ -37,6 +37,11 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 8. Complete — Recovery 4 retired the obsolete executable workflow through five approved units on 2026-08-02.
 9. Complete — Recovery 5 passed all five calibrated units and independently restored and verified the protected baseline on 2026-08-02.
 10. Complete — Recovery 6 passed Steps 8.2a–8.7d in strengthened run `20260802-step8-recovery-v2-10`; the aggregate and adversarial gates passed and the protected baseline was independently restored on 2026-08-02.
+11. Complete — Step 8B was reviewed and approved by the user on 2026-08-02; the accepted reset-only responsiveness limitation was recorded on 2026-08-04.
+12. Partial — Step 8C run `step8c-full-20260805-sequential-r2` executed all 34 approved cases across 37 lanes with browser evidence and no case-level physical reset. Its initial and final physical resets completed, and the final source restoration occurred before ledger validation.
+13. Evidence limitation identified — the final ledger validator rejected result assembly for absence-case identifiers, scheduling evidence, source/read revision representation, and fixture-population mutation evidence. The user directed that the expensive 34-case execution not be rerun and declined further ledger work at its current time and token cost. This initially left Step 8C formally incomplete; item 15 records the later explicit product acceptance of that limitation.
+14. Waived by product decision — on 2026-08-05 the product manager removed Step 9's requirement for two additional complete runs because it is disproportionate and redundant for the project's practical objective after Step 8B review and Step 8C execution. This waiver removes the repeatability gate; it does not convert the invalid Step 8C ledger into accepted evidence.
+15. Complete by product decision — on 2026-08-05 the product manager reviewed the recorded final evidence and limitations, accepted Stage 5 as complete for the project's practical purpose despite the invalid ledger and waived repeatability evidence, and authorized Step 11 commit and push. This decision does not claim that the missing evidence passed and does not authorize Step 12 merge.
 
 Recovery 3–4 is committed and pushed at `30ed384`; Recovery 5 is committed and pushed at `d2ef6af`; Recovery 6 is committed and pushed at `5a9b28b`.
 
@@ -85,14 +90,17 @@ The audit did not find evidence of a second active A02, A03, or A05 rule path. T
 | Planning correction and historical checkpoint preservation | Complete and pushed. |
 | Connected source actions and legal A02/A03/A05 lifecycle rules | Complete and pushed. |
 | Durable experiment identity, shared-clock serialization, due-poll replay, history, and snapshot persistence | Implemented and pushed as service foundations. Recovery 1 found that speed semantics, the polling-frequency shape, snapshot API exposure, and the approved V2 presentation still require correction or connection. |
-| Exact 34-case declaration, independent setup/cleanup contracts, and evidence format | Complete and pushed as execution foundations. The final 34-case acceptance run has not happened. |
+| Exact 34-case declaration, independent setup/cleanup contracts, and evidence format | The declaration and contracts are complete and pushed. All 34 case bodies executed successfully on 2026-08-05, but the assembled final ledger failed validation. |
 | Source isolation and read-only database failure handling | Complete and pushed. |
 | Automatic scheduling, restart, interruption, and recovery without manual row deletion | Complete and pushed. |
 | Step 8.1 browser runtime and evidence foundation | Complete and reusable. |
 | Previous Step 8.2–8.7 browser run | Preserved as diagnostic history, not accepted evidence. |
 | Step 8B passive Dashboard and Chat previews | Complete. The user accepted the implemented preview integration and focused UI changes on 2026-08-02, and automated passivity checks pass. Technical identifiers and links belong in Step 8C evidence rather than the preview. |
-| Step 8C final 34-case execution | Not started. |
-| Steps 9–12 final repeatability, review, commit, and merge | Not started. |
+| Step 8C final 34-case execution | Accepted with an explicit evidence limitation. Run `step8c-full-20260805-sequential-r2` completed all 34 approved cases across 37 lanes and restored the source, but its final ledger failed validation. The product manager accepted that limitation without authorizing a rerun. |
+| Step 9 repeatability runs | Waived by the product manager on 2026-08-05. No additional complete runs are required. |
+| Step 10 final evidence review | Complete by product decision on 2026-08-05. |
+| Step 11 commit and push | Authorized and in progress. |
+| Step 12 merge | Not started; separate approval is required. |
 
 ### What we are not starting over
 
@@ -726,10 +734,10 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 | Remaining step | Outcome | Required approval or stop |
 | --- | --- | --- |
 | 8B | Add passive Dashboard and Chat previews to the approved laboratory and review them with the user. | Complete. Focused human acceptance and automated passivity evidence were recorded on 2026-08-02. |
-| 8C | Execute the exact 34 connected acceptance cases and produce final result records. | All 34 must pass; no failures, skips, extras, or excluded cases. |
-| 9 | Run the complete finished version twice from clean starting states. | Both runs must pass without changing the tested version or reusing evidence. |
-| 10 | Review all final evidence and decide whether Stage 5 is genuinely complete. | Stop with documentation uncommitted for user review. |
-| 11 | Commit and push the completed Stage 5 branch. | Separate explicit commit and push authorization; no merge. |
+| 8C | Execute the exact 34 connected acceptance cases and produce final result records. | Accepted by product decision with the invalid final-ledger limitation explicitly retained. |
+| 9 | Run the complete finished version twice from clean starting states. | Waived by product decision on 2026-08-05. |
+| 10 | Review all final evidence and decide whether Stage 5 is genuinely complete. | Complete by product decision on 2026-08-05. |
+| 11 | Commit and push the completed Stage 5 branch. | Authorized on 2026-08-05; no merge. |
 | 12 | Review and merge Stage 5 into `main`. | Separate explicit merge approval and separate approval before pushing `main`. |
 
 ### Step 8B — Add passive Dashboard and Chat previews
@@ -753,6 +761,8 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 
 **Automated passivity evidence — 2026-08-02:** Repeated alert-preview opening, refresh, A02/A03/A05 selection changes, identity changes, session reads, Dashboard reads, and authenticated socket open/resume/disconnect left the complete Monitor table snapshot unchanged. A non-administrator remains unable to access the laboratory message projection. The connected run also left checksums unchanged for all five reset-managed `test_database` tables: `articulo_serial`, `balanza_carga_detalle_registros`, `flujo_materiales_detalles`, `orden_trabajo_materiales`, and `ordenes_trabajo`. Focused frontend checks confirm that preview selection and surface switching remain local and that the alert preview exposes only the read-only scenario-message API.
 
+**Accepted local reset limitation — 2026-08-04:** After a deliberate `test_database` reset clears Monitor's local derived state, the first historical poll can rebuild hundreds of baseline incidents. During that uncommon cold rebuild, the Laboratory pause action may complete only after the active poll and the simulated clock may visibly catch up in jumps. The user explicitly accepted this local reset-only responsiveness limitation as non-blocking for Step 8C because Monitor's source reading, detection, incident creation, Dashboard data, and eventual pause remain correct. This decision does not waive any connected-data correctness, isolation, recovery, cleanup, or evidence requirement.
+
 ### Step 8C — Execute the exact 34 connected acceptance cases
 
 **Purpose:** Produce the first complete, reviewable Stage 5 acceptance result set after all required capabilities exist.
@@ -773,7 +783,11 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 
 **If a defect is found:** Return it to the recovery or earlier Stage 5 step that owns the behavior, correct and revalidate that area, then restart Step 8C from a clean baseline. Do not edit the result files to hide the failure.
 
-### Step 9 — Run the finished version twice
+**Execution record — 2026-08-05:** The first sequential run, `step8c-full-20260805-sequential`, stopped at A02-00 because a prior synthetic A02 terminal movement was mistaken for the movement created by that case. The harness was corrected to remove only disposable `MONITOR-STAGE5-*` source-action rows between cases while retaining one physical reset before the suite and one after it. Focused run `step8c-a02-sequential-fix-proof` then passed A02-00 and A02-01 sequentially. Full run `step8c-full-20260805-sequential-r2` executed all 34 approved cases across 37 lanes and produced browser evidence for Laboratory, Dashboard, and Chat. Its initial reset completed in 89.062 seconds because it waited for standby preparation; its final reset completed in 5.727 seconds and restored the source before ledger validation. The case executions passed, but the final ledger validator rejected evidence assembly. No application or approved Step 8B behavior was changed. The user directed that the 34 cases not be rerun and declined further ledger work at its current cost. The product manager subsequently accepted this evidence limitation and Stage 5 completion; this record does not claim that the ledger passed.
+
+### Step 9 — Waived: run the finished version twice
+
+**Product decision — 2026-08-05:** The product manager waived this step. Two additional complete runs are not required because their time and token cost is disproportionate after the approved Step 8B manual review and the full Step 8C case execution. The project accepts the resulting absence of independent two-run repeatability evidence. This waiver does not resolve or validate the Step 8C ledger.
 
 **Purpose:** Prove Stage 5 is repeatable and did not pass once by chance.
 
@@ -787,26 +801,28 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 6. Repeat the entire examination independently from another clean baseline without reusing incidents, conversations, messages, screenshots, or results.
 7. If anything changes or fails, correct it and restart both runs from the beginning.
 
-**Done when:** Two complete independent runs pass against the same unchanged commit, both baselines restore successfully, and neither run is missing required evidence.
+**Status:** Waived. The original repeatability procedure below is retained as historical context and may be used voluntarily, but it is no longer a Stage 5 exit requirement.
 
 **Important:** Any later change to code, rules, setup data, evidence logic, or branch integration invalidates both runs.
 
 ### Step 10 — Review and document the final evidence
 
+**Product decision — 2026-08-05:** Complete. The product manager reviewed the documented run, manual review, restoration, invalid-ledger limitation, and Step 9 waiver and accepted them as sufficient to complete Stage 5 for the project's practical purpose. This is an explicit acceptance of the evidence gaps, not a claim that the final ledger or independent repeatability evidence passed.
+
 **Purpose:** Decide whether the evidence genuinely supports saying Stage 5 is complete.
 
 **Work:**
 
-- Confirm both Step 9 runs tested the same commit.
-- Confirm both runs contain exactly 34 passes, zero failures, zero skips, zero extras, and zero excluded cases.
+- Record that Step 9's two-run requirement was explicitly waived and do not claim independent repeatability evidence.
+- Confirm the available Step 8C execution record and its unresolved ledger status are represented accurately.
 - Review the connected trace, browser evidence, focused Step 8B human review, and both restoration records.
 - Confirm the plan still excludes production authentication, Aurora, deployment, production load, and other Phase 10 work.
-- Record the final commit, run identifiers, contract and fixture versions, browser evidence, human decision, restoration, and remaining exclusions in this single authority file.
-- Update the Phase 6 README and roadmap to Stage 5 complete and Stage 6 next only when every requirement passes.
+- Record the final commit, available run identifiers, contract and fixture versions, browser evidence, human decision, restoration, Step 9 waiver, and remaining exclusions in this single authority file.
+- Update the Phase 6 README and roadmap to Stage 5 complete only after the user accepts the accurately recorded evidence and any explicit limitations.
 - Preserve earlier checkpoint and invalidated-run material as clearly historical evidence.
 - Present the final documentation changes uncommitted for user review.
 
-**Done when:** The user agrees that the recorded evidence supports Stage 5 completion and approves the final documentation.
+**Done when:** Complete — the user agreed that the accurately qualified record supports Stage 5 completion and approved proceeding to Step 11.
 
 **Stop:** Do not commit, push, or merge during Step 10.
 
@@ -822,7 +838,7 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 - Create the final Stage 5 corrective commit or commits.
 - Push only `codex/phase6-stage5`.
 - Verify that the local and remote branch point to the same commit.
-- Present the commits, changed files, tested commit, two final run identifiers, and any remaining untracked files.
+- Present the commits, changed files, tested commit, available run identifiers, the Step 9 waiver, and any remaining untracked files.
 
 **Done when:** The remote Stage 5 branch contains only the approved final work and is ready for merge review.
 
@@ -834,7 +850,7 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 
 **Work:**
 
-- Present all Stage 5 commits, changed files, the tested commit, both final run identifiers, remaining exclusions, and unresolved or deferred items.
+- Present all Stage 5 commits, changed files, the tested commit, available run identifiers, the Step 9 waiver, remaining exclusions, and unresolved or deferred items.
 - Confirm that Stage 6 is next and that Phase 6 is not being marked complete prematurely.
 - Obtain explicit approval for the merge method.
 - Prefer a normal merge commit so the checkpoint and corrective history remain visible; the user makes the final decision.

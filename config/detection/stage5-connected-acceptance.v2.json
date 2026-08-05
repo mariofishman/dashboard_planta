@@ -133,7 +133,7 @@
     },
     {
       "id": "A02-03", "group": "A02", "title": "Receipt before detection",
-      "requiredActionIds": ["a02.prepare_dispatch", "experiment.advance", "a02.receive", "scheduler.await_due"],
+      "requiredActionIds": ["a02.prepare_dispatch", "experiment.configure", "experiment.advance", "a02.receive", "scheduler.await_due"],
       "expected": "Receipt after minute 30 but before the first complete read creates no historical A02 incident.",
       "evidence": { "technical": ["source-truth-before-read"], "browser": ["dashboard-absence", "chat-absence"], "scheduling": ["receipt-before-due-poll"], "recovery": [] }
     },

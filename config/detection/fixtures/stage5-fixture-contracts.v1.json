@@ -353,9 +353,10 @@
       },
       "actions": [
         { "sequence": 1, "actionId": "a02.prepare_dispatch", "keyRefs": ["template", "movement"], "parameters": {} },
-        { "sequence": 2, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 31 } },
-        { "sequence": 3, "actionId": "a02.receive", "keyRefs": ["movement"], "parameters": {} },
-        { "sequence": 4, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
+        { "sequence": 2, "actionId": "experiment.configure", "keyRefs": [], "parameters": { "secondsPerSimulatedMinute": 60, "pollingFrequencyMinutes": 31 } },
+        { "sequence": 3, "actionId": "experiment.advance", "keyRefs": [], "parameters": { "minutes": 30 } },
+        { "sequence": 4, "actionId": "a02.receive", "keyRefs": ["movement"], "parameters": {} },
+        { "sequence": 5, "actionId": "scheduler.await_due", "keyRefs": [], "parameters": { "ruleCode": "A02", "cycles": 1 } }
       ], "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
     },
     {
