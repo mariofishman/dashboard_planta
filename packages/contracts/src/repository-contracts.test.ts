@@ -128,6 +128,6 @@ test("backup-confirmed fields match the protected local schema", async (context)
   const result = JSON.parse(output);
   assert.deepEqual(
     { result: result.result, tables: result.tables, fields: result.fields, dataRowsPrinted: result.dataRowsPrinted },
-    { result: "pass", tables: 20, fields: 101, dataRowsPrinted: 0 },
+    { result: "pass", tables: 20, fields: 107, dataRowsPrinted: 0 },
   );
 });
