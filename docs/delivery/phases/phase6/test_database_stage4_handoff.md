@@ -48,3 +48,5 @@ npm run validate:phase6-stage4
 - The test source uses a controlled laboratory clock and a fixed local freshness provider; live replica freshness and lag semantics remain Phase 10 evidence.
 - Keep `monitor_sim_*` and the simulator adapter until Stage 5 replacement acceptance passes.
 - Aurora compatibility, replica behavior, production authorization, production query plans, load, pilot, and deployment remain Phase 10.
+
+Stage 6 update: Stage 5 replacement acceptance passed and was approved. The conditional retention instruction above is therefore satisfied and superseded; the simulator and its end-state artifacts are retired in Stage 6.

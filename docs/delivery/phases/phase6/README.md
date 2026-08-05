@@ -2,7 +2,7 @@
 
 **Role:** Phase 6 status index; the linked Stage 5 recovery and completion plan is the sole Stage 5 execution and evidence authority
 
-**Status:** In progress; Stages 1–4 complete; Stage 5 is complete and merged into local `main` at `6aa83da`, with its final-ledger limitation and Step 9 waiver recorded; `origin/main` publication awaits separate authorization; Stage 6 is next
+**Status:** Complete locally and accepted — 2026-08-05; branch delivery to `main` remains
 
 **Project sequencing authority:** [`../../../roadmap.md`](../../../roadmap.md)
 
@@ -16,9 +16,9 @@ The three prerequisite workstreams are complete within their separate scopes:
 - the guarded, resettable local `test_database`; and
 - the approved standalone `alertas_fake` Stage 2 laboratory and its 34 valid tests.
 
-Commit `165abc1` remains a preserved pre-recovery checkpoint; its useful implementation was corrected and revalidated through Recovery 1–6. Step 8B is complete and approved. On 2026-08-05, all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final evidence ledger failed validation. The product manager explicitly accepted that limitation, waived Step 9's two additional complete runs, and completed the Step 10 evidence review. Step 11 completed at `f142ae6`. The reviewed branch then merged without conflicts into local `main` at `6aa83da`, and focused post-merge checks passed. Stage 5 is complete without claiming that the missing evidence passed. Publishing `main` remains separately gated, and Stage 6 is next.
+Commit `165abc1` remains a preserved pre-recovery checkpoint; its useful implementation was corrected and revalidated through Recovery 1–6. Step 8B is complete and approved. On 2026-08-05, all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final evidence ledger failed validation. The product manager explicitly accepted that limitation, waived Step 9's two additional complete runs, and completed the Step 10 evidence review. Step 11 completed at `f142ae6`. The reviewed branch then merged without conflicts into `main` at `6aa83da`, focused post-merge checks passed, and the completion record was committed at `e05684b`. Local and remote `main` match at `e05684b`; the completed Stage 5 branch was deleted locally and remotely after containment was verified. Stage 5 is complete without claiming that the missing evidence passed. Stage 6 retirement implementation, validation, and final exit review are complete locally and accepted; branch delivery remains.
 
-The three workstreams now coexist on local `main` through the Stage 5 merge. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It originally connected that correct boundary behind the older scenario-screen composition. Recovery 3 later connected the approved tabbed V2 laboratory on `/dev/scenarios`, and Recovery 6 produced the passing replacement Step 8.2–8.7 evidence. The earlier browser run remains diagnostic history and is invalid for acceptance.
+The three workstreams now coexist on published `main` through the Stage 5 merge. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It originally connected that correct boundary behind the older scenario-screen composition. Recovery 3 later connected the approved tabbed V2 laboratory on `/dev/scenarios`, and Recovery 6 produced the passing replacement Step 8.2–8.7 evidence. The earlier browser run remains diagnostic history and is invalid for acceptance.
 
 ## Stage plan
 
@@ -28,12 +28,14 @@ The three workstreams now coexist on local `main` through the Stage 5 merge. Sta
 | 2 — Approve the standalone laboratory | Complete — 2026-07-31 | Review the V2 laboratory one test at a time. | All 34 valid tests pass and are user-approved; invalid/deferred recurrence cases remain explicitly excluded. |
 | 3 — Inspect the `test_database` handoff | Complete — 2026-07-31 | Verified the merged runtime, reset safeguards, readiness contract, credentials, Node driver access, and A02/A03/A05 source mappings. | **Ready with exact gaps.** The evidence, approved mappings, corrections, and Stage 4 gaps are recorded in the Stage 3 handoff. |
 | 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected the older `/dev/scenarios` composition to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. This did not connect or accept the approved V2 interface. |
-| 5 — Run connected acceptance | **Complete and merged locally — 2026-08-05** | Step 8B is approved; all 34 Step 8C cases executed; the final ledger limitation and Step 9 waiver are explicitly accepted; Steps 10–12 are complete locally. | Complete — merge `6aa83da` passed focused post-merge checks; remote publication remains separately gated. |
-| 6 — Finalize Phase 6 | Pending | Audit the accepted Stage 5 evidence, reconcile authority and implementation, document Phase 10 exclusions, and decide whether the old operational source simulator can be retired. | The Phase 6 exit gate passes and the user accepts the integrated local result. |
+| 5 — Run connected acceptance | **Complete and published — 2026-08-05** | Step 8B is approved; all 34 Step 8C cases executed; the final ledger limitation and Step 9 waiver are explicitly accepted; Steps 10–12 are complete. | Complete — merge `6aa83da` passed focused post-merge checks and `origin/main` contains the final record at `e05684b`. |
+| 6 — Finalize Phase 6 | **Complete and accepted locally — 2026-08-05** | Audited the accepted Stage 5 result. Retired the Monitor-owned source simulator, runtime fixture and backup sources, fake source tables and registrations, hardcoded Phase 4 incidents, and tests that manufactured EmusaSoft facts inside Monitor. | Complete — the product manager accepted the final Phase 6 result without changing the previously accepted Stage 5 limitations. |
 
-## Immediate next action — Publish `main`, then Stage 6
+## Immediate next action — Phase 6 delivery
 
-Obtain separate authorization before pushing local `main` to `origin/main`. After publication, Stage 6 audits the accepted Stage 5 result, reconciles authority and implementation, documents Phase 10 exclusions, and decides which old simulator components can be retired. Continue to preserve the accepted invalid-ledger and repeatability limitations accurately.
+Review, commit, push, and merge `codex/phase6-stage6` through the normal separate approval gates. After publication on `main`, Phase 7 may begin from the delivered Phase 6 result.
+
+Local retirement evidence: the migrated Monitor database contains zero `monitor_sim_*` tables, zero fixture/simulator/backup query registrations, three `test_database` query registrations, and no hardcoded incidents or conversations. Database tests pass 3/3, focused API server tests pass 12/12, detection tests pass 15/15 including six connected source-action cases, workspace typecheck and build pass, and `git diff --check` passes. The complete 34-case Stage 5 suite was not rerun.
 
 ## Supporting specifications and evidence
 
@@ -60,3 +62,7 @@ The superseded Stage 5 plan is preserved as [`stage5_corrective_execution_plan_v
 ## Phase 6 exit gate
 
 Phase 6 completes only when the separate source boundary, deterministic reset, A02/A03/A05 lifecycle, routing, Dashboard, conversations, messages, and accepted Chat UI pass together through automated and manual evidence. The synthetic operational source boundary may be removed only after that replacement acceptance.
+
+Stage 5 supplied that replacement acceptance. Stage 6 therefore removes the synthetic source boundary without reopening or overstating the accepted Stage 5 evidence limitations. Phase 10 remains responsible for real EmusaSoft authentication, Aurora access, production-query validation, and deployment integration.
+
+**Exit decision — 2026-08-05:** The product manager confirmed that no further product questions remain and directed Phase 6 to be marked complete. The local exit gate is accepted with the already recorded Stage 5 ledger limitation and Step 9 waiver unchanged. Git delivery remains a separate workflow action and does not reopen the product decision.

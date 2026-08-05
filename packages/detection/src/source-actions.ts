@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { ScenarioRuleCode } from "./simulator.js";
+import type { ScenarioRuleCode } from "./scenario-source.js";
 
 export const sourceActionIds = [
   "a02.prepare_dispatch", "a02.receive", "a02.cancel", "a02.reject",

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseRuntime } from "@monitor/database";
-import type { ScenarioRuleCode } from "./simulator.js";
+import type { ScenarioRuleCode } from "./scenario-source.js";
 
 export type ExperimentSecondsPerSimulatedMinute = number;
 export type ExperimentPollingFrequencyMinutes = number;

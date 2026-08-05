@@ -15,7 +15,7 @@ export interface MonitorConfig {
   databaseUrl?: string;
   redisUrl?: string;
   enableScenarioLab: boolean;
-  scenarioSource: "simulator" | "test_database";
+  scenarioSource: "test_database";
   features: FeatureFlags;
 }
 
@@ -42,9 +42,8 @@ export function loadConfig(overrides: Partial<MonitorConfig> = {}): MonitorConfi
   if (nodeEnv === "production" && allowMockAuth) throw new Error("Mock authentication cannot be enabled in production");
   const enableScenarioLab = overrides.enableScenarioLab ?? booleanValue(process.env.MONITOR_ENABLE_SCENARIO_LAB, nodeEnv === "development" || nodeEnv === "test");
   if (enableScenarioLab && !["development", "test"].includes(nodeEnv)) throw new Error("Scenario laboratory is local development and test only");
-  const scenarioSource = overrides.scenarioSource ?? process.env.MONITOR_SCENARIO_SOURCE ?? (nodeEnv === "development" ? "test_database" : "simulator");
-  if (!["simulator", "test_database"].includes(scenarioSource)) throw new Error("Invalid MONITOR_SCENARIO_SOURCE");
-  if (scenarioSource === "test_database" && !enableScenarioLab) throw new Error("test_database scenario source requires the scenario laboratory");
+  const scenarioSource = overrides.scenarioSource ?? process.env.MONITOR_SCENARIO_SOURCE ?? "test_database";
+  if (scenarioSource !== "test_database") throw new Error("MONITOR_SCENARIO_SOURCE must be test_database");
   const repositoryRoot = resolve(import.meta.dirname, "../../..");
   const configuredPgliteDir = process.env.MONITOR_PGLITE_DATA_DIR;
 
@@ -60,7 +59,7 @@ export function loadConfig(overrides: Partial<MonitorConfig> = {}): MonitorConfi
     ...(databaseUrl ? { databaseUrl } : {}),
     ...(redisUrl ? { redisUrl } : {}),
     enableScenarioLab,
-    scenarioSource: scenarioSource as MonitorConfig["scenarioSource"],
+    scenarioSource,
     features: overrides.features ?? {
       dashboardShell: booleanValue(process.env.MONITOR_FEATURE_DASHBOARD_SHELL, true),
       chatShell: booleanValue(process.env.MONITOR_FEATURE_CHAT_SHELL, true),

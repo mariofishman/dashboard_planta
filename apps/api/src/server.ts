@@ -2,7 +2,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
 import { ConversationService, type ConversationParticipant } from "@monitor/conversations";
-import { DetectionRepository, DetectionRunner, DetectionScheduler, FixedBackupFreshnessProvider, loadFixtureRegistry, loadSourceActionContracts, ScenarioExperimentRepository, ScenarioExperimentRuntime, ScenarioSourceRepository, scenarioContextFor, simulatorRegistry, TestDatabaseConnections, TestDatabaseFreshnessProvider, TestDatabaseScenarioRepository, testDatabaseContextFor, testDatabaseRegistry, type DetectionQueryDefinition, type DetectionSourceAdapter, type ScenarioSource, type TestDatabaseFixtureSeeds } from "@monitor/detection";
+import { DetectionRepository, DetectionRunner, DetectionScheduler, DisabledFreshnessProvider, loadSourceActionContracts, ScenarioExperimentRepository, ScenarioExperimentRuntime, TestDatabaseConnections, TestDatabaseFreshnessProvider, TestDatabaseScenarioRepository, testDatabaseContextFor, testDatabaseRegistry, type DetectionQueryDefinition, type DetectionSourceAdapter, type ScenarioSource, type TestDatabaseFixtureSeeds } from "@monitor/detection";
 import { IncidentService, type IncidentChange, type RuleContract } from "@monitor/incidents";
 import Fastify from "fastify";
 import { readFile } from "node:fs/promises";
@@ -54,33 +54,6 @@ export interface MonitorServer {
     active(): Stage5BrowserRuntimeSeed | null;
   };
   close(): Promise<void>;
-}
-
-async function seedPhase4Incidents(service: IncidentService, repositoryRoot: string, database: DatabaseRuntime) {
-  const existing = await database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident");
-  const databaseWasEmpty = Number(existing.count) === 0;
-  const document = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
-  const rules = new Map(document.rules.filter((rule) => ["A02", "A03", "A05"].includes(rule.code)).map((rule) => [rule.code, rule]));
-  const apply = async (code: "A02" | "A03" | "A05", evidence: Record<string, unknown>, context: Parameters<IncidentService["apply"]>[0]["context"], minutesAgo: number) => {
-    const rule = rules.get(code);
-    if (!rule) throw new Error(`missing_phase4_rule_${code}`);
-    return service.apply({ rule, evidence, context, observedAt: databaseWasEmpty ? new Date(Date.now() - minutesAgo * 60_000) : new Date() });
-  };
-  await apply("A05", { articleSerialId: 205, declaredAgeMinutes: 134, weighed: false, sourceWorkOrderFinished: true, movedFromMachine: false },
-    { plantId: 1, workOrderId: "1510873", workOrderCode: "151087.3", machineCode: "P15", operationName: "Impresión", shiftName: "Día", responsibleName: "Equipo de procesos" }, 134);
-  await apply("A02", { materialFlowDetailId: 202, isWorkOrderReservation: true, state: "TRANSITO", receivedAt: null, elapsedMinutes: 38 },
-    { plantId: 1, workOrderId: "1510873", workOrderCode: "151087.3", machineCode: "P15", operationName: "Impresión", shiftName: "Día", responsibleName: "Almacén de materia prima" }, 38);
-  await apply("A03", { workOrderId: 103, active: true, elapsedMinutes: 79, consumptionCount: 0 },
-    { plantId: 1, workOrderId: "1510561", workOrderCode: "151056.1", machineCode: "P12", operationName: "Impresión", shiftName: "Día", responsibleName: "Operación de máquina" }, 79);
-  if (!databaseWasEmpty) return;
-  await apply("A03", { workOrderId: 1510211, active: true, elapsedMinutes: 16, consumptionCount: 0 },
-    { plantId: 1, workOrderId: "1510211", workOrderCode: "151021.1", machineCode: "CT04", operationName: "Corte", shiftName: "Tarde", responsibleName: "Operación de máquina" }, 1620);
-  await apply("A03", { workOrderId: 1510211, active: true, elapsedMinutes: 27, consumptionCount: 1 },
-    { plantId: 1, workOrderId: "1510211", workOrderCode: "151021.1", machineCode: "CT04", operationName: "Corte", shiftName: "Tarde", responsibleName: "Operación de máquina" }, 1609);
-  await apply("A02", { materialFlowDetailId: 688, isWorkOrderReservation: true, state: "TRANSITO", receivedAt: null, elapsedMinutes: 41 },
-    { plantId: 1, workOrderId: "1510392", workOrderCode: "151039.2", machineCode: "CT04", operationName: "Corte", shiftName: "Día", responsibleName: "Almacén de materia prima" }, 3100);
-  await apply("A02", { materialFlowDetailId: 688, isWorkOrderReservation: true, state: "RECIBIDO", receivedAt: "2026-07-19T10:20:00Z", elapsedMinutes: 20 },
-    { plantId: 1, workOrderId: "1510392", workOrderCode: "151039.2", machineCode: "CT04", operationName: "Corte", shiftName: "Día", responsibleName: "Almacén de materia prima" }, 3080);
 }
 
 export async function buildMonitorServer(options: {
@@ -193,30 +166,26 @@ export async function buildMonitorServer(options: {
       ...(context.cycleId ? { cycleId: context.cycleId } : {}),
     });
   });
-  if (!config.enableScenarioLab) await seedPhase4Incidents(incidentService, repositoryRoot, database);
   const ruleDocument = JSON.parse(await readFile(resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"), "utf8")) as { rules: RuleContract[] };
   const incidentRules = new Map<string, RuleContract>(ruleDocument.rules.filter((rule) => ["A02", "A03", "A05"].includes(rule.code)).map((rule) => [rule.code, rule]));
   const detectionRepository = new DetectionRepository(database);
   let testDatabaseConnections: TestDatabaseConnections | null = null;
   let scenarioSource: ScenarioSource | null = null;
-  if (config.enableScenarioLab && config.scenarioSource === "test_database") {
+  if (config.enableScenarioLab) {
     testDatabaseConnections = await TestDatabaseConnections.create(repositoryRoot);
     scenarioSource = await TestDatabaseScenarioRepository.create(testDatabaseConnections, repositoryRoot, options.testDatabaseFixtureSeeds);
-  } else if (config.enableScenarioLab) {
-    scenarioSource = new ScenarioSourceRepository(database);
   }
   const freshness = scenarioSource instanceof TestDatabaseScenarioRepository
     ? new TestDatabaseFreshnessProvider(scenarioSource)
-    : new FixedBackupFreshnessProvider("phase1-fixtures.v1");
+    : new DisabledFreshnessProvider();
   const detectionRunner = new DetectionRunner(detectionRepository, freshness, undefined, async ({ cycleId, query, rows, observedAt }) => {
     const rule = incidentRules.get(query.ruleCode);
     if (!rule) return;
     const sourceBusinessTime = scenarioSource?.pollMetadata?.(query.ruleCode as "A02" | "A03" | "A05")?.currentAt
       ?? (scenarioSource ? (await scenarioSource.status(query.ruleCode)).scenarioClock.currentAt : null);
     const incidentObservedAt = sourceBusinessTime ? new Date(sourceBusinessTime) : observedAt;
-    await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt: incidentObservedAt, contextFor: (row) => query.adapterKind === "simulator"
-      ? scenarioContextFor(row)
-      : query.adapterKind === "test_database" ? testDatabaseContextFor(row) : ({ plantId: 1 }) });
+    await incidentService.reconcileHealthyCycle({ rule, rows, cycleId, observedAt: incidentObservedAt,
+      contextFor: (row) => query.adapterKind === "test_database" ? testDatabaseContextFor(row) : ({ plantId: 1 }) });
     const downstream = await database.queryAll(`SELECT i.id,i.lifecycle,i.plant_id AS "plantId"
       FROM monitor_incident i
       LEFT JOIN monitor_conversation_incident ci ON ci.incident_id=i.id
@@ -230,26 +199,9 @@ export async function buildMonitorServer(options: {
     }
   });
   const detectionScheduler = new DetectionScheduler(detectionRunner, 2);
-  const fixtureSources = await loadFixtureRegistry(
-    resolve(repositoryRoot, "config/alerts/alert-rules.v1.json"),
-    resolve(repositoryRoot, "tests/fixtures/alerts/rule-cases.v1.json"),
-  );
   const scenarioSources = scenarioSource
-    ? config.scenarioSource === "test_database"
-      ? await testDatabaseRegistry(repositoryRoot, testDatabaseConnections!, scenarioSource as TestDatabaseScenarioRepository)
-      : simulatorRegistry(scenarioSource as ScenarioSourceRepository)
+    ? await testDatabaseRegistry(repositoryRoot, testDatabaseConnections!, scenarioSource as TestDatabaseScenarioRepository)
     : [];
-  const localDetectionSources = scenarioSource
-    ? [...fixtureSources.filter(({ query }) => !["A02", "A03", "A05"].includes(query.ruleCode)), ...scenarioSources]
-    : fixtureSources;
-  await Promise.all(localDetectionSources
-    .filter(({ query }) => !scenarioSource || !["A02", "A03", "A05"].includes(query.ruleCode))
-    .map(({ query, adapter }) => detectionScheduler.runRecovery(query, adapter)));
-  // Deterministic tests invoke the same runner through the development poll route.
-  // Development keeps normal scheduled polling active for source-to-screen review.
-  if (config.nodeEnv !== "test") localDetectionSources
-    .filter(({ query }) => !scenarioSource || !["A02", "A03", "A05"].includes(query.ruleCode))
-    .forEach(({ query, adapter }) => detectionScheduler.schedule(query, adapter));
 
   io.use(async (socket, next) => {
     const signedCookie = cookieValue(socket.handshake.headers.cookie, "monitor_session");
@@ -316,7 +268,7 @@ export async function buildMonitorServer(options: {
   app.get("/metrics", async (_request, reply) => reply.type("text/plain; version=0.0.4").send(prometheusMetrics(metrics)));
   app.get("/api/features", { preHandler: app.requireScopes(["monitor:read"]) }, async () => config.features);
   app.get("/api/diagnostics/source", { preHandler: app.requireScopes(["monitor:read"]) }, async () => ({
-    environment: config.scenarioSource === "test_database" ? "local-test-database" : "local-fixtures",
+    environment: scenarioSource ? "local-test-database" : "source-disabled",
     productionConnected: false,
     sources: await detectionRepository.diagnostics(),
   }));
@@ -385,9 +337,7 @@ export async function buildMonitorServer(options: {
       (error) => app.log.error({ err: error }, "scenario experiment runtime failed"),
     );
     await scenarioRuntime.initialize();
-    const reset = config.scenarioSource === "test_database"
-      ? new TestDatabaseResetCoordinator(repositoryRoot, database, scenarioRuntime, () => { stage5BrowserRuntimeSeed = null; })
-      : undefined;
+    const reset = new TestDatabaseResetCoordinator(repositoryRoot, database, scenarioRuntime, () => { stage5BrowserRuntimeSeed = null; });
     await app.register(scenarioRoutes, {
       database,
       source: scenarioSource,
@@ -396,11 +346,11 @@ export async function buildMonitorServer(options: {
       runtime: scenarioRuntime,
       experiments: scenarioExperiments,
       registry: scenarioRegistry,
-      ...(reset ? { reset } : {}),
+      reset,
     });
   }
-  if (options.stage5BrowserRuntime && (config.nodeEnv === "production" || config.scenarioSource !== "test_database" || !scenarioRuntime)) throw new Error("stage5_browser_runtime_requires_connected_test_database");
-  const stage5BrowserRuntime = scenarioRuntime && config.nodeEnv !== "production" && config.scenarioSource === "test_database" ? {
+  if (options.stage5BrowserRuntime && (config.nodeEnv === "production" || !scenarioRuntime)) throw new Error("stage5_browser_runtime_requires_connected_test_database");
+  const stage5BrowserRuntime = scenarioRuntime && config.nodeEnv !== "production" ? {
     activate(seed: Stage5BrowserRuntimeSeed) { stage5BrowserRuntimeSeed = structuredClone(seed); },
     clear() { stage5BrowserRuntimeSeed = null; },
     active() { return stage5BrowserRuntimeSeed ? structuredClone(stage5BrowserRuntimeSeed) : null; },

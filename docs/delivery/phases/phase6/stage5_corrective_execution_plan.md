@@ -4,11 +4,11 @@
 
 **Supersedes:** [Version 1](../../../../archive/docs/implementation/stage5_corrective_execution_plan_v1.md), preserved as historical planning and execution evidence only.
 
-**Branch:** `codex/phase6-stage5`
+**Historical branch:** `codex/phase6-stage5`, deleted locally and remotely after verified merge and publication
 
-**Historical pre-Step-8B implementation checkpoint:** `27bd646`. The separate future instant-reset plan was added at `1b608b2`. The preserved pre-recovery implementation base is `2319c80`. The completed Stage 5 branch tip is `f142ae6`, merged into local `main` at `6aa83da`.
+**Historical pre-Step-8B implementation checkpoint:** `27bd646`. The separate future instant-reset plan was added at `1b608b2`. The preserved pre-recovery implementation base is `2319c80`. The completed Stage 5 branch tip is `f142ae6`, merged into `main` at `6aa83da`; the final completion record is published on `origin/main` at `e05684b`.
 
-**Current Stage 5 status:** Complete and merged into local `main` at merge commit `6aa83da` on 2026-08-05. The reviewed merge passed focused post-merge validators, typecheck, and build. The unresolved final-ledger limitation and Step 9 waiver remain explicitly accepted. `origin/main` has not been pushed because that requires separate authorization.
+**Current Stage 5 status:** Complete, merged, verified, documented, and published on `origin/main` at `e05684b` on 2026-08-05. The reviewed merge `6aa83da` passed focused post-merge validators, typecheck, and build. The unresolved final-ledger limitation and Step 9 waiver remain explicitly accepted. The completed Stage 5 branch was deleted locally and remotely after containment was verified.
 
 ## Start here
 
@@ -23,7 +23,7 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 | 3 | Complete Recovery 3–4. | The approved V2 laboratory is connected and the obsolete executable workflow cannot be mistaken for current Stage 5 behavior. |
 | 4 | Complete Recovery 5. | Complete — every affected focused check passes and the development baseline is independently restored and verified. |
 | 5 | Complete Recovery 6. | Complete — new Step 8.2–8.7 evidence passes in one runtime using the approved laboratory. |
-| 6 | Resume the original path at Step 8B. | Complete — Steps 8B–12 are complete through the reviewed local merge `6aa83da`; pushing `main` remains separately gated. |
+| 6 | Resume the original path at Step 8B. | Complete — Steps 8B–12 are complete through reviewed merge `6aa83da` and published completion record `e05684b`. |
 
 ### Exact next action
 
@@ -43,6 +43,7 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 14. Waived by product decision — on 2026-08-05 the product manager removed Step 9's requirement for two additional complete runs because it is disproportionate and redundant for the project's practical objective after Step 8B review and Step 8C execution. This waiver removes the repeatability gate; it does not convert the invalid Step 8C ledger into accepted evidence.
 15. Complete by product decision — on 2026-08-05 the product manager reviewed the recorded final evidence and limitations, accepted Stage 5 as complete for the project's practical purpose despite the invalid ledger and waived repeatability evidence, and authorized Step 11 commit and push. This decision does not claim that the missing evidence passed and does not authorize Step 12 merge.
 16. Complete locally — Step 11 commit `f142ae6` was pushed to `origin/codex/phase6-stage5`; the user then authorized Step 12. The reviewed branch was merged without conflicts into local `main` at `6aa83da`, and focused fixture, declaration, ledger, browser-harness, browser-evidence, typecheck, build, and diff checks passed. Pushing `main` remains separately gated.
+17. Complete and published — the Step 12 completion record was committed at `e05684b`, local `main` was pushed, and local and `origin/main` were verified at that exact commit. The contained `codex/phase6-stage5` branch was then deleted locally and remotely.
 
 Recovery 3–4 is committed and pushed at `30ed384`; Recovery 5 is committed and pushed at `d2ef6af`; Recovery 6 is committed and pushed at `5a9b28b`.
 
@@ -101,7 +102,7 @@ The audit did not find evidence of a second active A02, A03, or A05 rule path. T
 | Step 9 repeatability runs | Waived by the product manager on 2026-08-05. No additional complete runs are required. |
 | Step 10 final evidence review | Complete by product decision on 2026-08-05. |
 | Step 11 commit and push | Complete at `f142ae6`; local and remote Stage 5 branches match. |
-| Step 12 merge | Complete locally at merge commit `6aa83da`; post-merge checks pass. `origin/main` is unchanged pending separate push authorization. |
+| Step 12 merge | Complete and published. Merge `6aa83da` and final record `e05684b` are on `origin/main`; post-merge checks pass. |
 
 ### What we are not starting over
 
@@ -739,7 +740,7 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 | 9 | Run the complete finished version twice from clean starting states. | Waived by product decision on 2026-08-05. |
 | 10 | Review all final evidence and decide whether Stage 5 is genuinely complete. | Complete by product decision on 2026-08-05. |
 | 11 | Commit and push the completed Stage 5 branch. | Complete at `f142ae6`. |
-| 12 | Review and merge Stage 5 into `main`. | Complete locally at `6aa83da`; pushing `main` remains separately gated. |
+| 12 | Review and merge Stage 5 into `main`. | Complete and published through merge `6aa83da` and final record `e05684b`. |
 
 ### Step 8B — Add passive Dashboard and Chat previews
 
@@ -847,7 +848,7 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 
 ### Step 12 — Review and merge Stage 5 into `main`
 
-**Execution record — 2026-08-05:** The user explicitly authorized review and merge. The Stage 5 branch was clean, synchronized with `origin/codex/phase6-stage5`, directly based on current `origin/main`, and contained no tracked protected or runtime data. It merged without conflicts into local `main` as `6aa83da`. Focused fixture, declaration, ledger, browser-harness, browser-evidence, typecheck, build, and diff checks passed on the merged tree. The connected 8C suite was not rerun and the database was not reset. `origin/main` remains unchanged pending separate push authorization.
+**Execution record — 2026-08-05:** The user explicitly authorized review and merge. The Stage 5 branch was clean, synchronized with `origin/codex/phase6-stage5`, directly based on current `origin/main`, and contained no tracked protected or runtime data. It merged without conflicts into `main` as `6aa83da`. Focused fixture, declaration, ledger, browser-harness, browser-evidence, typecheck, build, and diff checks passed on the merged tree. The connected 8C suite was not rerun and the database was not reset. The final completion record was committed and published at `e05684b`; local and remote `main` were verified equal; then the contained Stage 5 branch was deleted locally and remotely.
 
 **Purpose:** Make Stage 5 part of the canonical project only after final review.
 
@@ -862,12 +863,14 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 - Push `main` only with separate explicit authorization.
 - Keep the Stage 5 branch until the merged result is verified.
 
-**Done when:** Complete locally — Stage 5 is merged, verified, and accurately documented on local `main`. Remote publication still requires separate authorization.
+**Done when:** Complete — Stage 5 is merged, verified, accurately documented, and published on `origin/main`.
 
 **Approval:** Merge approval and permission to push `main` are separate decisions.
 
 ### After Step 12
 
 Stage 5 is complete, but Phase 6 remains in progress. Stage 6 then audits the merged result, confirms which connected components replace the simulator, preserves useful deterministic test tools, decides what can be retired, and performs the final Phase 6 exit review.
+
+**Stage 6 retirement decision — 2026-08-05:** The product manager confirmed that accepted Stage 5 fully replaces the old Monitor-owned operational source simulator. Stage 6 removes its runtime implementation, `monitor_sim_*` end-state tables, runtime fixture and backup-source registrations, hardcoded Phase 4 demonstration incidents, and tests that manufacture EmusaSoft facts inside Monitor. EmusaSoft-derived tests must use Laboratory actions against `test_database` followed by Monitor polling. Only isolated Monitor-owned database-safety tests that create no EmusaSoft facts may retain a temporary Monitor database. Historical migrations `0003`, `0010`, and `0011` remain ordered history; terminal migration `0022` removes their obsolete end-state artifacts.
 
 No recovery stage or remaining step advances status before its own completion and approval conditions are met.

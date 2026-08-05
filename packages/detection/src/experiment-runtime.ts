@@ -8,7 +8,7 @@ import {
   type ScenarioExperiment,
   type ScenarioExperimentIdentity,
 } from "./experiment.js";
-import type { ScenarioRuleCode, ScenarioSource } from "./simulator.js";
+import type { ScenarioRuleCode, ScenarioSource } from "./scenario-source.js";
 
 type ScenarioRegistry = Map<ScenarioRuleCode, { query: DetectionQueryDefinition; adapter: DetectionSourceAdapter }>;
 interface ScenarioRuntimeTrigger {

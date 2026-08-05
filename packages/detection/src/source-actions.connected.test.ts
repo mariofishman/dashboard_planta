@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { after, before, describe, it } from "node:test";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import type { ScenarioSourceAction } from "./simulator.js";
+import type { ScenarioSourceAction } from "./scenario-source.js";
 import { a02TerminalActionFor, loadSourceActionContracts, sourceActionIds, type SourceActionContract, type SourceActionId } from "./source-actions.js";
 import { TestDatabaseConnections, TestDatabaseScenarioRepository } from "./test-database.js";
 
