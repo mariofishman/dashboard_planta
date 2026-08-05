@@ -35,10 +35,11 @@ D04 is retired into consolidated D01. Historical D04 incidents and current compa
 - **D01:** consolidated OT-level longitudinal invariant integrated; D04 retired from active catalog, executable contracts, fixtures, publication, and Phase 7 inventory. The completed Phase 6 source boundary remains unchanged.
 - **D02:** closed-OT delivered-reel invariant integrated with its inclusive 90% completion boundary, any-positive-consumption clearance rule, unverified `motivo_cierre` boundary, and per-reel condition identity.
 - **D03:** closed-OT mass-balance invariant integrated with its all-weighed gate, theoretical ink and adhesive inputs, strict 5% boundary, E05 blocker, and explicit independence from every other alert. D03 is never suppressed or cascade-resolved through another alert.
+- **A01:** material-readiness invariant integrated with full-quantity allocation, reservation, and dispatch checks; reservation-first competing-stock allocation; inclusive 60- and 30-minute checkpoints; cancellation and rescheduling lifecycle; and explicit independence from D03.
 
 ## Immediate next action
 
-Inspect A01 against the D01/D02/D03-integrated result and present the A01 functional-conflict and validation checkpoint for approval.
+Inspect B01 against the A01/D01/D02/D03-integrated result and present the B01 functional-conflict and validation checkpoint for approval.
 
 ## Phase 7 exit gate
 

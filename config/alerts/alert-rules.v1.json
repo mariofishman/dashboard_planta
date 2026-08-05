@@ -3,25 +3,25 @@
   "catalogRevision": "2026-08-01",
   "rules": [
     {
-      "code": "A01", "title": "Required material not ready before OT start", "ruleVersion": "1.0.0",
-      "queryId": "a01-material-readiness", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
+      "code": "A01", "title": "Required material not ready before OT start", "ruleVersion": "1.1.0",
+      "queryId": "a01-material-readiness", "queryVersion": "1.1.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId", "materialRequirementId"], "classification": ["deadline", "deterministic"],
-      "labels": ["Por vencer", "Error"], "productionReadiness": "fixture-proven-production-pending",
+      "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"ordenes_trabajo","fields":["id","fecha_inicio_planificada"],"evidence":"backup-confirmed"},
         {"source":"pre_reserva_orden_trabajo","fields":["id","id_orden_trabajo_destino","id_articulo","estado"],"evidence":"backup-confirmed"},
-        {"source":"inventory_availability_contract","fields":["availableQuantity","purchaseOrSupplierPending","dispatched"],"evidence":"phase10-pending"}
+        {"source":"inventory_availability_contract","fields":["requiredQuantityKg","allocatedQuantityKg","reservedQuantityKg","dispatchedQuantityKg","canceled"],"evidence":"phase10-pending"}
       ],
-      "requiredEvidence": ["workOrderId","materialRequirementId","minutesToPlannedStart","materialAvailable","reserved","dispatched"],
+      "requiredEvidence": ["workOrderId","materialRequirementId","minutesToPlannedStart","requiredQuantityKg","allocatedQuantityKg","reservedQuantityKg","dispatchedQuantityKg","canceled"],
       "parameters": {"readinessMinutes":{"value":60,"unit":"minutes","status":"approved"},"dispatchMinutes":{"value":30,"unit":"minutes","status":"approved"}},
-      "predicate": {"any":[{"all":[{"lte":[{"var":"minutesToPlannedStart"},{"param":"readinessMinutes"}]},{"any":[{"not":{"var":"materialAvailable"}},{"not":{"var":"reserved"}}]}]},{"all":[{"lte":[{"var":"minutesToPlannedStart"},{"param":"dispatchMinutes"}]},{"not":{"var":"dispatched"}}]}]},
+      "predicate": {"all":[{"not":{"var":"canceled"}},{"any":[{"all":[{"lte":[{"var":"minutesToPlannedStart"},{"param":"readinessMinutes"}]},{"any":[{"lt":[{"var":"allocatedQuantityKg"},{"var":"requiredQuantityKg"}]},{"lt":[{"var":"reservedQuantityKg"},{"var":"requiredQuantityKg"}]}]}]},{"all":[{"lte":[{"var":"minutesToPlannedStart"},{"param":"dispatchMinutes"}]},{"lt":[{"var":"dispatchedQuantityKg"},{"var":"requiredQuantityKg"}]}]}]}]},
       "reasonRules": [
-        {"code":"material_not_in_warehouse","when":{"not":{"var":"materialAvailable"}}},
-        {"code":"not_reserved_stock_available","when":{"all":[{"var":"materialAvailable"},{"not":{"var":"reserved"}}]}},
-        {"code":"reserved_not_dispatched","when":{"all":[{"var":"reserved"},{"lte":[{"var":"minutesToPlannedStart"},{"param":"dispatchMinutes"}]},{"not":{"var":"dispatched"}}]}}
+        {"code":"material_not_in_warehouse","when":{"lt":[{"var":"allocatedQuantityKg"},{"var":"requiredQuantityKg"}]}},
+        {"code":"not_reserved_stock_available","when":{"all":[{"gte":[{"var":"allocatedQuantityKg"},{"var":"requiredQuantityKg"}]},{"lt":[{"var":"reservedQuantityKg"},{"var":"requiredQuantityKg"}]}]}},
+        {"code":"reserved_not_dispatched","when":{"all":[{"gte":[{"var":"reservedQuantityKg"},{"var":"requiredQuantityKg"}]},{"lte":[{"var":"minutesToPlannedStart"},{"param":"dispatchMinutes"}]},{"lt":[{"var":"dispatchedQuantityKg"},{"var":"requiredQuantityKg"}]}]}}
       ],
-      "resolution": "Current checkpoint requirements pass, or an approved reschedule creates new checkpoints.",
-      "correlations": ["Update one incident at the 60-minute and 30-minute checkpoints."],
+      "resolution": "Full checkpoint requirements pass, cancellation clears the requirement, or rescheduling resolves the occurrence before evaluation at new checkpoints.",
+      "correlations": ["Update one Error occurrence at the 60-minute and 30-minute checkpoints and after actual start."],
       "productionDependencies": ["ES2-01 availability and dispatch mapping", "ES2-04 routing evidence"]
     },
     {

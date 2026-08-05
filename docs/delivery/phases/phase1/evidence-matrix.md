@@ -13,7 +13,7 @@
 
 | Rule | Final classification | Natural key | Sufficient evidence | Timestamp and units | Local status |
 |---|---|---|---|---|---|
-| A01 | Deadline + deterministic | OT + material requirement | Planned start, availability, reservation, dispatch | Planned start; minutes | Fixture proven; availability/dispatch mapping pending |
+| A01 | Deadline + deterministic | OT + material requirement | Planned start, required/allocable/reserved/dispatched quantities, cancellation | Planned start; minutes and kilograms | Fixture and standalone laboratory proven; exact source mapping pending |
 | A02 | Deadline + deterministic | Material-flow detail | OT reservation, transit state, receipt value, elapsed time | Flow creation as candidate send time; minutes | Query and fixture proven locally |
 | A03 | Deadline + deterministic | OT | Active state, actual start age, consumption count, A07 state | Actual start; minutes | Fixture proven; active-state semantics pending |
 | A04 | Physical + statistical | OT | Input, output, waste, rewinder capacity, tolerance | Evaluation time; kilograms | Fixture proven; capacity/tolerance pending |
