@@ -33,10 +33,11 @@ D04 is retired into consolidated D01. Historical D04 incidents and current compa
 ## Completed Stage 1 checkpoints
 
 - **D01:** consolidated OT-level longitudinal invariant integrated; D04 retired from active catalog, executable contracts, fixtures, publication, and Phase 7 inventory. The completed Phase 6 source boundary remains unchanged.
+- **D02:** closed-OT delivered-reel invariant integrated with its inclusive 90% completion boundary, any-positive-consumption clearance rule, unverified `motivo_cierre` boundary, and per-reel condition identity.
 
 ## Immediate next action
 
-Inspect D02 against the D01-integrated result and present the D02 functional-conflict and validation checkpoint for approval.
+Inspect D03 against the D01/D02-integrated result and present the D03 functional-conflict and validation checkpoint for approval.
 
 ## Phase 7 exit gate
 

@@ -271,23 +271,24 @@
       "productionDependencies": ["Verified initial-gross, core-tare, weighed-remnant, required-layer, width, grammage, closure, and pairwise-candidate mappings; current bounded query validation"]
     },
     {
-      "code": "D02", "title": "Completed OT has delivered reserved reels unconsumed", "ruleVersion": "1.0.0",
-      "queryId": "d02-delivered-reel-unconsumed", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
+      "code": "D02", "title": "Completed OT has delivered reserved reels unconsumed", "ruleVersion": "1.0.1",
+      "queryId": "d02-delivered-reel-unconsumed", "queryVersion": "1.0.1-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId", "articleSerialId"], "classification": ["deterministic"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"pre_reserva_orden_trabajo","fields":["id","id_orden_trabajo_destino","id_orden_trabajo_material_destino"],"evidence":"backup-confirmed"},
         {"source":"flujo_materiales_detalles","fields":["id_orden_trabajo","id_articulo_serial","fecha_recepcion"],"evidence":"backup-confirmed"},
         {"source":"orden_trabajo_materiales","fields":["id_orden_trabajo","id_serial_articulo","cantidad_consumida"],"evidence":"backup-confirmed"},
-        {"source":"ordenes_trabajo","fields":["id","motivo_cierre","cantidad_produccion_planificada","fecha_fin_ejecucion"],"evidence":"backup-confirmed"}
+        {"source":"ordenes_trabajo","fields":["id","motivo_cierre","cantidad_produccion_planificada","fecha_fin_ejecucion"],"evidence":"backup-confirmed"},
+        {"source":"good_production_quantity_contract","fields":["goodOutputQuantity","productionQuantityUnit"],"evidence":"phase10-pending"}
       ],
-      "requiredEvidence": ["workOrderId","articleSerialId","fullProductionCompleted","reservedReelDelivered","reelConsumed","truncated"],
-      "parameters": {},
-      "predicate": {"all":[{"var":"fullProductionCompleted"},{"var":"reservedReelDelivered"},{"not":{"var":"reelConsumed"}},{"not":{"var":"truncated"}}]},
-      "reasonRules": [{"code":"delivered_reel_unconsumed","when":{"all":[{"var":"reservedReelDelivered"},{"not":{"var":"reelConsumed"}}]}}],
-      "resolution": "Consumption, return, reassignment, completion, or reservation evidence is corrected.",
-      "correlations": ["Do not apply automatically to truncated OTs."],
-      "productionDependencies": ["Exact complete-production criterion"]
+      "requiredEvidence": ["workOrderId","articleSerialId","workOrderClosed","plannedProductionQuantity","goodOutputQuantity","productionQuantityUnit","reservedReelDelivered","consumedQuantity","reelDisposition"],
+      "parameters": {"completionShortfallToleranceFraction":{"value":0.10,"unit":"fraction-of-planned-production","status":"approved"}},
+      "predicate": {"all":[{"var":"workOrderClosed"},{"gte":[{"var":"goodOutputQuantity"},{"mul":[{"sub":[1,{"param":"completionShortfallToleranceFraction"}]},{"var":"plannedProductionQuantity"}]}]},{"var":"reservedReelDelivered"},{"eq":[{"var":"consumedQuantity"},0]},{"eq":[{"var":"reelDisposition"},"at_machine"]}]},
+      "reasonRules": [{"code":"delivered_reel_unconsumed","when":{"all":[{"var":"reservedReelDelivered"},{"eq":[{"var":"consumedQuantity"},0]},{"eq":[{"var":"reelDisposition"},"at_machine"]}]}}],
+      "resolution": "Positive consumption, return or reassignment, delivery or reservation correction, or evidence below the approved 90% completion boundary clears the condition.",
+      "correlations": ["D02 suppresses duplicate D03 for the same missing-consumption imbalance."],
+      "productionDependencies": ["Verified actual good-production quantity and unit mapping", "Verified motivo_cierre values and operator provenance before using closure reason"]
     },
     {
       "code": "D03", "title": "OT input good production and waste do not balance", "ruleVersion": "1.0.0",
