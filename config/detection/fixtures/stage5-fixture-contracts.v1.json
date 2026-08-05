@@ -31,7 +31,7 @@
       "testId": "SH-01", "group": "shared",
       "fixtureIdentity": { "contractId": "stage5:SH-01", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
       "dependencyTestIds": [],
-      "source": { "applicability": "not_applicable", "notApplicableReason": "Experiment creation has no source precondition." },
+      "source": { "applicability": "not_applicable", "notApplicableReason": "Experiment creation has no source precondition; the harness creates connected prior history before the asserted new experiment." },
       "actions": [{ "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} }],
       "experimentProfile": "isolated_per_test", "cleanupProfile": "restore_verified"
     },
@@ -115,7 +115,7 @@
         "naturalKeys": [
           { "ref": "a02Template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.clean[0]" },
           { "ref": "a02Movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 2 },
-          { "ref": "a03WorkOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.clean[0]" },
+          { "ref": "a03WorkOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.actionTemplate[0]" },
           { "ref": "a05Serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.clean[0]" }
         ],
         "startingState": [
@@ -170,7 +170,7 @@
       "testId": "SH-08", "group": "shared",
       "fixtureIdentity": { "contractId": "stage5:SH-08", "fixtureVersion": "1.0.0", "sourceRevision": "staging_emusa_core-20260723-025548" },
       "dependencyTestIds": [],
-      "source": { "applicability": "not_applicable", "notApplicableReason": "Durable experiment-history isolation does not mutate source records." },
+      "source": { "applicability": "not_applicable", "notApplicableReason": "The case mutates no source record; the harness creates connected prior observations before creating the next experiment." },
       "actions": [
         { "sequence": 1, "actionId": "experiment.create", "keyRefs": [], "parameters": {} },
         { "sequence": 2, "actionId": "experiment.snapshot", "keyRefs": [], "parameters": { "snapshotLabel": "prior_history" } },
@@ -187,7 +187,7 @@
         "naturalKeys": [
           { "ref": "a02Template", "ruleCode": "A02", "field": "materialFlowDetailId", "seedRef": "a02.downstream[0]" },
           { "ref": "a02Movement", "ruleCode": "A02", "field": "materialFlowDetailId", "producedByActionSequence": 1 },
-          { "ref": "a03WorkOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.threshold[0]" },
+          { "ref": "a03WorkOrder", "ruleCode": "A03", "field": "workOrderId", "seedRef": "a03.actionTemplate[0]" },
           { "ref": "a05Serial", "ruleCode": "A05", "field": "articleSerialId", "seedRef": "a05.thresholdBoth[0]" }
         ],
         "startingState": [
