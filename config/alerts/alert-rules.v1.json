@@ -1,27 +1,27 @@
 {
   "contractVersion": "1.0.0",
-  "catalogRevision": "2026-07-31",
+  "catalogRevision": "2026-08-01",
   "rules": [
     {
-      "code": "A01", "title": "Required material not ready before OT start", "ruleVersion": "1.0.0",
-      "queryId": "a01-material-readiness", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
+      "code": "A01", "title": "Required material not ready before OT start", "ruleVersion": "1.1.0",
+      "queryId": "a01-material-readiness", "queryVersion": "1.1.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId", "materialRequirementId"], "classification": ["deadline", "deterministic"],
-      "labels": ["Por vencer", "Error"], "productionReadiness": "fixture-proven-production-pending",
+      "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"ordenes_trabajo","fields":["id","fecha_inicio_planificada"],"evidence":"backup-confirmed"},
         {"source":"pre_reserva_orden_trabajo","fields":["id","id_orden_trabajo_destino","id_articulo","estado"],"evidence":"backup-confirmed"},
-        {"source":"inventory_availability_contract","fields":["availableQuantity","purchaseOrSupplierPending","dispatched"],"evidence":"phase10-pending"}
+        {"source":"inventory_availability_contract","fields":["requiredQuantityKg","allocatedQuantityKg","reservedQuantityKg","dispatchedQuantityKg","canceled"],"evidence":"phase10-pending"}
       ],
-      "requiredEvidence": ["workOrderId","materialRequirementId","minutesToPlannedStart","materialAvailable","reserved","dispatched"],
+      "requiredEvidence": ["workOrderId","materialRequirementId","minutesToPlannedStart","requiredQuantityKg","allocatedQuantityKg","reservedQuantityKg","dispatchedQuantityKg","canceled"],
       "parameters": {"readinessMinutes":{"value":60,"unit":"minutes","status":"approved"},"dispatchMinutes":{"value":30,"unit":"minutes","status":"approved"}},
-      "predicate": {"any":[{"all":[{"lte":[{"var":"minutesToPlannedStart"},{"param":"readinessMinutes"}]},{"any":[{"not":{"var":"materialAvailable"}},{"not":{"var":"reserved"}}]}]},{"all":[{"lte":[{"var":"minutesToPlannedStart"},{"param":"dispatchMinutes"}]},{"not":{"var":"dispatched"}}]}]},
+      "predicate": {"all":[{"not":{"var":"canceled"}},{"any":[{"all":[{"lte":[{"var":"minutesToPlannedStart"},{"param":"readinessMinutes"}]},{"any":[{"lt":[{"var":"allocatedQuantityKg"},{"var":"requiredQuantityKg"}]},{"lt":[{"var":"reservedQuantityKg"},{"var":"requiredQuantityKg"}]}]}]},{"all":[{"lte":[{"var":"minutesToPlannedStart"},{"param":"dispatchMinutes"}]},{"lt":[{"var":"dispatchedQuantityKg"},{"var":"requiredQuantityKg"}]}]}]}]},
       "reasonRules": [
-        {"code":"material_not_in_warehouse","when":{"not":{"var":"materialAvailable"}}},
-        {"code":"not_reserved_stock_available","when":{"all":[{"var":"materialAvailable"},{"not":{"var":"reserved"}}]}},
-        {"code":"reserved_not_dispatched","when":{"all":[{"var":"reserved"},{"lte":[{"var":"minutesToPlannedStart"},{"param":"dispatchMinutes"}]},{"not":{"var":"dispatched"}}]}}
+        {"code":"material_not_in_warehouse","when":{"lt":[{"var":"allocatedQuantityKg"},{"var":"requiredQuantityKg"}]}},
+        {"code":"not_reserved_stock_available","when":{"all":[{"gte":[{"var":"allocatedQuantityKg"},{"var":"requiredQuantityKg"}]},{"lt":[{"var":"reservedQuantityKg"},{"var":"requiredQuantityKg"}]}]}},
+        {"code":"reserved_not_dispatched","when":{"all":[{"gte":[{"var":"reservedQuantityKg"},{"var":"requiredQuantityKg"}]},{"lte":[{"var":"minutesToPlannedStart"},{"param":"dispatchMinutes"}]},{"lt":[{"var":"dispatchedQuantityKg"},{"var":"requiredQuantityKg"}]}]}}
       ],
-      "resolution": "Current checkpoint requirements pass, or an approved reschedule creates new checkpoints.",
-      "correlations": ["Update one incident at the 60-minute and 30-minute checkpoints."],
+      "resolution": "Full checkpoint requirements pass, cancellation clears the requirement, or rescheduling resolves the occurrence before evaluation at new checkpoints.",
+      "correlations": ["Update one Error occurrence at the 60-minute and 30-minute checkpoints and after actual start."],
       "productionDependencies": ["ES2-01 availability and dispatch mapping", "ES2-04 routing evidence"]
     },
     {
@@ -107,15 +107,15 @@
         {"source":"cotizacion_config_waste","fields":["id","id_cotizacion_config_valor","id_operacion"],"evidence":"backup-confirmed"},
         {"source":"cotizacion_config_rangos","fields":["id","valor_kg"],"evidence":"backup-confirmed"}
       ],
-      "requiredEvidence": ["workOrderId","declaredWaste","wasteAgeMinutes","wasteWeighed","balanceSuggestsWaste","specificD03Exists"],
+      "requiredEvidence": ["workOrderId","declaredWaste","wasteAgeMinutes","wasteWeighed","balanceSuggestsWaste"],
       "parameters": {"weighingMinutes":{"value":30,"unit":"minutes","status":"provisional"}},
-      "predicate": {"all":[{"not":{"var":"specificD03Exists"}},{"any":[{"all":[{"var":"declaredWaste"},{"gt":[{"var":"wasteAgeMinutes"},{"param":"weighingMinutes"}]},{"not":{"var":"wasteWeighed"}}]},{"var":"balanceSuggestsWaste"}]}]},
+      "predicate": {"any":[{"all":[{"var":"declaredWaste"},{"gt":[{"var":"wasteAgeMinutes"},{"param":"weighingMinutes"}]},{"not":{"var":"wasteWeighed"}}]},{"var":"balanceSuggestsWaste"}]},
       "reasonRules": [
         {"code":"waste_not_weighed","when":{"all":[{"var":"declaredWaste"},{"gt":[{"var":"wasteAgeMinutes"},{"param":"weighingMinutes"}]},{"not":{"var":"wasteWeighed"}}]}},
         {"code":"possible_waste_not_declared","when":{"var":"balanceSuggestsWaste"}}
       ],
       "resolution": "Waste evidence is declared and weighed, or corrected balance evidence removes the condition.",
-      "correlations": ["Attach a waste reason to D03 instead of creating a duplicate when D03 exists."],
+      "correlations": ["A06 and D03 remain independent when both predicates trigger; related evidence may be linked without suppressing either incident."],
       "productionDependencies": ["Closed-but-undeclared waste signal", "Quotation and historical baseline mapping"]
     },
     {
@@ -133,11 +133,11 @@
       "predicate": {"gt":[{"sub":[{"add":[{"var":"goodOutputKg"},{"var":"wasteKg"}]},{"var":"declaredInputKg"}]},{"var":"toleranceKg"}]},
       "reasonRules": [{"code":"input_evidence_gap","when":{"gt":[{"sub":[{"add":[{"var":"goodOutputKg"},{"var":"wasteKg"}]},{"var":"declaredInputKg"}]},{"var":"toleranceKg"}]}}],
       "resolution": "Declared input covers verified or estimated output and waste within tolerance.",
-      "correlations": ["Suppress A03; merge or link with D03 at closure."],
+      "correlations": ["Suppress A03 when its own approved correlation rule applies; A07 and D03 remain independent and may link evidence without lifecycle coupling."],
       "productionDependencies": ["Tolerance and verified-weight treatment"]
     },
     {
-      "code": "B01", "title": "OT started outside latest approved plan sequence", "ruleVersion": "1.0.0",
+      "code": "B01", "title": "OT started outside latest approved plan sequence", "ruleVersion": "1.0.1",
       "queryId": "b01-plan-sequence-deviation", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId"], "classification": ["deterministic"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
@@ -149,23 +149,26 @@
       "parameters": {},
       "predicate": {"all":[{"var":"actualStarted"},{"ne":[{"var":"workOrderId"},{"var":"nextApprovedWorkOrderId"}]},{"not":{"var":"sequenceUpdatedBeforeStart"}}]},
       "reasonRules": [{"code":"outside_approved_sequence","when":{"ne":[{"var":"workOrderId"},{"var":"nextApprovedWorkOrderId"}]}}],
-      "resolution": "The current plan is updated with the valid sequence and reason.",
+      "resolution": "A valid late sequence update with a reason resolves the incident while preserving the original deviation and update audit evidence; unreconstructable history requires administrative closure without resolution.",
       "correlations": ["Link material or machine incidents that explain the deviation."],
-      "productionDependencies": ["Latest approved plan source"]
+      "productionDependencies": ["Latest approved plan source and EmusaSoft validity mapping"]
     },
     {
-      "code": "B02", "title": "Planned OT has not started on time", "ruleVersion": "1.0.0",
+      "code": "B02", "title": "Planned OT has not started on time", "ruleVersion": "1.0.1",
       "queryId": "b02-planned-start-missed", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId", "planVersionId"], "classification": ["deadline", "deterministic"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
-      "sourceMappings": [{"source":"ordenes_trabajo","fields":["id","id_equipo","fecha_inicio_planificada","fecha_inicio_ejecucion"],"evidence":"backup-confirmed"}],
-      "requiredEvidence": ["workOrderId","planVersionId","plannedStartPassed","actualStarted","approvedReschedule"],
+      "sourceMappings": [
+        {"source":"ordenes_trabajo","fields":["id","id_equipo","fecha_inicio_planificada","fecha_inicio_ejecucion"],"evidence":"backup-confirmed"},
+        {"source":"approved_plan_contract","fields":["planVersionId","plannedStartAt","status","approvedAt"],"evidence":"phase10-pending"}
+      ],
+      "requiredEvidence": ["workOrderId","planVersionId","plannedStartPassed","actualStarted","approvedPlanUpdate"],
       "parameters": {},
-      "predicate": {"all":[{"var":"plannedStartPassed"},{"not":{"var":"actualStarted"}},{"not":{"var":"approvedReschedule"}}]},
+      "predicate": {"all":[{"var":"plannedStartPassed"},{"not":{"var":"actualStarted"}},{"not":{"var":"approvedPlanUpdate"}}]},
       "reasonRules": [{"code":"planned_start_missed","when":{"all":[{"var":"plannedStartPassed"},{"not":{"var":"actualStarted"}}]}}],
-      "resolution": "The OT starts or an approved reschedule supersedes the plan version.",
-      "correlations": ["Link a specific delay cause instead of duplicating the operational problem."],
-      "productionDependencies": ["Plan-version and approved-reschedule semantics"]
+      "resolution": "The OT starts, even late, or an approved full-plan update reschedules, removes, or cancels the OT and supersedes the missed plan version; unrelated actions and alerts do not resolve B02.",
+      "correlations": [],
+      "productionDependencies": ["Approved plan-version source and approved full-plan-update validity mapping"]
     },
     {
       "code": "B03", "title": "Machine has no active OT for more than 30 minutes", "ruleVersion": "1.0.0",
@@ -174,15 +177,15 @@
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"ordenes_trabajo","fields":["id_equipo","fecha_inicio_ejecucion","fecha_fin_ejecucion"],"evidence":"backup-confirmed"},
-        {"source":"equipo_pausa","fields":["id_equipo","fecha_pausa","fecha_reanudacion","estado"],"evidence":"backup-confirmed"}
+        {"source":"approved_production_plan_contract","fields":["planVersionId","scheduleWindowId","productionExpectationState","effectiveFrom","effectiveTo"],"evidence":"phase10-pending"}
       ],
-      "requiredEvidence": ["equipmentId","scheduleWindowId","expectedToOperate","activeWorkOrder","excludedState","idleMinutes"],
+      "requiredEvidence": ["equipmentId","scheduleWindowId","productionExpectationState","activeWorkOrder","idleMinutes"],
       "parameters": {"idleMinutes":{"value":30,"unit":"minutes","status":"approved"}},
-      "predicate": {"all":[{"var":"expectedToOperate"},{"not":{"var":"activeWorkOrder"}},{"not":{"var":"excludedState"}},{"gt":[{"var":"idleMinutes"},{"param":"idleMinutes"}]}]},
-      "reasonRules": [{"code":"unexplained_machine_idle","when":{"not":{"var":"excludedState"}}}],
-      "resolution": "An OT starts, a valid pause is recorded, or the plan no longer expects production.",
-      "correlations": ["A valid pause with an outdated plan routes to B02 plan correction."],
-      "productionDependencies": ["Expected production interval and exclusion states"]
+      "predicate": {"all":[{"eq":[{"var":"productionExpectationState"},"production_expected"]},{"not":{"var":"activeWorkOrder"}},{"gt":[{"var":"idleMinutes"},{"param":"idleMinutes"}]}]},
+      "reasonRules": [{"code":"unexplained_machine_idle","when":{"all":[{"eq":[{"var":"productionExpectationState"},"production_expected"]},{"not":{"var":"activeWorkOrder"}}]}}],
+      "resolution": "An OT becomes active or an approved plan update makes production suspended or not expected for the interval.",
+      "correlations": ["Evaluate any missed specific OT under B02 independently; shared machine and time evidence does not let B03 infer causation."],
+      "productionDependencies": ["Approved expected-production windows and plan-level suspension states"]
     },
     {
       "code": "C01", "title": "Produced reel weight outside plausible range", "ruleVersion": "1.0.0",
@@ -219,7 +222,7 @@
       "predicate": {"all":[{"gte":[{"var":"sampleCount"},{"var":"minimumSampleSize"}]},{"any":[{"lt":[{"var":"actualWasteKg"},{"var":"lowerKg"}]},{"gt":[{"var":"actualWasteKg"},{"var":"upperKg"}]}]}]},
       "reasonRules": [{"code":"waste_outside_range","when":{"any":[{"lt":[{"var":"actualWasteKg"},{"var":"lowerKg"}]},{"gt":[{"var":"actualWasteKg"},{"var":"upperKg"}]}]}}],
       "resolution": "Corrected or verified waste evidence falls inside the versioned model range.",
-      "correlations": ["A06 or D03 supplies the specific missing-evidence explanation when available."],
+      "correlations": ["A06 or D03 may supply linked missing-evidence context; each alert keeps its own predicate and lifecycle."],
       "productionDependencies": ["Quotation-matrix joins and baseline version"]
     },
     {
@@ -241,76 +244,78 @@
       "productionDependencies": ["Complete pause evidence, units, and segmented historical range"]
     },
     {
-      "code": "D01", "title": "Declared meters exceed consumed-reel meters", "ruleVersion": "1.0.0",
-      "queryId": "d01-declared-meters-over-input", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
+      "code": "D01", "title": "OT longitudinal meters and substrate layers do not close", "ruleVersion": "2.0.0",
+      "queryId": "d01-declared-meters-over-input", "queryVersion": "2.0.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId"], "classification": ["deterministic", "physical"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
-        {"source":"ordenes_trabajo","fields":["id","material_metro_lineal_total_consumo","tolerancia_bobina"],"evidence":"backup-confirmed"},
-        {"source":"consumed_reel_conversion_contract","fields":["weightKg","widthM","grammageGM2","estimatedMeters"],"evidence":"phase10-pending"}
+        {"source":"ordenes_trabajo","fields":["id","fecha_fin_ejecucion"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_salidas","fields":["id","id_orden_trabajo","metros_lineales_resultantes","ancho_bobina","gramaje","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_materiales","fields":["id","id_orden_trabajo","id_serial_articulo","ancho_bobina","gramaje","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"articulo_serial","fields":["id","peso_tara","peso_neto","factor_tara"],"evidence":"backup-confirmed"},
+        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_bruto","peso_tara","peso_neto","tipo_registro","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"balanza_cargas","fields":["id_tara_tuco","peso_tuco"],"evidence":"backup-confirmed"},
+        {"source":"balanza_carga_taras","fields":["id","tipo","peso","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"d01_layer_closure_measurement_contract","fields":["materialRequirementId","reelId","initialGrossKg","verifiedCoreTareKg","remnantDeclared","remnantGrossKg","widthM","grammageGM2","layerResults","pairwiseLayerGaps","maximumDeclaredMetersOverLayerInputGapMeters","maximumLayerInputOverDeclaredMetersGapMeters","maximumPairwiseLayerGapMeters"],"evidence":"phase10-pending"}
       ],
-      "requiredEvidence": ["workOrderId","consumedReelMeters","declaredRunMeters","toleranceMeters"],
-      "parameters": {},
-      "predicate": {"gt":[{"sub":[{"var":"declaredRunMeters"},{"var":"consumedReelMeters"}]},{"var":"toleranceMeters"}]},
-      "reasonRules": [{"code":"declared_meters_exceed_input","when":{"gt":[{"sub":[{"var":"declaredRunMeters"},{"var":"consumedReelMeters"}]},{"var":"toleranceMeters"}]}}],
-      "resolution": "Corrected run meters or consumption evidence falls within tolerance.",
-      "correlations": ["D01 is a specific cause that suppresses duplicate D03."],
-      "productionDependencies": ["Reel-to-meter formula, core treatment, units, and tolerance"]
+      "requiredEvidence": ["workOrderId","closed","declaredRunMeters","totalOrderKg","maximumDeclaredMetersOverLayerInputGapMeters","maximumLayerInputOverDeclaredMetersGapMeters","maximumPairwiseLayerGapMeters","layerResults","pairwiseLayerGaps"],
+      "parameters": {
+        "toleranceFraction":{"value":0.05,"unit":"fraction of theoretical order kg","status":"approved"},
+        "toleranceCapKg":{"value":150,"unit":"kg","status":"approved"}
+      },
+      "predicate": {"all":[{"var":"closed"},{"any":[{"gt":[{"var":"maximumDeclaredMetersOverLayerInputGapMeters"},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]},{"gt":[{"var":"maximumLayerInputOverDeclaredMetersGapMeters"},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]},{"gt":[{"var":"maximumPairwiseLayerGapMeters"},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]}]}]},
+      "reasonRules": [
+        {"code":"declared_meters_exceed_layer_input","when":{"all":[{"var":"closed"},{"gt":[{"var":"maximumDeclaredMetersOverLayerInputGapMeters"},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]}]}},
+        {"code":"layer_input_exceeds_declared_meters","when":{"all":[{"var":"closed"},{"gt":[{"var":"maximumLayerInputOverDeclaredMetersGapMeters"},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]}]}},
+        {"code":"substrate_layers_do_not_match","when":{"all":[{"var":"closed"},{"gt":[{"var":"maximumPairwiseLayerGapMeters"},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]}]}}
+      ],
+      "resolution": "A complete healthy closure evaluation proves every required layer agrees with declared run meters and every other required layer within the approved kilogram-derived tolerance.",
+      "correlations": ["D01 may replace or enrich A04 only when its deterministic layer evidence explains the same discrepancy; A05 and D03 remain independent, and D01 never suppresses D03."],
+      "productionDependencies": ["Verified initial-gross, core-tare, weighed-remnant, required-layer, width, grammage, closure, and pairwise-candidate mappings; current bounded query validation"]
     },
     {
-      "code": "D02", "title": "Completed OT has delivered reserved reels unconsumed", "ruleVersion": "1.0.0",
-      "queryId": "d02-delivered-reel-unconsumed", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
+      "code": "D02", "title": "Completed OT has delivered reserved reels unconsumed", "ruleVersion": "1.0.1",
+      "queryId": "d02-delivered-reel-unconsumed", "queryVersion": "1.0.1-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId", "articleSerialId"], "classification": ["deterministic"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"pre_reserva_orden_trabajo","fields":["id","id_orden_trabajo_destino","id_orden_trabajo_material_destino"],"evidence":"backup-confirmed"},
         {"source":"flujo_materiales_detalles","fields":["id_orden_trabajo","id_articulo_serial","fecha_recepcion"],"evidence":"backup-confirmed"},
         {"source":"orden_trabajo_materiales","fields":["id_orden_trabajo","id_serial_articulo","cantidad_consumida"],"evidence":"backup-confirmed"},
-        {"source":"ordenes_trabajo","fields":["id","motivo_cierre","cantidad_produccion_planificada","fecha_fin_ejecucion"],"evidence":"backup-confirmed"}
+        {"source":"ordenes_trabajo","fields":["id","motivo_cierre","cantidad_produccion_planificada","fecha_fin_ejecucion"],"evidence":"backup-confirmed"},
+        {"source":"good_production_quantity_contract","fields":["goodOutputQuantity","productionQuantityUnit"],"evidence":"phase10-pending"}
       ],
-      "requiredEvidence": ["workOrderId","articleSerialId","fullProductionCompleted","reservedReelDelivered","reelConsumed","truncated"],
-      "parameters": {},
-      "predicate": {"all":[{"var":"fullProductionCompleted"},{"var":"reservedReelDelivered"},{"not":{"var":"reelConsumed"}},{"not":{"var":"truncated"}}]},
-      "reasonRules": [{"code":"delivered_reel_unconsumed","when":{"all":[{"var":"reservedReelDelivered"},{"not":{"var":"reelConsumed"}}]}}],
-      "resolution": "Consumption, return, reassignment, completion, or reservation evidence is corrected.",
-      "correlations": ["Do not apply automatically to truncated OTs."],
-      "productionDependencies": ["Exact complete-production criterion"]
+      "requiredEvidence": ["workOrderId","articleSerialId","workOrderClosed","plannedProductionQuantity","goodOutputQuantity","productionQuantityUnit","reservedReelDelivered","consumedQuantity","reelDisposition"],
+      "parameters": {"completionShortfallToleranceFraction":{"value":0.10,"unit":"fraction-of-planned-production","status":"approved"}},
+      "predicate": {"all":[{"var":"workOrderClosed"},{"gte":[{"var":"goodOutputQuantity"},{"mul":[{"sub":[1,{"param":"completionShortfallToleranceFraction"}]},{"var":"plannedProductionQuantity"}]}]},{"var":"reservedReelDelivered"},{"eq":[{"var":"consumedQuantity"},0]},{"eq":[{"var":"reelDisposition"},"at_machine"]}]},
+      "reasonRules": [{"code":"delivered_reel_unconsumed","when":{"all":[{"var":"reservedReelDelivered"},{"eq":[{"var":"consumedQuantity"},0]},{"eq":[{"var":"reelDisposition"},"at_machine"]}]}}],
+      "resolution": "Positive consumption, return or reassignment, delivery or reservation correction, or evidence below the approved 90% completion boundary clears the condition.",
+      "correlations": ["D02 and D03 remain independent even when both arise from the same missing-consumption issue."],
+      "productionDependencies": ["Verified actual good-production quantity and unit mapping", "Verified motivo_cierre values and operator provenance before using closure reason"]
     },
     {
-      "code": "D03", "title": "OT input good production and waste do not balance", "ruleVersion": "1.0.0",
+      "code": "D03", "title": "OT input good production and waste do not balance", "ruleVersion": "1.1.0",
       "queryId": "d03-work-order-mass-balance", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
-      "naturalKey": ["workOrderId"], "classification": ["deterministic", "statistical", "physical"],
-      "labels": ["Error posible", "Error"], "productionReadiness": "fixture-proven-production-pending",
-      "sourceMappings": [
-        {"source":"orden_trabajo_materiales","fields":["id_orden_trabajo","cantidad_consumida"],"evidence":"backup-confirmed"},
-        {"source":"articulo_serial","fields":["id","id_orden_trabajo_origen","tipo"],"evidence":"backup-confirmed"},
-        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_neto"],"evidence":"backup-confirmed"}
-      ],
-      "requiredEvidence": ["workOrderId","consumedInputKg","goodOutputKg","wasteKg","specificCausePresent"],
-      "parameters": {"balanceToleranceFraction":{"value":0.05,"unit":"fraction-of-good-output","status":"approved"}},
-      "predicate": {"all":[{"not":{"var":"specificCausePresent"}},{"gt":[{"abs":{"sub":[{"sub":[{"var":"consumedInputKg"},{"var":"goodOutputKg"}]},{"var":"wasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputKg"}]}]}]},
-      "reasonRules": [{"code":"mass_balance_gap","when":{"gt":[{"abs":{"sub":[{"sub":[{"var":"consumedInputKg"},{"var":"goodOutputKg"}]},{"var":"wasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputKg"}]}]}}],
-      "resolution": "The balance returns within the versioned tolerance after evidence correction.",
-      "correlations": ["Suppress when A03, A04, A05, A06, A07, D01, D02, or D04 explains the gap."],
-      "productionDependencies": ["Verified-versus-estimated evidence policy"]
-    },
-    {
-      "code": "D04", "title": "Consumed-reel meters exceed declared meters", "ruleVersion": "1.0.0",
-      "queryId": "d04-unexplained-consumed-meters", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId"], "classification": ["deterministic", "physical"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
-        {"source":"ordenes_trabajo","fields":["id","material_metro_lineal_total_consumo","tolerancia_bobina"],"evidence":"backup-confirmed"},
-        {"source":"articulo_serial","fields":["id","id_ultimo_orden_trabajo_cierre","tipo","metro_lineal_consumo"],"evidence":"backup-confirmed"},
-        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_neto"],"evidence":"backup-confirmed"}
+        {"source":"ordenes_trabajo","fields":["id","fecha_fin_ejecucion","metros_lineales_planificados","ancho_teorico_bobina"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_materiales","fields":["id","id_orden_trabajo","cantidad_consumida","tipo_materia_prima","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_salidas","fields":["id","id_orden_trabajo","tipo","cantidad_bulto_sin_pesar","cantidad_bulto_parcial_sin_pesar","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"articulo_serial","fields":["id","id_orden_trabajo_origen","id_tipo_merma","tipo","fecha_eliminacion"],"evidence":"backup-confirmed"},
+        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_neto","eliminado"],"evidence":"backup-confirmed"}
       ],
-      "requiredEvidence": ["workOrderId","consumedReelMeters","declaredRunMeters","remnantReelMeters","toleranceMeters"],
-      "parameters": {},
-      "predicate": {"gt":[{"sub":[{"sub":[{"var":"consumedReelMeters"},{"var":"declaredRunMeters"}]},{"var":"remnantReelMeters"}]},{"var":"toleranceMeters"}]},
-      "reasonRules": [{"code":"unexplained_consumed_meters","when":{"gt":[{"sub":[{"sub":[{"var":"consumedReelMeters"},{"var":"declaredRunMeters"}]},{"var":"remnantReelMeters"}]},{"var":"toleranceMeters"}]}}],
-      "resolution": "Declared run and remnant meters explain consumed-reel meters within tolerance.",
-      "correlations": ["Link A04 for a missing remnant and A05 for handling failures."],
-      "productionDependencies": ["Remnant conversion and lock behavior"]
+      "requiredEvidence": ["workOrderId","workOrderClosed","weighedRawMaterialsKg","goodOutputNetKg","weighedWasteKg","plannedProductionAreaM2","inkApplied","adhesiveApplied","containerBalanceValid"],
+      "parameters": {
+        "balanceToleranceFraction":{"value":0.05,"unit":"fraction-of-net-good-output","status":"approved"},
+        "inkKgPerM2":{"value":0.002,"unit":"kg-per-planned-square-meter","status":"approved"},
+        "adhesiveKgPerM2":{"value":0.002,"unit":"kg-per-planned-square-meter","status":"approved"}
+      },
+      "predicate": {"all":[{"var":"workOrderClosed"},{"var":"containerBalanceValid"},{"gt":[{"abs":{"sub":[{"sub":[{"add":[{"var":"weighedRawMaterialsKg"},{"mul":[{"param":"inkKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"inkApplied"}]},{"mul":[{"param":"adhesiveKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"adhesiveApplied"}]}]},{"var":"goodOutputNetKg"}]},{"var":"weighedWasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputNetKg"}]}]}]},
+      "reasonRules": [{"code":"mass_balance_gap","when":{"gt":[{"abs":{"sub":[{"sub":[{"add":[{"var":"weighedRawMaterialsKg"},{"mul":[{"param":"inkKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"inkApplied"}]},{"mul":[{"param":"adhesiveKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"adhesiveApplied"}]}]},{"var":"goodOutputNetKg"}]},{"var":"weighedWasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputNetKg"}]}]}}],
+      "resolution": "After all required weights remain present, corrected source evidence returns the absolute balance gap to or below the versioned tolerance.",
+      "correlations": ["D03 is independent and is never suppressed by another alert, including when both arise from the same underlying issue."],
+      "productionDependencies": ["All-weighed source completeness, planned-area and operation applicability mapping, bounded current-source query validation, and future EmusaSoft imbalance-state verification"]
     },
     {
       "code": "E01", "title": "Required extrusion safety inventory is incomplete", "ruleVersion": "1.0.0",

@@ -25,12 +25,12 @@ The stored incident lifecycle is separate from these labels.
 
 ## One-incident rule
 
-The dashboard must not create duplicate alerts for the same underlying problem.
+The dashboard normally avoids duplicate alerts for the same underlying problem. D03 is an explicit exception: when its own OT mass-balance predicate triggers, it remains a separate incident even if another alert describes the same source issue.
 
 - Each alert defines a stable natural key from the affected OT, reel, material requirement, machine, container, or workflow stage. Architecture combines that key with the alert type, detection-query ID, and key-schema version to identify one continuing condition.
 - A continuing condition updates the same incident occurrence with more precise evidence. After a healthy cycle proves it cleared, a later recurrence creates a new occurrence rather than reopening history.
-- A specific deterministic rule replaces or enriches a generic statistical warning.
-- An OT-level balance warning must not appear separately when its imbalance has already been explained by a specific missing-consumption, missing-output, missing-waste, or weighing incident.
+- A specific deterministic rule may replace or enrich a generic statistical warning only where that alert's own rule explicitly permits it.
+- D03 is never suppressed, resolved, or closed automatically through another alert. Correcting shared source evidence may independently make several alert predicates clear during the same healthy cycle.
 
 ## Resolution and administrative closure model
 
@@ -39,11 +39,11 @@ Every incident has two distinct terminal outcomes:
 - `Resolved` (user-visible label: `Resuelta`): the underlying ERP or physical condition was corrected and the detection rule now passes.
 - `Closed without resolution` (user-visible label: `Cerrada sin resolución`): an authorized administrator confirms that the historical operational record can no longer be reconstructed safely. Closure never invents reservations, movements, receipts, consumption, production, waste, scale, inventory, or OT records. Any later inventory, location, cost, valuation, or OT reconciliation adjustment belongs entirely to EmusaSoft.
 
-Administrative closure requires a standardized reason, mandatory comment, administrator identity, timestamp, and preserved evidence. It stops reminders and escalations but does not state that the business condition was fixed. Before confirmation, show incidents correlated by OT, material or reel, machine, and time window. The administrator may close the root incident and selected consequences as one audited cascade with a shared closure reference. While the same uninterrupted ERP condition persists, Monitor suppresses reopening that closed occurrence. A healthy polling cycle that proves the condition cleared ends the suppression; if the condition later recurs, Monitor creates a new incident occurrence.
+Administrative closure requires a standardized reason, mandatory comment, administrator identity, timestamp, and preserved evidence. It stops reminders and escalations but does not state that the business condition was fixed. Before confirmation, show incidents correlated by OT, material or reel, machine, and time window. The administrator may close the root incident and selected consequences as one audited cascade with a shared closure reference, except that D03 requires its own audited closure action and is never cascade-closed. While the same uninterrupted ERP condition persists, Monitor suppresses reopening that closed occurrence. A healthy polling cycle that proves the condition cleared ends the suppression; if the condition later recurs, Monitor creates a new incident occurrence.
 
 Monitor does not create, submit, approve, track, or apply adjustment requests. It provides a read-only record of the closure, its evidence, and its EmusaSoft references. Any later adjustment workflow belongs entirely to EmusaSoft and remains outside Monitor.
 
-For the A01 exception described during review, material may have been physically sent and consumed without reservation or EmusaSoft movements. Close A01 and only the selected downstream missing-dispatch, missing-consumption, and balance incidents for the same OT and material under reason `physical_operation_outside_erp`. Do not backfill transactions that cannot be proven. Preserve the evidence for EmusaSoft to handle any later adjustment outside Monitor.
+For the A01 exception described during review, material may have been physically sent and consumed without reservation or EmusaSoft movements. Close A01 and only the selected downstream missing-dispatch and missing-consumption incidents for the same OT and material under reason `physical_operation_outside_erp`. D03 remains independent and requires its own audited closure action if its history cannot be reconstructed. Do not backfill transactions that cannot be proven. Preserve the evidence for EmusaSoft to handle any later adjustment outside Monitor.
 
 | Code | Recommended resolution |
 |---|---|
@@ -55,15 +55,14 @@ For the A01 exception described during review, material may have been physically
 | A06 | Declare or weigh waste and correct its category. If the missing quantity cannot be recovered, close without resolution and link the resulting D03 gap. |
 | A07 | Declare missing consumption while OT input remains editable, or correct the output/waste evidence. If input is locked and cannot be reconstructed, close without resolution and link D03. |
 | B01 | Update the current plan and record the reason for the sequence change. An already-started historical deviation is closed as explained or closed without resolution when it cannot be reconstructed. |
-| B02 | Start, record the real pause, or reschedule and update the full plan. Close a historical unreconstructable delay without resolution with its affected plan version. |
+| B02 | Start the OT or update the full plan to supersede the missed commitment. A pause alone does not resolve B02. Close a historical unreconstructable delay without resolution with its affected plan version. |
 | B03 | Start the next OT, record the pause, or update the expected production interval. Preserve unexplained historical downtime when closing without resolution. |
 | C01 | Reweigh and correct unit, barcode, or scale association. Close a verified exceptional reel without resolution while preserving both measurements. |
 | C02 | Reweigh or correct the waste category/unit. Close verified exceptional waste without resolution rather than changing a correct value to fit the model. |
 | C06 | Correct production quantity, OT timing, or missing pauses. Close a verified exceptional rate without resolution with its evidence and model version. |
-| D01 | Add missing consumption or correct meters/reel data. If the locked history cannot be recovered, close without resolution with the remaining meter difference. |
+| D01 | Add missing consumption, weigh a declared remnant, or correct run, layer, reel, weight, width, or grammage evidence. If locked history cannot be recovered, close without resolution with the remaining layer and pairwise meter differences. |
 | D02 | Declare consumed material, return/reassign unused material, or correct completion/reservation. Preserve an unproven reel disposition as an inventory exception. |
 | D03 | Resolve the specific upstream cause and recalculate. Close an unreconstructable or accepted residual gap without resolution with final gap, tolerance, evidence, and linked incidents. |
-| D04 | Declare, weigh, label, and return the remnant reel or correct run-meter and reel data. If locked history cannot be reconstructed, close without resolution and preserve the discrepancy for EmusaSoft follow-up outside Monitor. |
 | E01 | Replenish safety stock, use an approved substitute, or reschedule/cancel. Close a passed historical readiness window without resolution and record whether production continued. |
 | E02 | Capture starting quantities or reconstruct them only from traceable records. Otherwise close without resolution and link E03/E04/D03. |
 | E03 | Correct closing/opening quantity or the missing intervening movement. If neither side is provable, close without resolution for the OT pair and preserve the difference. |
@@ -76,21 +75,21 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 ### A01 — Required material not ready before OT start
 
-**Alert label:** Por vencer → Error
+**Alert label:** Error
 **Scope:** Printing, lamination, adhesive lamination, and cutting
 
 | Field | Definition |
 |---|---|
-| When it happens | At 60 minutes before planned OT start, required material is unavailable in the warehouse or has not been reserved. At 30 minutes before start, the same incident is updated if the material has not been dispatched. |
+| When it happens | At 60 minutes before planned OT start, the full required quantity is not allocable from warehouse stock or has not been fully reserved. At 30 minutes before start, the same incident is updated if the full required quantity has not been dispatched. |
 | Why the alert exists | The OT is at risk of starting without the required material at the machine. |
-| Possible causes | The material planner did not reserve the material or secure its short-term availability; a supplier has not delivered; or the material was reserved but warehouse dispatch is late. |
+| Possible causes | Allocable warehouse stock is insufficient, the material planner did not reserve the full quantity, or warehouse dispatch of the fully reserved quantity is incomplete. |
 | Example | OT 151200.1 starts at 10:00. At 09:00, one substrate is not reserved because it is not in stock. At 09:30, the user-visible incident states: `No despachado porque el material no está reservado ni disponible en almacén`. |
 
-**Detection indicators and algorithm:** At `planned start - 60 minutes`, evaluate required materials, reservation records, warehouse availability, and open purchase or supplier-delivery status. At `planned start - 30 minutes`, add dispatch status. Maintain one incident per OT and required material. Use reason codes such as `not_reserved_stock_available`, `material_not_in_warehouse`, `purchase_or_supplier_pending`, and `reserved_not_dispatched`.
+**Detection indicators and algorithm:** At and after `planned start - 60 minutes`, evaluate each required material against the full remaining required quantity. Warehouse stock is allocated first to OTs with recorded material reservations, then to unreserved OTs by earliest planned start; equal planned starts use the permanent EmusaSoft OT ID as a deterministic tie-breaker. Stock committed to another OT is not available. `materialAvailable` is true only when the resulting allocable quantity covers the full requirement. A partial reservation is not reserved readiness. At and after `planned start - 30 minutes`, require the full quantity to be dispatched; partial dispatch does not pass. Maintain one incident per OT and material requirement, always labeled `Error`. Use `material_not_in_warehouse` when allocable stock is insufficient, `not_reserved_stock_available` when full stock is allocable but the full quantity is not reserved, and `reserved_not_dispatched` when the full quantity is reserved but has not been fully dispatched. Do not infer purchase or supplier-delivery status from unavailable evidence.
 
-**Primary action owner:** `not_reserved_stock_available`, `material_not_in_warehouse`, or `purchase_or_supplier_pending` → **Material planner**. `reserved_not_dispatched` → **Warehouse dispatcher or sender**.
+**Primary action owner:** `not_reserved_stock_available` or `material_not_in_warehouse` → **Material planner**. `reserved_not_dispatched` → **Warehouse dispatcher or sender**.
 
-**Resolution:** Keep one incident open until every condition required at the current checkpoint is satisfied. At the 60-minute checkpoint, the material must be available and reserved; at the 30-minute checkpoint it must also be sent. Rescheduling closes the current deadlines and creates new checkpoints. If the material was already physically sent and consumed outside EMUSA Soft and the missing historical transactions cannot be proven, an administrator closes A01 and selected correlated consequences without resolution; the system must not fabricate reservations, movements, receipts, or consumption.
+**Resolution:** Keep the same incident open, including after actual OT start, until every full-quantity condition required at the current checkpoint is satisfied. Cancellation resolves it on the next healthy evaluation. Rescheduling resolves the current occurrence, reevaluates only against the new 60- and 30-minute checkpoints, and creates a new occurrence only if the rescheduled OT breaches a new checkpoint. If the material was already physically sent and consumed outside EMUSA Soft and the missing historical transactions cannot be proven, an administrator closes A01 and selected same-material missing-dispatch or missing-consumption consequences without resolution; the system must not fabricate reservations, movements, receipts, or consumption. A01 never selects, suppresses, resolves, or closes D03 because material readiness and OT mass balance are independent conditions.
 
 
 ### A02 — Reserved OT material not received within 30 minutes
@@ -183,7 +182,7 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 | Possible causes | Waste was produced but not declared, a declared bag was not weighed, the waste category is wrong, or statistical expectations do not fit this specific run. |
 | Example | Comparable printing OTs of this size normally produce 70–100 kg of waste. The OT closes with only 5 kg declared, while input and good-output estimates leave an unexplained 80 kg gap. |
 
-**Detection indicators and algorithm:** Use two evidence paths in one incident. First, for declared waste, alert when no scale record exists after the configured weighing interval. Second, at closure, compare actual or estimated good-output mass, declared waste, and expected waste against consumed input mass. Source theoretical waste from the quotation configuration chain: `operaciones` → `cotizacion_config_waste` → `cotizacion_config_valores`; use `cotizacion_config_rangos.valor_kg` and `cotizacion_config_rango_valores.valor` for lot-size bands, and `cotizacion_config_waste_gap` plus `cotizacion_config_waste_gap_detalle.id_taxon` for operation/substrate adjustments. Compare that baseline with historical actual waste by operation, substrate/taxon, machine, and OT-size band. A separate aggregate statistics table or materialized view may cache those historical distributions, but it must be derived from OT, waste-serial, and scale records rather than become a second source of truth. When balance evidence points to missing waste, add reason `possible_waste_not_declared`. If the same imbalance already exists as `D03`, attach the waste reason to that incident instead of duplicating it.
+**Detection indicators and algorithm:** Use two evidence paths in one incident. First, for declared waste, alert when no scale record exists after the configured weighing interval. Second, at closure, compare actual or estimated good-output mass, declared waste, and expected waste against consumed input mass. Source theoretical waste from the quotation configuration chain: `operaciones` → `cotizacion_config_waste` → `cotizacion_config_valores`; use `cotizacion_config_rangos.valor_kg` and `cotizacion_config_rango_valores.valor` for lot-size bands, and `cotizacion_config_waste_gap` plus `cotizacion_config_waste_gap_detalle.id_taxon` for operation/substrate adjustments. Compare that baseline with historical actual waste by operation, substrate/taxon, machine, and OT-size band. A separate aggregate statistics table or materialized view may cache those historical distributions, but it must be derived from OT, waste-serial, and scale records rather than become a second source of truth. When balance evidence points to missing waste, add reason `possible_waste_not_declared`. If D03 also triggers from the same evidence, keep both incidents independent and link their evidence without suppressing either.
 
 **Primary action owner:** Missing or incorrect waste declaration → **machine operator**. Declared waste missing a weight → **Process operator**.
 
@@ -199,7 +198,7 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 | Possible causes | Missing consumption declaration, incorrect output weight or estimate, incorrect waste amount, or output associated with the wrong OT. |
 | Example | Two produced reels are estimated at 350 kg each, or about 700 kg total, while the OT records only 500 kg of raw-material consumption. The unexplained 200 kg indicates possible undeclared consumption. |
 
-**Detection indicators and algorithm:** Calculate `required input evidence = actual or estimated good-output mass + actual or estimated waste mass` and `consumption gap = required input evidence - declared input consumption`. Open A07 when the gap exceeds the configured tolerance. Prefer actual scale weights. For unweighed reels, estimate mass from meters, width, basis weight, and comparable weighed reels. Statistical evidence creates a possible error; actual verified weights can confirm an error. A07 is evaluated independently from A03. At OT closure, link or merge A07 with D03 instead of creating duplicate incidents.
+**Detection indicators and algorithm:** Calculate `required input evidence = actual or estimated good-output mass + actual or estimated waste mass` and `consumption gap = required input evidence - declared input consumption`. Open A07 when the gap exceeds the configured tolerance. Prefer actual scale weights. For unweighed reels, estimate mass from meters, width, basis weight, and comparable weighed reels. Statistical evidence creates a possible error; actual verified weights can confirm an error. A07 is evaluated independently from A03. At OT closure, A07 and D03 remain independent; related evidence may be linked without merging or suppressing either incident.
 
 **Primary action owner:** **machine operator**.
 
@@ -223,6 +222,10 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 **Primary action owner:** **Operation shift supervisor**, who must confirm the valid sequence and ensure any floor resequencing is recorded. The machine operator remains an implicated recipient because that operator started the OT.
 
+**Resolution:** If the valid sequence and its reason are recorded after the OT has already started, resolve B01 as explained. Preserve the originally expected OT, the OT that actually started, the start time, and the later update's actor, timestamp, and reason in incident history; the late update must not rewrite the original deviation. If the historical sequence and reason cannot be reconstructed safely, an administrator closes the incident without resolution under the shared administrative-closure rules.
+
+**EmusaSoft ownership boundary:** EmusaSoft determines who is authorized to change its production plan and whether a recorded change is valid. Monitor consumes the resulting approved-plan evidence; it does not define or enforce EmusaSoft plan-edit permissions. The current approved-plan source and validity mapping remain pending source-contract validation.
+
 
 ### B02 — Planned OT has not started on time
 
@@ -235,11 +238,13 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 | Possible causes | Setup delay, missing materials, unavailable operator, machine problem, or an unrecorded plan change. |
 | Example | OT 151230.1 should start on P15 at 16:00, but at 16:01 it has not started and no revised plan exists. |
 
-**Detection indicators and algorithm:** For each machine plan, find the first pending OT whose planned start is in the past. Alert when it has no actual start and no approved rescheduling event. If another specific incident explains the delay, link it as the reason rather than duplicating the operational problem.
+**Detection indicators and algorithm:** For each machine plan, find the first pending OT whose planned start has arrived or is in the past. Alert when it has no actual start and no approved plan update that supersedes that planned commitment. Maintain one independent condition per `OT + approved plan version`. If the same OT is reprogrammed under a new approved plan version and misses the new start, create a separate B02 occurrence for that new missed commitment. Other alerts remain independent: Monitor does not infer that another alert caused B02, create a cross-alert link, suppress either alert, or couple their lifecycles.
 
 **Primary action owner:** Previous OT still running or schedule simply delayed → **Planner**. Nothing running and no recorded pause → **machine operator** until the real machine state is recorded; after that, the **Planner** owns the plan update.
 
-**Resolution:** If the preceding OT is still running, the planner supplies the expected delay and selects `Actualizar todo el plan`; the system shifts every subsequent OT on that machine. If nothing is running, record a categorized equipment pause and then update the plan. If the historical delay can no longer be reconstructed, an administrator closes without resolution and preserves the observed delay and affected plan version.
+**Resolution:** B02 resolves only after a healthy evaluation observes either that the OT started or that an approved full-plan update superseded the missed commitment. A late start resolves B02 while its missed-start occurrence remains in history. An approved update may assign a later planned start, remove the OT, or cancel it; each outcome resolves the occurrence for the superseded plan version. If a later approved plan version also misses its start, it creates a separate occurrence. Recording an equipment pause, correcting another alert, or recording any other unrelated action does not resolve B02. If the historical delay can no longer be reconstructed, an administrator closes without resolution and preserves the observed delay and affected plan version.
+
+**EmusaSoft ownership boundary:** EmusaSoft determines whether a production-plan update is approved and which plan version is current. Monitor consumes that evidence and does not infer approval, causality, or plan-edit authorization. The approved-plan version and update mapping remain pending source-contract validation.
 
 
 ### B03 — Machine has no active OT for more than 30 minutes
@@ -248,16 +253,16 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 
 | Field | Definition |
 |---|---|
-| When it happens | A machine expected to be producing has no active OT for more than 30 minutes. |
+| When it happens | The current approved production plan expects a machine to be producing, but the machine has no active OT for more than 30 continuous minutes. |
 | Why the alert exists | Planned production time is being lost without a corresponding active work order. |
-| Possible causes | Disorganization, unrecorded machine stoppage, missing material, operator delay, maintenance, or a plan that was not updated. |
+| Possible causes | Disorganization, missing material, operator delay, maintenance that was not recorded in the production plan, or a plan that was not updated. |
 | Example | P09 is scheduled to produce during the shift but has no active OT between 14:00 and 14:31. |
 
-**Detection indicators and algorithm:** Require that the machine is scheduled or expected to operate, has no active OT, and has remained in that state for more than 30 minutes. Exclude recorded maintenance, planned shutdown, approved pause, or no-production schedule periods.
+**Detection indicators and algorithm:** Use the current approved production plan to establish one expected-production window for the machine. Within that window, start or continue the idle clock only while no OT is active. Trigger strictly after 30 continuous minutes; equality at 30 minutes does not trigger. An OT paused within its own execution remains an active OT and is outside B03. A planner- or supervisor-initiated whole-day or plan-level suspension, planned shutdown, or no-production period changes the approved plan so production is no longer expected and therefore excludes or clears B03. An equipment-pause record does not independently create that plan state. Maintain one condition per machine and approved expected-production window.
 
-**Primary action owner:** No machine-state or pause record → **machine operator**. Valid pause exists but the production plan still expects activity → **Planner**.
+**Primary action owner:** **Planner**, who updates or restructures the approved production plan. The operation shift supervisor remains informed and may initiate the need for a plan-level suspension. The machine operator may be an implicated recipient but cannot resolve B03 by recording an in-OT or equipment pause.
 
-**Resolution:** Record the machine’s real state using the equipment-pause workflow, including category, explanation when required, and expected duration. Then shift the remaining plan using the same `Actualizar todo el plan` behavior described in `B02`. Close normally when an OT starts, a valid pause is recorded, or the plan no longer expects production. If the interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration.
+**Resolution:** Close normally after a healthy evaluation observes that an OT is active or that an approved production-plan update makes production suspended or not expected for that interval. A plan-level suspension resolves B03 immediately; it is recorded through the production-planning workflow by an authorized planner or supervisor, not by a machine operator. Recording an in-OT or equipment pause does not resolve B03. If the interval is historical and its cause cannot be recovered, close without resolution and retain the unexplained downtime duration.
 
 
 ## C — Statistical and physical plausibility
@@ -320,21 +325,47 @@ These rules detect values that are possible to enter but inconsistent with physi
 
 ## D — Work-order closure and material balance
 
-### D01 — Declared meters exceed consumed-reel meters
+### D01 — OT longitudinal meters and substrate layers do not close
 
 **Alert label:** Error
 **Confirmed:** Yes
 
 | Field | Definition |
 |---|---|
-| When it happens | At closure, declared run meters materially exceed the estimated meters provided by consumed reels. |
-| Why the alert exists | The declared production cannot be explained by recorded consumption. |
-| Possible causes | Missing consumption declaration, incorrect run meters, incorrect reel data, or incorrect closure. |
-| Example | Consumed reels support approximately 30,000 m, but the operator declares 40,000 m. |
+| When it happens | At OT closure, declared run meters and the used meters of every required substrate layer do not agree within tolerance, or required layers disagree with one another. |
+| Why the alert exists | Every required substrate layer should represent the same longitudinal production run. A material discrepancy means the closure evidence is internally inconsistent. |
+| Possible causes | Missing or excess consumption declaration, incorrect run meters, incorrect layer or reel association, missing or incorrect remnant evidence, or incorrect weight, core tare, width, or grammage. |
+| Example | The OT declares 40,000 m. One layer supports 37,000 m and another supports 43,000 m. D01 records both signed layer gaps and the layer-to-layer mismatch in one occurrence. |
 
-**Detection indicators and algorithm:** Estimate meters in every consumed reel from weight, width, and basis weight. Sum them and compare them with declared run meters. Alert when the difference exceeds the configured tolerance. This is the primary closure rule.
+**Detection indicators and algorithm:** D01 is the single deterministic longitudinal closure rule and is evaluated only at OT closure. Estimate meters actually used from every assigned input reel, sum sequential reels only within the same required substrate layer, compare every layer with declared run meters, and compare every pair of required layers. Keep one OT-level occurrence containing every applicable reason and affected layer.
+
+Use neutral business terms: `original usable reel meters` means usable substrate originally present before production; `used layer meters` means meters actually consumed from all reels assigned sequentially to one required layer; `declared run meters` means the OT run meters declared at closure; and `weighed remnant meters` means usable meters remaining on a declared partial reel after weighing. Similar EmusaSoft linear-meter field names do not have verified operational semantics and remain production-mapping dependencies.
+
+Evaluate every required substrate layer independently. Reels used sequentially for the same layer may be summed, but meters from different layers must never be summed into one input total. The same physical reel identity must never contribute to more than one layer in the same OT; a duplicate cross-layer association is insufficient evidence rather than a valid closure result. Every required layer represents the same run and is compared separately with declared run meters and pairwise with every other required layer.
+
+For a reel with no remnant declared at closure, treat it as fully used and calculate `net used kg = measured initial gross kg - verified core tare kg`; zero remnant meters are implicit. If verified core tare is missing, negative, or not smaller than initial gross weight, evidence for that layer is insufficient. The source schema contains core-tare candidates, but a connected source contract must still prove the applicable value and its relationship to each reel.
+
+For a declared partial reel with a weighed remnant, calculate `net used kg = measured initial gross kg - measured remnant gross kg`. The core remains in both measurements and cancels; do not subtract it twice. Equivalently, calculate original usable reel meters from `initial gross kg - verified core tare kg`, calculate weighed remnant meters from `remnant gross kg - the same verified core tare kg`, and subtract the latter from the former. Both paths must agree. Initial and remnant gross weights must be positive, and remnant gross must be smaller than initial gross.
+
+If a remnant is declared but not yet weighed, evidence is incomplete: do not create a new D01 occurrence and do not resolve or change an existing occurrence. Evaluate immediately when the remnant is weighed and all other evidence is complete. A05 independently owns the declared remnant's 30-minute weighing and movement obligations. Do not substitute an unverified stored linear-meter value for missing weight evidence.
+
+Convert each reel's net used mass to meters using `used meters = net used kg / (width m × grammage kg/m²)`, equivalent to `net used kg × 1000 / (width m × grammage g/m²)`. Width and grammage must be positive and normalized before evaluation.
+
+Calculate theoretical order mass from declared outputs without waiting for produced reels to be weighed: `total order kg = Σ(declared output meters × output width m × output grammage g/m² / 1000)`. Calculate `allowed kg = min(0.05 × total order kg, 150 kg)` and `allowed meters = allowed kg / (total order kg / total declared output meters)`. The `0.05` fraction and `150 kg` cap are approved configurable parameters. Use the same allowed meters for all layer-to-run and pairwise comparisons.
+
+D01 triggers when any required layer satisfies `declared run meters - used layer meters > allowed meters`, any layer satisfies `used layer meters - declared run meters > allowed meters`, or any pair satisfies `absolute(used layer A meters - used layer B meters) > allowed meters`. Equality at every tolerance boundary is clear. Pairwise checks are required because two layers may each be within run tolerance in opposite directions while differing from each other beyond tolerance.
+
+Reasons are `declared_meters_exceed_layer_input`, `layer_input_exceeds_declared_meters`, and `substrate_layers_do_not_match`. The former D04 reason `unexplained_consumed_meters` is retired historical metadata, not an active rule reason.
+
+Evidence records declared run meters, theoretical order kilograms, allowed kilograms and meters, every required layer and its used meters, every signed layer-to-run gap, every pairwise gap beyond tolerance, and the contributing reels and measurement path. Missing and invalid fields are reported when evidence is insufficient. Repeated unchanged complete evaluations do not duplicate an occurrence or evidence. Changed complete evidence updates the same open occurrence. A later complete healthy evaluation resolves only when every layer agrees with the run and every other layer within tolerance. Failed, partial, invalid, or insufficient cycles preserve an existing occurrence unchanged. A later recurrence after a proved clear interval creates a new occurrence.
+
+D01 is a specific deterministic explanation. When its evidence explains the same chain, it may replace or enrich generic A04 evidence and prevent a duplicate A04 incident for the same discrepancy. A04 remains the earlier physical/statistical rewinder-capacity warning, A05 remains the per-reel handling incident, and D03 remains the independent aggregate OT kilogram balance. D01 never suppresses D03.
 
 **Primary action owner:** **machine operator**.
+
+**Resolution:** Weigh a declared partial remnant, add or correct consumption, or correct gross weight, core tare, layer/reel association, width, grammage, declared run meters, or output dimensions in EmusaSoft. If locked history cannot be reconstructed safely, an administrator closes without resolution with mandatory reason, comment, administrator reference, timestamp, and frozen run, layer, reel, signed-gap, pairwise-gap, tolerance, and source evidence. Administrative closure suppresses only the same uninterrupted condition until a healthy clear evaluation expires suppression.
+
+**Consolidation record — 2026-08-01:** D04 was retired from the active catalog and executable inventory because its useful opposite-direction meter check is part of this same invariant. D01 retains its OT natural key and key-schema version; its rule and candidate-query versions change for the expanded predicate and evidence schema. Historical D04 records remain historical and are not production evidence.
 
 
 ### D02 — Completed OT has delivered reserved reels unconsumed
@@ -349,47 +380,33 @@ These rules detect values that are possible to enter but inconsistent with physi
 | Possible causes | Missing consumption declaration, incorrect completion status, or incorrect reservation quantity. |
 | Example | Four reels were reserved and delivered; full production was completed, but only three were consumed. |
 
-**Detection indicators and algorithm:** Require all three conditions: full planned production completed, reserved reels delivered to the machine, and `delivered reserved reels - consumed reels` is not empty. Do not apply automatically to truncated OTs.
+**Detection indicators and algorithm:** Evaluate one delivered reserved reel per `OT + article serial`. Require all three conditions: the OT is closed with verified good output at or above 90% of its planned production quantity, the reserved reel was delivered to the machine, and the reel has no valid positive consumption quantity. The 10% shortfall tolerance is inclusive: exactly 90% counts as full production, while any lower result is treated as partial or truncated production and does not trigger D02. Planned and good-output quantities must be positive or non-negative respectively and expressed in the same verified production unit; missing or invalid quantity evidence is insufficient rather than clear. Any valid positive consumption means the reel was used for D02, even when only part of the reserved reel was consumed. A returned or reassigned unused reel clears the condition. `ordenes_trabajo.motivo_cierre` exists in the current source mapping, but its values, operator provenance, and complete-versus-truncated meaning are not verified, so D02 must not use it as a completion signal until that contract is established.
+
+**Resolution and recurrence:** Resolve the current occurrence after a healthy evaluation proves positive consumption, return or reassignment of the unused reel, correction of the delivery or reservation, or correction showing that the OT did not meet the 90% completion boundary. A later occurrence for the same `OT + article serial` requires source-valid evidence that an earlier consumption or disposition record was corrected or invalidated; Monitor must not invent recurrence from a synthetic state reversal. D02 and D03 remain independent even when the same missing-consumption evidence contributes to both predicates.
 
 **Primary action owner:** Missing consumption declaration → **machine operator**. Incorrect reservation quantity or reel selection → **Material planner**.
 
 
 ### D03 — OT input, good production, and waste do not balance
 
-**Alert label:** Error posible / Error
-
-| Field | Definition |
-|---|---|
-| When it happens | At closure, the absolute mass-balance gap exceeds 5% of total good-production mass. The percentage is an initial configurable parameter. |
-| Why the alert exists | One or more production, waste, consumption, or weighing records may be missing or incorrect. |
-| Possible causes | Undeclared produced reel, undeclared waste, unweighed output, wrong weight, missing consumption, or statistical assumptions that do not fit this OT. |
-| Example | Consumed input is 1,500 kg, good production is 1,300 kg, and waste is 90 kg. The 110 kg gap exceeds the current tolerance of 65 kg, which is 5% of good production. |
-
-**Detection indicators and algorithm:** Calculate `balance gap = consumed input mass - good-output mass - waste mass` and `allowed gap = 0.05 × total good-production mass`. Alert when `absolute balance gap > allowed gap`. Store `0.05` as a configurable parameter so it can change later. Do not subtract an undefined generic process-loss value. Use actual scale weights from `balanza_carga_detalle_registros` when available. For declared but unweighed output, estimate from `articulo_serial`, `orden_trabajo_salidas`, width, grammage, declared linear meters when present, and comparable weighed serials. For missing or unweighed waste, use both the quotation waste matrix (`cotizacion_config_waste`, kilogram ranges and substrate/taxon gaps) and historical waste distributions. Recalculate whenever actual weights arrive. Statistical gaps are possible errors; gaps that remain beyond tolerance after actual weights are available are errors. If evidence identifies a specific `A03`, `A04`, `A05`, `A06`, `D01`, `D02`, or `D04` cause, enrich that incident and suppress a duplicate `D03` alert.
-
-**Primary action owner:** When a specific linked alert explains the gap, inherit that alert's deterministic owner. Otherwise, missing or incorrect OT declarations → **machine operator**; suspected weighing evidence → **Process operator**.
-
-### D04 — Consumed-reel meters exceed declared meters
-
 **Alert label:** Error
 
 | Field | Definition |
 |---|---|
-| When it happens | At OT closure, consumed-reel meters exceed declared run meters plus the meters represented by any declared remnant reels beyond the configured tolerance. |
-| Why the alert exists | The excess material must be explained. It may still exist physically as a partially consumed remnant reel that must return to inventory. |
-| Possible causes | Undeclared remnant reel, incorrect run meters, incorrect consumed-reel weight, width, or grammage, or an unrecorded warehouse return. |
-| Example | A consumed reel supports 10,000 m, but the OT declares 5,000 run meters and no remnant. The remaining equivalent of 5,000 m should exist as a declared, weighed, labeled, and returned remnant reel. |
+| When it happens | After the OT closes and every applicable non-ink/non-adhesive raw material, production reel, and waste record has a measured weight, the absolute mass-balance gap exceeds 5% of total net good-production mass. The percentage is an initial configurable parameter. |
+| Why the alert exists | The completed, fully weighed OT still contains an unexplained physical mass difference. |
+| Possible causes | Missing or incorrect material consumption, production, waste, OT association, or scale evidence. |
+| Example | Measured raw-material input plus theoretical ink and adhesive is 1,500 kg, net weighed good production is 1,300 kg, and weighed waste is 90 kg. The 110 kg gap exceeds the current tolerance of 65 kg, which is 5% of net good production. |
 
-**Detection indicators and algorithm:** Calculate `unexplained meters = consumed-reel meters - declared run meters - declared remnant-reel meters`. Alert when unexplained meters exceed the configured tolerance. Estimate remnant meters from its measured kilograms, width, and grammage. Link A04 when the remnant declaration is missing and A05 when the declared remnant is not weighed or moved; do not create duplicate incidents.
+**Detection indicators and algorithm — approved 2026-08-01; independence clarified 2026-08-05:** Monitor calculates D03; EmusaSoft does not currently provide a verified authoritative OT-level imbalance state. A later source-owned replacement is permitted only after its state and semantics are verified. Do not evaluate D03 until the OT is closed and every applicable non-ink/non-adhesive raw material, production reel, and waste record has a measured weight. Missing required weights are insufficient evidence and must not create D03. Use the scale's net production-reel weight; it already excludes the core, so Monitor must not subtract core weight again. Ink and adhesive are the only approved unweighed raw-material inputs: calculate each applicable contribution from the OT's planned production area at `2 g/m²`. Apply both cumulatively when the OT includes both printing and lamination. Calculate `adjusted input kg = measured other raw-material kg + theoretical ink kg + theoretical adhesive kg`, `balance gap = adjusted input kg - net weighed good-production kg - weighed waste kg`, and `allowed gap = 0.05 × net weighed good-production kg`. Open `Error` only when `absolute balance gap > allowed gap`; equality does not trigger. D03 has no `Error posible` or estimated-output path. Do not subtract an undefined generic process-loss value. If E05 makes an extrusion-container consumption negative, D03 is blocked until that source evidence is corrected. D03 is never suppressed by another alert. When another alert describes the same source issue, both incidents remain independent and each resolves only when its own predicate becomes clear or through its own audited administrative closure.
 
-**Primary action owner:** Missing remnant declaration or incorrect run meters → **machine operator**. A declared remnant that is not weighed or moved inherits A05 and routes to the **Process operator**.
+**Primary action owner:** Missing or incorrect OT declarations → **machine operator**; suspected weighing evidence → **Process operator**. Other alerts keep their own owners and do not replace D03 routing.
 
-**Resolution:** Declare the remnant reel, record its remaining kilograms, weigh it, print or attach its identifying label, and return it to the raw-material warehouse. Otherwise correct run meters or reel data. If the OT is locked and the history cannot be reconstructed, close without resolution and preserve the discrepancy for EmusaSoft follow-up outside Monitor.
-
+**Resolution:** Correct the specific material, production, waste, OT-association, or scale evidence and recalculate after all required weights remain present. Resolve automatically only when D03's own absolute gap is at or below the configured tolerance. A shared source correction may independently resolve D03 and other alerts in the same healthy cycle. If the historical evidence cannot be reconstructed safely, an administrator may close D03 without resolution through D03's own audited closure action, preserving the final input, output, waste, theoretical additions, gap, tolerance, and linked incidents.
 
 ## E — Extrusion and Exlam resin-container alerts
 
-Every E01–E05 rule applies to both Extrusion and Exlam. Both operations use resin recipes and material containers. Operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients. Each container holds one specific resin used by the current OT. Separately, every applicable machine has a machine-specific safety warehouse holding resin for current and near-term orders. General output handling, weighing, movement, rate, and aggregate closure still use A04/A05, C06, D03, and D04. E04 is separate because resin proportions can be wrong even when total mass balances. E05 is a hard same-OT container invariant that prevents negative calculated consumption from contaminating E04 or D03.
+Every E01–E05 rule applies to both Extrusion and Exlam. Both operations use resin recipes and material containers. Operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients. Each container holds one specific resin used by the current OT. Separately, every applicable machine has a machine-specific safety warehouse holding resin for current and near-term orders. General output handling, weighing, movement, rate, and aggregate closure still use A04/A05, C06, consolidated D01, and D03. E04 is separate because resin proportions can be wrong even when total mass balances. E05 is a hard same-OT container invariant that prevents negative calculated consumption from contaminating E04 or D03.
 
 ### E01 — Required extrusion safety inventory is incomplete
 
@@ -510,11 +527,11 @@ Codes not listed use the seven general rules without modification.
 
 | Code | Override or exception |
 |---|---|
-| A01 | Do not notify the machine operator. Short-term availability, reservation, and supplier follow-up route to the material planner; ready reserved material awaiting dispatch routes to the warehouse dispatcher or sender. The operation shift supervisor and technical leader still receive the alert. |
+| A01 | Do not notify the machine operator. Insufficient allocable stock or incomplete reservation routes to the material planner; ready reserved material awaiting full dispatch routes to the warehouse dispatcher or sender. The operation shift supervisor and technical leader still receive the alert. |
 | A02 | The material has already been sent. Notify both the warehouse dispatcher or sender and the machine operator, plus their applicable shift supervisors. The reason determines which position is primary. |
 | A05 | The process operator owns both weighing and movement. A produced reel also notifies the process supervisor. A remnant raw-material reel additionally notifies the warehouse dispatcher or sender and its supervisor or leader. |
 | A06 | The machine operator owns waste declaration. When weighing is implicated, also notify the process operator and process supervisor. |
-| B03 | When no active OT exists, use the planned shift operator if known; otherwise the machine shift supervisor and technical leader are the actionable production recipients. |
+| B03 | The Planner is the primary action owner. Inform the operation shift supervisor and technical leader; include the planned shift operator when known as an implicated recipient, but an operator cannot resolve B03 by recording an in-OT or equipment pause. |
 | D02 | Add the material planner only when reservation quantity or reel selection is implicated. Add raw-material warehouse positions only when delivery or return evidence implicates them. |
 | E01 | Do not use OT reservation routing. Notify the material planner and the warehouse dispatcher or sender assigned to resins, not every user in that warehouse zone. |
 | E03 | This incident spans two OTs: notify the machine operators for the previous and current OTs and any identified process operator involved between them. |

@@ -28,7 +28,7 @@
         <div class="closure-example"><strong>A01 example</strong><span>Material was never reserved, but the warehouse physically sent it to the machine and the operator consumed it outside EmusaSoft. Close A01 and the selected downstream incidents under reason <em>Physical operation outside ERP</em>. Do not create fake historical records. Preserve the evidence so EmusaSoft can handle any later adjustment outside Monitor.</span></div>
       </section>
 
-      <nav class="stage-index" id="alert-index" aria-label="Alert index"><a href="#family-a">A</a><a href="#a01">A01</a><a href="#a02">A02</a><a href="#a03">A03</a><a href="#a04">A04</a><a href="#a05">A05</a><a href="#a06">A06</a><a href="#a07">A07</a><a href="#family-b">B</a><a href="#b01">B01</a><a href="#b02">B02</a><a href="#b03">B03</a><a href="#family-c">C</a><a href="#c01">C01</a><a href="#c02">C02</a><a href="#c06">C06</a><a href="#family-d">D</a><a href="#d01">D01</a><a href="#d02">D02</a><a href="#d03">D03</a><a href="#d04">D04</a><a href="#family-e">E</a><a href="#e01">E01</a><a href="#e02">E02</a><a href="#e03">E03</a><a href="#e04">E04</a><a href="#e05">E05</a><a href="#role-glossary">Roles</a></nav>
+      <nav class="stage-index" id="alert-index" aria-label="Alert index"><a href="#family-a">A</a><a href="#a01">A01</a><a href="#a02">A02</a><a href="#a03">A03</a><a href="#a04">A04</a><a href="#a05">A05</a><a href="#a06">A06</a><a href="#a07">A07</a><a href="#family-b">B</a><a href="#b01">B01</a><a href="#b02">B02</a><a href="#b03">B03</a><a href="#family-c">C</a><a href="#c01">C01</a><a href="#c02">C02</a><a href="#c06">C06</a><a href="#family-d">D</a><a href="#d01">D01</a><a href="#d02">D02</a><a href="#d03">D03</a><a href="#family-e">E</a><a href="#e01">E01</a><a href="#e02">E02</a><a href="#e03">E03</a><a href="#e04">E04</a><a href="#e05">E05</a><a href="#role-glossary">Roles</a></nav>
       <div class="catalog" id="catalog"><section class="family-section"><div class="family-heading" id="family-a"><span class="family-code">A</span><div><h2>Material, inventory, and production-data registration</h2><p>General material and output-registration controls.</p></div></div><article class="alert-card family-a state-upcoming" id="a01">
 
     <div class="card-heading"><div><span class="alert-id">A01 · Readiness and dispatch</span><h2>Required material not ready before OT start</h2></div><span class="state-pill">Por vencer → Error</span></div>
@@ -417,33 +417,33 @@
   </section>
   </article></section><section class="family-section"><div class="family-heading" id="family-d"><span class="family-code">D</span><div><h2>Work-order closure and material balance</h2><p>Reconciles declared meters, consumed material, good output, and waste.</p></div></div><article class="alert-card family-d state-error" id="d01">
 
-    <div class="card-heading"><div><span class="alert-id">D01 · Closure meters</span><h2>Declared meters exceed consumed-reel meters</h2></div><span class="state-pill">Error · Confirmado</span></div>
+    <div class="card-heading"><div><span class="alert-id">D01 · Closure meters</span><h2>OT longitudinal meters and substrate layers do not close</h2></div><span class="state-pill">Error · Confirmado</span></div>
     <div class="definition-grid">
       <section>
 
-    <h3>When it happens</h3><p>At closure, run meters exceed meters supported by consumed reels.</p>
+    <h3>When it happens</h3><p>At OT closure, declared run meters and each required substrate layer disagree beyond tolerance, or required layers disagree with one another.</p>
   </section>
       <section>
 
-    <h3>Why the alert exists</h3><p>Production cannot be explained by recorded consumption.</p>
+    <h3>Why the alert exists</h3><p>Every required substrate layer should represent the same longitudinal production run.</p>
   </section>
       <section>
 
-    <h3>Possible causes</h3><p>Missing consumption, wrong run meters, reel data, or closure.</p>
+    <h3>Possible causes</h3><p>Missing or excess consumption, wrong run meters, incorrect layer or reel association, remnant evidence, weight, tare, width, or grammage.</p>
   </section>
       <section>
 
-    <h3>Example</h3><p>Consumed reels support 30,000 m but closure declares 40,000 m.</p>
+    <h3>Example</h3><p>The OT declares 40,000 m; one layer supports 37,000 m and another 43,000 m. D01 records both signed gaps and the layer mismatch in one occurrence.</p>
   </section>
     </div>
     <section class="detection-rule">
 
-    <h3>Detection indicators and algorithm</h3><p>Estimate meters from consumed-reel weight, width, and grammage; compare with declared run meters using tolerance.</p>
+    <h3>Detection indicators and algorithm</h3><p>At closure, convert each reel's used mass to meters, sum sequential reels only within the same required layer, compare every layer with declared run meters, and compare every layer pair. The same physical reel cannot contribute to multiple layers; a duplicate association is insufficient evidence. A reel with no declared remnant uses initial gross minus verified core tare. A weighed partial remnant uses initial gross minus remnant gross so the core cancels. Trigger on either signed layer-to-run direction or pairwise absolute difference strictly above the common kilogram-derived meter tolerance. Equality is clear. D04 was retired into this combined invariant on 2026-08-01.</p>
   </section>
     <section class="owner-rule"><h3>Primary Action Owner</h3><p><strong>machine operator</strong>.</p></section>
     <section class="resolution-rule">
 
-    <h3>Recommended resolution</h3><p>Declare the missing consumed reel or correct run meters, reel weight, width, grammage, or closure data. If the OT is historically locked and the source record cannot be recovered, close without resolution with the remaining meter difference and link D03 rather than entering invented consumption.</p>
+    <h3>Recommended resolution</h3><p>Weigh a declared remnant, add or correct consumption, or correct run, layer, reel, weight, tare, width, grammage, or output evidence. If locked history cannot be recovered, close without resolution with frozen layer, reel, signed-gap, pairwise-gap, tolerance, source, actor, timestamp, reason, and comment evidence.</p>
   </section>
   </article><article class="alert-card family-d state-error" id="d02">
 
@@ -505,17 +505,6 @@
 
     <h3>Recommended resolution</h3><p>Resolve the most specific underlying incident first: missing consumption, output, waste, or weight. Recalculate the balance after corrected or actual weights arrive. If the residual gap cannot be reconstructed or is accepted as a documented physical exception, close without resolution with the final gap, tolerance, evidence, and linked cause incidents.</p>
   </section>
-  </article><article class="alert-card family-d state-error" id="d04">
-    <div class="card-heading"><div><span class="alert-id">D04 · Closure meters</span><h2>Consumed-reel meters exceed declared meters</h2></div><span class="state-pill">Error</span></div>
-    <div class="definition-grid">
-      <section><h3>When it happens</h3><p>At OT closure, consumed-reel meters exceed declared run meters plus the meters represented by any declared remnant reels beyond the configured tolerance.</p></section>
-      <section><h3>Why the alert exists</h3><p>The excess material must be explained. It may still exist physically as a partially consumed remnant reel that must return to inventory.</p></section>
-      <section><h3>Possible causes</h3><p>Undeclared remnant reel, incorrect run meters, incorrect consumed-reel weight, width, or grammage, or an unrecorded warehouse return.</p></section>
-      <section><h3>Example</h3><p>A consumed reel supports 10,000 m, but the OT declares 5,000 run meters and no remnant. The remaining equivalent of 5,000 m should exist as a declared, weighed, labeled, and returned remnant reel.</p></section>
-    </div>
-    <section class="detection-rule"><h3>Detection indicators and algorithm</h3><p>Calculate <strong>unexplained meters = consumed-reel meters − declared run meters − declared remnant-reel meters</strong>. Alert when unexplained meters exceed the configured tolerance. Estimate remnant meters from its measured kilograms, width, and grammage. Link A04 when the remnant declaration is missing and A05 when the declared remnant is not weighed or moved; do not create duplicate incidents.</p></section>
-    <section class="owner-rule"><h3>Primary Action Owner</h3><p>Missing remnant declaration or incorrect run meters → <strong>machine operator</strong>. A declared remnant that is not weighed or moved inherits A05 and routes to the <strong>Process operator</strong>.</p></section>
-    <section class="resolution-rule"><h3>Recommended resolution</h3><p>Declare the remnant reel, record its remaining kilograms, weigh it, print or attach its identifying label, and return it to the raw-material warehouse. Otherwise correct run meters or reel data. If the OT is locked and the history cannot be reconstructed, close without resolution and preserve the discrepancy for EmusaSoft follow-up outside Monitor.</p></section>
   </article></section><section class="family-section"><div class="family-heading" id="family-e"><span class="family-code">E</span><div><h2>Extrusion and Exlam resin-container alerts</h2><p>Shared resin safety-inventory, container-inventory, continuity, and formulation controls.</p></div></div><section class="family-review-note">
     <h3>All E01–E05 rules apply to both Extrusion and Exlam</h3><p>Both operations use resin recipes and material containers. Every E-family detection and resolution rule applies to Extrusion and Exlam; operation-specific machine, recipe, warehouse, container, and shift assignments supply the runtime evidence and recipients.</p>
   </section><section class="family-review-note">
