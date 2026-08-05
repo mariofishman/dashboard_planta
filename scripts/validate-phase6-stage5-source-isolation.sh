@@ -2,6 +2,7 @@
 set -uo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+test_db_runtime="${TEST_DB_RUNTIME_ROOT:-/Users/mariofishman/projects/dashboard_planta/local-data/test-database}"
 run_id="${STAGE6_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)}"
 evidence_dir="$repo_root/local-data/test-database/evidence/stage6/$run_id"
 mkdir -p "$evidence_dir"
@@ -33,7 +34,7 @@ run_core_check() {
 }
 
 verify_cleanup() {
-  [[ ! -e "$repo_root/local-data/test-database/state/reset.lock" ]] || {
+  [[ ! -e "$test_db_runtime/state/reset.lock" ]] || {
     echo "reset safety lock remains after validation" >&2
     return 1
   }

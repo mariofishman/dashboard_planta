@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { afterEach, it } from "node:test";
 import { io as connectSocket } from "socket.io-client";
 import { TestDatabaseConnections, TestDatabaseScenarioRepository } from "@monitor/detection";
@@ -12,7 +12,9 @@ import { assertCanonicalSourceActionIsolation } from "./source-action-isolation.
 
 const servers: MonitorServer[] = [];
 const repositoryRoot = resolve(import.meta.dirname, "../../..");
-const connectedLabAvailable = existsSync(resolve(repositoryRoot, "local-data/test-database/state/ready"));
+const protectedDump = process.env.TEST_DB_DUMP ?? "/Users/mariofishman/projects/dashboard_planta/local-data/database/staging_emusa_core-20260723-025548.sql";
+const testDatabaseRuntime = process.env.TEST_DB_RUNTIME_ROOT ?? resolve(dirname(dirname(protectedDump)), "test-database");
+const connectedLabAvailable = existsSync(resolve(testDatabaseRuntime, "state/ready"));
 
 async function scenarioServer() {
   const instance = await buildMonitorServer({

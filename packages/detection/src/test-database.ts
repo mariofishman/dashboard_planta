@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { access, readFile, readdir, stat } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import mysql, { type Pool, type PoolConnection, type RowDataPacket } from "mysql2/promise";
 import type {
   ScenarioAction,
@@ -136,7 +136,9 @@ export class TestDatabaseConnections {
   }
 
   static async create(repositoryRoot: string): Promise<TestDatabaseConnections> {
-    const runtime = resolve(repositoryRoot, "local-data/test-database");
+    void repositoryRoot;
+    const protectedDump = process.env.TEST_DB_DUMP ?? "/Users/mariofishman/projects/dashboard_planta/local-data/database/staging_emusa_core-20260723-025548.sql";
+    const runtime = process.env.TEST_DB_RUNTIME_ROOT ?? resolve(dirname(dirname(protectedDump)), "test-database");
     const [monitor, writer] = await Promise.all([
       readMode600Configuration(resolve(runtime, "secrets/monitor.host.cnf"), "monitor_source_ro"),
       readMode600Configuration(resolve(runtime, "secrets/writer.host.cnf"), "alertas_fake"),

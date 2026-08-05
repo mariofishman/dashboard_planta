@@ -1,12 +1,13 @@
 import { constants } from "node:fs";
 import { access, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const requireFromDetection = createRequire(resolve(root, "packages/detection/package.json"));
 const mysql = requireFromDetection("mysql2/promise");
-const runtime = resolve(root, "local-data/test-database");
+const protectedDump = process.env.TEST_DB_DUMP ?? "/Users/mariofishman/projects/dashboard_planta/local-data/database/staging_emusa_core-20260723-025548.sql";
+const runtime = process.env.TEST_DB_RUNTIME_ROOT ?? resolve(dirname(dirname(protectedDump)), "test-database");
 const readyFile = resolve(runtime, "state/ready");
 const resetLock = resolve(runtime, "state/reset.lock");
 const evidenceDirectory = resolve(runtime, "evidence");

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, rmdir } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import test from "node:test";
 import {
   TestDatabaseConnections,
@@ -14,6 +14,8 @@ import { assertCanonicalSourceActionIsolation } from "../apps/api/src/source-act
 import { buildMonitorServer, type MonitorServer } from "../apps/api/src/server.js";
 
 const repositoryRoot = resolve(import.meta.dirname, "..");
+const protectedDump = process.env.TEST_DB_DUMP ?? "/Users/mariofishman/projects/dashboard_planta/local-data/database/staging_emusa_core-20260723-025548.sql";
+const testDatabaseRuntime = process.env.TEST_DB_RUNTIME_ROOT ?? resolve(dirname(dirname(protectedDump)), "test-database");
 const manager = { authorization: "Bearer mock:plant-manager" };
 const codes: ScenarioRuleCode[] = ["A02", "A03", "A05"];
 
@@ -844,7 +846,7 @@ test("6.4b blocks source access without creating an incident and recovers only a
     },
   });
   const connections = await TestDatabaseConnections.create(repositoryRoot);
-  const resetLock = resolve(repositoryRoot, "local-data/test-database/state/reset.lock");
+  const resetLock = resolve(testDatabaseRuntime, "state/reset.lock");
   let lockCreated = false;
   let original: Record<string, unknown> | undefined;
   try {

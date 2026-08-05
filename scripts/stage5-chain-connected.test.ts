@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { test } from "node:test";
 import { TestDatabaseConnections } from "@monitor/detection";
 import { buildMonitorServer } from "../apps/api/src/server.js";
@@ -11,8 +11,10 @@ import {
 } from "./lib/stage5-chain-capture.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const runtimeAvailable = existsSync(resolve(root, "local-data/test-database/state/ready"))
-  && existsSync(resolve(root, "local-data/test-database/secrets/writer.host.cnf"));
+const protectedDump = process.env.TEST_DB_DUMP ?? "/Users/mariofishman/projects/dashboard_planta/local-data/database/staging_emusa_core-20260723-025548.sql";
+const testDatabaseRuntime = process.env.TEST_DB_RUNTIME_ROOT ?? resolve(dirname(dirname(protectedDump)), "test-database");
+const runtimeAvailable = existsSync(resolve(testDatabaseRuntime, "state/ready"))
+  && existsSync(resolve(testDatabaseRuntime, "secrets/writer.host.cnf"));
 const manager = { authorization: "Bearer mock:plant-manager" };
 
 test("diagnostic connected rehearsal captures one authoritative source-to-Monitor chain", { skip: !runtimeAvailable }, async () => {
