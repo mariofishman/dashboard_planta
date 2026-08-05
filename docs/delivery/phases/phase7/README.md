@@ -38,10 +38,11 @@ D04 is retired into consolidated D01. Historical D04 incidents and current compa
 - **A01:** material-readiness invariant integrated with full-quantity allocation, reservation, and dispatch checks; reservation-first competing-stock allocation; inclusive 60- and 30-minute checkpoints; cancellation and rescheduling lifecycle; and explicit independence from D03.
 - **B01:** approved-plan sequence invariant integrated with EmusaSoft-owned update validity, preservation of the originally expected and actually started OTs, audited late explanations, independent explanatory links, and no Monitor-defined plan authorization rule.
 - **B02:** planned-start invariant integrated with inclusive deadline evaluation, one condition per OT and approved plan version, late-start resolution, approved superseding full-plan updates, and complete independence from equipment pauses and other alerts.
+- **B03:** unexplained machine-idle invariant integrated with strict post-30-minute triggering, approved expected-production windows, active paused-OT exclusion, plan-level suspension/no-production resolution, independent B02 lifecycle, and Planner ownership.
 
 ## Immediate next action
 
-Inspect B03 against the A01/B01/B02/D01/D02/D03-integrated result and present the B03 functional-conflict and validation checkpoint for approval.
+Run the aggregate Stage 1 review across all seven integrated laboratories, cumulative documentation, executable contracts, focused suites, repository tests, typecheck, and build; then present the integration-to-`main` checkpoint separately.
 
 ## Phase 7 exit gate
 

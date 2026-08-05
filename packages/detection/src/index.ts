@@ -1,6 +1,7 @@
 export * from "./a01-laboratory.js";
 export * from "./b01-laboratory.js";
 export * from "./b02-laboratory.js";
+export * from "./b03-laboratory.js";
 export * from "./d01-laboratory.js";
 export * from "./d02-laboratory.js";
 export * from "./d03-laboratory.js";

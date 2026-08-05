@@ -22,7 +22,7 @@
 | A07 | Physical + statistical | OT | Good output, waste, declared input, tolerance | Latest contributing evidence; kilograms | Fixture proven; tolerance/evidence policy pending |
 | B01 | Deterministic | OT | Actual start, latest-plan next OT, prior sequence update | Actual OT start | Fixture proven; approved-plan source pending |
 | B02 | Deadline + deterministic | OT + plan version | Planned deadline, actual start, approved full-plan update | Planned start | Fixture proven; approved plan-version source mapping pending |
-| B03 | Deadline + deterministic | Machine + schedule window | Expected operation, active OT, exclusions, idle age | Start of unexplained interval; minutes | Fixture proven; schedule/exclusion source pending |
+| B03 | Deadline + deterministic | Machine + approved expected-production window | Approved plan expectation state, active OT, idle age | Start of continuous no-active-OT interval; minutes | Fixture proven; approved plan-window and suspension source pending |
 | C01 | Physical + statistical | Article serial | Weight, bounds, sample size | Scale record; kilograms | Fixture proven; model segmentation pending |
 | C02 | Statistical | OT | Waste weight, bounds, sample size | OT closure/latest waste weight; kilograms | Fixture proven; baseline version pending |
 | C06 | Physical + statistical | OT | Output, effective runtime, rate bounds | OT execution interval; meters/minute | Fixture proven; pause completeness pending |

@@ -177,15 +177,15 @@
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
         {"source":"ordenes_trabajo","fields":["id_equipo","fecha_inicio_ejecucion","fecha_fin_ejecucion"],"evidence":"backup-confirmed"},
-        {"source":"equipo_pausa","fields":["id_equipo","fecha_pausa","fecha_reanudacion","estado"],"evidence":"backup-confirmed"}
+        {"source":"approved_production_plan_contract","fields":["planVersionId","scheduleWindowId","productionExpectationState","effectiveFrom","effectiveTo"],"evidence":"phase10-pending"}
       ],
-      "requiredEvidence": ["equipmentId","scheduleWindowId","expectedToOperate","activeWorkOrder","excludedState","idleMinutes"],
+      "requiredEvidence": ["equipmentId","scheduleWindowId","productionExpectationState","activeWorkOrder","idleMinutes"],
       "parameters": {"idleMinutes":{"value":30,"unit":"minutes","status":"approved"}},
-      "predicate": {"all":[{"var":"expectedToOperate"},{"not":{"var":"activeWorkOrder"}},{"not":{"var":"excludedState"}},{"gt":[{"var":"idleMinutes"},{"param":"idleMinutes"}]}]},
-      "reasonRules": [{"code":"unexplained_machine_idle","when":{"not":{"var":"excludedState"}}}],
-      "resolution": "An OT starts, a valid pause is recorded, or the plan no longer expects production.",
-      "correlations": ["A valid pause with an outdated plan routes to B02 plan correction."],
-      "productionDependencies": ["Expected production interval and exclusion states"]
+      "predicate": {"all":[{"eq":[{"var":"productionExpectationState"},"production_expected"]},{"not":{"var":"activeWorkOrder"}},{"gt":[{"var":"idleMinutes"},{"param":"idleMinutes"}]}]},
+      "reasonRules": [{"code":"unexplained_machine_idle","when":{"all":[{"eq":[{"var":"productionExpectationState"},"production_expected"]},{"not":{"var":"activeWorkOrder"}}]}}],
+      "resolution": "An OT becomes active or an approved plan update makes production suspended or not expected for the interval.",
+      "correlations": ["Evaluate any missed specific OT under B02 independently; shared machine and time evidence does not let B03 infer causation."],
+      "productionDependencies": ["Approved expected-production windows and plan-level suspension states"]
     },
     {
       "code": "C01", "title": "Produced reel weight outside plausible range", "ruleVersion": "1.0.0",

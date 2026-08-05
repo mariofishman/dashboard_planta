@@ -37,9 +37,9 @@
     {"id":"B02-clear","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false,"approvedPlanUpdate":true},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"B02-insufficient","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false},"expectedStatus":"insufficient","expectedReasons":[]},
 
-    {"id":"B03-trigger","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","expectedToOperate":true,"activeWorkOrder":false,"excludedState":false,"idleMinutes":31},"expectedStatus":"triggered","expectedReasons":["unexplained_machine_idle"]},
-    {"id":"B03-clear","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","expectedToOperate":true,"activeWorkOrder":false,"excludedState":true,"idleMinutes":31},"expectedStatus":"clear","expectedReasons":[]},
-    {"id":"B03-insufficient","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","expectedToOperate":true,"activeWorkOrder":false,"excludedState":false},"expectedStatus":"insufficient","expectedReasons":[]},
+    {"id":"B03-trigger","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","productionExpectationState":"production_expected","activeWorkOrder":false,"idleMinutes":31},"expectedStatus":"triggered","expectedReasons":["unexplained_machine_idle"]},
+    {"id":"B03-clear","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","productionExpectationState":"suspended","activeWorkOrder":false,"idleMinutes":31},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"B03-insufficient","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","productionExpectationState":"production_expected","activeWorkOrder":false},"expectedStatus":"insufficient","expectedReasons":[]},
 
     {"id":"C01-trigger","ruleCode":"C01","input":{"articleSerialId":301,"actualKg":700,"lowerKg":250,"upperKg":600,"sampleCount":30,"minimumSampleSize":20},"expectedStatus":"triggered","expectedReasons":["weight_outside_range"]},
     {"id":"C01-clear","ruleCode":"C01","input":{"articleSerialId":301,"actualKg":450,"lowerKg":250,"upperKg":600,"sampleCount":30,"minimumSampleSize":20},"expectedStatus":"clear","expectedReasons":[]},
