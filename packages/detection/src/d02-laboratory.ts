@@ -39,7 +39,6 @@ export interface D02LaboratoryIncident {
   consumedQuantity: string;
   reelDisposition: D02ReelDisposition;
   reasons: string[];
-  correlationInstructions: string[];
   resolutionEvidence: {
     type: "healthy_source_correction";
     consumedQuantity: string;
@@ -60,7 +59,6 @@ export interface D02LaboratoryResult {
   disposition: D02LaboratoryDisposition;
   reasons: string[];
   missingEvidence: string[];
-  correlationInstructions: string[];
   incident: D02LaboratoryIncident | null;
 }
 
@@ -111,7 +109,6 @@ function result(
     disposition,
     reasons: triggered ? ["delivered_reel_unconsumed"] : [],
     missingEvidence,
-    correlationInstructions: triggered ? ["suppress_duplicate_D03"] : [],
     incident: copyIncident(incident),
   };
 }
@@ -232,7 +229,6 @@ export class D02StandaloneLaboratory {
       consumedQuantity: snapshot.consumedQuantity!,
       reelDisposition: snapshot.reelDisposition!,
       reasons: ["delivered_reel_unconsumed"],
-      correlationInstructions: ["suppress_duplicate_D03"],
       resolutionEvidence: null,
       administrativeClosure: null,
     };

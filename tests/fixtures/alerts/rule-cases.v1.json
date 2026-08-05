@@ -21,9 +21,9 @@
     {"id":"A05-clear","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":31,"weighed":true,"sourceWorkOrderFinished":true,"movedFromMachine":true},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"A05-insufficient","ruleCode":"A05","input":{"articleSerialId":205,"declaredAgeMinutes":31,"weighed":false,"sourceWorkOrderFinished":true},"expectedStatus":"insufficient","expectedReasons":[]},
 
-    {"id":"A06-trigger","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteAgeMinutes":31,"wasteWeighed":false,"balanceSuggestsWaste":false,"specificD03Exists":false},"expectedStatus":"triggered","expectedReasons":["waste_not_weighed"]},
-    {"id":"A06-clear","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteAgeMinutes":31,"wasteWeighed":true,"balanceSuggestsWaste":false,"specificD03Exists":false},"expectedStatus":"clear","expectedReasons":[]},
-    {"id":"A06-insufficient","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteAgeMinutes":31,"wasteWeighed":false,"balanceSuggestsWaste":false},"expectedStatus":"insufficient","expectedReasons":[]},
+    {"id":"A06-trigger","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteAgeMinutes":31,"wasteWeighed":false,"balanceSuggestsWaste":false},"expectedStatus":"triggered","expectedReasons":["waste_not_weighed"]},
+    {"id":"A06-clear","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteAgeMinutes":31,"wasteWeighed":true,"balanceSuggestsWaste":false},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"A06-insufficient","ruleCode":"A06","input":{"workOrderId":106,"declaredWaste":true,"wasteWeighed":false,"balanceSuggestsWaste":false},"expectedStatus":"insufficient","expectedReasons":[]},
 
     {"id":"A07-trigger","ruleCode":"A07","input":{"workOrderId":107,"goodOutputKg":700,"wasteKg":100,"declaredInputKg":500,"toleranceKg":20},"expectedStatus":"triggered","expectedReasons":["input_evidence_gap"]},
     {"id":"A07-clear","ruleCode":"A07","input":{"workOrderId":107,"goodOutputKg":700,"wasteKg":100,"declaredInputKg":790,"toleranceKg":20},"expectedStatus":"clear","expectedReasons":[]},
@@ -66,9 +66,9 @@
     {"id":"D02-clear-after-partial-consumption","ruleCode":"D02","input":{"workOrderId":402,"articleSerialId":42,"workOrderClosed":true,"plannedProductionQuantity":10000,"goodOutputQuantity":9000,"productionQuantityUnit":"m","reservedReelDelivered":true,"consumedQuantity":0.001,"reelDisposition":"at_machine"},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"D02-insufficient","ruleCode":"D02","input":{"workOrderId":402,"articleSerialId":42,"workOrderClosed":true,"plannedProductionQuantity":10000,"goodOutputQuantity":9000,"productionQuantityUnit":"m","reservedReelDelivered":true,"consumedQuantity":0},"expectedStatus":"insufficient","expectedReasons":[]},
 
-    {"id":"D03-trigger","ruleCode":"D03","input":{"workOrderId":403,"consumedInputKg":1500,"goodOutputKg":1300,"wasteKg":90,"specificCausePresent":false},"expectedStatus":"triggered","expectedReasons":["mass_balance_gap"]},
-    {"id":"D03-clear","ruleCode":"D03","input":{"workOrderId":403,"consumedInputKg":1500,"goodOutputKg":1300,"wasteKg":200,"specificCausePresent":false},"expectedStatus":"clear","expectedReasons":[]},
-    {"id":"D03-insufficient","ruleCode":"D03","input":{"workOrderId":403,"consumedInputKg":1500,"goodOutputKg":1300,"wasteKg":90},"expectedStatus":"insufficient","expectedReasons":[]},
+    {"id":"D03-trigger","ruleCode":"D03","input":{"workOrderId":403,"workOrderClosed":true,"weighedRawMaterialsKg":1496,"goodOutputNetKg":1300,"weighedWasteKg":90,"plannedProductionAreaM2":1000,"inkApplied":true,"adhesiveApplied":true,"containerBalanceValid":true},"expectedStatus":"triggered","expectedReasons":["mass_balance_gap"]},
+    {"id":"D03-clear","ruleCode":"D03","input":{"workOrderId":403,"workOrderClosed":true,"weighedRawMaterialsKg":1496,"goodOutputNetKg":1300,"weighedWasteKg":200,"plannedProductionAreaM2":1000,"inkApplied":true,"adhesiveApplied":true,"containerBalanceValid":true},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"D03-insufficient","ruleCode":"D03","input":{"workOrderId":403,"workOrderClosed":true,"weighedRawMaterialsKg":1496,"goodOutputNetKg":1300,"plannedProductionAreaM2":1000,"inkApplied":true,"adhesiveApplied":true,"containerBalanceValid":true},"expectedStatus":"insufficient","expectedReasons":[]},
 
     {"id":"E01-trigger","ruleCode":"E01","input":{"workOrderId":501,"articleId":51,"machineWarehouseMapped":true,"minutesToPlannedStart":180,"safetyStockKg":100,"demandNext4HoursKg":200},"expectedStatus":"triggered","expectedReasons":["safety_inventory_shortfall"]},
     {"id":"E01-clear","ruleCode":"E01","input":{"workOrderId":501,"articleId":51,"machineWarehouseMapped":true,"minutesToPlannedStart":180,"safetyStockKg":220,"demandNext4HoursKg":200},"expectedStatus":"clear","expectedReasons":[]},

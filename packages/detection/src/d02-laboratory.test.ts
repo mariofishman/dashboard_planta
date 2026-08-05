@@ -233,10 +233,11 @@ describe("D02 standalone deterministic laboratory", () => {
     assert.equal(failed.incident?.lifecycle, "open");
   });
 
-  it("D02-17 reports D02 as the specific cause that suppresses duplicate D03", () => {
+  it("D02-17 keeps D02 and D03 independent for the same missing-consumption issue", () => {
     const result = laboratory.evaluate({ status: "healthy", snapshot: unused });
-    assert.deepEqual(result.correlationInstructions, ["suppress_duplicate_D03"]);
-    assert.deepEqual(result.incident?.correlationInstructions, ["suppress_duplicate_D03"]);
+    assert.equal(result.disposition, "triggered");
+    assert.equal(Object.hasOwn(result, "correlationInstructions"), false);
+    assert.equal(Object.hasOwn(result.incident!, "correlationInstructions"), false);
   });
 
   it("D02-18 keeps two delivered reels under one OT as independent conditions", () => {

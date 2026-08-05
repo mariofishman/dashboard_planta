@@ -2,7 +2,7 @@
 
 **Role:** Supporting preparation document only
 
-**Status:** Supporting preparation; D01 and D02 standalone laboratories integrated, connected boundaries deferred
+**Status:** Supporting preparation; D01, D02, and D03 standalone laboratories integrated, connected boundaries deferred
 
 **Execution authority:** [`README.md`](README.md)
 
@@ -57,7 +57,7 @@ The laboratory requires reason, mandatory comment, actor reference, and timestam
 
 ### Recurrence and correlation
 
-A healthy clear evaluation expires suppression or resolves an open occurrence. A later triggered evaluation creates a new occurrence. D01 replaces or enriches A04 or D03 only when the same OT evidence chain is deterministically explained. Independent A04 capacity, A05 handling, and D03 mass-balance conditions remain distinct.
+A healthy clear evaluation expires suppression or resolves an open occurrence. A later triggered evaluation creates a new occurrence. D01 replaces or enriches A04 only when the same OT evidence chain is deterministically explained. A05 handling and D03 mass-balance conditions remain distinct; D01 never suppresses D03.
 
 ### Routing expectations
 
@@ -81,7 +81,7 @@ The catalog keeps the machine operator as D01's primary action owner under gener
 | D01-11 | Open multi-layer D01 with unreconstructable history | Administratively close | No external mutation | Full layer and pair evidence frozen | Monitor authorization and audit |
 | D01-12 | Closed occurrence, healthy clear, then return | Poll clear and later trigger | No external mutation | New occurrence only after proved clear interval | Source-valid recurrence |
 | D01-13 | Open D01 followed by failed cycle | Poll failed cycle | No external mutation | Existing occurrence unchanged | Poller failure behavior |
-| D01-14 | D01 and D03 candidates | Classify correlation | No external mutation | Suppress D03 only for same OT and evidence chain | Connected incident correlation |
+| D01-14 | D01 and D03 candidates share the same OT and evidence chain | Classify independence | No external mutation | D01 and D03 both remain active under their own predicates | Connected independent lifecycle evidence |
 | D01-15 | Multiple layers are below run on one OT | Poll complete fixture | No external mutation | One occurrence identifies every deficient layer | Monitor evidence persistence |
 | D01-16 | One layer is more than tolerance above run | Evaluate complete fixture | No external mutation | `layer_input_exceeds_declared_meters` | Source query and lifecycle |
 | D01-17 | Two layers each within run tolerance but apart beyond tolerance | Evaluate pairwise evidence | No external mutation | `substrate_layers_do_not_match` only | Pairwise source candidate generation |
@@ -166,7 +166,7 @@ Standalone closure requires actor reference, standardized reason, mandatory comm
 
 ### Recurrence and correlation
 
-A new occurrence for the same key requires explicit source-valid correction evidence showing why a previously cleared reel is validly unconsumed again. Without that evidence, the laboratory returns insufficient. A triggered D02 emits the expected correlation instruction to suppress duplicate D03 for the same missing-consumption imbalance.
+A new occurrence for the same key requires explicit source-valid correction evidence showing why a previously cleared reel is validly unconsumed again. Without that evidence, the laboratory returns insufficient. D02 and D03 remain independent even when the same missing-consumption evidence contributes to both predicates.
 
 ### Routing expectations
 
@@ -193,7 +193,7 @@ The catalog's general recipients and D02 overrides remain authoritative. The sta
 | D02-14 | Prior occurrence resolved | Recreate trigger without recurrence evidence | Reversal provenance absent | Insufficient; no invented occurrence | Source audit evidence |
 | D02-15 | Open occurrence and incomplete/invalid snapshot | Evaluate missing or malformed quantity evidence | Source truth unproven | Insufficient; open state preserved | Query schema validation |
 | D02-16 | Open occurrence | Fail evaluation cycle | No healthy source result | Failed state preserves occurrence | Polling and persistence failure |
-| D02-17 | D02 trigger also explains balance gap | Evaluate correlation | Specific missing consumption exists | D02 trigger plus duplicate-D03 suppression instruction | Cross-rule incident correlation |
+| D02-17 | D02 trigger also explains a D03 balance gap | Evaluate both independent predicates | Specific missing consumption exists | D02 triggers without suppressing D03 | Connected independent lifecycle evidence |
 | D02-18 | Two delivered reels under one OT | Evaluate each serial | Independent reel states | Independent condition keys | Bounded multi-row query |
 
 ### Automated test references
@@ -217,3 +217,102 @@ Backup-confirmed candidates are `pre_reserva_orden_trabajo` for the reservation,
 
 - 2026-08-01 — Product owner approved quantity-based completion: the OT must be closed and verified good output must reach at least 90% of planned production; the 10% shortfall tolerance is inclusive. Because no verified operator complete-versus-truncated signal exists, `motivo_cierre` is not used.
 - 2026-08-01 — Product owner approved any valid positive consumption as proof that the delivered reserved reel was used; partial consumption qualifies and the alert does not require consuming the full reel.
+
+## D03 — OT input, good production, and waste do not balance
+
+### Business objective
+
+Prepare deterministic D03 behavior against controlled, fully weighed OT evidence without starting Phase 7 or claiming source integration. The business objective and approved formula remain defined by the [D03 catalog rule](../../../product/alert_catalog.md#d03--ot-input-good-production-and-waste-do-not-balance).
+
+### Authority and existing evidence
+
+- `docs/product/alert_catalog.md` is authoritative for the trigger, all-weighed gate, formula, resolution, administrative closure, independence, and routing rules.
+- `config/alerts/alert-rules.v1.json` defines query `d03-work-order-mass-balance`, key-schema version 1, natural key `workOrderId`, reason `mass_balance_gap`, the 5% tolerance, and the two `0.002 kg/m²` theoretical inputs.
+- `tests/fixtures/alerts/rule-cases.v1.json` and `scripts/phase1/validate-rule-contracts.mjs` cover one synthetic trigger, clear, and insufficient contract result.
+- `docs/delivery/phases/phase1/evidence-matrix.md` classifies D03 as a closure mass-balance rule and records that connected production evidence remains pending.
+- The protected July 23 schema confirms the named OT, material, output, serial, and scale fields. The current read-only mapping validation matched 97 fields across 18 tables without printing source rows. Schema presence does not prove the final bounded D03 query, completeness semantics, or deployed production behavior.
+- `packages/detection/src/d03-laboratory.ts` and its test file are standalone deterministic code only. They do not call `test_database`, the Monitor poller, routing, Dashboard, Chat, staging, or production.
+
+### Trigger and non-trigger conditions
+
+The scenario matrix covers the catalog rule after OT closure and complete weighing: positive and negative gaps beyond tolerance trigger `Error`; equality and smaller gaps do not. Before closure, with any required weight missing, or with invalid E05 container evidence, no D03 occurrence is created. Other active alerts never suppress D03. Detailed rule prose remains in the catalog.
+
+### Thresholds, units, timing, and tolerances
+
+The tolerance is exactly 5% of net weighed good-production mass and the comparison is strict: equality is clear. The laboratory converts nonnegative kilogram evidence to integer grams, rounds each theoretical ink or adhesive contribution from planned square meters to the nearest gram, and compares `absolute gap grams × 100` with `good-output grams × 5`. Ink and adhesive each contribute `2 g/m²` of planned production area and accumulate to `4 g/m²` when both apply. The injected clock controls lifecycle timestamps but does not alter the closure formula.
+
+### Persistence and duplicate prevention
+
+The condition key is `D03 + d03-work-order-mass-balance + key schema 1 + workOrderId`. Repeated evaluation of one unchanged imbalance retains one stable occurrence and one evidence observation. Changed complete evidence updates the same open occurrence without changing condition identity. `reset()` restores the same in-memory baseline without touching any database.
+
+### Correction and automatic resolution
+
+Per the catalog, corrected material, production, waste, OT-association, or scale evidence resolves D03 automatically when a later healthy complete evaluation places the absolute gap at or below tolerance. Net reel weights already exclude cores; the laboratory never subtracts a core a second time.
+
+### Administrative closure
+
+The standalone closure action requires actor reference, standardized reason, and comment, freezes the final formula evidence on the occurrence, and suppresses the same uninterrupted imbalance. Only a later healthy clear evaluation expires suppression. This is simulated laboratory state and is not a Monitor incident write.
+
+### Recurrence and correlation
+
+A later source-valid correction may clear a closed OT imbalance; if a subsequent complete source-valid correction makes the same OT imbalanced again, the same condition key receives a new occurrence. The standalone laboratory models that sequence, but the connected correction workflow remains unverified. D03 remains independent of every other alert, including when they describe the same source issue. Each alert resolves from its own predicate; one shared source correction may therefore resolve several alerts independently. E05 invalid container evidence blocks D03 rather than contributing impossible negative consumption.
+
+### Routing expectations
+
+The catalog always routes D03 to the factory manager, affected operation shift supervisor, technical leader, and implicated machine operator; suspected scale evidence also adds the Process operator. Other alerts retain their own routing. The standalone laboratory does not resolve people or deliver notifications.
+
+### Scenario matrix
+
+| Scenario ID | Starting state | Laboratory action | Expected source state | Expected standalone result | Deferred connected evidence |
+| --- | --- | --- | --- | --- | --- |
+| D03-00 | Dirty in-memory laboratory, then reset | Reset the laboratory | Controlled fixture returns to its original values | Repeatable empty occurrence baseline | Source reset and all connected boundaries deferred |
+| D03-01 | Fully weighed OT still open | Evaluate before closure | Synthetic OT has no closure timestamp | Clear; no D03 occurrence | OT closure mapping deferred |
+| D03-02 | Closed OT with one production reel lacking net weight | Evaluate | Synthetic weighing evidence is incomplete | Insufficient; no `Error posible` and no occurrence | Weighing-completeness query deferred |
+| D03-03 | Closed, fully weighed OT; adjusted input exceeds output plus waste | Evaluate 110 kg gap against 65 kg tolerance | Synthetic evidence is complete | One open `Error` occurrence | Connected source and lifecycle deferred |
+| D03-04 | Closed, fully weighed OT; output plus waste exceeds adjusted input | Evaluate the negative gap | Synthetic evidence is complete | Absolute gap triggers the same `mass_balance_gap` reason | Connected source and lifecycle deferred |
+| D03-05 | Closed, fully weighed OT at exact 5% boundary | Evaluate | Synthetic evidence is complete | Clear because equality does not trigger | Decimal/source precision deferred |
+| D03-06 | Closed, fully weighed OT inside tolerance | Evaluate | Synthetic evidence is complete | Clear; no occurrence | Connected non-trigger deferred |
+| D03-07 | Printing and lamination both apply to 1,000 planned m² | Calculate theoretical inputs | Ink and adhesive remain unweighed by approved policy | Add 2 kg ink plus 2 kg adhesive cumulatively | Operation and planned-area mapping deferred |
+| D03-08 | Weighed production reel reports 1,300 kg net | Evaluate output | Scale net weight already excludes the core | Use 1,300 kg once; no second core deduction | Scale semantics validation deferred |
+| D03-09 | One open D03 occurrence | Repeat unchanged evaluation | Synthetic evidence is unchanged | Same occurrence; no duplicate observation | Monitor transaction/delivery deduplication deferred |
+| D03-10 | One open D03 occurrence | Correct weighed waste so the gap is within tolerance | Synthetic evidence becomes balanced | Resolve automatically | EmusaSoft correction workflow and polling deferred |
+| D03-11 | One open D03 occurrence | Close administratively, then repeat unchanged evaluation | Synthetic source remains imbalanced | Closed without resolution; same uninterrupted condition suppressed | Monitor authorization, audit, and reporting deferred |
+| D03-12 | Administratively closed occurrence | Evaluate a healthy clear correction, then a later source-valid imbalance | Synthetic evidence clears and later requalifies | Suppression expires; occurrence 2 opens | Connected correction/recurrence validity deferred |
+| D03-13 | Fully weighed gap while A06, D01, or D02 is also active | Evaluate D03 with other-alert context | Multiple predicates describe related evidence | D03 still triggers one independent occurrence | Connected independent lifecycle evidence deferred |
+| D03-14 | Extrusion evidence would create negative container consumption | Evaluate with invalid container balance | E05 source invariant is unresolved | Insufficient and blocked by E05 | E05 source mapping and connected ordering deferred |
+| D03-15 | One open D03 occurrence | Remove a required later weight | Synthetic cycle evidence becomes incomplete | Insufficient; prior occurrence remains open | Schema validation and incomplete-cycle telemetry deferred |
+| D03-16 | One open D03 occurrence | Run a failed laboratory cycle after a balancing correction | Source evaluation fails | Prior occurrence remains open | Adapter, database, and Monitor failed-cycle evidence deferred |
+| D03-17 | OT with and without theoretical inputs | Remove planned-area evidence | Area is absent | Required only when ink or adhesive applies; otherwise calculation proceeds | Planned-area source mapping deferred |
+
+### Automated test references
+
+`packages/detection/src/d03-laboratory.test.ts` maps test names directly to D03-00 through D03-17. All are standalone deterministic tests. Existing generic contract coverage remains in `packages/contracts/src/repository-contracts.test.ts` through the Phase 1 validator.
+
+### Required source mappings
+
+- OT identity and closure: `ordenes_trabajo.id` and `fecha_fin_ejecucion` are backup-confirmed; the final closure predicate remains unconnected.
+- Planned production area: `ordenes_trabajo.metros_lineales_planificados` and `ancho_teorico_bobina` are backup-confirmed candidate inputs. Their multiplication, unit conversion, operation applicability, and completeness require the later query contract.
+- Other measured raw material: `orden_trabajo_materiales.cantidad_consumida` and `tipo_materia_prima` are backup-confirmed candidate fields. Ink and adhesive use the approved theoretical contributions rather than measured weight.
+- Production and waste identity/completeness: `orden_trabajo_salidas`, `articulo_serial`, and the output unweighed counters are backup-confirmed candidate fields.
+- Production and waste kilograms: non-deleted `balanza_carga_detalle_registros.peso_neto` is the candidate measured source. Production net weight already excludes core by approved business rule.
+- E05 validity is a controlled standalone input. Other-alert context proves D03 independence but does not affect its predicate; connected ordering and joins are deferred.
+
+### Blockers and deferred connected tests
+
+- **Standalone deterministic laboratory:** implemented for the scenario matrix; passing tests are evidence only for pure in-memory behavior.
+- **Connected `test_database` source boundary:** not executed. The bounded D03 query, all-weighed completeness, planned-area calculation, operation applicability, source joins, E05 ordering, and representative fixtures remain deferred.
+- **Connected Monitor polling and incident lifecycle:** not executed; it remains Phase 7 connected work after the completed Phase 6 baseline.
+- **Dashboard:** not executed.
+- **Chat:** not executed.
+- **Production or Phase 10:** not executed. Current source reconciliation, Aurora credentials, read-only enforcement, query plans/load, scale semantics, correction behavior, and any future authoritative EmusaSoft imbalance state remain unvalidated.
+
+This standalone preparation cannot satisfy the Phase 7 connected exit gate.
+
+### Approval record
+
+- 2026-08-05 — The product manager decided that D03 is never suppressed by another alert. Related incidents remain independent and resolve when their own predicates clear or through their own audited administrative closure.
+
+- 2026-08-01 — The user approved that Monitor calculates D03 until an authoritative EmusaSoft OT-level imbalance state and its semantics are verified; there is no source fallback in the current rule.
+- 2026-08-01 — The user approved that D03 waits for all applicable production, waste, and non-ink/non-adhesive raw-material weights, produces only `Error`, and has no `Error posible` path.
+- 2026-08-01 — The user approved theoretical ink and adhesive at `2 g/m²` each because those two raw materials are not weighed. They accumulate to `4 g/m²` when both apply and use planned production area.
+- 2026-08-01 — The user confirmed that the scale supplies production-reel weight net of the core; Monitor must not deduct core weight again.

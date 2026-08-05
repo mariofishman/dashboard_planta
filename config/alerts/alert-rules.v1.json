@@ -107,15 +107,15 @@
         {"source":"cotizacion_config_waste","fields":["id","id_cotizacion_config_valor","id_operacion"],"evidence":"backup-confirmed"},
         {"source":"cotizacion_config_rangos","fields":["id","valor_kg"],"evidence":"backup-confirmed"}
       ],
-      "requiredEvidence": ["workOrderId","declaredWaste","wasteAgeMinutes","wasteWeighed","balanceSuggestsWaste","specificD03Exists"],
+      "requiredEvidence": ["workOrderId","declaredWaste","wasteAgeMinutes","wasteWeighed","balanceSuggestsWaste"],
       "parameters": {"weighingMinutes":{"value":30,"unit":"minutes","status":"provisional"}},
-      "predicate": {"all":[{"not":{"var":"specificD03Exists"}},{"any":[{"all":[{"var":"declaredWaste"},{"gt":[{"var":"wasteAgeMinutes"},{"param":"weighingMinutes"}]},{"not":{"var":"wasteWeighed"}}]},{"var":"balanceSuggestsWaste"}]}]},
+      "predicate": {"any":[{"all":[{"var":"declaredWaste"},{"gt":[{"var":"wasteAgeMinutes"},{"param":"weighingMinutes"}]},{"not":{"var":"wasteWeighed"}}]},{"var":"balanceSuggestsWaste"}]},
       "reasonRules": [
         {"code":"waste_not_weighed","when":{"all":[{"var":"declaredWaste"},{"gt":[{"var":"wasteAgeMinutes"},{"param":"weighingMinutes"}]},{"not":{"var":"wasteWeighed"}}]}},
         {"code":"possible_waste_not_declared","when":{"var":"balanceSuggestsWaste"}}
       ],
       "resolution": "Waste evidence is declared and weighed, or corrected balance evidence removes the condition.",
-      "correlations": ["Attach a waste reason to D03 instead of creating a duplicate when D03 exists."],
+      "correlations": ["A06 and D03 remain independent when both predicates trigger; related evidence may be linked without suppressing either incident."],
       "productionDependencies": ["Closed-but-undeclared waste signal", "Quotation and historical baseline mapping"]
     },
     {
@@ -133,7 +133,7 @@
       "predicate": {"gt":[{"sub":[{"add":[{"var":"goodOutputKg"},{"var":"wasteKg"}]},{"var":"declaredInputKg"}]},{"var":"toleranceKg"}]},
       "reasonRules": [{"code":"input_evidence_gap","when":{"gt":[{"sub":[{"add":[{"var":"goodOutputKg"},{"var":"wasteKg"}]},{"var":"declaredInputKg"}]},{"var":"toleranceKg"}]}}],
       "resolution": "Declared input covers verified or estimated output and waste within tolerance.",
-      "correlations": ["Suppress A03; merge or link with D03 at closure."],
+      "correlations": ["Suppress A03 when its own approved correlation rule applies; A07 and D03 remain independent and may link evidence without lifecycle coupling."],
       "productionDependencies": ["Tolerance and verified-weight treatment"]
     },
     {
@@ -219,7 +219,7 @@
       "predicate": {"all":[{"gte":[{"var":"sampleCount"},{"var":"minimumSampleSize"}]},{"any":[{"lt":[{"var":"actualWasteKg"},{"var":"lowerKg"}]},{"gt":[{"var":"actualWasteKg"},{"var":"upperKg"}]}]}]},
       "reasonRules": [{"code":"waste_outside_range","when":{"any":[{"lt":[{"var":"actualWasteKg"},{"var":"lowerKg"}]},{"gt":[{"var":"actualWasteKg"},{"var":"upperKg"}]}]}}],
       "resolution": "Corrected or verified waste evidence falls inside the versioned model range.",
-      "correlations": ["A06 or D03 supplies the specific missing-evidence explanation when available."],
+      "correlations": ["A06 or D03 may supply linked missing-evidence context; each alert keeps its own predicate and lifecycle."],
       "productionDependencies": ["Quotation-matrix joins and baseline version"]
     },
     {
@@ -267,7 +267,7 @@
         {"code":"substrate_layers_do_not_match","when":{"all":[{"var":"closed"},{"gt":[{"var":"maximumPairwiseLayerGapMeters"},{"div":[{"min":[{"mul":[{"var":"totalOrderKg"},{"param":"toleranceFraction"}]},{"param":"toleranceCapKg"}]},{"div":[{"var":"totalOrderKg"},{"var":"declaredRunMeters"}]}]}]}]}}
       ],
       "resolution": "A complete healthy closure evaluation proves every required layer agrees with declared run meters and every other required layer within the approved kilogram-derived tolerance.",
-      "correlations": ["D01 replaces or enriches A04 or D03 only when its deterministic layer evidence explains the same discrepancy; independent A04, A05, and D03 conditions remain distinct."],
+      "correlations": ["D01 may replace or enrich A04 only when its deterministic layer evidence explains the same discrepancy; A05 and D03 remain independent, and D01 never suppresses D03."],
       "productionDependencies": ["Verified initial-gross, core-tare, weighed-remnant, required-layer, width, grammage, closure, and pairwise-candidate mappings; current bounded query validation"]
     },
     {
@@ -287,26 +287,32 @@
       "predicate": {"all":[{"var":"workOrderClosed"},{"gte":[{"var":"goodOutputQuantity"},{"mul":[{"sub":[1,{"param":"completionShortfallToleranceFraction"}]},{"var":"plannedProductionQuantity"}]}]},{"var":"reservedReelDelivered"},{"eq":[{"var":"consumedQuantity"},0]},{"eq":[{"var":"reelDisposition"},"at_machine"]}]},
       "reasonRules": [{"code":"delivered_reel_unconsumed","when":{"all":[{"var":"reservedReelDelivered"},{"eq":[{"var":"consumedQuantity"},0]},{"eq":[{"var":"reelDisposition"},"at_machine"]}]}}],
       "resolution": "Positive consumption, return or reassignment, delivery or reservation correction, or evidence below the approved 90% completion boundary clears the condition.",
-      "correlations": ["D02 suppresses duplicate D03 for the same missing-consumption imbalance."],
+      "correlations": ["D02 and D03 remain independent even when both arise from the same missing-consumption issue."],
       "productionDependencies": ["Verified actual good-production quantity and unit mapping", "Verified motivo_cierre values and operator provenance before using closure reason"]
     },
     {
-      "code": "D03", "title": "OT input good production and waste do not balance", "ruleVersion": "1.0.0",
+      "code": "D03", "title": "OT input good production and waste do not balance", "ruleVersion": "1.1.0",
       "queryId": "d03-work-order-mass-balance", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
-      "naturalKey": ["workOrderId"], "classification": ["deterministic", "statistical", "physical"],
-      "labels": ["Error posible", "Error"], "productionReadiness": "fixture-proven-production-pending",
+      "naturalKey": ["workOrderId"], "classification": ["deterministic", "physical"],
+      "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
       "sourceMappings": [
-        {"source":"orden_trabajo_materiales","fields":["id_orden_trabajo","cantidad_consumida"],"evidence":"backup-confirmed"},
-        {"source":"articulo_serial","fields":["id","id_orden_trabajo_origen","tipo"],"evidence":"backup-confirmed"},
-        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_neto"],"evidence":"backup-confirmed"}
+        {"source":"ordenes_trabajo","fields":["id","fecha_fin_ejecucion","metros_lineales_planificados","ancho_teorico_bobina"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_materiales","fields":["id","id_orden_trabajo","cantidad_consumida","tipo_materia_prima","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"orden_trabajo_salidas","fields":["id","id_orden_trabajo","tipo","cantidad_bulto_sin_pesar","cantidad_bulto_parcial_sin_pesar","eliminado"],"evidence":"backup-confirmed"},
+        {"source":"articulo_serial","fields":["id","id_orden_trabajo_origen","id_tipo_merma","tipo","fecha_eliminacion"],"evidence":"backup-confirmed"},
+        {"source":"balanza_carga_detalle_registros","fields":["id_articulo_serial","peso_neto","eliminado"],"evidence":"backup-confirmed"}
       ],
-      "requiredEvidence": ["workOrderId","consumedInputKg","goodOutputKg","wasteKg","specificCausePresent"],
-      "parameters": {"balanceToleranceFraction":{"value":0.05,"unit":"fraction-of-good-output","status":"approved"}},
-      "predicate": {"all":[{"not":{"var":"specificCausePresent"}},{"gt":[{"abs":{"sub":[{"sub":[{"var":"consumedInputKg"},{"var":"goodOutputKg"}]},{"var":"wasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputKg"}]}]}]},
-      "reasonRules": [{"code":"mass_balance_gap","when":{"gt":[{"abs":{"sub":[{"sub":[{"var":"consumedInputKg"},{"var":"goodOutputKg"}]},{"var":"wasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputKg"}]}]}}],
-      "resolution": "The balance returns within the versioned tolerance after evidence correction.",
-      "correlations": ["Suppress when A03, A04, A05, A06, A07, D01, or D02 explains the same gap."],
-      "productionDependencies": ["Verified-versus-estimated evidence policy"]
+      "requiredEvidence": ["workOrderId","workOrderClosed","weighedRawMaterialsKg","goodOutputNetKg","weighedWasteKg","plannedProductionAreaM2","inkApplied","adhesiveApplied","containerBalanceValid"],
+      "parameters": {
+        "balanceToleranceFraction":{"value":0.05,"unit":"fraction-of-net-good-output","status":"approved"},
+        "inkKgPerM2":{"value":0.002,"unit":"kg-per-planned-square-meter","status":"approved"},
+        "adhesiveKgPerM2":{"value":0.002,"unit":"kg-per-planned-square-meter","status":"approved"}
+      },
+      "predicate": {"all":[{"var":"workOrderClosed"},{"var":"containerBalanceValid"},{"gt":[{"abs":{"sub":[{"sub":[{"add":[{"var":"weighedRawMaterialsKg"},{"mul":[{"param":"inkKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"inkApplied"}]},{"mul":[{"param":"adhesiveKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"adhesiveApplied"}]}]},{"var":"goodOutputNetKg"}]},{"var":"weighedWasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputNetKg"}]}]}]},
+      "reasonRules": [{"code":"mass_balance_gap","when":{"gt":[{"abs":{"sub":[{"sub":[{"add":[{"var":"weighedRawMaterialsKg"},{"mul":[{"param":"inkKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"inkApplied"}]},{"mul":[{"param":"adhesiveKgPerM2"},{"var":"plannedProductionAreaM2"},{"var":"adhesiveApplied"}]}]},{"var":"goodOutputNetKg"}]},{"var":"weighedWasteKg"}]}},{"mul":[{"param":"balanceToleranceFraction"},{"var":"goodOutputNetKg"}]}]}}],
+      "resolution": "After all required weights remain present, corrected source evidence returns the absolute balance gap to or below the versioned tolerance.",
+      "correlations": ["D03 is independent and is never suppressed by another alert, including when both arise from the same underlying issue."],
+      "productionDependencies": ["All-weighed source completeness, planned-area and operation applicability mapping, bounded current-source query validation, and future EmusaSoft imbalance-state verification"]
     },
     {
       "code": "E01", "title": "Required extrusion safety inventory is incomplete", "ruleVersion": "1.0.0",

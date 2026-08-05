@@ -129,7 +129,7 @@ export interface D01CorrelatedCondition {
 export interface D01CorrelationClassification {
   A04: "not_active" | "independent_capacity_condition" | "replaced_or_enriched_by_d01";
   A05: "not_active" | "independent_reel_handling_condition";
-  D03: "not_active" | "independent_mass_balance_condition" | "suppressed_duplicate";
+  D03: "not_active" | "independent_mass_balance_condition";
 }
 
 const conditionKey = (workOrderId: string) =>
@@ -471,6 +471,6 @@ export function classifyD01Correlations(
     A05: !conditions.A05?.active ? "not_active" : "independent_reel_handling_condition",
     D03: !conditions.D03?.active
       ? "not_active"
-      : explains(conditions.D03) ? "suppressed_duplicate" : "independent_mass_balance_condition",
+      : "independent_mass_balance_condition",
   };
 }

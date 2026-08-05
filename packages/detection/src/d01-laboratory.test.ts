@@ -229,11 +229,11 @@ describe("D01 consolidated standalone deterministic laboratory", () => {
     assert.equal(lab.inspect().occurrences[0]?.lifecycle, "open");
   });
 
-  it("D01-14 suppresses duplicate D03 only for the same OT and evidence chain", () => {
+  it("D01-14 keeps D03 independent even for the same OT and evidence chain", () => {
     const result = evaluateD01(snapshot());
     assert.equal(classifyD01Correlations(result, {
       D03: { active: true, workOrderId: "401", sameEvidenceChain: true },
-    }).D03, "suppressed_duplicate");
+    }).D03, "independent_mass_balance_condition");
     assert.equal(classifyD01Correlations(result, {
       D03: { active: true, workOrderId: "999", sameEvidenceChain: true },
     }).D03, "independent_mass_balance_condition");
