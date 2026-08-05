@@ -11,7 +11,7 @@ const fixturesPath = resolve(root, "tests/fixtures/alerts/rule-cases.v1.json");
 const expectedCodes = [
   "A01", "A02", "A03", "A04", "A05", "A06", "A07",
   "B01", "B02", "B03", "C01", "C02", "C06",
-  "D01", "D02", "D03", "D04", "E01", "E02", "E03", "E04",
+  "D01", "D02", "D03", "E01", "E02", "E03", "E04",
 ];
 
 const fail = (message) => {
@@ -47,6 +47,7 @@ function evaluate(expression, input, parameters) {
     case "add": return values.reduce((total, value) => total + Number(value), 0);
     case "sub": return Number(values[0]) - Number(values[1]);
     case "mul": return values.reduce((total, value) => total * Number(value), 1);
+    case "min": return Math.min(...values.map(Number));
     case "div": {
       if (Number(values[1]) === 0) fail("division by zero");
       return Number(values[0]) / Number(values[1]);
@@ -108,6 +109,135 @@ function evaluateCase(rule, fixture) {
   return { status: triggered ? "triggered" : "clear", reasons: reasons.sort(), missing: [] };
 }
 
+const D01_LAYER_REASON_CODES = [
+  "declared_meters_exceed_layer_input",
+  "layer_input_exceeds_declared_meters",
+];
+const D01_MEASUREMENT_PATHS = new Set([
+  "initial_gross_minus_core_tare",
+  "initial_gross_minus_weighed_remnant",
+]);
+
+function approximatelyEqual(left, right) {
+  return Number.isFinite(left)
+    && Number.isFinite(right)
+    && Math.abs(left - right) <= Number.EPSILON * 16 * Math.max(1, Math.abs(left), Math.abs(right));
+}
+
+function requireFinitePositive(value, fixtureId, field) {
+  if (!Number.isFinite(value) || value <= 0) fail(`${fixtureId}: ${field} must be a finite positive number`);
+}
+
+function requireFiniteNonNegative(value, fixtureId, field) {
+  if (!Number.isFinite(value) || value < 0) fail(`${fixtureId}: ${field} must be a finite non-negative number`);
+}
+
+function validateD01AggregateEvidence(rule, fixture) {
+  const input = fixture.input;
+  const missing = rule.requiredEvidence.filter((field) => !Object.hasOwn(input, field));
+  if (missing.length > 0) return;
+
+  requireFinitePositive(input.declaredRunMeters, fixture.id, "declaredRunMeters");
+  requireFinitePositive(input.totalOrderKg, fixture.id, "totalOrderKg");
+  if (!Array.isArray(input.layerResults) || input.layerResults.length === 0) {
+    fail(`${fixture.id}: complete D01 evidence requires at least one layer result`);
+  }
+  if (!Array.isArray(input.pairwiseLayerGaps)) fail(`${fixture.id}: pairwiseLayerGaps must be an array`);
+
+  const allowedKg = Math.min(
+    input.totalOrderKg * rule.parameters.toleranceFraction.value,
+    rule.parameters.toleranceCapKg.value,
+  );
+  const allowedMeters = allowedKg / (input.totalOrderKg / input.declaredRunMeters);
+  const layersById = new Map();
+  const reelIds = new Set();
+
+  for (const layer of input.layerResults) {
+    if (typeof layer.materialRequirementId !== "string" || layer.materialRequirementId.length === 0) {
+      fail(`${fixture.id}: every layer requires a materialRequirementId`);
+    }
+    if (layersById.has(layer.materialRequirementId)) {
+      fail(`${fixture.id}: duplicate layer ${layer.materialRequirementId}`);
+    }
+    requireFinitePositive(layer.usedMeters, fixture.id, `${layer.materialRequirementId}.usedMeters`);
+    const expectedGap = layer.usedMeters - input.declaredRunMeters;
+    if (!approximatelyEqual(layer.layerToRunGapMeters, expectedGap)) {
+      fail(`${fixture.id}: ${layer.materialRequirementId} layerToRunGapMeters does not match used meters`);
+    }
+    const expectedReasonCodes = [];
+    if (expectedGap < -allowedMeters) expectedReasonCodes.push(D01_LAYER_REASON_CODES[0]);
+    if (expectedGap > allowedMeters) expectedReasonCodes.push(D01_LAYER_REASON_CODES[1]);
+    if (!Array.isArray(layer.reasonCodes)
+      || new Set(layer.reasonCodes).size !== layer.reasonCodes.length
+      || JSON.stringify([...layer.reasonCodes].sort()) !== JSON.stringify(expectedReasonCodes.sort())) {
+      fail(`${fixture.id}: ${layer.materialRequirementId} reasonCodes do not match its signed gap`);
+    }
+    if (!Array.isArray(layer.reels) || layer.reels.length === 0) {
+      fail(`${fixture.id}: ${layer.materialRequirementId} requires contributing-reel evidence`);
+    }
+    let reelMeters = 0;
+    for (const reel of layer.reels) {
+      if (typeof reel.reelId !== "string" || reel.reelId.length === 0) {
+        fail(`${fixture.id}: every contributing reel requires a reelId`);
+      }
+      if (reelIds.has(reel.reelId)) fail(`${fixture.id}: duplicate contributing reel ${reel.reelId}`);
+      reelIds.add(reel.reelId);
+      if (!D01_MEASUREMENT_PATHS.has(reel.measurementPath)) {
+        fail(`${fixture.id}: ${reel.reelId} has an invalid measurementPath`);
+      }
+      requireFinitePositive(reel.netUsedKg, fixture.id, `${reel.reelId}.netUsedKg`);
+      requireFinitePositive(reel.usedMeters, fixture.id, `${reel.reelId}.usedMeters`);
+      reelMeters += reel.usedMeters;
+    }
+    if (!approximatelyEqual(reelMeters, layer.usedMeters)) {
+      fail(`${fixture.id}: ${layer.materialRequirementId} usedMeters does not equal its contributing reels`);
+    }
+    layersById.set(layer.materialRequirementId, layer);
+  }
+
+  const expectedPairCount = input.layerResults.length * (input.layerResults.length - 1) / 2;
+  if (input.pairwiseLayerGaps.length !== expectedPairCount) {
+    fail(`${fixture.id}: pairwiseLayerGaps must contain every distinct layer pair`);
+  }
+  const pairKeys = new Set();
+  for (const pair of input.pairwiseLayerGaps) {
+    const left = layersById.get(pair.leftMaterialRequirementId);
+    const right = layersById.get(pair.rightMaterialRequirementId);
+    if (!left || !right || left === right) fail(`${fixture.id}: pairwise gap references invalid layers`);
+    const pairKey = [pair.leftMaterialRequirementId, pair.rightMaterialRequirementId].sort().join("|");
+    if (pairKeys.has(pairKey)) fail(`${fixture.id}: duplicate pairwise gap ${pairKey}`);
+    pairKeys.add(pairKey);
+    const expectedGap = left.usedMeters - right.usedMeters;
+    if (!approximatelyEqual(pair.gapMeters, expectedGap)) {
+      fail(`${fixture.id}: pairwise gap ${pairKey} does not match layer meters`);
+    }
+    if (pair.exceedsTolerance !== (Math.abs(expectedGap) > allowedMeters)) {
+      fail(`${fixture.id}: pairwise gap ${pairKey} has an inconsistent exceedsTolerance value`);
+    }
+  }
+
+  const recomputed = {
+    maximumDeclaredMetersOverLayerInputGapMeters: Math.max(
+      0,
+      ...input.layerResults.map((layer) => input.declaredRunMeters - layer.usedMeters),
+    ),
+    maximumLayerInputOverDeclaredMetersGapMeters: Math.max(
+      0,
+      ...input.layerResults.map((layer) => layer.usedMeters - input.declaredRunMeters),
+    ),
+    maximumPairwiseLayerGapMeters: Math.max(
+      0,
+      ...input.pairwiseLayerGaps.map((pair) => Math.abs(pair.gapMeters)),
+    ),
+  };
+  for (const [field, expected] of Object.entries(recomputed)) {
+    requireFiniteNonNegative(input[field], fixture.id, field);
+    if (!approximatelyEqual(input[field], expected)) {
+      fail(`${fixture.id}: ${field} does not match detailed D01 evidence`);
+    }
+  }
+}
+
 const catalog = await load(catalogPath);
 const fixtureSet = await load(fixturesPath);
 
@@ -130,7 +260,11 @@ for (const fixture of fixtureSet.cases) {
   fixtureIds.add(fixture.id);
   const rule = ruleByCode.get(fixture.ruleCode);
   if (!rule) fail(`fixture ${fixture.id} references unknown rule ${fixture.ruleCode}`);
+  if (rule.code === "D01") validateD01AggregateEvidence(rule, fixture);
   const actual = evaluateCase(rule, fixture);
+  if (fixture.registryCanonical === true && fixture.expectedStatus !== "triggered") {
+    fail(`${fixture.id}: registry canonical fixture must be triggered`);
+  }
   const expectedReasons = [...fixture.expectedReasons].sort();
   if (actual.status !== fixture.expectedStatus) fail(`${fixture.id}: expected ${fixture.expectedStatus}, got ${actual.status}`);
   if (JSON.stringify(actual.reasons) !== JSON.stringify(expectedReasons)) {
@@ -147,6 +281,11 @@ for (const rule of catalog.rules) {
   }
   const completeKeys = cases.filter((fixture) => fixture.expectedStatus !== "insufficient").map((fixture) => conditionKey(rule, fixture.input));
   if (new Set(completeKeys).size !== 1) fail(`${rule.code} trigger and clear fixtures must represent one continuing condition`);
+  const triggeredCases = cases.filter((fixture) => fixture.expectedStatus === "triggered");
+  const canonicalCases = triggeredCases.filter((fixture) => fixture.registryCanonical === true);
+  if (triggeredCases.length > 1 && canonicalCases.length !== 1) {
+    fail(`${rule.code} with multiple trigger fixtures requires exactly one registry canonical trigger`);
+  }
 }
 
 const localQueryProven = catalog.rules.filter((rule) => rule.productionReadiness === "local-query-proven").map((rule) => rule.code);

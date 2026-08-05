@@ -1,3 +1,4 @@
+export * from "./d01-laboratory.js";
 export * from "./freshness.js";
 export * from "./experiment.js";
 export * from "./experiment-runtime.js";

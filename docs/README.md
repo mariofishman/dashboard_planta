@@ -20,7 +20,7 @@ All current documentation is written in English. User-visible product labels rem
 Only two documents control delivery progress:
 
 1. [`roadmap.md`](roadmap.md) records the project phases, their exit gates, and the path through Phase 10.
-2. The README for the active phase records its ordered stages, current stage, immediate next action, and phase exit gate. The current execution authority is [`delivery/phases/phase6/README.md`](delivery/phases/phase6/README.md).
+2. The README for the active phase records its ordered stages, current stage, immediate next action, and phase exit gate. The current execution authority is [`delivery/phases/phase7/README.md`](delivery/phases/phase7/README.md).
 
 Subject authorities define what must be true; they do not report implementation progress. Specifications explain how one surface or subsystem should behave. Test reports, audits, and validation records are evidence and cannot advance a phase by themselves.
 

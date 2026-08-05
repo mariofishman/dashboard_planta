@@ -42,3 +42,5 @@ Current Phase 10 status belongs only in `docs/integrations/emusasoft/integration
 **Current revalidation — 2026-07-23:** 5 contract tests passed, TypeScript type-checking passed, 21 contracts and 63 fixtures passed the reference evaluator, 87 mapped fields across 18 tables matched the backup DDL, and no production data rows were printed.
 
 **Gate result:** Phase 1 passed locally for the 21-rule inventory that existed on 2026-07-21. E05 is a later catalog addition and is explicitly pending.
+
+**Post-Phase-1 consolidation — 2026-08-01:** D04 was retired into the expanded D01 longitudinal closure invariant after Phase 1 completed. This does not rewrite the historical 21-rule/63-fixture gate above. The current active executable inventory has 20 contracts; consolidated D01 retains the OT natural key and key-schema version `1`, while D04 has no active contract or fixture. E05 remains pending.

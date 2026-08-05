@@ -16,7 +16,7 @@
 
 **Open integration register:** [EmusaSoft integration register](integrations/emusasoft/integration_register.md)
 
-**Current execution:** [Stage 5 recovery and completion plan](delivery/phases/phase6/stage5_corrective_execution_plan.md)
+**Current execution:** [Phase 7 execution README](delivery/phases/phase7/README.md)
 
 ## 1. Why Version Three exists
 
@@ -184,9 +184,9 @@ A02, A03, and A05 must each prove:
 
 ## 6. Phase 7 — Deterministic closure, deadline, and balance rules
 
-**Alert codes:** A01, B01, B02, B03, D01, D02, D03, and D04
+**Alert codes:** A01, B01, B02, B03, D01, D02, and D03. D04 was retired into D01 on 2026-08-01 because both directions belong to one longitudinal closure invariant.
 
-**Supporting preparation:** [`delivery/phases/phase7/alertas_fake_scenario_specification.md`](delivery/phases/phase7/alertas_fake_scenario_specification.md) is an empty per-alert preparation scaffold. It is not execution authority, Phase 7 status, or acceptance evidence.
+**Supporting preparation:** [`delivery/phases/phase7/alertas_fake_scenario_specification.md`](delivery/phases/phase7/alertas_fake_scenario_specification.md) contains approved standalone preparation for consolidated D01 and remains available for other Phase 7 alert blocks. It is not execution authority, Phase 7 status, connected evidence, or acceptance evidence.
 
 **Deliverables:**
 
@@ -288,10 +288,10 @@ Local `test_database` evidence reduces Phase 10 uncertainty but cannot prove cre
 | C01 | 8 | Contract and fixtures complete | Model-quality, sample-size, and shadow-mode gate |
 | C02 | 8 | Contract and fixtures complete | Model-quality, sample-size, and shadow-mode gate |
 | C06 | 8 | Contract and fixtures complete | Model-quality, sample-size, and shadow-mode gate |
-| D01 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| D01 | 7 | Consolidated contract, fixtures, and standalone laboratory prepared; connected Phase 7 implementation pending | Current source and bounded-query validation |
 | D02 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
 | D03 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
-| D04 | 7 | Contract and fixtures complete | Current source and bounded-query validation |
+| D04 | Retired into D01 | No active contract or fixture; legacy connected routing cleanup deferred to authorized integration work | Covered by D01 live gate |
 | E01 | 8 | Contract and fixtures complete | Physical-source and current-source validation |
 | E02 | 8 | Contract and synthetic fixtures complete | ES2-05 immutable snapshots and current-source validation |
 | E03 | 8 | Contract and synthetic fixtures complete | ES2-05 immutable snapshots and current-source validation |
