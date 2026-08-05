@@ -300,43 +300,6 @@ describe("Phase 2 platform foundation", () => {
     socket.disconnect();
   });
 
-  it("reports healthy local source diagnostics without claiming production connectivity", async () => {
-    const instance = await server();
-    const response = await instance.app.inject({
-      method: "GET",
-      url: "/api/diagnostics/source",
-      headers: { authorization: "Bearer mock:plant-manager" },
-    });
-    assert.equal(response.statusCode, 200);
-    assert.equal(response.json().productionConnected, false);
-    assert.equal(response.json().sources.length, 21);
-    assert.equal(response.json().sources.filter((source: { status: string }) => source.status === "healthy").length, 21);
-  });
-
-  it("serves the seeded Phase 4 incident dashboard and evidence detail", async () => {
-    const instance = await server();
-    const list = await instance.app.inject({ method: "GET", url: "/api/incidents", headers: { authorization: "Bearer mock:plant-manager" } });
-    assert.equal(list.statusCode, 200);
-    assert.equal(list.json().incidents.length, 5);
-    assert.equal(list.json().incidents.filter((incident: { lifecycle: string }) => incident.lifecycle === "open").length, 3);
-    const detail = await instance.app.inject({ method: "GET", url: `/api/incidents/${list.json().incidents[0].id}`, headers: { authorization: "Bearer mock:plant-manager" } });
-    assert.equal(detail.statusCode, 200);
-    assert.ok(detail.json().evidence.length >= 1);
-    assert.ok(detail.json().transitions.length >= 1);
-    const detectorEvidence = await instance.database.queryOne("SELECT COUNT(*)::int AS count FROM monitor_incident_evidence WHERE cycle_id IS NOT NULL");
-    assert.equal(detectorEvidence.count, 0, "unchanged detector polls must not create duplicate evidence");
-  });
-
-  it("recovers committed incident events by cursor and protects the API", async () => {
-    const instance = await server();
-    assert.equal((await instance.app.inject("/api/incidents")).statusCode, 401);
-    const changes = await instance.app.inject({ method: "GET", url: "/api/changes?after=0", headers: { authorization: "Bearer mock:shift-supervisor" } });
-    assert.equal(changes.statusCode, 200);
-    assert.ok(changes.json().changes.length >= 7);
-    const cursors = changes.json().changes.map((change: { cursor: number }) => change.cursor);
-    assert.deepEqual(cursors, [...cursors].sort((a, b) => a - b));
-  });
-
   it("scopes conversation change recovery to participants and plant administrators", async () => {
     const instance = await server();
     const conversationId = "00000000-0000-4000-8000-000000000060";

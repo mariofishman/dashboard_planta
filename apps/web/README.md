@@ -13,7 +13,7 @@ npm run dev
 
 The web app runs at <http://127.0.0.1:5173> and the local API runs at <http://127.0.0.1:3000>.
 
-Development uses the separate local `test_database` for scenario writes and read-only Monitor polling. Automated tests use the deterministic in-memory simulator unless `MONITOR_SCENARIO_SOURCE=test_database` is set explicitly.
+Development Laboratory actions write only to the separate local `test_database`, and Monitor polls it through the read-only source account. The retired Monitor-owned EmusaSoft source simulator is unavailable in application and test configuration.
 
 Choose a local test profile when the sign-in screen appears. Opening a direct link while signed out is safe: after signing in, the app keeps the requested URL.
 

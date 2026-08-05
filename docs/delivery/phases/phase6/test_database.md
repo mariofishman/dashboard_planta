@@ -170,3 +170,5 @@ A03 uses an active, nondeleted OT whose actual start is at least 15 minutes old 
 Local MySQL cannot prove Aurora replication, failover, managed credentials, replica lag, production authorization, production load, or production plans. These remain Phase 10 evidence.
 
 Stage 4 connected both application accounts through readiness/reset guards and the normal scheduler, while retaining the synthetic simulator until Stage 5 replacement acceptance. It validated incident lifecycle only; routing, Dashboard, conversation, message, and Chat UI acceptance remains in Stage 5.
+
+Stage 5 subsequently completed and accepted that connected replacement. Stage 6 retires the Monitor-owned simulator, runtime fixture and backup-source fallbacks, synthetic source tables and registrations, and hardcoded demonstration incidents. Current local EmusaSoft-shaped behavior reads only from `test_database`.

@@ -13,7 +13,7 @@ import type {
   ScenarioSourceAction,
   ScenarioSourceActionInput,
   ScenarioStatus,
-} from "./simulator.js";
+} from "./scenario-source.js";
 import {
   a02TerminalActionFor,
   assertA02MovementOpen,

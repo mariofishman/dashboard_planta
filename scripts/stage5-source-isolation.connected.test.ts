@@ -6,7 +6,6 @@ import {
   TestDatabaseConnections,
   TestDatabaseScenarioRepository,
   TestDatabaseSourceAdapter,
-  SimulatorSourceAdapter,
   type ScenarioFault,
   type ScenarioRuleCode,
 } from "@monitor/detection";
@@ -315,11 +314,11 @@ test("6.1b detects a direct approved fixture mutation only after a real-adapter 
   }
 });
 
-test("6.1c keeps connected A02, A03, and A05 healthy with simulator consumption disabled", async () => {
+test("6.1c keeps connected A02, A03, and A05 healthy after simulator retirement", async () => {
   const server = await buildMonitorServer({
     config: {
       nodeEnv: "test",
-      cookieSecret: "stage5-simulator-disabled-connected-secret",
+      cookieSecret: "stage5-simulator-retired-connected-secret",
       allowMockAuth: true,
       enableScenarioLab: true,
       scenarioSource: "test_database",
@@ -342,7 +341,6 @@ test("6.1c keeps connected A02, A03, and A05 healthy with simulator consumption 
       const entry = server.acceptance.registry.get(code)!;
       assert.equal(entry.query.adapterKind, "test_database");
       assert.ok(entry.adapter instanceof TestDatabaseSourceAdapter);
-      assert.equal(entry.adapter instanceof SimulatorSourceAdapter, false);
     }
 
     const fixtureIds = server.acceptance.source.fixtureIds;
@@ -380,17 +378,9 @@ test("6.1c keeps connected A02, A03, and A05 healthy with simulator consumption 
       id_almacen=? WHERE id=?`, [fixtureIds.A05.originWarehouseId, fixtureIds.A05.serialId]);
     await connections.writer.execute("UPDATE ordenes_trabajo SET fecha_fin_ejecucion=UTC_TIMESTAMP() WHERE id=?", [a05Original.workOrderId]);
 
-    const simulatorTables = (await server.database.queryAll(`SELECT table_name AS "tableName" FROM information_schema.tables
-      WHERE table_schema=current_schema() AND table_type='BASE TABLE' AND left(table_name,12)='monitor_sim_' ORDER BY table_name`))
-      .map(({ tableName }) => String(tableName));
-    assert.ok(simulatorTables.length > 0, "simulator tables were unavailable before the disablement proof");
-    for (const table of simulatorTables.reverse()) {
-      if (!/^monitor_sim_[a-z0-9_]+$/.test(table)) throw new Error("invalid_simulator_table_name");
-      await server.database.execute(`DROP TABLE ${table} CASCADE`);
-    }
     const remainingSimulatorTables = await server.database.queryOne(`SELECT COUNT(*)::int AS count FROM information_schema.tables
       WHERE table_schema=current_schema() AND table_type='BASE TABLE' AND left(table_name,12)='monitor_sim_'`);
-    assert.equal(Number(remainingSimulatorTables.count), 0);
+    assert.equal(Number(remainingSimulatorTables.count), 0, "retired fake EmusaSoft source tables must not exist in Monitor");
 
     const cycleIds: Record<string, string> = {};
     const naturalKeys: Record<ScenarioRuleCode, number> = {

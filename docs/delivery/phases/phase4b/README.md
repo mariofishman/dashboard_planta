@@ -4,6 +4,8 @@
 
 **Role:** Historical completion evidence. Current project status and sequencing live in [`../../../roadmap.md`](../../../roadmap.md).
 
+**Retirement note:** Phase 6 Stage 5 replaced this simulator with the accepted Laboratory connected to `test_database`; Stage 6 removes its runtime implementation and end-state database artifacts. The items below describe historical Phase 4B delivery only.
+
 **Historical implementation plan:** [`../../../../archive/docs/implementation/phase4b_implementation_plan.md`](../../../../archive/docs/implementation/phase4b_implementation_plan.md)
 
 ## What was delivered

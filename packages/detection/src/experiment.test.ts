@@ -8,7 +8,7 @@ import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "
 import type { DetectionScheduler } from "./scheduler.js";
 import { ScenarioExperimentRuntime } from "./experiment-runtime.js";
 import { ScenarioExperimentRepository, type ScenarioSnapshotPayloadV1 } from "./experiment.js";
-import type { ScenarioSource } from "./simulator.js";
+import type { ScenarioSource } from "./scenario-source.js";
 import type { CycleResult, DetectionQueryDefinition, DetectionSourceAdapter } from "./types.js";
 
 const migrationRoot = resolve(import.meta.dirname, "../../database/migrations");

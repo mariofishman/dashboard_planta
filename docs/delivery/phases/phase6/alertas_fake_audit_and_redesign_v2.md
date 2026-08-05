@@ -54,7 +54,7 @@ The [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md
 - Source actions never create, resolve, reopen, or administratively close Monitor incidents directly.
 - Only a complete successful poll may reconcile source state with Monitor state.
 - Failed, incomplete, invalid, or stale reads preserve the last trustworthy Monitor state.
-- The fallback `monitor_sim_*` simulator remains separately available until connected V2 replacement acceptance proves that the operational development workflow no longer depends on it. It is not the current default connected source boundary.
+- Stage 5 connected V2 replacement acceptance proved the operational workflow no longer depends on the fallback `monitor_sim_*` simulator. Stage 6 retires that fallback; `test_database` is the only local EmusaSoft-shaped operational source.
 
 ## 3. Why V2 replaces the V1 interface
 
@@ -673,7 +673,7 @@ The most likely V2 implementation mistakes are:
 
 Stage 4 resolution of the executable and integration mismatches:
 
-- the retained fallback simulator still has isolated per-rule scenario clocks; Stage 4 also added shared experiment-runtime foundations, but the older `/dev/scenarios` screen does not expose the approved V2 shared-clock workflow;
+- the now-retired fallback simulator had isolated per-rule scenario clocks; Stage 5 replaced it with the approved V2 shared experiment runtime connected to `test_database`;
 - Stage 4 removed `strongerA07` from the A03 contract, simulator path, UI, fixtures, and tests. A03 now evaluates independently from A07.
 - Stage 4 connected the older application `/dev/scenarios` composition to `test_database`, the read-only adapter, and Monitor incident state. It did not port or accept the tabbed V2 interface. Routing deliveries, Dashboard cards, conversations, messages, Chat UI, and the connected V2 workflow remain Stage 5 acceptance scope.
 

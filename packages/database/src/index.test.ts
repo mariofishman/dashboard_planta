@@ -3,7 +3,28 @@ import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { createDatabaseRuntime } from "./index.js";
+import { createDatabaseRuntime, migrateFoundation } from "./index.js";
+
+test("foundation migration removes retired fake EmusaSoft sources from Monitor", async () => {
+  const database = await createDatabaseRuntime({ mode: "pglite", pgliteDataDir: "memory://" });
+  try {
+    await migrateFoundation(database);
+    const tables = await database.queryAll(`SELECT table_name AS "tableName" FROM information_schema.tables
+      WHERE table_schema=current_schema() AND table_type='BASE TABLE' AND left(table_name,12)='monitor_sim_'`);
+    assert.deepEqual(tables, []);
+    assert.equal(Number((await database.queryOne(
+      "SELECT COUNT(*)::int AS count FROM monitor_detection_query WHERE adapter_kind='fixture'",
+    )).count), 0);
+    await assert.rejects(database.execute(`INSERT INTO monitor_detection_query
+      (query_id,rule_code,query_version,adapter_kind,interval_ms,timeout_ms,page_size,max_rows)
+      VALUES ('retired-simulator','A02','retired','simulator',300000,3000,1000,10000)`));
+    await assert.rejects(database.execute(`INSERT INTO monitor_detection_query
+      (query_id,rule_code,query_version,adapter_kind,interval_ms,timeout_ms,page_size,max_rows)
+      VALUES ('retired-fixture','A03','retired','fixture',300000,3000,1000,10000)`));
+  } finally {
+    await database.close();
+  }
+});
 
 test("file-backed PGlite allows only one runtime per data directory", async () => {
   const root = await mkdtemp(join(tmpdir(), "monitor-pglite-lock-"));

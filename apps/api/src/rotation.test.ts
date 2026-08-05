@@ -8,7 +8,7 @@ afterEach(async () => { await Promise.all(servers.splice(0).map((server) => serv
 async function server() {
   const instance = await buildMonitorServer({ config: {
     nodeEnv: "test", cookieSecret: "phase-5-rotation-secret-with-enough-entropy", allowMockAuth: true,
-    enableScenarioLab: true, databaseMode: "pglite", pgliteDataDir: "memory://",
+    enableScenarioLab: false, databaseMode: "pglite", pgliteDataDir: "memory://",
   } });
   servers.push(instance);
   return instance;

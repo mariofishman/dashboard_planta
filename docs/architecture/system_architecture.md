@@ -125,6 +125,8 @@ EmusaSoft provides:
 
 The existing Aurora read replica is Monitor's authoritative and most current available operational source. A transaction becomes observable to Monitor when it appears in a successful complete replica read. Monitor does not require a separate replica-lag signal before creating or resolving an incident. Replication delay is accepted as part of the observation delay and is measured where operational telemetry makes that possible.
 
+For local Phase 6 behavior, `test_database` is the sole EmusaSoft-shaped operational source. Laboratory action buttons write source facts there; the rest of Laboratory, Dashboard, and Chat continue showing Monitor's last successful poll until Monitor polls again. Monitor's own database stores derived incidents, evidence, routing, conversations, messages, roster, and audit history, but it contains no synthetic EmusaSoft source tables, runtime fixture source, backup-source fallback, or hardcoded demonstration incidents.
+
 ## 9. Ownership
 
 | Component | Owner |
