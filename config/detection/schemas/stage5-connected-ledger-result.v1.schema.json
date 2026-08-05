@@ -1,0 +1,333 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dashboard-planta.local/schemas/stage5-connected-ledger-result.v1.schema.json",
+  "title": "Phase 6 Stage 5 connected acceptance ledger result",
+  "description": "One independently reported Stage 5B result. Every chain section is present and explicitly required or not applicable.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "identity",
+    "expectation",
+    "laboratoryActions",
+    "sourceChain",
+    "readChain",
+    "monitorChain",
+    "visibleResult",
+    "schedulingRecovery",
+    "cleanup",
+    "failure"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "identity": { "$ref": "#/$defs/identity" },
+    "expectation": { "$ref": "#/$defs/expectation" },
+    "laboratoryActions": { "$ref": "#/$defs/laboratoryActions" },
+    "sourceChain": { "$ref": "#/$defs/sourceChain" },
+    "readChain": { "$ref": "#/$defs/readChain" },
+    "monitorChain": { "$ref": "#/$defs/monitorChain" },
+    "visibleResult": { "$ref": "#/$defs/visibleResult" },
+    "schedulingRecovery": { "$ref": "#/$defs/schedulingRecovery" },
+    "cleanup": { "$ref": "#/$defs/cleanup" },
+    "failure": { "$ref": "#/$defs/failure" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": { "identity": { "type": "object", "properties": { "status": { "const": "passed" } } } }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "failure": { "type": "object", "properties": { "applicability": { "const": "not_applicable" } }, "required": ["applicability"] },
+          "cleanup": { "type": "object", "properties": { "sourceRestored": { "const": true } }, "required": ["sourceRestored"] }
+        }
+      },
+      "else": {
+        "type": "object",
+        "properties": { "failure": { "type": "object", "properties": { "applicability": { "const": "required" } } } }
+      }
+    }
+  ],
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "identifier": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "artifactPath": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
+    "stringArray": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmptyString" }, "uniqueItems": true },
+    "identifierArray": { "type": "array", "items": { "$ref": "#/$defs/identifier" }, "uniqueItems": true },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["testId", "group", "status", "experimentId", "runId", "manifestVersion", "sourceActionContractVersion", "startedAt", "completedAt"],
+      "properties": {
+        "testId": { "type": "string", "pattern": "^(SH-(?:0[1-9]|1[01])|A02-(?:0[0-7]|09)|A03-0[0-5]|A05-(?:0[0-6]|08))$" },
+        "group": { "enum": ["shared", "A02", "A03", "A05"] },
+        "status": { "enum": ["passed", "failed", "skipped"] },
+        "experimentId": { "$ref": "#/$defs/identifier" },
+        "runId": { "$ref": "#/$defs/identifier" },
+        "manifestVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "sourceActionContractVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "startedAt": { "$ref": "#/$defs/timestamp" },
+        "completedAt": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["declared", "observed", "matched"],
+      "properties": {
+        "declared": { "$ref": "#/$defs/nonEmptyString" },
+        "observed": { "$ref": "#/$defs/nonEmptyString" },
+        "matched": { "type": "boolean" }
+      }
+    },
+    "laboratoryActions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["applicability", "items"],
+      "properties": {
+        "applicability": { "const": "required" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sequence", "actionId", "actionName", "invocationPath", "endpoint", "writerIdentity", "businessTime", "auditTime"],
+            "properties": {
+              "sequence": { "type": "integer", "minimum": 1 },
+              "actionId": { "$ref": "#/$defs/identifier" },
+              "actionName": { "$ref": "#/$defs/nonEmptyString" },
+              "invocationPath": { "enum": ["human_and_automation", "automation_only"] },
+              "endpoint": { "$ref": "#/$defs/nonEmptyString" },
+              "writerIdentity": { "enum": ["alertas_fake", "not_applicable"] },
+              "businessTime": { "$ref": "#/$defs/timestamp" },
+              "auditTime": { "$ref": "#/$defs/timestamp" }
+            }
+          }
+        }
+      }
+    },
+    "sourceMutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actionId", "actionSequence", "naturalKey", "table", "fields", "before", "after", "beforeDigest", "afterDigest"],
+      "properties": {
+        "actionId": { "$ref": "#/$defs/identifier" },
+        "actionSequence": { "type": "integer", "minimum": 1 },
+        "naturalKey": { "$ref": "#/$defs/nonEmptyString" },
+        "table": { "$ref": "#/$defs/identifier" },
+        "fields": { "$ref": "#/$defs/stringArray" },
+        "before": {},
+        "after": {},
+        "beforeDigest": { "$ref": "#/$defs/digest" },
+        "afterDigest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "sourceChainPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["database", "writerIdentity", "mutations", "unrelatedRowsDigestBefore", "unrelatedRowsDigestAfter", "sourceRevision"],
+      "properties": {
+        "database": { "const": "test_database" },
+        "writerIdentity": { "const": "alertas_fake" },
+        "mutations": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/sourceMutation" } },
+        "unrelatedRowsDigestBefore": { "$ref": "#/$defs/digest" },
+        "unrelatedRowsDigestAfter": { "$ref": "#/$defs/digest" },
+        "sourceRevision": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    },
+    "sourceChain": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["applicability", "payload"],
+          "properties": { "applicability": { "const": "required" }, "payload": { "$ref": "#/$defs/sourceChainPayload" } }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["applicability", "notApplicableReason"],
+          "properties": { "applicability": { "const": "not_applicable" }, "notApplicableReason": { "$ref": "#/$defs/nonEmptyString" } }
+        }
+      ]
+    },
+    "readChainPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapterKind", "sourceAccount", "queryId", "queryVersion", "pages", "sourceRevision", "pollCycleIds", "completeness", "freshness"],
+      "properties": {
+        "adapterKind": { "const": "test_database" },
+        "sourceAccount": { "const": "monitor_source_ro" },
+        "queryId": { "$ref": "#/$defs/identifier" },
+        "queryVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "pages": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["page", "rowCount", "revision"],
+            "properties": { "page": { "type": "integer", "minimum": 1 }, "rowCount": { "type": "integer", "minimum": 0 }, "revision": { "$ref": "#/$defs/nonEmptyString" } }
+          }
+        },
+        "sourceRevision": { "$ref": "#/$defs/nonEmptyString" },
+        "pollCycleIds": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/identifier" }, "uniqueItems": true },
+        "completeness": { "enum": ["complete", "incomplete", "invalid_shape", "partial_pagination", "duplicate_keys", "revision_drift", "timeout", "transport_error", "overlap_rejected"] },
+        "freshness": { "enum": ["fresh", "stale", "unknown"] }
+      }
+    },
+    "readChain": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "payload"], "properties": { "applicability": { "const": "required" }, "payload": { "$ref": "#/$defs/readChainPayload" } } },
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "notApplicableReason"], "properties": { "applicability": { "const": "not_applicable" }, "notApplicableReason": { "$ref": "#/$defs/nonEmptyString" } } }
+      ]
+    },
+    "monitorChainPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "pollCycleIds", "incidentIds", "evidenceIds", "routingDecisionIds", "deliveryIds", "conversationIds", "messageIds", "receiptIds", "cursorStart", "cursorEnd"],
+      "properties": {
+        "outcome": { "enum": ["presence", "absence", "history"] },
+        "pollCycleIds": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/identifier" }, "uniqueItems": true },
+        "incidentIds": { "$ref": "#/$defs/identifierArray" },
+        "evidenceIds": { "$ref": "#/$defs/identifierArray" },
+        "routingDecisionIds": { "$ref": "#/$defs/identifierArray" },
+        "deliveryIds": { "$ref": "#/$defs/identifierArray" },
+        "conversationIds": { "$ref": "#/$defs/identifierArray" },
+        "messageIds": { "$ref": "#/$defs/identifierArray" },
+        "receiptIds": { "$ref": "#/$defs/identifierArray" },
+        "cursorStart": { "type": "integer", "minimum": 0 },
+        "cursorEnd": { "type": "integer", "minimum": 0 }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "outcome": { "const": "presence" } } },
+          "then": {
+            "type": "object",
+            "properties": {
+              "incidentIds": { "type": "array", "minItems": 1 }, "evidenceIds": { "type": "array", "minItems": 1 }, "routingDecisionIds": { "type": "array", "minItems": 1 },
+              "deliveryIds": { "type": "array", "minItems": 1 }, "conversationIds": { "type": "array", "minItems": 1 }, "messageIds": { "type": "array", "minItems": 1 }
+            }
+          }
+        },
+        {
+          "if": { "type": "object", "properties": { "outcome": { "const": "absence" } } },
+          "then": {
+            "type": "object",
+            "properties": {
+              "incidentIds": { "type": "array", "maxItems": 0 }, "evidenceIds": { "type": "array", "maxItems": 0 }, "routingDecisionIds": { "type": "array", "maxItems": 0 },
+              "deliveryIds": { "type": "array", "maxItems": 0 }, "conversationIds": { "type": "array", "maxItems": 0 }, "messageIds": { "type": "array", "maxItems": 0 }, "receiptIds": { "type": "array", "maxItems": 0 }
+            }
+          }
+        }
+      ]
+    },
+    "monitorChain": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "payload"], "properties": { "applicability": { "const": "required" }, "payload": { "$ref": "#/$defs/monitorChainPayload" } } },
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "notApplicableReason"], "properties": { "applicability": { "const": "not_applicable" }, "notApplicableReason": { "$ref": "#/$defs/nonEmptyString" } } }
+      ]
+    },
+    "visibleResultPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "dashboardCardArtifacts", "chatListArtifacts", "chatDetailArtifacts", "connectedIds"],
+      "properties": {
+        "outcome": { "enum": ["presence", "absence", "responsive"] },
+        "dashboardCardArtifacts": { "type": "array", "items": { "$ref": "#/$defs/artifactPath" }, "uniqueItems": true },
+        "chatListArtifacts": { "type": "array", "items": { "$ref": "#/$defs/artifactPath" }, "uniqueItems": true },
+        "chatDetailArtifacts": { "type": "array", "items": { "$ref": "#/$defs/artifactPath" }, "uniqueItems": true },
+        "connectedIds": { "$ref": "#/$defs/identifierArray" }
+      },
+      "allOf": [
+        {
+          "if": { "type": "object", "properties": { "outcome": { "enum": ["presence", "responsive"] } } },
+          "then": { "type": "object", "properties": { "dashboardCardArtifacts": { "type": "array", "minItems": 1 }, "chatListArtifacts": { "type": "array", "minItems": 1 }, "chatDetailArtifacts": { "type": "array", "minItems": 1 }, "connectedIds": { "type": "array", "minItems": 1 } } }
+        },
+        {
+          "if": { "type": "object", "properties": { "outcome": { "const": "absence" } } },
+          "then": { "type": "object", "properties": { "dashboardCardArtifacts": { "type": "array", "minItems": 1 }, "chatListArtifacts": { "type": "array", "minItems": 1 }, "connectedIds": { "type": "array", "maxItems": 0 } } }
+        }
+      ]
+    },
+    "visibleResult": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "payload"], "properties": { "applicability": { "const": "required" }, "payload": { "$ref": "#/$defs/visibleResultPayload" } } },
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "notApplicableReason"], "properties": { "applicability": { "const": "not_applicable" }, "notApplicableReason": { "$ref": "#/$defs/nonEmptyString" } } }
+      ]
+    },
+    "applicableTimeline": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["applicability", "events"],
+          "properties": {
+            "applicability": { "const": "required" },
+            "events": {
+              "type": "array", "minItems": 1,
+              "items": {
+                "type": "object", "additionalProperties": false,
+                "required": ["kind", "businessTime", "auditTime", "pollCycleId"],
+                "properties": { "kind": { "$ref": "#/$defs/identifier" }, "businessTime": { "$ref": "#/$defs/timestamp" }, "auditTime": { "$ref": "#/$defs/timestamp" }, "pollCycleId": { "$ref": "#/$defs/identifier" } }
+              }
+            }
+          }
+        },
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "notApplicableReason"], "properties": { "applicability": { "const": "not_applicable" }, "notApplicableReason": { "$ref": "#/$defs/nonEmptyString" } } }
+      ]
+    },
+    "applicableRecovery": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["applicability", "interruptionPoint", "repairCycleId", "idempotencyAssertions"],
+          "properties": {
+            "applicability": { "const": "required" },
+            "interruptionPoint": { "$ref": "#/$defs/nonEmptyString" },
+            "repairCycleId": { "$ref": "#/$defs/identifier" },
+            "idempotencyAssertions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/nonEmptyString" }, "uniqueItems": true }
+          }
+        },
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "notApplicableReason"], "properties": { "applicability": { "const": "not_applicable" }, "notApplicableReason": { "$ref": "#/$defs/nonEmptyString" } } }
+      ]
+    },
+    "schedulingRecovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scheduling", "recovery"],
+      "properties": { "scheduling": { "$ref": "#/$defs/applicableTimeline" }, "recovery": { "$ref": "#/$defs/applicableRecovery" } }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fixtureContractVersion", "resetContractVersion", "executedInFinally", "sourceRestored", "beforeDigest", "afterDigest", "artifactPath"],
+      "properties": {
+        "fixtureContractVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "resetContractVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "executedInFinally": { "const": true },
+        "sourceRestored": { "type": "boolean" },
+        "beforeDigest": { "$ref": "#/$defs/digest" },
+        "afterDigest": { "$ref": "#/$defs/digest" },
+        "artifactPath": { "$ref": "#/$defs/artifactPath" }
+      }
+    },
+    "failurePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "owningGate", "artifactPaths"],
+      "properties": {
+        "code": { "$ref": "#/$defs/identifier" },
+        "message": { "$ref": "#/$defs/nonEmptyString" },
+        "owningGate": { "enum": ["5.2", "5.3", "5.4", "6", "7", "8", "8B", "8C"] },
+        "artifactPaths": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/artifactPath" }, "uniqueItems": true }
+      }
+    },
+    "failure": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "payload"], "properties": { "applicability": { "const": "required" }, "payload": { "$ref": "#/$defs/failurePayload" } } },
+        { "type": "object", "additionalProperties": false, "required": ["applicability", "notApplicableReason"], "properties": { "applicability": { "const": "not_applicable" }, "notApplicableReason": { "const": "result_passed" } } }
+      ]
+    }
+  }
+}

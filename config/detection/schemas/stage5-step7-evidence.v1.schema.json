@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://monitor.local/schemas/stage5-step7-evidence.v1.schema.json",
+  "title": "Phase 6 Stage 5 Step 7 aggregate evidence",
+  "oneOf": [
+    { "$ref": "#/$defs/suiteEvidence" },
+    { "$ref": "#/$defs/aggregateEvidence" }
+  ],
+  "$defs": {
+    "identifierList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "caseEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "pollCycleIds", "queryIds", "runtimeEventIds", "interruptionIds", "timestamps", "objectIds", "assertions", "cleanup"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^7\\.[1-7][a-d]?(?:-7\\.[1-7][a-d])?$" },
+        "status": { "const": "passed" },
+        "pollCycleIds": { "$ref": "#/$defs/identifierList" },
+        "queryIds": { "$ref": "#/$defs/identifierList" },
+        "runtimeEventIds": { "$ref": "#/$defs/identifierList" },
+        "interruptionIds": { "$ref": "#/$defs/identifierList" },
+        "timestamps": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "format": "date-time" },
+            "uniqueItems": true
+          }
+        },
+        "objectIds": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/identifierList" }
+        },
+        "assertions": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "const": true }
+        },
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["executedInFinally", "sourceRestored", "beforeSourceIds", "afterSourceIds"],
+          "properties": {
+            "executedInFinally": { "type": "boolean" },
+            "sourceRestored": { "type": "boolean" },
+            "beforeSourceIds": { "$ref": "#/$defs/identifierList" },
+            "afterSourceIds": { "$ref": "#/$defs/identifierList" }
+          }
+        }
+      }
+    },
+    "suiteEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "suite", "runId", "startedAt", "completedAt", "cases"],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "kind": { "const": "suite" },
+        "suite": { "enum": ["scheduling", "recovery"] },
+        "runId": { "type": "string", "minLength": 1 },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "cases": { "type": "array", "items": { "$ref": "#/$defs/caseEvidence" } }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "exitCode", "log"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "exitCode": { "type": "integer", "minimum": 0 },
+        "log": { "type": "string", "minLength": 1 }
+      }
+    },
+    "aggregateEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "kind", "gate", "runId", "startedAt", "completedAt", "accepted", "scheduling", "recovery", "sourceRestoration", "checks"],
+      "properties": {
+        "schemaVersion": { "const": "1.0.0" },
+        "kind": { "const": "aggregate" },
+        "gate": { "const": "phase6-stage5-step7" },
+        "runId": { "type": "string", "minLength": 1 },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "accepted": { "type": "boolean" },
+        "scheduling": { "$ref": "#/$defs/suiteEvidence" },
+        "recovery": { "$ref": "#/$defs/suiteEvidence" },
+        "sourceRestoration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["resetExitCode", "baselineBefore", "restoreExitCode", "baselineAfter", "cleanupExecutedInFinally", "log"],
+          "properties": {
+            "resetExitCode": { "type": "integer", "minimum": 0 },
+            "baselineBefore": { "type": "boolean" },
+            "restoreExitCode": { "type": "integer", "minimum": 0 },
+            "baselineAfter": { "type": "boolean" },
+            "cleanupExecutedInFinally": { "type": "boolean" },
+            "log": { "type": "string", "minLength": 1 }
+          }
+        },
+        "checks": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/check" } }
+      }
+    }
+  }
+}

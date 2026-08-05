@@ -1,4 +1,4 @@
-import type { RotationCalendarState, RotationException, RotationPattern, RotationPatternSnapshot, RosterAssignment, RosterSnapshot, SessionResponse } from "@monitor/contracts";
+import type { RotationCalendarState, RotationException, RotationPattern, RotationPatternSnapshot, RosterAssignment, RosterSnapshot, SessionResponse, Stage5BrowserRuntimeIdentity } from "@monitor/contracts";
 
 export interface MockIdentitySummary {
   identityId: "monitor-admin" | "plant-manager" | "shift-supervisor" | "machine-operator" | "operation-scheduler";
@@ -24,26 +24,44 @@ export type IncidentLifecycle = "open" | "resolved" | "closed_without_resolution
 export interface IncidentSummary {
   id: string; ruleCode: "A02" | "A03" | "A05"; lifecycle: IncidentLifecycle; label: string; title: string; summary: string;
   workOrderId: string | null; workOrderCode: string | null; machineCode: string | null; operationName: string | null;
-  shiftName: string | null; responsibleName: string | null; reasons: string[]; openedAt: string; updatedAt: string;
+  shiftName: string | null; responsibleName: string | null; reasons: string[]; openedAt: string; effectiveAt: string; updatedAt: string;
   resolvedAt: string | null; occurrence: number;
 }
 export interface IncidentDetail extends IncidentSummary {
   evidence: { id: string; status: "triggered" | "clear"; reasons: string[]; evidence: Record<string, unknown>; observedAt: string }[];
   transitions: { fromState: IncidentLifecycle | null; toState: IncidentLifecycle; reason: string; occurredAt: string }[];
   related: { id: string; ruleCode: string; title: string; lifecycle: IncidentLifecycle }[];
+  administrativeClosure: { reason: string; comment: string; actorSysUserId: number; closedAt: string } | null;
 }
 
 export interface ConversationSummary {
   id: string; title: string; updatedAt: string; writableUntil: string | null; lastSender: string; lastBody: string;
   lastKind: "text" | "alert" | "attachment"; openAlerts: number; unreadCount: number; isParticipant: boolean;
+  participantCount?: number; participantNames?: string;
+  openAlertItems?: { id: string; code: string; title: string; summary: string; workOrderCode: string | null; machineCode: string | null; openedAt: string }[];
 }
 export interface ConversationMessage {
   id: string; cursor: number; senderSysUserId: number | null; senderName: string; kind: "text" | "alert" | "attachment";
   body: string; payload: Record<string, unknown>; replyToMessageId: string | null; sentAt: string; editedAt: string | null; deletedAt: string | null;
   deliveredCount: number; readCount: number;
+  resolutionGuidance?: string[];
+}
+export interface ScenarioAlertRecipient { name: string; role: string }
+export interface ScenarioAlertMessageItem {
+  message: ConversationMessage;
+  lifecycle: IncidentLifecycle;
+  ruleCode: ScenarioRuleCode;
+  sourceKey: number;
+  recipients: ScenarioAlertRecipient[];
 }
 
 export type ScenarioRuleCode = "A02" | "A03" | "A05";
+export type SourceActionId =
+  | "a02.prepare_dispatch" | "a02.receive" | "a02.cancel" | "a02.reject"
+  | "a03.start_work_order" | "a03.record_first_consumption" | "a03.close_work_order" | "a03.cancel_work_order"
+  | "a05.declare_produced_reel" | "a05.declare_remnant_reel" | "a05.register_weighing" | "a05.register_movement"
+  | "a05.close_source_work_order" | "a05.handoff_to_a02";
+export type A02SourceAuthority = "origin" | "destination" | "both";
 export type ScenarioFault = "timeout" | "source_error" | "partial" | "invalid_schema";
 export type ScenarioCase = "clean_baseline" | "before_threshold" | "at_threshold" | "past_threshold"
   | "before_threshold_not_weighed" | "before_threshold_still_at_machine"
@@ -62,6 +80,7 @@ export interface ScenarioStatus {
   sourceChangedAt: string;
   pendingFault: ScenarioFault | null;
   sourceState: { rowCount: number; rows: Record<string, unknown>[]; evaluation: { status: "clear" | "triggered"; reasons: string[] } };
+  records: ScenarioRecordStatus[];
   pollerState: { pendingFault: ScenarioFault | null; latestPoll: { status: string; sourceRevision: string | null; complete: boolean; fullEvaluation: boolean; errorCode: string | null; finishedAt: string } | null };
   expectedResult: { sourceCondition: "clear" | "triggered"; reasons: string[]; awaitingPoll: boolean; nextPoll: string; incidentLifecycle: string | null; occurrence: number | null; expectedCounts: { incidents: number; openIncidents: number; conversationLinks: number; alertMessages: number }; dashboard: string; conversation: string };
   actualMonitor: {
@@ -72,6 +91,53 @@ export interface ScenarioStatus {
   comparison: { matches: boolean; mismatches: string[] };
   latestChangeCursor: number | null;
   detectionDelayMilliseconds: number | null;
+}
+
+export interface ScenarioRecordStatus {
+  key: number;
+  row: Record<string, unknown>;
+  pendingPoll: boolean;
+  expected: { triggered: boolean; reasons: string[]; incidentLifecycle: string | null };
+  actual: {
+    incident: { id: string; lifecycle: IncidentLifecycle; occurrence: number; openedAt: string; resolvedAt: string | null; updatedAt: string } | null;
+    evidenceCount: number; deliveryCount: number; conversationCount: number; messageCount: number; latestChangeCursor: number | null;
+    deliveries: { id: string; recipientName: string; channel: string; state: string; sentAt: string | null }[];
+    conversationIds: string[]; messageIds: string[]; detectionDelayMilliseconds: number | null;
+  };
+  comparison: { matches: boolean; mismatches: string[] };
+}
+
+export interface ScenarioExperiment {
+  id: string; runId: string; manifestVersion: string; sourceActionContractVersion: string; name: string;
+  status: "running" | "paused" | "completed"; businessTime: string; secondsPerSimulatedMinute: number;
+  pollingFrequencyMinutes: number; nextDue: Record<ScenarioRuleCode, string>; createdAt: string; updatedAt: string;
+}
+export interface ScenarioRuntimeStatus {
+  experiment: ScenarioExperiment | null; automaticScheduling: boolean; realMillisecondsPerSimulatedMinute: number | null; nextAutomaticTickAt: string | null;
+}
+export interface ScenarioSnapshot {
+  id: string; experimentId: string; label: string; schemaVersion: string; payload: Record<string, unknown>; capturedBusinessTime: string; capturedAt: string;
+}
+export interface ScenarioAcceptanceResult {
+  experimentId: string; testId: string; status: "passed" | "failed" | "not_run"; evidence: Record<string, unknown>; startedAt: string; completedAt: string;
+}
+export interface ScenarioRuntimeEvent {
+  id: string; experimentId: string; eventType: "poll_started" | "poll_completed" | "poll_failed" | "source_action";
+  ruleCode: ScenarioRuleCode; businessTime: string; payload: Record<string, unknown>; recordedAt: string;
+}
+export interface ScenarioExperimentDetail {
+  experiment: ScenarioExperiment;
+  snapshots: { items: ScenarioSnapshot[]; nextCursor: string | null };
+  results: { items: ScenarioAcceptanceResult[]; nextCursor: string | null };
+  events: ScenarioRuntimeEvent[];
+}
+export interface ScenarioOperationalHistoryItem {
+  id: string; experimentId: string; experimentName: string; experimentStatus: ScenarioExperiment["status"];
+  ruleCode: ScenarioRuleCode; sourceKey: number; firstAt: string; lastAt: string; recordedAt: string;
+  actionIds: string[]; eventCount: number; timeline: { actionId: SourceActionId; at: string }[]; input: Record<string, unknown> | null; evidence: Record<string, unknown>;
+  currentSource: Record<string, unknown> | null; incidentCount: number;
+  sourceState: string; durationMinutes: number | null; timingOutcome: "active" | "on_time" | "late";
+  terminalOutcome: string | null; incidentOutcome: IncidentLifecycle | "none";
 }
 
 export class ApiRequestError extends Error {
@@ -122,6 +188,10 @@ export async function sourceDiagnostics(): Promise<{ environment: string; produc
   return responseJson(await fetch("/api/diagnostics/source", { credentials: "include" }));
 }
 
+export async function stage5BrowserRuntimeIdentity(): Promise<Stage5BrowserRuntimeIdentity> {
+  return responseJson<Stage5BrowserRuntimeIdentity>(await fetch("/api/dev/stage5/runtime-identity", { credentials: "include" }));
+}
+
 export async function incidents(filters: { status?: string; operation?: string; search?: string } = {}): Promise<IncidentSummary[]> {
   const query = new URLSearchParams(Object.entries(filters).filter(([, value]) => value && value !== "all") as [string, string][]);
   return (await responseJson<{ incidents: IncidentSummary[] }>(await fetch(`/api/incidents?${query}`, { credentials: "include" }))).incidents;
@@ -129,6 +199,13 @@ export async function incidents(filters: { status?: string; operation?: string; 
 
 export async function incidentDetail(id: string): Promise<IncidentDetail> {
   return responseJson<IncidentDetail>(await fetch(`/api/incidents/${id}`, { credentials: "include" }));
+}
+
+export async function closeIncidentWithoutResolution(id: string, reason: string, comment: string): Promise<void> {
+  await responseJson(await fetch(`/api/incidents/${id}/close-without-resolution`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reason, comment }),
+  }));
 }
 
 export async function conversationForIncident(id: string): Promise<string | null> {
@@ -145,9 +222,14 @@ export async function conversations(search = "", before?: string, scope: "mine" 
   return responseJson(await fetch(`/api/conversations?${query}`, { credentials: "include" }));
 }
 
-export async function conversationMessages(id: string, before?: number): Promise<{ messages: ConversationMessage[]; nextCursor: number | null; writableUntil: string | null }> {
+export async function conversationMessages(id: string, before?: number): Promise<{ messages: ConversationMessage[]; nextCursor: number | null; writableUntil: string | null; title: string; participantCount: number; participantNames: string }> {
   const query = before ? `?before=${before}` : "";
   return responseJson(await fetch(`/api/conversations/${id}/messages${query}`, { credentials: "include" }));
+}
+
+export async function scenarioAlertMessages(selection?: { ruleCode: ScenarioRuleCode; sourceKey: number; experimentId?: string }): Promise<{ items: ScenarioAlertMessageItem[] }> {
+  const query = selection ? `?${new URLSearchParams({ ruleCode: selection.ruleCode, sourceKey: String(selection.sourceKey), ...(selection.experimentId ? { experimentId: selection.experimentId } : {}) })}` : "";
+  return responseJson(await fetch(`/api/dev/scenario-alert-messages${query}`, { credentials: "include" }));
 }
 
 export async function sendConversationMessage(id: string, body: string, clientCommandId: string, replyToMessageId?: string | null, payload?: Record<string, unknown>) {
@@ -225,9 +307,67 @@ export async function scenarios(): Promise<ScenarioStatus[]> {
   return (await responseJson<{ scenarios: ScenarioStatus[] }>(await fetch("/api/dev/scenarios", { credentials: "include" }))).scenarios;
 }
 
-export async function scenarioAction(code: ScenarioRuleCode, action: "reset" | "trigger" | "prepare" | "correct" | "advance-time" | "fail-next-poll" | "poll" | "recur", body?: Record<string, unknown>): Promise<ScenarioStatus> {
-  const init: RequestInit = { method: "POST", credentials: "include" };
-  if (body) { init.headers = { "content-type": "application/json" }; init.body = JSON.stringify(body); }
-  const result = await responseJson<ScenarioStatus | { scenario: ScenarioStatus }>(await fetch(`/api/dev/scenarios/${code}/${action}`, init));
-  return "scenario" in result ? result.scenario : result;
+export async function scenarioRuntime(): Promise<ScenarioRuntimeStatus> {
+  return responseJson<ScenarioRuntimeStatus>(await fetch("/api/dev/scenario-runtime", { credentials: "include" }));
+}
+
+export async function createScenarioExperiment(input: { name: string; businessTime: string; pollingFrequencyMinutes: number; runId: string; manifestVersion: string }): Promise<ScenarioRuntimeStatus> {
+  return responseJson(await fetch("/api/dev/scenario-runtime", {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(input),
+  }));
+}
+
+export async function configureScenarioExperiment(id: string, secondsPerSimulatedMinute: number, pollingFrequencyMinutes: number): Promise<ScenarioRuntimeStatus> {
+  return responseJson(await fetch(`/api/dev/scenario-runtime/${id}/config`, {
+    method: "PUT", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ secondsPerSimulatedMinute, pollingFrequencyMinutes }),
+  }));
+}
+
+export async function pauseScenarioExperiment(id: string, paused: boolean): Promise<ScenarioRuntimeStatus> {
+  return responseJson(await fetch(`/api/dev/scenario-runtime/${id}/pause`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ paused }),
+  }));
+}
+
+export async function advanceScenarioExperiment(id: string, minutes: number): Promise<{ experiment: ScenarioExperiment }> {
+  return responseJson(await fetch(`/api/dev/scenario-runtime/${id}/advance`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ minutes }),
+  }));
+}
+
+export async function scenarioExperiments(cursor?: string): Promise<{ items: ScenarioExperiment[]; nextCursor: string | null }> {
+  const query = new URLSearchParams({ limit: "20" });
+  if (cursor) query.set("cursor", cursor);
+  return responseJson(await fetch(`/api/dev/scenario-experiments?${query}`, { credentials: "include" }));
+}
+
+export async function scenarioExperiment(id: string, cursors: { snapshotCursor?: string; resultCursor?: string } = {}): Promise<ScenarioExperimentDetail> {
+  const query = new URLSearchParams(Object.entries(cursors).filter((entry): entry is [string, string] => Boolean(entry[1])));
+  return responseJson<ScenarioExperimentDetail>(await fetch(`/api/dev/scenario-experiments/${id}${query.size ? `?${query}` : ""}`, { credentials: "include" }));
+}
+
+export async function captureScenarioSnapshot(id: string, label: string): Promise<ScenarioSnapshot> {
+  return responseJson<ScenarioSnapshot>(await fetch(`/api/dev/scenario-experiments/${id}/snapshots`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ label }),
+  }));
+}
+
+export async function failScenarioNextPoll(code: ScenarioRuleCode): Promise<ScenarioStatus> {
+  return responseJson<ScenarioStatus>(await fetch(`/api/dev/test/scenarios/${code}/fail-next-poll`, {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ fault: "timeout" }),
+  }));
+}
+
+export async function scenarioSourceAction(actionId: SourceActionId, key: number, authority?: A02SourceAuthority, input?: Record<string, string | number>): Promise<ScenarioStatus> {
+  const payload = { actionId, key, ...(authority ? { authority } : {}), ...(input ? { input } : {}) };
+  const result = await responseJson<{ scenario: ScenarioStatus }>(await fetch("/api/dev/source-actions", {
+    method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+  }));
+  return result.scenario;
+}
+
+export async function scenarioOperationalHistory(code: ScenarioRuleCode, filters: Record<string, string> = {}): Promise<ScenarioOperationalHistoryItem[]> {
+  const query = new URLSearchParams({ code, ...Object.fromEntries(Object.entries(filters).filter(([, value]) => value)) });
+  const result = await responseJson<{ items: ScenarioOperationalHistoryItem[] }>(await fetch(`/api/dev/scenario-operational-history?${query}`, { credentials: "include" }));
+  return result.items;
 }

@@ -21,11 +21,12 @@ export class DetectionRunner {
     const startedAt = new Date();
     if (this.running.has(query.queryId)) {
       const signal = await this.freshness.inspect(query);
-      return this.repository.recordFailure({ cycleId, query, status: "overlap_skipped", freshness: signal, pages: 0, rows: 0, startedAt, finishedAt: new Date(), errorCode: "query_already_running", recoveryRun });
+      return this.repository.recordFailure({ cycleId, query, status: "overlap_skipped", freshness: signal, pages: 0, pageEvidence: [], rows: 0, startedAt, finishedAt: new Date(), errorCode: "query_already_running", recoveryRun });
     }
     this.running.add(query.queryId);
     let pages = 0;
     let rows: Record<string, unknown>[] = [];
+    const pageEvidence: CycleResult["pageEvidence"] = [];
     let freshnessSignal: FreshnessSignal = { status: "unknown", observedAt: startedAt.toISOString(), lagMilliseconds: null, providerVersion: "unavailable", sourceRevision: null };
     try {
       freshnessSignal = await this.freshness.inspect(query);
@@ -37,6 +38,7 @@ export class DetectionRunner {
       while (true) {
         const sourcePage = await this.readWithRetry(query, adapter, cursor);
         pages += 1;
+        pageEvidence.push({ page: pages, rowCount: sourcePage.rows.length, revision: sourcePage.sourceRevision });
         this.validatePage(query, sourcePage);
         if (revision !== null && sourcePage.sourceRevision !== revision) throw new CycleFailure("partial", "source_revision_changed");
         revision = sourcePage.sourceRevision;
@@ -57,7 +59,7 @@ export class DetectionRunner {
       if (finalFreshness.status !== "fresh") throw new CycleFailure("unknown_freshness", "freshness_became_unknown");
       const observedAt = new Date();
       const result = await this.repository.reconcileHealthy({
-        cycleId, query, freshness: finalFreshness, rows, sourceRevision: revision!, pages,
+        cycleId, query, freshness: finalFreshness, rows, sourceRevision: revision!, pages, pageEvidence,
         startedAt, finishedAt: observedAt, recoveryRun,
       });
       if (this.onHealthyCycle) {
@@ -68,7 +70,7 @@ export class DetectionRunner {
     } catch (error) {
       const failure = error instanceof CycleFailure ? error : new CycleFailure("source_error", "source_query_failed");
       return this.repository.recordFailure({
-        cycleId, query, status: failure.status, freshness: freshnessSignal, pages, rows: rows.length,
+        cycleId, query, status: failure.status, freshness: freshnessSignal, pages, pageEvidence, rows: rows.length,
         startedAt, finishedAt: new Date(), errorCode: failure.code, recoveryRun,
       });
     } finally {

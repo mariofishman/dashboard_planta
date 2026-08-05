@@ -4,6 +4,18 @@ import type { DatabaseExecutor, DatabaseRuntime } from "@monitor/database";
 export interface ConversationParticipant { sysUserId: number; displayName: string; sourceKey: string }
 export interface ConversationPrincipal { sysUserId: number; displayName: string; admin: boolean }
 
+export const conversationInterruptionPoints = [
+  "before_conversation_attachment",
+  "after_conversation_attachment",
+  "before_alert_message_creation",
+  "after_alert_message_creation",
+] as const;
+export type ConversationInterruptionPoint = typeof conversationInterruptionPoints[number];
+export interface ConversationInterruptionCoordinator {
+  armed(points: readonly ConversationInterruptionPoint[]): Promise<Set<ConversationInterruptionPoint>>;
+  fire(point: ConversationInterruptionPoint, context: Record<string, unknown>): Promise<void>;
+}
+
 const EDIT_WINDOW_MS = 15 * 60_000;
 const DELETE_WINDOW_MS = 2 * 24 * 60 * 60_000;
 
@@ -27,11 +39,24 @@ export class ConversationReadOnlyError extends Error {}
 export class MessageWindowExpiredError extends Error {}
 export class ConversationValidationError extends Error {}
 
+class ConversationTransactionInterruption extends Error {
+  constructor(
+    readonly point: ConversationInterruptionPoint,
+    readonly context: Record<string, unknown>,
+  ) {
+    super(`conversation_transaction_interruption:${point}`);
+  }
+}
+
 export class ConversationService {
-  constructor(private readonly database: DatabaseRuntime, private readonly publish: (event: Record<string, unknown>) => Promise<void> = async () => {}) {}
+  constructor(
+    private readonly database: DatabaseRuntime,
+    private readonly publish: (event: Record<string, unknown>) => Promise<void> = async () => {},
+    private readonly interruptions?: ConversationInterruptionCoordinator,
+  ) {}
 
   private async authorize(executor: DatabaseExecutor, conversationId: string, principal: ConversationPrincipal) {
-    const conversation = await executor.queryOne("SELECT id,writable_until FROM monitor_conversation WHERE id=$1", [conversationId]);
+    const conversation = await executor.queryOne("SELECT id,title,writable_until FROM monitor_conversation WHERE id=$1", [conversationId]);
     if (!conversation.id) throw new ConversationForbiddenError("conversation_not_found");
     if (!principal.admin) {
       const participant = await executor.queryOne(`SELECT 1 AS allowed FROM monitor_conversation_participant
@@ -51,11 +76,34 @@ export class ConversationService {
       .map((row) => Number(row.sys_user_id));
   }
 
-  async attachIncident(input: { incidentId: string; plantId: number; participants: ConversationParticipant[]; alert: Record<string, unknown> }) {
+  async authorizedConversationIds(principal: ConversationPrincipal, plantIds: number[]): Promise<string[]> {
+    if (!plantIds.length) return [];
+    const rows = principal.admin
+      ? await this.database.queryAll("SELECT id FROM monitor_conversation WHERE plant_id=ANY($1::bigint[]) ORDER BY id", [plantIds])
+      : await this.database.queryAll(`SELECT c.id FROM monitor_conversation c
+          JOIN monitor_conversation_participant p ON p.conversation_id=c.id
+          WHERE c.plant_id=ANY($1::bigint[]) AND p.sys_user_id=$2 AND p.removed_at IS NULL ORDER BY c.id`,
+        [plantIds, principal.sysUserId]);
+    return rows.map((row) => String(row.id));
+  }
+
+  async attachIncident(input: { incidentId: string; plantId: number; participants: ConversationParticipant[]; alert: Record<string, unknown>; cycleId?: string }) {
     if (!input.participants.length) return null;
     const unique = [...new Map(input.participants.map((item) => [item.sysUserId, item])).values()];
     const participantFingerprint = fingerprint(unique);
-    const result = await this.database.transaction(async (transaction) => {
+    const armed = await this.interruptions?.armed(conversationInterruptionPoints) ?? new Set<ConversationInterruptionPoint>();
+    const interrupt = (point: ConversationInterruptionPoint, context: Record<string, unknown>) => {
+      if (armed.has(point)) throw new ConversationTransactionInterruption(point, {
+        ...(input.cycleId ? { cycleId: input.cycleId } : {}),
+        incidentId: input.incidentId,
+        plantId: input.plantId,
+        participantFingerprint,
+        ...context,
+      });
+    };
+    let result: { conversationId: string; created: boolean; cursor: number; messageId?: string; changeCursor?: number; changeEventId?: string };
+    try {
+      result = await this.database.transaction(async (transaction) => {
       const already = await transaction.queryOne("SELECT conversation_id FROM monitor_conversation_incident WHERE incident_id=$1", [input.incidentId]);
       if (already.conversation_id) {
         const conversationId = String(already.conversation_id);
@@ -86,15 +134,52 @@ export class ConversationService {
         }
       }
       await transaction.execute("UPDATE monitor_conversation SET writable_until=NULL,updated_at=now() WHERE id=$1", [conversation.id]);
+      const attachmentContext = {
+        transactionConversationId: String(conversation.id),
+        conversationCreated: created,
+      };
+      interrupt("before_conversation_attachment", attachmentContext);
       await transaction.execute("INSERT INTO monitor_conversation_incident (conversation_id,incident_id) VALUES ($1,$2)", [conversation.id, input.incidentId]);
+      interrupt("after_conversation_attachment", attachmentContext);
+      interrupt("before_alert_message_creation", attachmentContext);
       const message = await transaction.queryOne(`INSERT INTO monitor_message
         (conversation_id,sender_name,kind,body,payload,client_command_id)
         VALUES ($1,'Monitor','alert','',$2::jsonb,$3) RETURNING id,cursor,sent_at`,
       [conversation.id, JSON.stringify(input.alert), `incident:${input.incidentId}`]);
+      interrupt("after_alert_message_creation", {
+        ...attachmentContext,
+        transactionMessageId: String(message.id),
+        transactionMessageCursor: Number(message.cursor),
+      });
+      const change = await transaction.queryOne(`INSERT INTO monitor_change_event
+        (event_type,scope_type,scope_id,payload,occurred_at)
+        VALUES ('message.created','conversation',$1,$2::jsonb,$3) RETURNING cursor,event_id`,
+      [conversation.id, JSON.stringify({
+        conversationId: String(conversation.id),
+        messageId: String(message.id),
+        messageCursor: Number(message.cursor),
+        kind: "alert",
+        incidentId: input.incidentId,
+      }), message.sent_at]);
       await transaction.execute("UPDATE monitor_conversation SET updated_at=$2 WHERE id=$1", [conversation.id, message.sent_at]);
-      return { conversationId: String(conversation.id), created, cursor: Number(message.cursor), messageId: String(message.id) };
+      return {
+        conversationId: String(conversation.id), created, cursor: Number(message.cursor), messageId: String(message.id),
+        changeCursor: Number(change.cursor), changeEventId: String(change.event_id),
+      };
+      });
+    } catch (error) {
+      if (!(error instanceof ConversationTransactionInterruption) || !this.interruptions) throw error;
+      await this.interruptions.fire(error.point, error.context);
+      throw error;
+    }
+    if (result.changeCursor) await this.publish({
+      type: "message.created",
+      eventId: result.changeEventId,
+      cursor: result.changeCursor,
+      conversationId: result.conversationId,
+      messageId: result.messageId,
+      messageCursor: result.cursor,
     });
-    if (result.cursor) await this.publish({ type: "message.created", conversationId: result.conversationId, cursor: result.cursor, messageId: result.messageId });
     return result;
   }
 
@@ -114,13 +199,19 @@ export class ConversationService {
     const params: unknown[] = [principal.sysUserId, includeAll, options.before ?? null, options.search?.trim() || null, limit + 1];
     const rows = await this.database.queryAll(`SELECT c.id,c.title,c.updated_at AS "updatedAt",c.writable_until AS "writableUntil",
       COALESCE(last.sender_name,'') AS "lastSender",COALESCE(last.body,'') AS "lastBody",last.kind AS "lastKind",
-      COALESCE(open_alerts.count,0)::int AS "openAlerts",
+      COALESCE(open_alerts.count,0)::int AS "openAlerts",COALESCE(open_alerts.items,'[]'::jsonb) AS "openAlertItems",
+      COALESCE(participants.count,0)::int AS "participantCount",COALESCE(participants.names,'') AS "participantNames",
       CASE WHEN p.sys_user_id IS NULL THEN 0 ELSE COALESCE(unread.count,0) END::int AS "unreadCount",
       (p.sys_user_id IS NOT NULL) AS "isParticipant"
       FROM monitor_conversation c
       LEFT JOIN monitor_conversation_participant p ON p.conversation_id=c.id AND p.sys_user_id=$1 AND p.removed_at IS NULL
       LEFT JOIN LATERAL (SELECT sender_name,body,kind FROM monitor_message WHERE conversation_id=c.id ORDER BY cursor DESC LIMIT 1) last ON TRUE
-      LEFT JOIN LATERAL (SELECT COUNT(*) AS count FROM monitor_conversation_incident ci JOIN monitor_incident i ON i.id=ci.incident_id WHERE ci.conversation_id=c.id AND i.lifecycle='open') open_alerts ON TRUE
+      LEFT JOIN LATERAL (SELECT COUNT(*) AS count,jsonb_agg(jsonb_build_object(
+        'id',i.id,'code',i.rule_code,'title',i.title,'summary',i.summary,'workOrderCode',i.work_order_code,
+        'machineCode',i.machine_code,'openedAt',i.opened_at) ORDER BY i.opened_at) AS items
+        FROM monitor_conversation_incident ci JOIN monitor_incident i ON i.id=ci.incident_id WHERE ci.conversation_id=c.id AND i.lifecycle='open') open_alerts ON TRUE
+      LEFT JOIN LATERAL (SELECT COUNT(*) AS count,string_agg(cp.display_name,', ' ORDER BY cp.display_name) AS names
+        FROM monitor_conversation_participant cp WHERE cp.conversation_id=c.id AND cp.removed_at IS NULL) participants ON TRUE
       LEFT JOIN LATERAL (SELECT COUNT(*) AS count FROM monitor_message m LEFT JOIN monitor_conversation_user_state s ON s.conversation_id=c.id AND s.sys_user_id=$1 WHERE m.conversation_id=c.id AND m.cursor>COALESCE(s.last_read_cursor,0) AND m.sender_sys_user_id IS DISTINCT FROM $1) unread ON TRUE
       WHERE ($2 OR p.sys_user_id IS NOT NULL) AND ($3::timestamptz IS NULL OR c.updated_at<$3::timestamptz)
         AND ($4::text IS NULL OR c.title ILIKE '%'||$4||'%'
@@ -141,16 +232,28 @@ export class ConversationService {
   async messages(conversationId: string, principal: ConversationPrincipal, options: { before?: number; limit?: number } = {}) {
     const conversation = await this.authorize(this.database, conversationId, principal);
     const limit = Math.min(100, Math.max(1, options.limit ?? 50));
-    const rows = await this.database.queryAll(`SELECT id,cursor,sender_sys_user_id AS "senderSysUserId",sender_name AS "senderName",kind,body,payload,
-      reply_to_message_id AS "replyToMessageId",sent_at AS "sentAt",edited_at AS "editedAt",deleted_at AS "deletedAt",
-      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=monitor_message.id AND r.delivered_at IS NOT NULL) AS "deliveredCount",
-      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=monitor_message.id AND r.read_at IS NOT NULL) AS "readCount"
-      FROM monitor_message WHERE conversation_id=$1 AND ($2::bigint IS NULL OR cursor<$2) ORDER BY cursor DESC LIMIT $3`,
+    const participants = await this.database.queryOne(`SELECT COUNT(*)::int AS count,string_agg(display_name,', ' ORDER BY display_name) AS names
+      FROM monitor_conversation_participant WHERE conversation_id=$1 AND removed_at IS NULL`, [conversationId]);
+    const rows = await this.database.queryAll(`SELECT m.id,m.cursor,m.sender_sys_user_id AS "senderSysUserId",m.sender_name AS "senderName",m.kind,m.body,m.payload,
+      m.reply_to_message_id AS "replyToMessageId",m.sent_at AS "sentAt",m.edited_at AS "editedAt",m.deleted_at AS "deletedAt",
+      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=m.id AND r.delivered_at IS NOT NULL) AS "deliveredCount",
+      (SELECT COUNT(*)::int FROM monitor_message_receipt r WHERE r.message_id=m.id AND r.read_at IS NOT NULL) AS "readCount",
+      g.steps AS "resolutionGuidance"
+      FROM monitor_message m
+      LEFT JOIN monitor_alert_guidance g ON m.kind='alert' AND g.rule_code=COALESCE(m.payload->>'ruleCode',m.payload->>'code')
+      WHERE m.conversation_id=$1 AND ($2::bigint IS NULL OR m.cursor<$2) ORDER BY m.cursor DESC LIMIT $3`,
     [conversationId, options.before ?? null, limit + 1]);
     return {
-      messages: rows.slice(0, limit).reverse().map((row) => ({ ...row, payload: json(row.payload) })),
+      messages: rows.slice(0, limit).reverse().map((row) => ({
+        ...row,
+        payload: json(row.payload),
+        resolutionGuidance: row.resolutionGuidance ? json<string[]>(row.resolutionGuidance) : [],
+      })),
       nextCursor: rows.length > limit ? Number(rows[limit - 1]!.cursor) : null,
       writableUntil: conversation.writable_until ? String(conversation.writable_until) : null,
+      title: String(conversation.title),
+      participantCount: Number(participants.count),
+      participantNames: String(participants.names ?? ""),
     };
   }
 
@@ -178,10 +281,29 @@ export class ConversationService {
         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8) RETURNING id,cursor,sent_at`,
       [conversationId, principal.sysUserId, principal.displayName, input.payload ? "attachment" : "text", body,
         JSON.stringify(input.payload ?? {}), input.replyToMessageId ?? null, input.clientCommandId]);
+      const change = await transaction.queryOne(`INSERT INTO monitor_change_event
+        (event_type,scope_type,scope_id,payload,occurred_at)
+        VALUES ('message.created','conversation',$1,$2::jsonb,$3) RETURNING cursor,event_id`,
+      [conversationId, JSON.stringify({
+        conversationId,
+        messageId: String(message.id),
+        messageCursor: Number(message.cursor),
+        kind: input.payload ? "attachment" : "text",
+      }), message.sent_at]);
       await transaction.execute("UPDATE monitor_conversation SET updated_at=$2 WHERE id=$1", [conversationId, message.sent_at]);
-      return { id: String(message.id), cursor: Number(message.cursor), duplicate: false };
+      return {
+        id: String(message.id), cursor: Number(message.cursor), duplicate: false,
+        changeCursor: Number(change.cursor), changeEventId: String(change.event_id),
+      };
     });
-    if (!result.duplicate) await this.publish({ type: "message.created", conversationId, messageId: result.id, cursor: result.cursor });
+    if (!result.duplicate) await this.publish({
+      type: "message.created",
+      eventId: result.changeEventId,
+      cursor: result.changeCursor,
+      conversationId,
+      messageId: result.id,
+      messageCursor: result.cursor,
+    });
     return result;
   }
 

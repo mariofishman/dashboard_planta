@@ -3,7 +3,7 @@
   "contractVersion": "1.1.0",
   "alertTypeCode": "A05",
   "queryId": "a05-reel-handling",
-  "queryVersion": "1.0.1-candidate",
+  "queryVersion": "1.0.2-candidate",
   "keySchemaVersion": 1,
   "naturalKey": ["articleSerialId"],
   "output": {
@@ -18,7 +18,13 @@
     "stillAtMachine": "boolean",
     "weighed": "boolean",
     "sourceWorkOrderFinished": "boolean",
-    "movedFromMachine": "boolean"
+    "movedFromMachine": "boolean",
+    "reelKind": "string",
+    "machineCode": "string",
+    "operationName": "string",
+    "shiftName": "string",
+    "responsibleName": "string",
+    "warehouseType": "string"
   },
   "sqlFile": "../queries/a05-reel-handling.v1.sql",
   "timeoutMs": 3000,

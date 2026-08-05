@@ -10,6 +10,8 @@
 
 - Do not ask the user to approve routine, reversible implementation choices or successful test results.
 - Ask for approval only for product or business boundaries, paid commitments, credentials or external access, irreversible actions, or externally binding decisions. Explain the practical consequence in plain language.
+- Before making an execution assumption that could materially change elapsed time, resource use, database-reset frequency, test meaning, or evidence validity, stop and ask the product manager one contextual question with clear options. Do not infer a costly isolation strategy merely because it is technically conventional.
+- Never introduce per-case physical database resets unless an approved plan explicitly requires them or the product manager approves them after seeing the alternatives. Prefer one verified initial baseline, targeted fixture preparation or cleanup between cases, and one verified final restoration when the cases support it.
 - Record an explicit user decision in the authoritative project documents and do not ask for a second vague “overall” approval of the same decision.
 - Phases 1 through 9 are local-first and use mock identities, synthetic fixtures, and protected local/sample databases. Real EmusaSoft authentication, Aurora access, production-query validation, and deployment integration belong to Phase 10.
 

@@ -59,9 +59,11 @@ import {
   conversations,
   deleteConversationMessage,
   editConversationMessage,
+  incidentDetail,
   markConversationRead,
   sendConversationMessage,
   type ConversationMessage,
+  type IncidentLifecycle,
 } from "./api";
 import {
   UI_ONLY_CONVERSATION_FIXTURES,
@@ -78,8 +80,14 @@ import {
   type ChatConversationRow,
   type ChatFilter,
 } from "./chatUi";
+import {
+  pendingMessageStorageKey,
+  readChatPresentationContext,
+  readPendingMessages,
+  writeChatPresentationContext,
+  writePendingMessages,
+} from "./browserStorageAuthority";
 
-const CHAT_CONTEXT_KEY = "monitor.chat.presentation-context";
 const QUICK_REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
 const alertToneColor = {
   danger: ui.color.lifecycleOpen,
@@ -147,23 +155,24 @@ export function ChatList({ session }: { session: SessionResponse }) {
   const chipLimit = alertChipLimit(isVeryNarrow ? 420 : isNarrow ? 760 : 1024);
   const isAdministrator = session.principal.scopes.includes("monitor:admin");
   const scope = conversationScope(isAdministrator);
+  const allowUiOnlyFixtures = import.meta.env.DEV && new URLSearchParams(window.location.search).get("uiFixtures") === "1";
 
   const refresh = useCallback(() => {
     void conversations(search, undefined, scope)
       .then((result) => {
-        setRows(buildConversationRows(result.conversations, import.meta.env.DEV));
+        setRows(buildConversationRows(result.conversations, allowUiOnlyFixtures && result.conversations.length === 0));
         setNextCursor(result.nextCursor);
         setShowConnectionWarning(false);
         setState("ready");
       })
       .catch(() => {
-        if (import.meta.env.DEV) {
+        if (allowUiOnlyFixtures) {
           setRows(buildConversationRows([], true));
           setShowConnectionWarning(true);
           setState("ready");
         } else setState("error");
       });
-  }, [scope, search]);
+  }, [allowUiOnlyFixtures, scope, search]);
 
   useEffect(refresh, [refresh]);
   useEffect(() => {
@@ -186,7 +195,7 @@ export function ChatList({ session }: { session: SessionResponse }) {
     setFilter(next);
   };
   const openConversation = (row: ChatConversationRow) => {
-    sessionStorage.setItem(CHAT_CONTEXT_KEY, JSON.stringify({ id: row.id, title: row.title, participants: row.participants, mockOnly: row.mockOnly }));
+    writeChatPresentationContext({ id: row.id, title: row.title, participants: row.participants, mockOnly: row.mockOnly });
     go(`/chats/${row.id}`);
   };
   const clearLongPress = () => {
@@ -281,12 +290,13 @@ type PendingMessage = { id: string; body: string; replyToMessageId: string | nul
 
 function payloadAlert(message: ConversationMessage): ChatAlertPresentation {
   const payload = message.payload;
+  const code = String(payload.ruleCode ?? payload.code ?? "Alerta");
   const age = String(payload.age ?? payload.unresolvedDuration ?? "Sin resolver");
   const payloadAgeMinutes = Number(payload.ageMinutes ?? payload.unresolvedAgeMinutes);
   const ageMinutes = Number.isFinite(payloadAgeMinutes) ? payloadAgeMinutes : unresolvedAgeMinutes(age);
   return {
     id: String(payload.id ?? `alert-${message.id}`),
-    code: String(payload.ruleCode ?? payload.code ?? "Alerta"),
+    code,
     shortName: String(payload.shortName ?? payload.title ?? "Alerta operativa"),
     age,
     ...(ageMinutes !== null ? { ageMinutes } : {}),
@@ -297,19 +307,25 @@ function payloadAlert(message: ConversationMessage): ChatAlertPresentation {
     ...(payload.machineCode ? { machineCode: String(payload.machineCode) } : {}),
     ...(payload.detectedAt ? { detectedAt: String(payload.detectedAt) } : payload.openedAt ? { detectedAt: time(String(payload.openedAt)) } : {}),
     ...(payload.blocking ? { blocking: String(payload.blocking) } : {}),
-    ...(Array.isArray(payload.resolution) ? { resolution: payload.resolution.map(String) } : {}),
+    resolution: Array.isArray(message.resolutionGuidance) ? message.resolutionGuidance : [],
   };
 }
 
-function AlertAttachment({ message, expanded, highlighted, register, onToggle, onCopyIdentifier }: { message: ConversationMessage; expanded: boolean; highlighted: boolean; register: (element: HTMLElement | null) => void; onToggle: () => void; onCopyIdentifier: (value: string) => void }) {
+export function AlertAttachment({ message, lifecycle = "open", expanded, highlighted, register, onToggle, onCopyIdentifier }: { message: ConversationMessage; lifecycle?: IncidentLifecycle | undefined; expanded: boolean; highlighted: boolean; register: (element: HTMLElement | null) => void; onToggle: () => void; onCopyIdentifier: (value: string) => void }) {
   const alert = payloadAlert(message);
+  const resolved = lifecycle === "resolved";
   const ageColor = unresolvedAgeTone(alert.ageMinutes) === "escalated" ? ui.color.unresolvedAgeEscalated : ui.color.unresolvedAgeRoutine;
+  const lifecyclePresentation = lifecycle === "resolved"
+    ? { label: "Resuelta", color: ui.color.lifecycleResolved }
+    : lifecycle === "closed_without_resolution"
+      ? { label: "Cerrada sin resolución", color: ui.color.lifecycleClosed }
+      : { label: `${alert.age}${alert.age === "Sin resolver" ? "" : " sin resolver"}`, color: ageColor };
   const fact = (label: string, value: string) => <Box key={label} component="div" sx={{ display: "flex", alignItems: "center", gap: "5px", px: "6px", py: "3px", borderRadius: ui.control.radius, bgcolor: "background.default" }}><Box component="dt" sx={{ color: "text.secondary", fontSize: "9px" }}>{label}</Box><Box component="dd" sx={{ m: 0, fontSize: "9px", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{value}</Box></Box>;
-  return <Paper ref={register} component="section" tabIndex={0} variant="outlined" aria-labelledby={`${message.id}-alert-title`} onClick={(event) => { if (!(event.target as Element).closest("button")) onToggle(); }} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onToggle(); } }} sx={{ mt: .25, overflow: "hidden", borderRadius: "7.5px", borderColor: highlighted ? "primary.main" : "rgba(225,29,72,.22)", bgcolor: "background.paper", boxShadow: "0 2px 6px rgba(0,36,107,.07)", outline: highlighted ? `2px solid ${ui.color.action}` : undefined, outlineOffset: highlighted ? 2 : undefined }}>
-    <Stack direction="row" alignItems="center" gap={1} sx={{ minHeight: 34, pl: "7px", pr: "9px", borderBottom: "1px solid", borderColor: "divider", bgcolor: "rgba(225,29,72,.045)" }}>
-      <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "5px", minHeight: 28, px: 1, border: "1px solid rgba(225,29,72,.7)", borderRadius: ui.control.radius, color: "error.main", fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap" }}><Box component="span" aria-hidden sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "currentColor" }}/>{alert.label}</Box>
+  return <Paper ref={register} component="section" tabIndex={0} variant="outlined" aria-labelledby={`${message.id}-alert-title`} onClick={(event) => { if (!(event.target as Element).closest("button")) onToggle(); }} onKeyDown={(event) => { if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onToggle(); } }} sx={{ mt: .25, overflow: "hidden", borderRadius: "7.5px", borderColor: highlighted ? "primary.main" : resolved ? ui.color.alertResolvedBorder : ui.color.alertOpenBorder, bgcolor: "background.paper", boxShadow: "0 2px 6px rgba(0,36,107,.07)", outline: highlighted ? `2px solid ${ui.color.action}` : undefined, outlineOffset: highlighted ? 2 : undefined }}>
+    <Stack direction="row" alignItems="center" gap={1} sx={{ minHeight: 34, pl: "7px", pr: "9px", borderBottom: "1px solid", borderColor: "divider", bgcolor: resolved ? ui.color.alertResolvedHeader : ui.color.alertOpenHeader }}>
+      {!resolved && <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "5px", minHeight: 28, px: 1, border: `1px solid ${ui.color.alertOpenLabelBorder}`, borderRadius: ui.control.radius, color: "error.main", fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap" }}><Box component="span" aria-hidden sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "currentColor" }}/>{alert.label}</Box>}
       <Box component="span" sx={{ display: "inline-grid", placeItems: "center", minHeight: 28, px: 1, borderRadius: ui.control.radius, bgcolor: "rgba(0,0,0,.08)", fontSize: "10px", fontWeight: 700, whiteSpace: "nowrap" }}>{alert.code}</Box>
-      <Typography component="span" fontWeight={700} sx={{ ml: "auto", color: ageColor, fontSize: "9px", lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{alert.age}{alert.age === "Sin resolver" ? "" : " sin resolver"}</Typography>
+      <Typography component="span" fontWeight={700} sx={{ ml: "auto", color: lifecyclePresentation.color, fontSize: "9px", lineHeight: 1, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{lifecyclePresentation.label}</Typography>
     </Stack>
     <Box sx={{ p: 1 }}>
       <Typography id={`${message.id}-alert-title`} variant="body2" fontWeight={700}>{alert.title}</Typography>
@@ -327,16 +343,16 @@ function AlertAttachment({ message, expanded, highlighted, register, onToggle, o
     {expanded && <Box sx={{ p: 1, borderTop: "1px solid", borderColor: "divider", bgcolor: "background.default" }}>
       {alert.blocking && <><Typography variant="caption" fontWeight={700}>Qué está bloqueando</Typography><Typography variant="caption" color="text.secondary" display="block" sx={{ mt: .25 }}>{alert.blocking}</Typography></>}
       <Typography variant="caption" fontWeight={700} display="block" sx={{ mt: alert.blocking ? 1 : 0 }}>Cómo resolverlo</Typography>
-      {alert.resolution?.length ? <Box component="ol" sx={{ my: .25, pl: 2.5, color: "text.secondary", fontSize: ui.typography.routine, lineHeight: 1.55 }}>{alert.resolution.map((step) => <li key={step}>{step}</li>)}</Box> : <Typography variant="caption" color="text.secondary">Revisa la evidencia y completa la corrección en el flujo operativo de EmusaSoft.</Typography>}
+      {alert.resolution?.length ? <Box component="ol" sx={{ my: .25, pl: 2.5, color: "text.secondary", fontSize: ui.typography.routine, lineHeight: 1.55 }}>{alert.resolution.map((step) => <li key={step}>{step}</li>)}</Box> : <Typography variant="caption" color="text.secondary">Esta alerta no tiene una guía de resolución aprobada en el catálogo.</Typography>}
     </Box>}
   </Paper>;
 }
 
 export function ChatDetail({ session, conversationId }: { session: SessionResponse; conversationId: string }) {
-  const queueKey = `monitor.pending.${session.principal.sysUserId}.${conversationId}`;
+  const queueKey = pendingMessageStorageKey(session.principal.sysUserId, conversationId);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [localMessages, setLocalMessages] = useState<ConversationMessage[]>([]);
-  const [pending, setPending] = useState<PendingMessage[]>(() => JSON.parse(localStorage.getItem(queueKey) ?? "[]") as PendingMessage[]);
+  const [pending, setPending] = useState<PendingMessage[]>(() => readPendingMessages<PendingMessage>(queueKey));
   const [draft, setDraft] = useState("");
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [sending, setSending] = useState(false);
@@ -364,6 +380,8 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
   const [conversationMenuAnchor, setConversationMenuAnchor] = useState<HTMLElement | null>(null);
   const [historySearchOpen, setHistorySearchOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
+  const [conversationMeta, setConversationMeta] = useState<{ title: string; participantCount: number; participantNames: string } | null>(null);
+  const [incidentLifecycles, setIncidentLifecycles] = useState<Record<string, IncidentLifecycle>>({});
   const isMobile = useMediaQuery("(max-width:760px)");
   const socket = useMemo(() => io({ withCredentials: true, autoConnect: false }), []);
   const composerInputRef = useRef<HTMLInputElement | null>(null);
@@ -375,14 +393,12 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
 
   const fixtureConversation = UI_ONLY_CONVERSATION_FIXTURES.find((row) => row.id === conversationId) ?? UI_ONLY_CONVERSATION_FIXTURES[0]!;
   const storedContext = useMemo(() => {
-    try {
-      const value = JSON.parse(sessionStorage.getItem(CHAT_CONTEXT_KEY) ?? "null") as { id?: string; title?: string; participants?: string; mockOnly?: boolean } | null;
-      return value?.id === conversationId ? value : null;
-    } catch { return null; }
+    return readChatPresentationContext(conversationId);
   }, [conversationId]);
   const mockConversation = Boolean(storedContext?.mockOnly || conversationId.startsWith("ui-demo-"));
-  const conversationTitle = storedContext?.title ?? fixtureConversation.title;
-  const participantSummary = storedContext?.participants ?? fixtureConversation.participants;
+  const conversationTitle = mockConversation ? storedContext?.title ?? fixtureConversation.title : conversationMeta?.title ?? storedContext?.title ?? "Conversación";
+  const participantSummary = mockConversation ? storedContext?.participants ?? fixtureConversation.participants
+    : conversationMeta ? `${conversationMeta.participantCount} ${conversationMeta.participantCount === 1 ? "participante" : "participantes"} · ${conversationMeta.participantNames}` : storedContext?.participants ?? "";
   const uiOnlyMessages = useMemo(() => buildUiOnlyMessages(demoPhoto, session.principal.sysUserId, session.principal.displayName), [session.principal.displayName, session.principal.sysUserId]);
 
   const refresh = useCallback(() => {
@@ -391,11 +407,20 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
       setMessages(result.messages);
       setNextMessageCursor(result.nextCursor);
       setReadOnly(Boolean(result.writableUntil && Date.parse(result.writableUntil) <= Date.now()));
+      if (result.title) setConversationMeta({ title: result.title, participantCount: result.participantCount, participantNames: result.participantNames });
+      else {
+        const listed = await conversations("", undefined, conversationScope(session.principal.scopes.includes("monitor:admin")));
+        const summary = listed.conversations.find((item) => item.id === conversationId);
+        if (summary) setConversationMeta({ title: summary.title, participantCount: Number(summary.participantCount ?? 0), participantNames: summary.participantNames ?? "" });
+      }
+      const incidentIds = [...new Set(result.messages.filter((message) => message.kind === "alert" && typeof message.payload.id === "string").map((message) => String(message.payload.id)))];
+      const details = await Promise.all(incidentIds.map((id) => incidentDetail(id)));
+      setIncidentLifecycles(Object.fromEntries(details.map((detail) => [detail.id, detail.lifecycle])));
       setState("ready");
       const latest = result.messages.at(-1)?.cursor;
       if (latest) await markConversationRead(conversationId, latest);
-    }).catch(() => setState(import.meta.env.DEV ? "ready" : "error"));
-  }, [conversationId, mockConversation]);
+    }).catch(() => setState("error"));
+  }, [conversationId, mockConversation, session.principal.scopes]);
   useEffect(refresh, [refresh]);
 
   const flushPending = useCallback(async (items: PendingMessage[]) => {
@@ -404,7 +429,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
       try {
         await sendConversationMessage(conversationId, item.body, item.id, item.replyToMessageId, item.payload);
         remaining = remaining.filter((pendingItem) => pendingItem.id !== item.id);
-        localStorage.setItem(queueKey, JSON.stringify(remaining));
+        writePendingMessages(queueKey, remaining);
         setPending(remaining);
       } catch { break; }
     }
@@ -413,35 +438,42 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
 
   useEffect(() => {
     if (mockConversation) return;
-    socket.on("connect", () => { void flushPending(JSON.parse(localStorage.getItem(queueKey) ?? "[]") as PendingMessage[]); });
+    socket.on("connect", () => { void flushPending(readPendingMessages<PendingMessage>(queueKey)); });
     socket.on("message.created", refresh);
     socket.on("message.updated", refresh);
+    socket.on("incident.changed", refresh);
     socket.on("typing", (event: { conversationId: string; sysUserId: number; active: boolean }) => { if (event.conversationId === conversationId) setTypingUsers((current) => event.active ? [...new Set([...current, event.sysUserId])] : current.filter((id) => id !== event.sysUserId)); });
     socket.on("presence", (event: { conversationId: string; sysUserId: number; online: boolean }) => { if (event.conversationId === conversationId) setOnlineUsers((current) => event.online ? [...new Set([...current, event.sysUserId])] : current.filter((id) => id !== event.sysUserId)); });
     socket.connect();
-    const online = () => void flushPending(JSON.parse(localStorage.getItem(queueKey) ?? "[]") as PendingMessage[]);
+    const online = () => void flushPending(readPendingMessages<PendingMessage>(queueKey));
     window.addEventListener("online", online);
     return () => { window.removeEventListener("online", online); socket.disconnect(); };
   }, [conversationId, flushPending, mockConversation, queueKey, refresh, socket]);
 
   const displayMessages = useMemo(() => {
-    const fixtureMessages = import.meta.env.DEV ? uiOnlyMessages : [];
+    const fixtureMessages = mockConversation ? uiOnlyMessages : [];
     const byId = new Map<string, ConversationMessage>();
     [...fixtureMessages, ...messages, ...localMessages].forEach((message) => byId.set(message.id, message));
     return [...byId.values()].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
   }, [localMessages, messages, uiOnlyMessages]);
+  const latestMessageId = displayMessages.at(-1)?.id ?? null;
   const messageById = useMemo(() => new Map(displayMessages.map((message) => [message.id, message])), [displayMessages]);
   const visibleMessages = useMemo(() => {
     const query = historySearch.trim().toLocaleLowerCase("es-PE");
     if (!query) return displayMessages;
     return displayMessages.filter((message) => `${message.senderName} ${textFromMessage(message)}`.toLocaleLowerCase("es-PE").includes(query));
   }, [displayMessages, historySearch]);
-  const alertMessages = useMemo(() => displayMessages.filter((message) => message.kind === "alert" && !message.deletedAt), [displayMessages]);
+  const alertMessages = useMemo(() => displayMessages.filter((message) => message.kind === "alert" && !message.deletedAt
+    && (mockConversation || incidentLifecycles[String(message.payload.id)] === "open")), [displayMessages, incidentLifecycles, mockConversation]);
+  const unavailable = state !== "ready";
 
   useEffect(() => {
-    if (state !== "ready") return;
-    window.requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "auto" }));
-  }, [state]);
+    if (state !== "ready" || !latestMessageId) return;
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      const viewport = scrollRef.current;
+      viewport?.scrollTo({ top: viewport.scrollHeight, behavior: smoothBehavior() });
+    }));
+  }, [latestMessageId, state]);
 
   const showToast = (message: string) => setToast(message);
   const toggleSet = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, id: string) => setter((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
@@ -544,12 +576,11 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
       appendLocalMessage(draft.trim(), attachment);
       setDraft(""); setAttachment(null); setReplyTo(null);
       showToast(attachment?.mockOnly ? "Archivo añadido a la vista local" : "Mensaje añadido a la vista local");
-      window.requestAnimationFrame(() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: smoothBehavior() }));
       return;
     }
     const nextMessage: PendingMessage = { id: crypto.randomUUID(), body: draft.trim(), replyToMessageId: replyTo?.id ?? null, ...(attachment ? { payload: { attachment } } : {}) };
     const next = [...pending, nextMessage];
-    setPending(next); localStorage.setItem(queueKey, JSON.stringify(next)); setDraft(""); setAttachment(null); setReplyTo(null); setSending(true);
+    setPending(next); writePendingMessages(queueKey, next); setDraft(""); setAttachment(null); setReplyTo(null); setSending(true);
     try { await flushPending(next); } finally { setSending(false); }
   };
 
@@ -564,8 +595,8 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
     <AppBar position="static" color="secondary" elevation={0}>
       <Toolbar sx={{ minHeight: "52px !important", gap: 1 }}>
         <IconButton color="inherit" aria-label="Volver a chats" onClick={() => go("/chats")} sx={{ width: 40, height: 40 }}><ArrowBackRounded/></IconButton>
-        <Box minWidth={0} flex={1}><Typography variant="h2" color="inherit" noWrap>{conversationTitle}</Typography><Typography variant="caption" sx={{ color: ui.color.textInverseMuted }} noWrap>{participantSummary}{onlineUsers.length ? ` · ${onlineUsers.length} en línea` : ""}</Typography></Box>
-        <IconButton color="inherit" aria-label="Opciones de la conversación" aria-haspopup="menu" aria-expanded={Boolean(conversationMenuAnchor)} onClick={(event) => setConversationMenuAnchor(event.currentTarget)} sx={{ width: 40, height: 40 }}><MoreVertRounded/></IconButton>
+        <Box minWidth={0} flex={1}><Typography variant="h2" color="inherit" noWrap>{state === "error" ? "Conversación no disponible" : conversationTitle}</Typography>{state !== "error" && <Typography variant="caption" sx={{ color: ui.color.textInverseMuted }} noWrap>{participantSummary}{onlineUsers.length ? ` · ${onlineUsers.length} en línea` : ""}</Typography>}</Box>
+        <IconButton color="inherit" aria-label="Opciones de la conversación" aria-haspopup="menu" aria-expanded={Boolean(conversationMenuAnchor)} disabled={unavailable} onClick={(event) => setConversationMenuAnchor(event.currentTarget)} sx={{ width: 40, height: 40 }}><MoreVertRounded/></IconButton>
       </Toolbar>
     </AppBar>
     <Menu anchorEl={conversationMenuAnchor} open={Boolean(conversationMenuAnchor)} onClose={() => setConversationMenuAnchor(null)}>
@@ -603,7 +634,7 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
               {!isMobile && !message.deletedAt && <IconButton size="small" aria-label="Acciones del mensaje" aria-haspopup="menu" onClick={(event) => { setSelectedMessage(message); setMessageMenuAnchor(event.currentTarget); }} sx={{ position: "absolute", top: 1, right: 1, width: 30, height: 30 }}><ExpandMoreRounded sx={{ fontSize: 17 }}/></IconButton>}
               {!outgoing && <Typography variant="caption" color={isTextBubble ? "primary.dark" : "primary.main"} fontWeight={700} display="block" sx={{ mb: isTextBubble ? "1px" : .15, mr: isAlert && !isMobile ? 4 : 0, ...(isTextBubble ? { lineHeight: 1.15 } : {}) }}>{message.senderName || "Monitor"}</Typography>}
               {quoted && <ButtonBase onClick={() => jumpToMessage(quoted.id)} aria-label={`Ir al mensaje citado de ${quoted.senderName}`} sx={{ position: "relative", display: "grid", width: "100%", textAlign: "left", justifyItems: "start", p: "6px 9px 6px 12px", mb: .5, borderRadius: "10px", bgcolor: "background.default", overflow: "hidden", "&::before": { position: "absolute", top: 6, left: 4, width: 3, height: 16, borderRadius: 2, bgcolor: "primary.main", content: "''" } }}><Typography variant="caption" color="primary.dark" fontWeight={700} sx={{ lineHeight: 1.2 }}>{quoted.senderName}</Typography><Typography variant="caption" color="text.secondary" noWrap sx={{ width: "100%", lineHeight: 1.3 }}>{textFromMessage(quoted)}</Typography></ButtonBase>}
-              {message.deletedAt ? <Typography variant="body2" color="text.secondary" fontStyle="italic">Mensaje eliminado</Typography> : isAlert ? <AlertAttachment message={message} expanded={expandedAlerts.has(message.id)} highlighted={flashMessageId === message.id} register={(element) => { if (element) alertRefs.current.set(message.id, element); else alertRefs.current.delete(message.id); }} onToggle={() => toggleSet(setExpandedAlerts, message.id)} onCopyIdentifier={(value) => void copyText(value, `OT ${value} copiada`)}/> : isAttachment ? renderAttachment(message) : <Typography variant="body2" component="span" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.body}</Typography>}
+              {message.deletedAt ? <Typography variant="body2" color="text.secondary" fontStyle="italic">Mensaje eliminado</Typography> : isAlert ? <AlertAttachment message={message} lifecycle={incidentLifecycles[String(message.payload.id)]} expanded={expandedAlerts.has(message.id)} highlighted={flashMessageId === message.id} register={(element) => { if (element) alertRefs.current.set(message.id, element); else alertRefs.current.delete(message.id); }} onToggle={() => toggleSet(setExpandedAlerts, message.id)} onCopyIdentifier={(value) => void copyText(value, `OT ${value} copiada`)}/> : isAttachment ? renderAttachment(message) : <Typography variant="body2" component="span" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{message.body}</Typography>}
               <Stack direction="row" justifyContent="flex-end" alignItems="center" gap={.5} sx={{ mt: "2px" }}>
                 {pinnedMessages.has(message.id) && <PushPinRounded
                   aria-label="Mensaje fijado"
@@ -668,11 +699,11 @@ export function ChatDetail({ session, conversationId }: { session: SessionRespon
           <IconButton aria-label="Quitar adjunto" onClick={() => setAttachment(null)} sx={{ width: 36, height: 36 }}><CloseRounded sx={{ fontSize: 17 }}/></IconButton>
         </Stack>}
         <Stack direction="row" gap={.5} alignItems="center">
-          <Tooltip title="Adjuntar imagen"><IconButton component="label" aria-label="Adjuntar imagen de la galería" disabled={readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><ImageRounded/><input hidden type="file" accept="image/*" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
-          <Tooltip title="Tomar foto"><IconButton component="label" aria-label="Tomar o adjuntar foto" disabled={readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><PhotoCameraRounded/><input hidden type="file" accept="image/*" capture="environment" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
-          <Tooltip title="Adjuntar archivo"><IconButton component="label" aria-label="Adjuntar archivo del dispositivo" disabled={readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><AttachFileRounded/><input hidden type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={(event) => { selectFile(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
-          <TextField inputRef={composerInputRef} fullWidth size="small" value={draft} onChange={(event) => { setDraft(event.target.value); if (!mockConversation) socket.emit("typing", { conversationId, active: Boolean(event.target.value) }); }} placeholder={readOnly ? "Conversación cerrada" : editingMessage ? "Editar mensaje" : attachment ? "Añadir comentario" : "Escribir mensaje"} disabled={readOnly} inputProps={{ "aria-label": "Escribir mensaje" }}/>
-          <IconButton type="submit" color="primary" disabled={readOnly || (!draft.trim() && !attachment) || sending} aria-label={editingMessage ? "Guardar edición" : "Enviar mensaje"} sx={{ width: 44, height: 44 }}><SendRounded/></IconButton>
+          <Tooltip title="Adjuntar imagen"><IconButton component="label" aria-label="Adjuntar imagen de la galería" disabled={unavailable || readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><ImageRounded/><input hidden type="file" accept="image/*" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
+          <Tooltip title="Tomar foto"><IconButton component="label" aria-label="Tomar o adjuntar foto" disabled={unavailable || readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><PhotoCameraRounded/><input hidden type="file" accept="image/*" capture="environment" onChange={(event) => { selectImage(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
+          <Tooltip title="Adjuntar archivo"><IconButton component="label" aria-label="Adjuntar archivo del dispositivo" disabled={unavailable || readOnly || Boolean(editingMessage)} sx={{ width: 44, height: 44 }}><AttachFileRounded/><input hidden type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt" onChange={(event) => { selectFile(event.target.files?.[0]); event.currentTarget.value = ""; }}/></IconButton></Tooltip>
+          <TextField inputRef={composerInputRef} fullWidth size="small" value={draft} onChange={(event) => { setDraft(event.target.value); if (!mockConversation) socket.emit("typing", { conversationId, active: Boolean(event.target.value) }); }} placeholder={unavailable ? "Conversación no disponible" : readOnly ? "Conversación cerrada" : editingMessage ? "Editar mensaje" : attachment ? "Añadir comentario" : "Escribir mensaje"} disabled={unavailable || readOnly} inputProps={{ "aria-label": "Escribir mensaje" }}/>
+          <IconButton type="submit" color="primary" disabled={unavailable || readOnly || (!draft.trim() && !attachment) || sending} aria-label={editingMessage ? "Guardar edición" : "Enviar mensaje"} sx={{ width: 44, height: 44 }}><SendRounded/></IconButton>
         </Stack>
       </Box>
     </Paper>

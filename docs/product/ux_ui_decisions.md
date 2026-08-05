@@ -472,6 +472,7 @@ The object has two clear destinations:
 2. expand a concise explanation and resolution guide.
 
 The resolution guide explains what is blocked or inconsistent and the safe steps for investigating or correcting it through the existing operational workflow.
+Its text is deterministic by alert code, originates in the recommended resolution in `alert_catalog.md`, and is stored in Monitor's `monitor_alert_guidance` table so authorized backend maintenance can change it without a frontend release. Chat and laboratory surfaces receive it through Monitor APIs; neither embeds a code-specific fallback. A generic instruction is not shown for a cataloged alert.
 
 ### 7.3 Interaction
 
@@ -485,6 +486,8 @@ The resolution guide explains what is blocked or inconsistent and the safe steps
 ### 7.4 Color and age
 
 - Alert-label color appears in a compact marker and written label; lifecycle state is presented separately.
+- While the incident is open, the structured alert keeps its danger border, danger-tinted header, and code-specific descriptive label such as `Alerta` or `Error`.
+- Once the incident is resolved, its border, header tint, and written lifecycle state use the equivalent resolved-green tokens. The code-specific `Alerta` or `Error` chip is hidden because that condition is no longer active; the alert code remains visible for identification.
 - The unresolved duration is written explicitly at the opposite edge of the header.
 - Age does not overlap the message-action control.
 - Before two hours unresolved, the duration uses the standard muted-navy metadata color. From two hours unresolved onward, the duration alone uses the deep-danger age token. The attachment surface, alert label, code, and lifecycle do not change with age.
@@ -492,11 +495,26 @@ The resolution guide explains what is blocked or inconsistent and the safe steps
 ### 7.5 Approved alert-object composition
 
 - The alert message uses the narrower `min(92%, 440px)` measure with the implementation's compact outer radius and nearly even shell padding.
-- The alert attachment uses a soft danger border, compact radius, and low navy shadow.
+- The alert attachment uses a soft lifecycle border, compact radius, and low navy shadow: danger while open and resolved green after resolution.
 - The header keeps the status as an outlined compact rectangle with a written label and danger dot; the code retains its compact neutral rectangle; the age remains uncapsuled at the opposite edge.
 - A light divider separates the explanation from compact operational facts.
 - Work-order and explanation actions remain two equal columns at every width. Narrow layouts shorten their visible labels to `OT` and `Ver` rather than stacking them.
 - The work-order action copies the identifier until the Phase 10 navigation contract authorizes a supported EmusaSoft route.
+
+### 7.6 Laboratory read-only preview
+
+- A selected laboratory record controls the preview; no record selection means no alert object is shown.
+- The preview can switch between the selected record's Chat alert and the real Dashboard in a narrow responsive viewport. Both surfaces remain read-only consumers of Monitor data.
+- The embedded Dashboard preview shows only the primary alert chart and its lifecycle legend. It omits the application header, bottom navigation, chart title and subtitle, incident list, and secondary analysis; the normal Dashboard remains unchanged.
+- Dashboard mode adds a compact **Filtros** action beside the preview switch. It opens the Dashboard's read-only advanced-filter drawer inside the preview and is absent in Alert mode.
+- The alert view shows the resolved routing recipients and their roles beside the alert object.
+- The preview container follows the height of its visible content instead of reserving unused vertical space.
+- The laboratory's A02 table keeps complete source values internally while using compact operational labels: the unique code shows its final four characters, warehouse origins show `AMP` or `APP`, machine destinations show only the machine name, and dispatch timestamps omit seconds. Exact complete values remain available as hover text.
+- A03 and A05 show elapsed simulated minutes beside their source start or declaration time, using the same experiment-clock calculation as A02.
+- A02, A03, and A05 keep a source-action row visible as pending until a healthy, complete poll acknowledges that action. A direct EmusaSoft-style edit can update the row and disable completed source controls, but cannot remove the row or change Monitor-derived alert presentation before polling.
+- The A02 warehouse-influence control appears only with the active movement table; history mode omits it because it cannot change historical records.
+- The experiment setup uses a narrow two-column control rail: the source-window input spans both columns, speed and polling sit below it, and time jumps use two columns. This preserves more width for the read-only Alert and Dashboard preview.
+- At desktop and tablet widths, starting or pausing an experiment never changes the experiment-header height. The experiment identifier truncates before the clock, start time, lifecycle, or run control can wrap.
 
 ## 8. Message actions
 
@@ -613,6 +631,8 @@ The custom range uses one anchored range-calendar popover. Opening it from a pre
 ### 10.4 Primary chart
 
 The main chart is a stacked bar chart with three lifecycle series:
+
+The scale reserves at least 12% vertical headroom above the highest bar so its value label remains inside the chart.
 
 - resolved — green;
 - open — red; and

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { createDatabaseRuntime, migrateFoundation, type DatabaseRuntime } from "@monitor/database";
-import { primaryRoleFor, requiredRolesFor, RoutingService } from "./routing.js";
+import { primaryRoleFor, requiredRolesFor, RoutingService, type RoutingInterruptionPoint } from "./routing.js";
 
 const databases: DatabaseRuntime[] = [];
 async function database() {
@@ -92,6 +92,65 @@ describe("Phase 5 catalog routing", () => {
     const retried = await db.queryOne("SELECT state,attempt_count FROM monitor_notification_delivery WHERE incident_id=$1 AND recipient_key='assignment:operator-b'", [incident.id]);
     assert.equal(retried.state, "sent");
     assert.equal(Number(retried.attempt_count), 3);
+  });
+
+  it("resumes the same routing decision across every routing and delivery interruption boundary", async () => {
+    const db = await database();
+    await db.execute("INSERT INTO monitor_roster_revision (plant_id,revision) VALUES (1,0)");
+    await db.execute(`INSERT INTO monitor_roster_assignment
+      (id,plant_id,person_name,position,scope,valid_from,state,setup_complete)
+      VALUES ('manager',1,'María Torres','Gerente de fábrica','factory','2026-07-01','active',TRUE),
+        ('leader',1,'Rosa Paredes','Líder técnico','operation','2026-07-01','active',TRUE)`);
+    await db.execute("INSERT INTO monitor_roster_assignment_operation (assignment_id,operation_name) VALUES ('leader','Impresión')");
+    const incident = await db.queryOne(`INSERT INTO monitor_incident
+      (rule_code,condition_key,occurrence,lifecycle,label,title,summary,plant_id,operation_name,shift_name,reasons,opened_at,updated_at)
+      VALUES ('A03','A03:interruptions',1,'open','Alerta','Consumo','Consumo',1,'Impresión','Día','[]'::jsonb,
+        '2026-08-01T12:00:00Z','2026-08-01T12:00:00Z') RETURNING id`);
+    await db.execute(`INSERT INTO monitor_incident_evidence (incident_id,status,reasons,evidence,observed_at)
+      VALUES ($1,'triggered','[]'::jsonb,'{}'::jsonb,'2026-08-01T12:00:00Z')`, [incident.id]);
+
+    let armed: RoutingInterruptionPoint | null = null;
+    const fired: Array<{ point: RoutingInterruptionPoint; context: Record<string, unknown> }> = [];
+    const service = new RoutingService(db, async (point, context) => {
+      if (armed !== point) return;
+      armed = null;
+      fired.push({ point, context });
+      throw new Error(`interrupted:${point}`);
+    });
+    const counts = async () => ({
+      decisions: Number((await db.queryOne("SELECT COUNT(*)::int AS count FROM monitor_routing_decision WHERE incident_id=$1", [incident.id])).count),
+      deliveries: Number((await db.queryOne("SELECT COUNT(*)::int AS count FROM monitor_notification_delivery WHERE incident_id=$1", [incident.id])).count),
+    });
+
+    armed = "before_routing_decision";
+    await assert.rejects(service.routeIncident(String(incident.id)), /interrupted:before_routing_decision/);
+    assert.deepEqual(await counts(), { decisions: 0, deliveries: 0 });
+
+    armed = "after_routing_decision";
+    await assert.rejects(service.routeIncident(String(incident.id)), /interrupted:after_routing_decision/);
+    assert.deepEqual(await counts(), { decisions: 1, deliveries: 0 });
+    const decisionId = String((await db.queryOne("SELECT id FROM monitor_routing_decision WHERE incident_id=$1", [incident.id])).id);
+    assert.equal(fired.at(-1)?.context.routingDecisionId, decisionId);
+
+    armed = "before_delivery_creation";
+    await assert.rejects(service.routeIncident(String(incident.id)), /interrupted:before_delivery_creation/);
+    assert.deepEqual(await counts(), { decisions: 1, deliveries: 0 });
+
+    armed = "after_delivery_creation";
+    await assert.rejects(service.routeIncident(String(incident.id)), /interrupted:after_delivery_creation/);
+    assert.deepEqual(await counts(), { decisions: 1, deliveries: 1 });
+    const firstDeliveryId = String((await db.queryOne("SELECT id FROM monitor_notification_delivery WHERE incident_id=$1", [incident.id])).id);
+    assert.equal(fired.at(-1)?.context.deliveryId, firstDeliveryId);
+
+    await service.routeIncident(String(incident.id));
+    assert.deepEqual(await counts(), { decisions: 1, deliveries: 2 });
+    const repairedIds = await db.queryAll("SELECT id FROM monitor_notification_delivery WHERE incident_id=$1 ORDER BY id", [incident.id]);
+    assert.ok(repairedIds.some((row) => row.id === firstDeliveryId));
+    await service.routeIncident(String(incident.id));
+    assert.deepEqual(await db.queryAll("SELECT id FROM monitor_notification_delivery WHERE incident_id=$1 ORDER BY id", [incident.id]), repairedIds);
+    assert.deepEqual(fired.map(({ point }) => point), [
+      "before_routing_decision", "after_routing_decision", "before_delivery_creation", "after_delivery_creation",
+    ]);
   });
 
   it("keeps valid recipients, records missing assignments, and emails administrators without a broad fallback", async () => {

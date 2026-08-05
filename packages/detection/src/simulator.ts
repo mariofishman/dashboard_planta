@@ -1,8 +1,9 @@
 import type { DatabaseExecutor, DatabaseRuntime } from "@monitor/database";
+import type { SourceActionContract, SourceActionEvidence } from "./source-actions.js";
 import type { DetectionQueryDefinition, DetectionSourceAdapter, SourcePage } from "./types.js";
 
 export type ScenarioRuleCode = "A02" | "A03" | "A05";
-export type ScenarioFault = "timeout" | "source_error" | "partial" | "invalid_schema";
+export type ScenarioFault = "timeout" | "source_error" | "partial" | "invalid_schema" | "partial_pagination" | "duplicate_keys" | "revision_change" | "stale" | "unknown_freshness";
 export type ScenarioCorrection = "weigh" | "move" | "both";
 export type ScenarioCase =
   | "clean_baseline"
@@ -20,6 +21,11 @@ export type ScenarioCase =
   | "past_threshold_remnant"
   | "movement_started";
 export type ScenarioAction = "reset" | "prepare" | "correct" | "correct_weigh" | "correct_move" | "advance_time" | "recur";
+export type ScenarioPopulation = "a02_mixed" | "a03_mixed";
+export type ScenarioSourceAction =
+  | "prepare_dispatch" | "receive" | "cancel" | "reject"
+  | "start_work_order" | "record_first_consumption" | "close_work_order" | "cancel_work_order" | "start_competing_work_order"
+  | "declare_produced_reel" | "declare_remnant_reel" | "register_weighing" | "register_movement" | "handoff";
 
 export interface ScenarioContext {
   plantId: number;
@@ -48,18 +54,36 @@ export interface ScenarioStatus {
   };
 }
 
+export interface ScenarioSourceActionOutcome {
+  status: ScenarioStatus;
+  evidence: SourceActionEvidence;
+}
+
+export type ScenarioSourceActionInput = Record<string, string | number | null>;
+
 export interface ScenarioSource {
   supportedCases(code: string): ScenarioCase[];
   reset(code: string): Promise<ScenarioStatus>;
   trigger(code: string): Promise<ScenarioStatus>;
   prepare(code: string, scenarioCase: string, action?: ScenarioAction): Promise<ScenarioStatus>;
+  preparePopulation?(code: ScenarioRuleCode, population: ScenarioPopulation, keys: number[]): Promise<ScenarioStatus>;
   correct(code: string, correction?: ScenarioCorrection): Promise<ScenarioStatus>;
   recur(code: string): Promise<ScenarioStatus>;
   advanceTime(code: string, minutes: number): Promise<ScenarioStatus>;
+  setBusinessTime(currentAt: string): Promise<void>;
+  setSourceCutoffAt?(cutoffAt: string | null): Promise<void>;
+  latestSourceTimestamp?(): Promise<string>;
+  isBaselineClean?(): boolean;
   failNextPoll(code: string, fault: ScenarioFault): Promise<ScenarioStatus>;
   consumeFault(code: ScenarioRuleCode): Promise<ScenarioFault | null>;
   rows(code: ScenarioRuleCode): Promise<{ rows: Record<string, unknown>[]; sourceRevision: string }>;
   status(code: string): Promise<ScenarioStatus>;
+  sourceActionCandidate?(code: ScenarioRuleCode, action: ScenarioSourceAction): Promise<number | null>;
+  sourceAction?(code: string, action: ScenarioSourceAction, key: number, contract: SourceActionContract, input?: ScenarioSourceActionInput): Promise<ScenarioSourceActionOutcome>;
+  replaceTracked?(code: ScenarioRuleCode, keys: number[]): void;
+  recordExternalSourceChange?(code: ScenarioRuleCode, action: string): void;
+  resetAfterDatabaseRestore?(): Promise<void>;
+  pollMetadata?(code: ScenarioRuleCode): { currentAt: string; sourceRevision: string };
 }
 
 const codes: ScenarioRuleCode[] = ["A02", "A03", "A05"];
@@ -160,35 +184,29 @@ export class ScenarioSourceRepository {
   }
 
   async recur(code: string): Promise<ScenarioStatus> {
-    const ruleCode = assertCode(code);
-    const latest = await this.database.queryOne("SELECT lifecycle FROM monitor_incident WHERE rule_code=$1 ORDER BY occurrence DESC LIMIT 1", [ruleCode]);
-    if (latest.lifecycle !== "resolved") throw new Error("recurrence_requires_resolved_incident");
-    await this.database.transaction(async (transaction) => {
-      const clock = await this.clock(transaction, ruleCode);
-      const advancedAt = new Date(Date.parse(clock.currentAt) + 60_000).toISOString();
-      await transaction.execute("UPDATE monitor_sim_scenario SET current_at=$2 WHERE rule_code=$1", [ruleCode, advancedAt]);
-      const recurrenceCase = ruleCode === "A05" ? "past_threshold_both" : "past_threshold";
-      if (ruleCode === "A02") await this.prepareA02(transaction, advancedAt, recurrenceCase);
-      if (ruleCode === "A03") await this.prepareA03(transaction, advancedAt, recurrenceCase);
-      if (ruleCode === "A05") await this.prepareA05(transaction, advancedAt, recurrenceCase);
-      await this.touch(transaction, ruleCode, "recur", "recurrence", true);
-    });
-    return this.status(ruleCode);
+    assertCode(code);
+    throw new Error("source_lifecycle_recurrence_unsupported");
   }
 
   async advanceTime(code: string, minutes: number): Promise<ScenarioStatus> {
     const ruleCode = assertCode(code);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240) throw new Error("invalid_advance_minutes");
     await this.database.transaction(async (transaction) => {
-      await transaction.execute("UPDATE monitor_sim_scenario SET current_at=current_at + ($2 * INTERVAL '1 minute') WHERE rule_code=$1", [ruleCode, minutes]);
+      await transaction.execute("UPDATE monitor_sim_scenario SET current_at=current_at + ($1 * INTERVAL '1 minute')", [minutes]);
       await this.touch(transaction, ruleCode, "advance_time", null, true);
     });
     return this.status(ruleCode);
   }
 
+  async setBusinessTime(currentAt: string): Promise<void> {
+    const timestamp = new Date(currentAt);
+    if (!Number.isFinite(timestamp.getTime())) throw new Error("invalid_scenario_business_time");
+    await this.database.execute("UPDATE monitor_sim_scenario SET current_at=$1", [timestamp.toISOString()]);
+  }
+
   async failNextPoll(code: string, fault: ScenarioFault): Promise<ScenarioStatus> {
     const ruleCode = assertCode(code);
-    if (!["timeout", "source_error", "partial", "invalid_schema"].includes(fault)) throw new Error("invalid_scenario_fault");
+    if (!["timeout", "source_error", "partial", "invalid_schema", "partial_pagination", "duplicate_keys", "revision_change", "stale", "unknown_freshness"].includes(fault)) throw new Error("invalid_scenario_fault");
     await this.database.execute(`UPDATE monitor_sim_scenario SET pending_fault=$2,last_action='fail_next_poll',
       last_action_at=current_at,last_action_recorded_at=now() WHERE rule_code=$1`, [ruleCode, fault]);
     return this.status(ruleCode);

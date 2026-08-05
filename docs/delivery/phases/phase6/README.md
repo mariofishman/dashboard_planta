@@ -1,8 +1,8 @@
 # Phase 6 — Source-compatible testing, conversations, and messages
 
-**Role:** Current Phase 6 execution and stage authority
+**Role:** Phase 6 status index; the linked Stage 5 recovery and completion plan is the sole Stage 5 execution and evidence authority
 
-**Status:** In progress; Stages 1–4 complete; Stage 5 is next
+**Status:** In progress; Stages 1–4 complete; Stage 5 is complete on its branch by explicit product decision, with its final-ledger limitation and Step 9 waiver recorded; Step 11 publication is current; Stage 6 pending
 
 **Project sequencing authority:** [`../../../roadmap.md`](../../../roadmap.md)
 
@@ -16,9 +16,9 @@ The three prerequisite workstreams are complete within their separate scopes:
 - the guarded, resettable local `test_database`; and
 - the approved standalone `alertas_fake` Stage 2 laboratory and its 34 valid tests.
 
-They have not yet passed as one connected system. Phase 7 remains blocked until the Phase 6 exit gate passes.
+Commit `165abc1` remains a preserved pre-recovery checkpoint; its useful implementation was corrected and revalidated through Recovery 1–6. Step 8B is complete and approved. On 2026-08-05, all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final evidence ledger failed validation. The product manager explicitly accepted that limitation, waived Step 9's two additional complete runs, and completed the Step 10 evidence review. Stage 5 is therefore complete on this branch without claiming that the missing evidence passed. Step 11 publication is current, Step 12 merge requires separate approval, and Stage 6 remains pending.
 
-The three workstreams now coexist on `main`. Stage 4 connected the separate source boundary and recorded its evidence; Stage 5 now validates the complete downstream path.
+The three workstreams coexist on the Stage 5 branch. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It originally connected that correct boundary behind the older scenario-screen composition. Recovery 3 later connected the approved tabbed V2 laboratory on `/dev/scenarios`, and Recovery 6 produced the passing replacement Step 8.2–8.7 evidence. The earlier browser run remains diagnostic history and is invalid for acceptance.
 
 ## Stage plan
 
@@ -27,13 +27,13 @@ The three workstreams now coexist on `main`. Stage 4 connected the separate sour
 | 1 — Stabilize requirements | Complete — 2026-07-29 | Audit A02, A03, A05 and define the redesigned laboratory and connected boundary. | Requirements and V2 specification recorded. |
 | 2 — Approve the standalone laboratory | Complete — 2026-07-31 | Review the V2 laboratory one test at a time. | All 34 valid tests pass and are user-approved; invalid/deferred recurrence cases remain explicitly excluded. |
 | 3 — Inspect the `test_database` handoff | Complete — 2026-07-31 | Verified the merged runtime, reset safeguards, readiness contract, credentials, Node driver access, and A02/A03/A05 source mappings. | **Ready with exact gaps.** The evidence, approved mappings, corrections, and Stage 4 gaps are recorded in the Stage 3 handoff. |
-| 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected `/dev/scenarios` to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. |
-| 5 — Run connected acceptance | **Next** | Execute business lifecycles and technical failure cases through routing, Dashboard, conversations, messages, and Chat UI. | A02, A03, and A05 satisfy the connected acceptance matrix without duplicate or unsafe state changes. |
-| 6 — Finalize Phase 6 | Pending | Reconcile authority and implementation, document Phase 10 exclusions, complete the final audit, and retire the old operational source simulator. | The Phase 6 exit gate passes and the user accepts the integrated local result. |
+| 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected the older `/dev/scenarios` composition to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. This did not connect or accept the approved V2 interface. |
+| 5 — Run connected acceptance | **Complete on branch by product decision; publication in progress** | Step 8B is approved; all 34 Step 8C cases executed; the final ledger limitation and Step 9 waiver are explicitly accepted; Step 10 is complete. | Commit and push the completed branch, then obtain separate approval for merge. |
+| 6 — Finalize Phase 6 | Pending | Audit the accepted Stage 5 evidence, reconcile authority and implementation, document Phase 10 exclusions, and decide whether the old operational source simulator can be retired. | The Phase 6 exit gate passes and the user accepts the integrated local result. |
 
-## Immediate next action — Stage 5
+## Immediate next action — Step 11 commit and push
 
-Use the [Stage 4 handoff](./test_database_stage4_handoff.md) to execute the connected acceptance matrix through routing, Dashboard, conversations, messages, and Chat UI. Keep Aurora behavior, production authorization, production plans, load, and deployment in Phase 10.
+Commit and push only the approved Stage 5 changes on `codex/phase6-stage5`. Run `step8c-full-20260805-sequential-r2` executed all 34 approved cases and restored the source, but its ledger failed evidence-format validation. The product manager accepted that limitation, waived Step 9, completed Step 10, and authorized Step 11. Do not claim that the invalid ledger or repeatability evidence passed. Do not merge without separate approval.
 
 ## Supporting specifications and evidence
 
@@ -44,6 +44,7 @@ These documents support execution but do not define current project or stage sta
 - [`test_database.md`](./test_database.md) — local MySQL safety, reset, commands, and validation evidence.
 - [`test_database_stage3_handoff.md`](./test_database_stage3_handoff.md) — final Stage 3 classification, driver/access evidence, approved source mappings, corrections, and exact Stage 4 gaps.
 - [`test_database_stage4_handoff.md`](./test_database_stage4_handoff.md) — connected source-boundary implementation, safeguards, and lifecycle evidence.
+- [`stage5_corrective_execution_plan.md`](./stage5_corrective_execution_plan.md) — the only current Stage 5 recovery, execution, and evidence authority.
 - [`../../../product/product_definition.md`](../../../product/product_definition.md) — product boundaries and conversation policy.
 - [`../../../product/alert_catalog.md`](../../../product/alert_catalog.md) — alert rules and routing.
 - [`../../../product/ux_ui_decisions.md`](../../../product/ux_ui_decisions.md) — accepted screen and interaction decisions.
@@ -51,6 +52,10 @@ These documents support execution but do not define current project or stage sta
 - [`../../../integrations/emusasoft/integration_register.md`](../../../integrations/emusasoft/integration_register.md) — external Phase 10 dependencies.
 
 Completed and superseded Phase 6 plans, audits, and earlier reports are preserved under [`../../../../archive/docs/implementation/`](../../../../archive/docs/implementation/) as historical evidence only.
+
+The historical checkpoint inventory, completion report, and handoff are preserved as [`stage5_connected_acceptance_inventory_checkpoint_165abc1.md`](../../../../archive/docs/implementation/stage5_connected_acceptance_inventory_checkpoint_165abc1.md), [`stage5_connected_acceptance_report_checkpoint_165abc1.md`](../../../../archive/docs/implementation/stage5_connected_acceptance_report_checkpoint_165abc1.md), and [`test_database_stage5_handoff_checkpoint_165abc1.md`](../../../../archive/docs/implementation/test_database_stage5_handoff_checkpoint_165abc1.md). Their completion claims are not accepted current authority.
+
+The superseded Stage 5 plan is preserved as [`stage5_corrective_execution_plan_v1.md`](../../../../archive/docs/implementation/stage5_corrective_execution_plan_v1.md). It is historical evidence only and has no current authority.
 
 ## Phase 6 exit gate
 

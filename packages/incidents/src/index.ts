@@ -101,8 +101,19 @@ const presentation: Record<SupportedRuleCode, { label: string; title: string; su
   A05: { label: "Error", title: "Bobina pendiente de pesar o mover", summary: "La bobina declarada requiere completar su pesaje o movimiento." },
 };
 
+const effectiveAtSql = (incidentAlias: string): string => `COALESCE((
+  SELECT NULLIF(e.evidence->>'sourceTimestamp','')::timestamptz
+  FROM monitor_incident_evidence e
+  WHERE e.incident_id=${incidentAlias}.id AND e.status='triggered' AND e.evidence ? 'sourceTimestamp'
+  ORDER BY e.observed_at ASC,e.id ASC LIMIT 1
+),${incidentAlias}.opened_at)`;
+
 export class IncidentService {
-  constructor(private readonly database: DatabaseRuntime, private readonly publish: (change: IncidentChange) => unknown | Promise<unknown> = () => undefined) {}
+  constructor(
+    private readonly database: DatabaseRuntime,
+    private readonly publish: (change: IncidentChange, context: { cycleId?: string }) => unknown | Promise<unknown> = () => undefined,
+    private readonly afterCommit: (change: IncidentChange, context: { cycleId?: string }) => unknown | Promise<unknown> = () => undefined,
+  ) {}
 
   async reconcileHealthyCycle(input: {
     rule: RuleContract;
@@ -116,6 +127,17 @@ export class IncidentService {
       const evaluation = evaluateRule(input.rule, row);
       if (evaluation.status === "triggered" && evaluation.conditionKey) activeKeys.add(evaluation.conditionKey);
       await this.apply({ rule: input.rule, evidence: row, context: input.contextFor(row), cycleId: input.cycleId, observedAt: input.observedAt });
+    }
+    const suppressions = await this.database.queryAll(
+      "SELECT condition_key FROM monitor_condition_suppression WHERE rule_code=$1 AND active=TRUE",
+      [input.rule.code],
+    );
+    for (const suppression of suppressions) {
+      if (!activeKeys.has(String(suppression.condition_key))) {
+        await this.database.execute(`UPDATE monitor_condition_suppression SET active=FALSE,expired_at=$3
+          WHERE rule_code=$1 AND condition_key=$2 AND active=TRUE`,
+        [input.rule.code, suppression.condition_key, input.observedAt.toISOString()]);
+      }
     }
     const open = await this.database.queryAll("SELECT id,condition_key,plant_id FROM monitor_incident WHERE rule_code=$1 AND lifecycle='open'", [input.rule.code]);
     for (const incident of open) {
@@ -173,6 +195,9 @@ export class IncidentService {
         await this.addEvidence(transaction, String(open.id), input, evaluated, observedAt);
         return this.addChangeEvent(transaction, String(open.id), "incident.updated", "open", input.context.plantId, observedAt);
       }
+      const suppression = await transaction.queryOne(`SELECT active FROM monitor_condition_suppression
+        WHERE rule_code=$1 AND condition_key=$2`, [input.rule.code, evaluated.conditionKey]);
+      if (suppression.active === true) return null;
       const occurrenceRow = await transaction.queryOne(`SELECT COALESCE(MAX(occurrence),0)::int + 1 AS occurrence
         FROM monitor_incident WHERE rule_code=$1 AND condition_key=$2`, [input.rule.code, evaluated.conditionKey]);
       const incident = await transaction.queryOne(`INSERT INTO monitor_incident
@@ -189,7 +214,39 @@ export class IncidentService {
       await this.addTransition(transaction, incidentId, null, "open", "condition_triggered", input.cycleId, observedAt);
       return this.addChangeEvent(transaction, incidentId, "incident.opened", "open", input.context.plantId, observedAt);
     });
-    if (change) await this.publish(change);
+    if (change) {
+      await this.afterCommit(change, { ...(input.cycleId ? { cycleId: input.cycleId } : {}) });
+      await this.publish(change, { ...(input.cycleId ? { cycleId: input.cycleId } : {}) });
+    }
+    return change;
+  }
+
+  async closeWithoutResolution(input: { incidentId: string; actorSysUserId: number; reason: string; comment: string; closedAt?: Date }): Promise<IncidentChange> {
+    const reason = input.reason.trim();
+    const comment = input.comment.trim();
+    if (!reason || reason.length > 100 || !comment || comment.length > 2000) throw new Error("invalid_administrative_closure");
+    const closedAt = (input.closedAt ?? new Date()).toISOString();
+    const change = await this.database.transaction(async (transaction) => {
+      const incident = await transaction.queryOne(`SELECT id,rule_code,condition_key,plant_id,lifecycle
+        FROM monitor_incident WHERE id=$1`, [input.incidentId]);
+      if (!incident.id) throw new Error("incident_not_found");
+      if (incident.lifecycle !== "open") throw new Error("incident_not_open");
+      const evidence = await transaction.queryOne(`SELECT evidence FROM monitor_incident_evidence
+        WHERE incident_id=$1 ORDER BY observed_at DESC LIMIT 1`, [input.incidentId]);
+      await transaction.execute(`INSERT INTO monitor_incident_administrative_closure
+        (incident_id,reason,comment,actor_sys_user_id,frozen_evidence,closed_at)
+        VALUES ($1,$2,$3,$4,$5::jsonb,$6)`, [input.incidentId, reason, comment, input.actorSysUserId, JSON.stringify(jsonValue(evidence.evidence) ?? {}), closedAt]);
+      await transaction.execute(`UPDATE monitor_incident SET lifecycle='closed_without_resolution',updated_at=$2,resolved_at=$2,
+        resolution_reason='administrative_closure' WHERE id=$1`, [input.incidentId, closedAt]);
+      await transaction.execute(`INSERT INTO monitor_condition_suppression
+        (rule_code,condition_key,incident_id,active,created_at,expired_at) VALUES ($1,$2,$3,TRUE,$4,NULL)
+        ON CONFLICT (rule_code,condition_key) DO UPDATE SET incident_id=EXCLUDED.incident_id,active=TRUE,created_at=EXCLUDED.created_at,expired_at=NULL`,
+      [incident.rule_code, incident.condition_key, input.incidentId, closedAt]);
+      await this.addTransition(transaction, input.incidentId, "open", "closed_without_resolution", "administrative_closure", undefined, closedAt);
+      return this.addChangeEvent(transaction, input.incidentId, "incident.resolved", "closed_without_resolution", Number(incident.plant_id), closedAt);
+    });
+    await this.afterCommit(change, {});
+    await this.publish(change, {});
     return change;
   }
 
@@ -206,18 +263,18 @@ export class IncidentService {
       const p = `$${parameters.length}`;
       conditions.push(`(title ILIKE '%' || ${p} || '%' OR rule_code ILIKE '%' || ${p} || '%' OR work_order_code ILIKE '%' || ${p} || '%' OR machine_code ILIKE '%' || ${p} || '%' OR responsible_name ILIKE '%' || ${p} || '%')`);
     }
-    return this.database.queryAll(`SELECT id, rule_code AS "ruleCode", lifecycle, label, title, summary, plant_id AS "plantId",
-      work_order_id AS "workOrderId", work_order_code AS "workOrderCode", machine_code AS "machineCode", operation_name AS "operationName",
-      shift_name AS "shiftName", responsible_name AS "responsibleName", reasons, opened_at AS "openedAt", updated_at AS "updatedAt",
-      resolved_at AS "resolvedAt", occurrence FROM monitor_incident WHERE ${conditions.join(" AND ")} ORDER BY opened_at DESC`, parameters);
+    return this.database.queryAll(`SELECT i.id, i.rule_code AS "ruleCode", i.lifecycle, i.label, i.title, i.summary, i.plant_id AS "plantId",
+      i.work_order_id AS "workOrderId", i.work_order_code AS "workOrderCode", i.machine_code AS "machineCode", i.operation_name AS "operationName",
+      i.shift_name AS "shiftName", i.responsible_name AS "responsibleName", i.reasons, i.opened_at AS "openedAt", ${effectiveAtSql("i")} AS "effectiveAt", i.updated_at AS "updatedAt",
+      i.resolved_at AS "resolvedAt", i.occurrence FROM monitor_incident i WHERE ${conditions.join(" AND ")} ORDER BY "effectiveAt" DESC`, parameters);
   }
 
   async detail(id: string, plantIds: number[]): Promise<Record<string, unknown> | null> {
-    const incident = await this.database.queryOne(`SELECT id, rule_code AS "ruleCode", lifecycle, label, title, summary,
-      work_order_id AS "workOrderId", work_order_code AS "workOrderCode", machine_code AS "machineCode", operation_name AS "operationName",
-      shift_name AS "shiftName", responsible_name AS "responsibleName", reasons, opened_at AS "openedAt", updated_at AS "updatedAt",
-      resolved_at AS "resolvedAt", occurrence, correlation_key AS "correlationKey" FROM monitor_incident
-      WHERE id=$1 AND plant_id=ANY($2::bigint[])`, [id, plantIds]);
+    const incident = await this.database.queryOne(`SELECT i.id, i.rule_code AS "ruleCode", i.lifecycle, i.label, i.title, i.summary,
+      i.work_order_id AS "workOrderId", i.work_order_code AS "workOrderCode", i.machine_code AS "machineCode", i.operation_name AS "operationName",
+      i.shift_name AS "shiftName", i.responsible_name AS "responsibleName", i.reasons, i.opened_at AS "openedAt", ${effectiveAtSql("i")} AS "effectiveAt", i.updated_at AS "updatedAt",
+      i.resolved_at AS "resolvedAt", i.occurrence, i.correlation_key AS "correlationKey" FROM monitor_incident i
+      WHERE i.id=$1 AND i.plant_id=ANY($2::bigint[])`, [id, plantIds]);
     if (!incident.id) return null;
     const evidence = await this.database.queryAll(`SELECT id,status,reasons,evidence,observed_at AS "observedAt"
       FROM monitor_incident_evidence WHERE incident_id=$1 ORDER BY observed_at DESC`, [id]);
@@ -225,13 +282,19 @@ export class IncidentService {
       FROM monitor_incident_transition WHERE incident_id=$1 ORDER BY occurred_at`, [id]);
     const related = incident.correlationKey ? await this.database.queryAll(`SELECT id,rule_code AS "ruleCode",title,lifecycle
       FROM monitor_incident WHERE correlation_key=$1 AND id<>$2 ORDER BY opened_at DESC`, [incident.correlationKey, id]) : [];
-    return { ...incident, evidence, transitions, related };
+    const administrativeClosure = await this.database.queryOne(`SELECT reason,comment,actor_sys_user_id AS "actorSysUserId",closed_at AS "closedAt"
+      FROM monitor_incident_administrative_closure WHERE incident_id=$1`, [id]);
+    return { ...incident, evidence, transitions, related, administrativeClosure: administrativeClosure.reason ? administrativeClosure : null };
   }
 
-  async changesAfter(cursor: number, plantIds: number[]): Promise<Record<string, unknown>[]> {
-    return this.database.queryAll(`SELECT cursor,event_id AS "eventId",event_type AS "eventType",payload,occurred_at AS "occurredAt"
-      FROM monitor_change_event WHERE cursor>$1 AND scope_type='plant' AND scope_id=ANY($2::text[]) ORDER BY cursor LIMIT 200`,
-      [cursor, plantIds.map(String)]);
+  async changesAfter(cursor: number, plantIds: number[], conversationIds: string[] = []): Promise<Record<string, unknown>[]> {
+    return this.database.queryAll(`SELECT cursor,event_id AS "eventId",event_type AS "eventType",scope_type AS "scopeType",
+      scope_id AS "scopeId",payload,occurred_at AS "occurredAt"
+      FROM monitor_change_event WHERE cursor>$1 AND (
+        (scope_type='plant' AND scope_id=ANY($2::text[]))
+        OR (scope_type='conversation' AND scope_id=ANY($3::text[]))
+      ) ORDER BY cursor LIMIT 200`,
+    [cursor, plantIds.map(String), conversationIds]);
   }
 
   private async addEvidence(transaction: DatabaseExecutor, incidentId: string, input: { evidence: Record<string, unknown>; cycleId?: string }, evaluation: RuleEvaluation, observedAt: string) {
@@ -250,7 +313,10 @@ export class IncidentService {
       await this.addTransition(transaction, incidentId, "open", "resolved", "absent_from_healthy_cycle", cycleId, timestamp);
       return this.addChangeEvent(transaction, incidentId, "incident.resolved", "resolved", plantId, timestamp);
     });
-    if (change) await this.publish(change);
+    if (change) {
+      await this.afterCommit(change, { cycleId });
+      await this.publish(change, { cycleId });
+    }
   }
 
   private async addTransition(transaction: DatabaseExecutor, incidentId: string, from: IncidentLifecycle | null, to: IncidentLifecycle, reason: string, cycleId: string | undefined, observedAt: string) {

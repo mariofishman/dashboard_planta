@@ -2,14 +2,14 @@
 
 **Status:** Complete locally — 2026-07-31
 
-**Scope:** Separate-source writes, read-only polling, scheduler connection, and Monitor incident lifecycle for A02, A03, and A05. This is not Stage 5 downstream acceptance or Phase 10 production evidence.
+**Scope:** Separate-source writes, read-only polling, scheduler connection, and Monitor incident lifecycle for A02, A03, and A05 behind the older `/dev/scenarios` screen composition. This is not connected V2 interface acceptance, Stage 5 downstream acceptance, or Phase 10 production evidence.
 
 ## Implemented boundary
 
 - `alertas_fake` uses the `alertas_fake` account and changes only approved source records in `test_database`.
 - Monitor uses the separate `monitor_source_ro` account and versioned, keyset-paginated A02/A03/A05 queries.
 - Both consumers require the readiness marker and refuse an active reset lock before connecting or polling.
-- Development `/dev/scenarios` uses this boundary by default; tests retain the deterministic in-memory simulator.
+- Development `/dev/scenarios` uses this boundary by default through the older screen composition; Stage 4 did not port or accept the approved tabbed V2 laboratory. Tests retain the deterministic in-memory simulator.
 - The laboratory reuses the versioned, backup-verified A02/A03/A05 identities in `config/detection/fixtures/test-database-stage4.v1.json`; it does not consume new source candidates over repeated runs.
 - The normal scheduler and the development “poll now” action invoke the same runner. Scenario actions never write incidents, routing, conversations, or messages directly.
 
@@ -43,6 +43,7 @@ npm run validate:phase6-stage4
 
 ## Remaining boundaries
 
+- Recovery must connect the approved V2 workflow to these existing services and replace the earlier Step 8.2–8.7 browser evidence, which remains diagnostic and invalid for acceptance.
 - Stage 5 must validate routing, deliveries, Dashboard cards, conversations, messages, Chat UI, recurrence, technical failure preservation, concurrency, and recovery as one connected system.
 - The test source uses a controlled laboratory clock and a fixed local freshness provider; live replica freshness and lag semantics remain Phase 10 evidence.
 - Keep `monitor_sim_*` and the simulator adapter until Stage 5 replacement acceptance passes.

@@ -190,6 +190,14 @@ export const notificationDelivery = pgTable("monitor_notification_delivery", {
   unique("monitor_notification_delivery_incident_recipient_channel_uq").on(table.incidentId, table.recipientKey, table.channel),
 ]);
 
+export const alertGuidance = pgTable("monitor_alert_guidance", {
+  ruleCode: text("rule_code").primaryKey(),
+  steps: jsonb("steps").notNull(),
+  source: text("source").notNull().default("alert_catalog"),
+  updatedBySysUserId: bigint("updated_by_sys_user_id", { mode: "number" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const featureFlag = pgTable("monitor_feature_flag", {
   key: text("key").primaryKey(),
   enabled: boolean("enabled").notNull().default(false),
@@ -209,6 +217,18 @@ export const changeEvent = pgTable("monitor_change_event", {
   unique("monitor_change_event_event_id_uq").on(table.eventId),
   index("monitor_change_event_scope_cursor_idx").on(table.scopeType, table.scopeId, table.cursor),
   index("monitor_change_event_occurred_at_idx").on(table.occurredAt),
+]);
+
+export const testInterruption = pgTable("monitor_test_interruption", {
+  id: uuid("id").primaryKey(),
+  point: text("point").notNull(),
+  status: text("status").notNull().default("armed"),
+  context: jsonb("context").notNull().default({}),
+  armedAt: timestamp("armed_at", { withTimezone: true }).notNull().defaultNow(),
+  firedAt: timestamp("fired_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("monitor_test_interruption_one_armed_point_idx").on(table.point).where(sql`${table.status} = 'armed'`),
+  index("monitor_test_interruption_history_idx").on(table.armedAt, table.id),
 ]);
 
 export const detectionQuery = pgTable("monitor_detection_query", {

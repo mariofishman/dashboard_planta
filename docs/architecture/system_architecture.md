@@ -150,7 +150,7 @@ The existing Aurora read replica is Monitor's authoritative and most current ava
 - Access requires an active product identity and current conversation membership. Roster deactivation blocks product access; administrative membership changes are authorized and audited.
 - Conversation lists and message histories use server-side cursor pagination. Unbounded collections are never returned as one complete response.
 - Sender-scoped `clientCommandId` provides idempotent message submission. A successful acknowledgement is returned only after commit.
-- PostgreSQL is canonical for conversations, messages, receipts, membership, revisions, audit records, and durable change events. Redis, presence, and typing are ephemeral and cannot change durable history.
+- PostgreSQL is canonical for conversations, messages, receipts, membership, revisions, audit records, durable change events, and per-alert resolution guidance. `monitor_alert_guidance` is the editable backend source delivered with alert messages; frontend bundles do not own or hardcode that guidance. Redis, presence, and typing are ephemeral and cannot change durable history.
 - Committed messages and change events are ordered by server cursor. Reconnect recovery ignores already-applied cursors and must never silently skip a gap.
 - Offline submission preserves distinct pending, failed, committed, delivered, and read states without treating an uncommitted send as successful.
 - Attachment commands require server authorization, file-type and size validation, sanitization, malware-scanning integration points, and rate limits. Local storage remains replaceable by production object storage.

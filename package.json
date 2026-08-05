@@ -23,15 +23,37 @@
     "db:test-source:status": "./scripts/test-database-runtime.sh status",
     "db:test-source:stop": "./scripts/test-database-runtime.sh stop",
     "db:test-source:reset": "ALLOW_TEST_DATABASE_RESET=yes ./scripts/test-database-reset.sh",
+    "db:test-source:reset:full": "ALLOW_TEST_DATABASE_RESET=yes TEST_DB_RESET_MODE=full ./scripts/test-database-reset.sh",
+    "db:test-source:template:build": "ALLOW_TEST_DATABASE_TEMPLATE_BUILD=yes ./scripts/test-database-build-physical-template.sh",
+    "db:test-source:standby:prepare": "./scripts/test-database-prepare-standby.sh --foreground",
     "db:test-source:validate": "./scripts/test-database-validate.sh health",
     "db:test-source:validate-baseline": "./scripts/test-database-validate.sh baseline",
     "db:test-source:driver-probe": "node scripts/test-database-driver-probe.mjs",
     "db:test-source:query-plans": "./scripts/test-database-query-plans.sh",
     "validate:alert-specification": "python3 .agents/skills/monitor-alert-rule-workflow/scripts/validate_alert_specification.py",
     "validate:phase5-routing": "tsx scripts/validate-phase5-routing.ts",
-    "validate:phase6-stage4": "tsx scripts/validate-phase6-stage4.ts"
+    "validate:phase6-stage4": "tsx scripts/validate-phase6-stage4.ts",
+    "validate:phase6-stage5a": "./scripts/validate-phase6-stage5a.sh",
+    "validate:phase6-stage5-declarations": "node --test scripts/stage5-declaration-validator.test.mjs && node scripts/validate-stage5-declarations.mjs",
+    "validate:phase6-stage5-fixtures": "node --test scripts/stage5-fixture-contract-validator.test.mjs scripts/stage5-fixture-runner.test.mjs && node scripts/validate-stage5-fixture-contracts.mjs",
+    "validate:phase6-stage5-chain": "node --test scripts/stage5-chain-capture.test.mjs && tsx --test scripts/stage5-chain-connected.test.ts",
+    "validate:phase6-stage5-ledger": "node --test scripts/stage5-ledger.test.mjs && node scripts/validate-stage5-ledger.mjs",
+    "validate:phase6-stage5-source-isolation": "./scripts/validate-phase6-stage5-source-isolation.sh",
+    "validate:phase6-stage5-source-isolation:focused": "tsx --test scripts/stage5-source-isolation.connected.test.ts",
+    "validate:phase6-stage5-scheduling": "tsx --test scripts/stage5-scheduling.connected.test.ts",
+    "validate:phase6-stage5-recovery": "tsx --test scripts/stage5-recovery.connected.test.ts",
+    "validate:phase6-stage5-step7-evidence": "node --test scripts/stage5-step7-evidence.test.mjs",
+    "validate:phase6-stage5-step7": "./scripts/validate-phase6-stage5-step7.sh",
+    "validate:phase6-stage5-browser-evidence": "node --test scripts/stage5-browser-evidence.test.mjs",
+    "validate:phase6-stage5-browser-harness": "node --test scripts/stage5-browser-harness.test.mjs && tsx --test apps/api/src/stage5-browser-runtime.test.ts",
+    "validate:phase6-stage5-browser-runtime": "tsx scripts/validate-phase6-stage5-browser-runtime.ts",
+    "validate:phase6-stage5-browser-acceptance": "tsx scripts/run-phase6-stage5-browser-acceptance.ts",
+    "validate:phase6-stage5-step8": "node scripts/validate-phase6-stage5-step8.mjs",
+    "validate:phase6-stage5-step8-adversarial": "node scripts/validate-phase6-stage5-step8-adversarial.mjs"
   },
   "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
     "concurrently": "9.2.4"
   }
 }

@@ -3,7 +3,7 @@
   "contractVersion": "1.1.0",
   "alertTypeCode": "A03",
   "queryId": "a03-active-without-consumption",
-  "queryVersion": "1.0.1-candidate",
+  "queryVersion": "1.0.2-candidate",
   "keySchemaVersion": 1,
   "naturalKey": ["workOrderId"],
   "output": {
@@ -11,7 +11,11 @@
     "workOrderCode": "string",
     "active": "boolean",
     "consumptionCount": "integer",
-    "sourceTimestamp": "timestamp"
+    "sourceTimestamp": "timestamp",
+    "machineCode": "string",
+    "operationName": "string",
+    "shiftName": "string",
+    "responsibleName": "string"
   },
   "sqlFile": "../queries/a03-active-without-consumption.v1.sql",
   "timeoutMs": 3000,

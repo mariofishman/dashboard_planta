@@ -8,7 +8,7 @@
 
 **Status:** Active; Phases 0–5 complete; Phase 6 in progress; Phase 7 is blocked by the Phase 6 exit gate
 
-**Roadmap date:** 2026-07-31
+**Roadmap date:** 2026-08-02
 
 **Supersedes:** [Version 2.1](../archive/docs/roadmaps/monitor_architecture_and_production_roadmap_v2.md)
 
@@ -16,14 +16,14 @@
 
 **Open integration register:** [EmusaSoft integration register](integrations/emusasoft/integration_register.md)
 
-**Current execution:** [Phase 6 stage plan](delivery/phases/phase6/README.md) — Stage 5 is next
+**Current execution:** [Stage 5 recovery and completion plan](delivery/phases/phase6/stage5_corrective_execution_plan.md)
 
 ## 1. Why Version Three exists
 
 Version Two guided the dynamic source laboratory, roster, routing, and initial conversation implementation. Review of that work identified three corrections that materially change the remaining sequence:
 
 1. The Phase 4B laboratory changed synthetic source tables stored inside Monitor's own local database. That proved lifecycle behavior, but it did not adequately reproduce Monitor reading a separate foreign database with the same engine, schema, indexes, collations, and SQL behavior as EmusaSoft.
-2. The development scenario screen then in use was difficult to understand and did not provide the clear, business-level control and evidence required for acceptance. The standalone V2 laboratory has since been implemented and its Stage 2 user review was completed and approved on 2026-07-31. This acceptance does not prove the connected source boundary.
+2. The development scenario screen then in use was difficult to understand and did not provide the clear, business-level control and evidence required for acceptance. The standalone tabbed V2 laboratory was implemented and its Stage 2 user review was completed and approved on 2026-07-31. Stage 4 connected the correct source boundary behind the older screen composition. Recovery later ported V2 onto `/dev/scenarios` and replacement Steps 8.2–8.7 passed; the earlier browser run remains diagnostic history and does not count as acceptance.
 3. The initial Phase 6 chat implementation did not have accepted visual parity with the approved chat-list and chat-detail prototypes; the corrective UI workstream has since been implemented and accepted.
 
 Version Three preserves the completed work from Phases 0–5 and treats Phase 4B as historical. It expands Phase 6 to correct the local source boundary, rebuild the scenario laboratory, complete the conversation product, and establish the testing foundation used by Phases 7–9.
@@ -85,7 +85,7 @@ Phase 5 remains complete. Its dynamic routing behavior will receive additional e
 
 ## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-**Status:** In progress. The conversation backend, validated local `test_database`, accepted chat UI, standalone laboratory, and Stage 4 source-boundary connection are complete within their scopes. Complete routing, Dashboard, conversation, message, and Chat UI acceptance remains in Stage 5.
+**Status:** In progress. Stages 1–4 are complete. Stage 5 is complete on its branch by explicit product decision: Step 8B was approved, all 34 Step 8C case bodies executed, the unresolved final-ledger limitation was accepted, Step 9 was waived, and Step 10 was completed. Step 11 publication is current; Step 12 merge remains separately gated. Stage 6 remains pending.
 
 **Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 
@@ -116,7 +116,7 @@ The EmusaSoft MCP is useful for discovering entities, fields, types, relationshi
 
 The redesign covers only A02, A03, and A05.
 
-The standalone V2 laboratory and its documented browser matrix are implemented. The [Phase 6 execution README](delivery/phases/phase6/README.md) owns the current stage plan; [`alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) remains the supporting laboratory specification. Stage 2 user review was completed and approved on 2026-07-31. The prototype is UI and business-rule evidence only and remains separate from the Stage 3–5 database and Monitor integration work.
+The standalone V2 laboratory and its documented browser matrix are implemented. The [Stage 5 recovery and completion plan](delivery/phases/phase6/stage5_corrective_execution_plan.md) is the sole current Stage 5 execution and evidence authority; [`alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) remains the supporting laboratory specification. Stage 2 user review was completed and approved on 2026-07-31. Recovery ported V2 onto `/dev/scenarios` using the connected database and Monitor services, replacement Steps 8.2–8.7 passed, and Step 8B was approved. On 2026-08-05 all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final ledger failed evidence-format validation. The product manager accepted that unresolved limitation, waived Step 9's two additional complete runs and the resulting absence of independent repeatability evidence, and completed the Step 10 evidence review. Stage 5 is complete on its branch by that explicit product decision; Step 11 publication is current and Step 12 merge remains separately gated.
 
 For each scenario, define in simple business language:
 
@@ -229,6 +229,8 @@ E02, E03, and E04 remain disabled in staging and production until ES2-05 proves 
 - performance, recovery, load, fault-injection, and prolonged-downtime testing;
 - Monitor database backup/restore, migration rollback, deployment rollback, and rule kill switches; and
 - operational runbooks and local acceptance evidence.
+
+Phase 9 hardening must also repeat source-boundary isolation across the complete local product, prove no operational dependency on `monitor_sim_*` or browser-local source truth, preserve versioned query and source-action contracts, automate schema-drift comparison, prove that changing source configuration does not require rewriting incident/routing/Dashboard/Chat business logic, and produce a complete rule-promotion matrix.
 
 Phase 9 uses mock identity, `test_database`, protected `backup_database`, and clearly labeled unit fixtures. It does not require production credentials, but it must not rely on synthetic source tables inside Monitor's database.
 

@@ -55,4 +55,5 @@ export interface CycleResult {
   pageCount: number;
   rowCount: number;
   errorCode: string | null;
+  pageEvidence: Array<{ page: number; rowCount: number; revision: string }>;
 }

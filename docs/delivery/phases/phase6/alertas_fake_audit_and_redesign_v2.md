@@ -2,7 +2,7 @@
 
 **Version:** 2.1 accepted Stage 2 specification
 
-**Role:** Supporting laboratory specification and preserved audit record; current execution status lives in [`README.md`](./README.md)
+**Role:** Supporting laboratory specification and preserved audit record; current Stage 5 execution and evidence status lives in the [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md), while [`README.md`](./README.md) remains the Phase 6 status index
 
 **Scope:** A02, A03, and A05 only  
 
@@ -14,9 +14,9 @@
 
 **Current prototype source:** browser-local synthetic records
 
-**Existing application source:** development-only synthetic PostgreSQL `monitor_sim_*` tables
+**Current connected application source:** `test_database` through the Stage 4 writer and Monitor read-only adapter, currently exposed behind the older `/dev/scenarios` screen composition
 
-**Required source boundary:** `alertas_fake` writes `test_database`; Monitor reads it through normal read-only polling
+**Required V2 connection:** preserve that source boundary while replacing the older screen with this approved tabbed workflow; the standalone prototype itself remains browser-local
 
 ## 1. Purpose
 
@@ -37,11 +37,11 @@ The required connected path remains:
 
 `tester changes test_database through alertas_fake → time advances → Monitor polls read-only → Monitor evaluates → incidents and downstream results update → reports and Dashboard read Monitor history`
 
-The standalone HTML prototype demonstrates the business workflow and interface only. It does not yet execute this connected path.
+The standalone HTML prototype demonstrates the approved business workflow and interface only. Stage 4 separately connected the source and Monitor services behind the older `/dev/scenarios` screen; Recovery 3 subsequently ported this V2 workflow onto those existing services, and Recovery 6 produced the passing replacement Step 8.2–8.7 evidence.
 
 ## Execution status
 
-The ordered stage plan, current stage, immediate next action, and Phase 6 exit gate are maintained only in [`README.md`](./README.md). Stage 2 acceptance evidence remains in [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md). This document defines the accepted laboratory behavior and preserves the audit findings needed for implementation; it does not advance stage status.
+The [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md) owns Stage 5 execution, evidence status, and the immediate next action. [`README.md`](./README.md) remains the Phase 6 status index and exit-gate summary. Stage 2 acceptance evidence remains in [`alertas_fake_v2_edge_case_test_report_v2.md`](./alertas_fake_v2_edge_case_test_report_v2.md). This document defines the accepted laboratory behavior and preserves the audit findings needed for implementation; it does not advance stage status.
 
 ## 2. Non-negotiable boundaries
 
@@ -54,7 +54,7 @@ The ordered stage plan, current stage, immediate next action, and Phase 6 exit g
 - Source actions never create, resolve, reopen, or administratively close Monitor incidents directly.
 - Only a complete successful poll may reconcile source state with Monitor state.
 - Failed, incomplete, invalid, or stale reads preserve the last trustworthy Monitor state.
-- The synthetic `monitor_sim_*` boundary remains until V2 passes equivalent scenarios through `test_database`.
+- The fallback `monitor_sim_*` simulator remains separately available until connected V2 replacement acceptance proves that the operational development workflow no longer depends on it. It is not the current default connected source boundary.
 
 ## 3. Why V2 replaces the V1 interface
 
@@ -138,7 +138,7 @@ The snapshot is structured evidence, not merely an image. A browser screenshot o
 
 ### 4.5 Reset behavior
 
-`Nuevo experimento` requires confirmation and creates a new experiment identity. It archives the current experiment inside the running laboratory so its movements, incidents, and snapshots remain queryable from history and integrity views. The standalone HTML prototype has no durable persistence, so its confirmation states plainly that reloading the page discards every browser-local experiment. The future connected application preserves the same history durably and never deletes or rewrites Monitor history. A source-only correction or receipt is never labeled reset.
+`Nuevo experimento` requires confirmation and creates a new experiment identity. It archives the current experiment inside the running laboratory so its movements, incidents, and snapshots remain queryable from history and integrity views. The standalone HTML prototype has no durable persistence, so its confirmation states plainly that reloading the page discards every browser-local experiment. The connected experiment services provide durable history, and Recovery 3 exposed the approved V2 history workflow without deleting or rewriting Monitor history. A source-only correction or receipt is never labeled reset.
 
 ## 5. Database and reporting design
 
@@ -666,22 +666,22 @@ The most likely V2 implementation mistakes are:
 
 ### 10.6 Authority corrections and remaining contract work
 
-- The catalog, executable alert contract, existing simulator, routing rules, `/dev/scenarios` UI, tests, and V2 prototype now remove A02 pending-dispatch and invented physical-arrival behavior. A02 is defined from the destination-bound `TRANSITO` movement, missing receipt, and time since dispatch. The future `test_database` adapter must preserve the same evidence boundary.
+- The catalog, executable alert contract, existing simulator, routing rules, `/dev/scenarios` UI, tests, and V2 prototype now remove A02 pending-dispatch and invented physical-arrival behavior. A02 is defined from the destination-bound `TRANSITO` movement, missing receipt, and time since dispatch. The Stage 4 `test_database` adapter preserves that evidence boundary; Recovery 3 preserved it while replacing the UI composition.
 - The catalog, executable alert contract, existing simulator, tests, and V2 prototype now use the approved A02 comparator `current time - sent time >= 30 minutes`.
 - The approved A05 presentation uses only `Error` at `>= 30 minutes`; it has no pre-threshold `Por vencer` state. The executable contract now carries only the `Error` label and matches the existing incident predicate.
 - Preserve A03's exact 15-minute comparator and define real active, closed/cancelled, and first-consumption mappings in the versioned source contract. Approved authority evaluates A03 independently: A07 does not suppress A03, and both alerts may coexist when their separate conditions are true.
 
 Stage 4 resolution of the executable and integration mismatches:
 
-- the existing `/dev/scenarios` simulator still uses isolated per-rule scenario clocks, while V2 intentionally uses one shared factory experiment clock;
+- the retained fallback simulator still has isolated per-rule scenario clocks; Stage 4 also added shared experiment-runtime foundations, but the older `/dev/scenarios` screen does not expose the approved V2 shared-clock workflow;
 - Stage 4 removed `strongerA07` from the A03 contract, simulator path, UI, fixtures, and tests. A03 now evaluates independently from A07.
-- Stage 4 connected the application `/dev/scenarios` implementation to `test_database`, the read-only adapter, and Monitor incident state. Routing deliveries, Dashboard cards, conversations, messages, and Chat UI remain the Stage 5 acceptance scope.
+- Stage 4 connected the older application `/dev/scenarios` composition to `test_database`, the read-only adapter, and Monitor incident state. It did not port or accept the tabbed V2 interface. Routing deliveries, Dashboard cards, conversations, messages, Chat UI, and the connected V2 workflow remain Stage 5 acceptance scope.
 
 ## 11. Implementation handoff
 
 The standalone implementation items previously listed here are complete in the V2 HTML prototype: shared clock, scheduler, snapshots, experiment archive, concurrent A02/A03/A05 records, incident detail, administrative closure, integrity counters, cancellation/rejection, and A05-to-A02 handoff. Recurrence is deliberately excluded from the laboratory UI. It is invalid for one specific A02 movement and one specific A03 OT, while no valid EmusaSoft source action has yet been identified for making a completed A05 record qualify again. The corrected prototype matrix is evidence only for that standalone scope.
 
-Implementation must preserve the accepted standalone behavior, the authority corrections in Section 10.6, and the proof boundary below. The current order and exit conditions for database inspection, connection, connected acceptance, and finalization live only in [`README.md`](./README.md).
+Recovery 3 preserved the accepted standalone behavior, the authority corrections in Section 10.6, and the proof boundary below while reusing the connected Stage 4 services. Recovery 6 then produced the passing replacement Step 8.2–8.7 evidence. The current order and exit conditions live only in the [Stage 5 recovery and completion plan](./stage5_corrective_execution_plan.md); [`README.md`](./README.md) is the Phase 6 status index.
 
 ## 12. Current proof boundary
 

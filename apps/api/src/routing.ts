@@ -5,6 +5,17 @@ export type RoutingRole =
   | "material_planner" | "planner" | "warehouse_dispatcher" | "warehouse_supervisor"
   | "process_operator" | "process_supervisor";
 
+export type RoutingInterruptionPoint =
+  | "before_routing_decision"
+  | "after_routing_decision"
+  | "before_delivery_creation"
+  | "after_delivery_creation";
+
+export type RoutingInterruptionHook = (
+  point: RoutingInterruptionPoint,
+  context: Record<string, unknown>,
+) => Promise<void>;
+
 const positionForRole: Record<RoutingRole, string> = {
   factory_manager: "Gerente de fábrica",
   operation_shift_supervisor: "Supervisor de turno de operación",
@@ -109,6 +120,14 @@ function jsonArray(value: unknown): string[] {
   return Array.isArray(parsed) ? parsed.map(String) : [];
 }
 
+function jsonRecordArray(value: unknown): Array<Record<string, unknown>> {
+  if (!value) return [];
+  const parsed = typeof value === "string" ? JSON.parse(value) : value;
+  return Array.isArray(parsed)
+    ? parsed.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
+}
+
 function dateKey(value: unknown): string { return new Date(String(value)).toISOString().slice(0, 10); }
 function dayNumber(value: string): number { return Math.floor(Date.parse(`${value}T12:00:00Z`) / 86_400_000); }
 function mod(value: number, by: number) { return ((value % by) + by) % by; }
@@ -144,9 +163,74 @@ function groupsForShift(pattern: Record<string, unknown>, incidentDate: string, 
 }
 
 export class RoutingService {
-  constructor(private readonly database: DatabaseRuntime) {}
+  constructor(
+    private readonly database: DatabaseRuntime,
+    private readonly interrupt: RoutingInterruptionHook = async () => undefined,
+  ) {}
 
-  async routeIncident(incidentId: string): Promise<Record<string, unknown> | null> {
+  private async ensureDeliveries(
+    incidentId: string,
+    routingDecisionId: string,
+    recipients: RoutingRecipient[],
+    operationContext: { cycleId?: string },
+  ): Promise<void> {
+    const existing = await this.database.queryAll(`SELECT id,recipient_key AS "recipientKey",channel
+      FROM monitor_notification_delivery WHERE incident_id=$1`, [incidentId]);
+    const completedKeys = new Set(existing
+      .filter((row) => row.channel === "in_app")
+      .map((row) => String(row.recipientKey)));
+    const missing = recipients.filter((recipient) => !completedKeys.has(recipient.key));
+    for (const [missingIndex, recipient] of missing.entries()) {
+      const context = {
+        ...operationContext,
+        incidentId,
+        routingDecisionId,
+        recipientKey: recipient.key,
+        recipientName: recipient.name,
+        missingIndex,
+        missingCount: missing.length,
+        requiredDeliveryCount: recipients.length,
+        completedDeliveryCount: completedKeys.size,
+      };
+      await this.interrupt("before_delivery_creation", context);
+      const delivery = await this.database.queryOne(`INSERT INTO monitor_notification_delivery
+        (incident_id,routing_decision_id,recipient_key,recipient_name,channel,state,attempt_count,sent_at)
+        VALUES ($1,$2,$3,$4,'in_app','sent',1,now())
+        ON CONFLICT (incident_id,recipient_key,channel) DO NOTHING RETURNING id`,
+      [incidentId, routingDecisionId, recipient.key, recipient.name]);
+      if (delivery.id) {
+        completedKeys.add(recipient.key);
+        await this.interrupt("after_delivery_creation", {
+          ...context,
+          deliveryId: delivery.id,
+          completedDeliveryCount: completedKeys.size,
+        });
+      }
+    }
+  }
+
+  private async ensureAdministrativeNotifications(
+    incidentId: string,
+    routingDecisionId: string,
+    plantId: number,
+    ruleCode: string,
+    diagnostics: Array<{ detail: string }>,
+  ): Promise<void> {
+    if (!diagnostics.length) return;
+    const administrators = await this.database.queryAll(`SELECT DISTINCT s.sys_user_id FROM monitor_identity_subject s
+      JOIN monitor_identity_plant_scope p ON p.identity_id=s.id WHERE p.plant_id=$1 AND s.enabled=TRUE
+      AND s.role IN ('MONITOR_ADMIN','FACTORY_MANAGER')`, [plantId]);
+    const ids = administrators.length ? administrators.map((row) => Number(row.sys_user_id)) : [9000];
+    for (const administratorId of ids) {
+      await this.database.execute(`INSERT INTO monitor_admin_email_outbox
+        (incident_id,routing_decision_id,administrator_sys_user_id,subject,body,state,attempt_count,sent_at)
+        VALUES ($1,$2,$3,$4,$5,'sent',1,now()) ON CONFLICT (incident_id,administrator_sys_user_id) DO NOTHING`,
+      [incidentId, routingDecisionId, administratorId, `Monitor: asignación incompleta para ${ruleCode}`,
+        diagnostics.map((item) => item.detail).join(" ")]);
+    }
+  }
+
+  async routeIncident(incidentId: string, operationContext: { cycleId?: string } = {}): Promise<Record<string, unknown> | null> {
     const incident = await this.database.queryOne(`SELECT id,rule_code,plant_id,operation_name,shift_name,responsible_name,reasons,opened_at,updated_at
       FROM monitor_incident WHERE id=$1`, [incidentId]);
     if (!incident.id) return null;
@@ -170,7 +254,13 @@ export class RoutingService {
       patternRow.revision ?? 0, calendarRow.revision ?? 0, exceptionRevision.updated_at].join("|");
     const prior = await this.database.queryOne(`SELECT id,status,primary_role AS "primaryRole",resolved_recipients AS recipients,diagnostics
       FROM monitor_routing_decision WHERE incident_id=$1 AND incident_fingerprint=$2`, [incidentId, fingerprint]);
-    if (prior.id) return { id: prior.id, status: prior.status, primaryRole: prior.primaryRole, recipients: prior.recipients, diagnostics: prior.diagnostics, deduplicated: true };
+    if (prior.id) {
+      const priorRecipients = jsonRecordArray(prior.recipients) as unknown as RoutingRecipient[];
+      const priorDiagnostics = jsonRecordArray(prior.diagnostics) as unknown as Array<{ detail: string }>;
+      await this.ensureDeliveries(incidentId, String(prior.id), priorRecipients, operationContext);
+      await this.ensureAdministrativeNotifications(incidentId, String(prior.id), plantId, String(incident.rule_code), priorDiagnostics);
+      return { id: prior.id, status: prior.status, primaryRole: prior.primaryRole, recipients: priorRecipients, diagnostics: priorDiagnostics, deduplicated: true };
+    }
 
     const rosterRows = await this.database.queryAll(`SELECT a.id,a.sys_user_id,a.person_name,a.position,a.warehouse_type,a.worker_group,
       COALESCE(jsonb_agg(o.operation_name) FILTER (WHERE o.operation_name IS NOT NULL),'[]'::jsonb) AS operations
@@ -230,29 +320,27 @@ export class RoutingService {
     const deduplicated = [...recipientsByName.values()];
     const status = diagnostics.some((item) => item.code === "conflicting_assignments") ? "conflict" : diagnostics.length ? "partial" : "complete";
 
+    await this.interrupt("before_routing_decision", {
+      ...operationContext,
+      incidentId,
+      incidentFingerprint: fingerprint,
+      status,
+      recipientCount: deduplicated.length,
+    });
     const decision = await this.database.queryOne(`INSERT INTO monitor_routing_decision
       (incident_id,incident_fingerprint,status,primary_role,required_roles,resolved_recipients,diagnostics,evaluated_at)
       VALUES ($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,clock_timestamp()) RETURNING id`,
     [incidentId, fingerprint, status, primaryRole, JSON.stringify(roles), JSON.stringify(deduplicated), JSON.stringify(diagnostics)]);
-    for (const recipient of deduplicated) {
-      await this.database.execute(`INSERT INTO monitor_notification_delivery
-        (incident_id,routing_decision_id,recipient_key,recipient_name,channel,state,attempt_count,sent_at)
-        VALUES ($1,$2,$3,$4,'in_app','sent',1,now()) ON CONFLICT (incident_id,recipient_key,channel) DO NOTHING`,
-      [incidentId, decision.id, recipient.key, recipient.name]);
-    }
-    if (diagnostics.length) {
-      const administrators = await this.database.queryAll(`SELECT DISTINCT s.sys_user_id FROM monitor_identity_subject s
-        JOIN monitor_identity_plant_scope p ON p.identity_id=s.id WHERE p.plant_id=$1 AND s.enabled=TRUE
-        AND s.role IN ('MONITOR_ADMIN','FACTORY_MANAGER')`, [plantId]);
-      const ids = administrators.length ? administrators.map((row) => Number(row.sys_user_id)) : [9000];
-      for (const administratorId of ids) {
-        await this.database.execute(`INSERT INTO monitor_admin_email_outbox
-          (incident_id,routing_decision_id,administrator_sys_user_id,subject,body,state,attempt_count,sent_at)
-          VALUES ($1,$2,$3,$4,$5,'sent',1,now()) ON CONFLICT (incident_id,administrator_sys_user_id) DO NOTHING`,
-        [incidentId, decision.id, administratorId, `Monitor: asignación incompleta para ${incident.rule_code}`,
-          diagnostics.map((item) => item.detail).join(" ")]);
-      }
-    }
+    await this.interrupt("after_routing_decision", {
+      ...operationContext,
+      incidentId,
+      routingDecisionId: decision.id,
+      incidentFingerprint: fingerprint,
+      status,
+      recipientCount: deduplicated.length,
+    });
+    await this.ensureDeliveries(incidentId, String(decision.id), deduplicated, operationContext);
+    await this.ensureAdministrativeNotifications(incidentId, String(decision.id), plantId, String(incident.rule_code), diagnostics);
     return { id: decision.id, status, primaryRole, recipients: deduplicated, diagnostics, deduplicated: false };
   }
 

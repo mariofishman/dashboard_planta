@@ -18,8 +18,8 @@ const snapshot = JSON.parse(
 };
 
 const definitions: Array<{ code: "A02" | "A05"; file: string; key: string; queryVersion: string; expectedRows: number }> = [
-  { code: "A02", file: "a02-reserved-material-in-transit.v1.sql", key: "materialFlowDetailId", queryVersion: "1.0.0-candidate", expectedRows: snapshot.queryResults.A02.rows },
-  { code: "A05", file: "a05-reel-handling.v1.sql", key: "articleSerialId", queryVersion: "1.0.1-candidate", expectedRows: snapshot.queryResults.A05.rows },
+  { code: "A02", file: "a02-reserved-material-in-transit.v1.sql", key: "materialFlowDetailId", queryVersion: "1.0.1-candidate", expectedRows: snapshot.queryResults.A02.rows },
+  { code: "A05", file: "a05-reel-handling.v1.sql", key: "articleSerialId", queryVersion: "1.0.2-candidate", expectedRows: snapshot.queryResults.A05.rows },
 ];
 
 describe("protected local backup adapters", { skip: !backupAvailable }, () => {

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sequential Substep Review"
+  short_description: "Approve, execute, and review sequential substeps"
+  default_prompt: "Use $sequential-substep-review to propose an exact substep split, wait for my approval, then execute and review each unit sequentially."

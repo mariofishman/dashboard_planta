@@ -20,6 +20,10 @@ import {
   CircularProgress,
   Container,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Drawer,
   FormControl,
   FormControlLabel,
@@ -52,6 +56,7 @@ import { io, type Socket } from "socket.io-client";
 import {
   currentSession,
   conversationForIncident,
+  closeIncidentWithoutResolution,
   incidentDetail,
   incidents,
   logout,
@@ -64,7 +69,8 @@ import {
 } from "./api";
 import { ChatDetail, ChatList } from "./Chats";
 import { OperationalResponsibilityRoster } from "./OperationalResponsibilityRoster";
-import { ScenarioLab } from "./ScenarioLab";
+import { ScenarioAlertPreview, ScenarioLab } from "./ScenarioLab";
+import { readMonitorCursor, writeMonitorCursor } from "./browserStorageAuthority";
 
 type LoadState = "loading" | "ready" | "error";
 
@@ -116,9 +122,10 @@ function dateKey(value: string) {
   const date = new Date(value);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
+const effectiveTime = (row: IncidentSummary): string => row.effectiveAt || row.openedAt;
 function dimensionValue(row: IncidentSummary, dimension: number) {
   const values = [
-    dateKey(row.openedAt), row.responsibleName, row.workOrderCode, row.machineCode,
+    dateKey(effectiveTime(row)), row.responsibleName, row.workOrderCode, row.machineCode,
     row.operationName, row.shiftName, `${row.ruleCode} · ${row.title}`,
   ];
   return values[dimension] ?? "Sin asignar";
@@ -182,7 +189,7 @@ function LoginView({ onLogin }: { onLogin: (session: SessionResponse) => void })
   </Box>;
 }
 
-function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: () => void }) {
+function Dashboard({ session, onLogout, embedded = false }: { session: SessionResponse; onLogout: () => void; embedded?: boolean }) {
   const [rows, setRows] = useState<IncidentSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -203,6 +210,10 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
   const [detail, setDetail] = useState<IncidentDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailConversationId, setDetailConversationId] = useState<string | null>(null);
+  const [closureOpen, setClosureOpen] = useState(false);
+  const [closureReason, setClosureReason] = useState("");
+  const [closureComment, setClosureComment] = useState("");
+  const [closureSubmitting, setClosureSubmitting] = useState(false);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [mobileQuickFiltersOpen, setMobileQuickFiltersOpen] = useState(false);
   const [desktopSearchExpanded, setDesktopSearchExpanded] = useState(false);
@@ -215,6 +226,7 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
   const pullStartY = useRef<number | null>(null);
   const customRangePhase = useRef<"start" | "end">("start");
   const socket = useMemo<Socket>(() => io({ withCredentials: true, autoConnect: false }), []);
+  const canCloseWithoutResolution = session.principal.scopes.includes("monitor:admin");
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -229,11 +241,11 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
   useEffect(() => {
     socket.on("connect", () => {
       setLiveState("live");
-      socket.emit("sync.resume", { cursor: Number(localStorage.getItem("monitor.cursor") ?? 0) });
+      socket.emit("sync.resume", { cursor: readMonitorCursor() });
     });
     socket.on("disconnect", () => setLiveState("reconnecting"));
     socket.on("incident.changed", (change: { cursor: number }) => {
-      localStorage.setItem("monitor.cursor", String(change.cursor));
+      writeMonitorCursor(change.cursor);
       refresh();
     });
     socket.connect();
@@ -247,22 +259,31 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
     window.addEventListener("scroll", hideQuickFilters, { passive: true });
     return () => window.removeEventListener("scroll", hideQuickFilters);
   }, []);
+  useEffect(() => {
+    if (!embedded) return;
+    const openEmbeddedFilters = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.source !== window.parent) return;
+      if ((event.data as { type?: unknown } | null)?.type === "monitor-scenario-dashboard-open-filters") setMobileFiltersOpen(true);
+    };
+    window.addEventListener("message", openEmbeddedFilters);
+    return () => window.removeEventListener("message", openEmbeddedFilters);
+  }, [embedded]);
 
   const rangeRows = useMemo(() => rows.filter((row) => {
-    if (range !== "custom") return Date.now() - Date.parse(row.openedAt) <= Number(range) * 86_400_000;
-    const timestamp = Date.parse(row.openedAt);
+    if (range !== "custom") return Date.now() - Date.parse(effectiveTime(row)) <= Number(range) * 86_400_000;
+    const timestamp = Date.parse(effectiveTime(row));
     return timestamp >= Date.parse(`${customFrom}T00:00:00`) && timestamp <= Date.parse(`${customTo}T23:59:59.999`);
   }), [customFrom, customTo, range, rows]);
   const statusRows = useMemo(() => statusFilters.length === 0 ? rangeRows : rangeRows.filter((row) => statusFilters.includes(row.lifecycle)), [rangeRows, statusFilters]);
   const groupedRows = useMemo(() => statusRows.filter((row) => {
-    if (dimension === 0 && selectedDate) return dateKey(row.openedAt) === selectedDate;
+    if (dimension === 0 && selectedDate) return dateKey(effectiveTime(row)) === selectedDate;
     if (dimension !== 0 && selectedGroup) return dimensionValue(row, dimension) === selectedGroup;
     return true;
   }), [dimension, selectedDate, selectedGroup, statusRows]);
   const ageLowerBounds = [0, 30, 60, 240];
   const ageUpperBounds = [30, 60, 240, Infinity];
   const visibleRows = useMemo(() => ageBucket === null ? groupedRows : groupedRows.filter((row) => {
-    const age = minutesBetween(row.openedAt);
+    const age = minutesBetween(effectiveTime(row));
     return row.lifecycle === "open" && age >= ageLowerBounds[ageBucket]! && age < ageUpperBounds[ageBucket]!;
   }), [ageBucket, groupedRows]);
   const totals = {
@@ -275,7 +296,7 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
     const statusFiltered = statusFilters.length === 0 ? rangeRows : rangeRows.filter((row) => statusFilters.includes(row.lifecycle));
     if (ageBucket === null) return statusFiltered;
     return statusFiltered.filter((row) => {
-      const age = minutesBetween(row.openedAt);
+      const age = minutesBetween(effectiveTime(row));
       return row.lifecycle === "open" && age >= ageLowerBounds[ageBucket]! && age < ageUpperBounds[ageBucket]!;
     });
   }, [ageBucket, rangeRows, statusFilters]);
@@ -303,10 +324,10 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
     return chartContextPoints.map(([key]) => [key, filtered.get(key) ?? { open: 0, resolved: 0, closed_without_resolution: 0 }] as const);
   }, [chartContextPoints, chartRows, dimension]);
   const chartMaximum = Math.max(1, ...chartContextPoints.map(([, point]) => point.open + point.resolved + point.closed_without_resolution));
-  const chartStep = Math.max(1, Math.ceil((chartMaximum + 1) / 5));
+  const chartStep = Math.max(1, Math.ceil(Math.max(chartMaximum + 1, chartMaximum * 1.12) / 5));
   const chartScale = chartStep * 5;
   const chartTicks = [5, 4, 3, 2, 1, 0].map((step) => step * chartStep);
-  const openAges = ageUpperBounds.map((limit, index) => groupedRows.filter((row) => row.lifecycle === "open" && minutesBetween(row.openedAt) >= ageLowerBounds[index]! && minutesBetween(row.openedAt) < limit).length);
+  const openAges = ageUpperBounds.map((limit, index) => groupedRows.filter((row) => row.lifecycle === "open" && minutesBetween(effectiveTime(row)) >= ageLowerBounds[index]! && minutesBetween(effectiveTime(row)) < limit).length);
 
   const openDetail = async (id: string) => {
     setDetailLoading(true);
@@ -398,7 +419,7 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
     const cells = (values: Array<string | number | null>) => values.map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(",");
     const csv = [
       cells(["Detectada", "Código", "Error", "Responsable", "OT", "Máquina", "Operación", "Turno", "Antigüedad", "Estado"]),
-      ...visibleRows.map((row) => cells([dateTime(row.openedAt), row.ruleCode, row.title, row.responsibleName, row.workOrderCode, row.machineCode, row.operationName, row.shiftName, duration(minutesBetween(row.openedAt, row.resolvedAt ?? undefined)), lifecycleLabel[row.lifecycle]])),
+      ...visibleRows.map((row) => cells([dateTime(effectiveTime(row)), row.ruleCode, row.title, row.responsibleName, row.workOrderCode, row.machineCode, row.operationName, row.shiftName, duration(minutesBetween(effectiveTime(row), row.resolvedAt ?? undefined)), lifecycleLabel[row.lifecycle]])),
     ].join("\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
@@ -408,7 +429,8 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
     URL.revokeObjectURL(url);
   };
 
-  return <Box onTouchStart={startPull} onTouchMove={movePull} onTouchEnd={endPull} onWheel={handleOverscroll} sx={{ minHeight: "100vh", bgcolor: "background.default", pb: 8 }}>
+  return <Box onTouchStart={startPull} onTouchMove={movePull} onTouchEnd={endPull} onWheel={handleOverscroll} sx={{ minHeight: embedded ? 0 : "100vh", bgcolor: "background.default", pb: embedded ? 0 : 8 }}>
+    {!embedded && <>
     <AppBar position="sticky" elevation={0} color="secondary" sx={{ borderBottom: `1px solid ${ui.color.inverseDivider}` }}>
       <Toolbar variant="dense" sx={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", minHeight: { xs: 48, sm: 48 }, px: { xs: .75, sm: 1.5 } }}>
         <IconButton color="inherit" size="small" aria-label="Abrir aplicaciones de producción" onClick={(event) => setMenuAnchor(event.currentTarget)} sx={{ justifySelf: "start", width: 40, height: 40 }}><MenuRounded fontSize="small"/></IconButton>
@@ -433,22 +455,23 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
         <QuickStatusChip label="Abiertas" selected={statusFilters.includes("open")} tone="error.main" onClick={() => selectMetric("open")}/>
       </Stack>}
     </Box>
+    </>}
 
-    <Container component="main" maxWidth={false} sx={{ maxWidth: 1280, px: { xs: 1, sm: 1.5, lg: 2 }, py: { xs: 1, sm: 1.25 } }}>
+    <Container component="main" maxWidth={false} sx={{ maxWidth: embedded ? "none" : 1280, px: embedded ? 0 : { xs: 1, sm: 1.5, lg: 2 }, py: embedded ? 0 : { xs: 1, sm: 1.25 } }}>
       {failed && <Alert severity="error" sx={{ mb: 1 }}>No se pudieron actualizar las alertas. Se conservan los últimos datos disponibles.</Alert>}
 
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "minmax(0,1fr)", lg: "minmax(0,2fr) minmax(286px,.72fr)" }, gap: 1, alignItems: "start", minWidth: 0 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: embedded ? "minmax(0,1fr)" : { xs: "minmax(0,1fr)", lg: "minmax(0,2fr) minmax(286px,.72fr)" }, gap: 1, alignItems: "start", minWidth: 0 }}>
         <Paper variant="outlined" sx={{ borderRadius: 1.5, minWidth: 0, overflow: "hidden" }}>
           <Box sx={{ p: { xs: 1, sm: 1.25 } }}>
-            <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ sm: "flex-start" }} gap={.75}>
-              <Box><Typography variant="h2">Alertas por {dimensions[dimension]?.toLowerCase()}</Typography><Typography variant="caption" color="text.secondary">{dimension === 0 && selectedDate ? shortDate(selectedDate) : selectedGroup ?? rangeLabel} · selecciona un segmento para filtrar.</Typography></Box>
+            <Stack direction={{ xs: "column", sm: "row" }} justifyContent={embedded ? "flex-end" : "space-between"} alignItems={{ sm: "flex-start" }} gap={.75}>
+              {!embedded && <Box><Typography variant="h2">Alertas por {dimensions[dimension]?.toLowerCase()}</Typography><Typography variant="caption" color="text.secondary">{dimension === 0 && selectedDate ? shortDate(selectedDate) : selectedGroup ?? rangeLabel} · selecciona un segmento para filtrar.</Typography></Box>}
               <Stack direction="row" gap={.4} flexWrap="wrap" aria-label="Filtrar por estado">
                 <StatusLegend lifecycle="resolved" label="Resueltas" active={statusFilters.length === 0 || statusFilters.includes("resolved")} selected={statusFilters.includes("resolved")} onClick={() => selectMetric("resolved")}/>
                 <StatusLegend lifecycle="open" label="Abiertas" active={statusFilters.length === 0 || statusFilters.includes("open")} selected={statusFilters.includes("open")} onClick={() => selectMetric("open")}/>
                 <StatusLegend lifecycle="closed_without_resolution" label="Sin resolución" active={statusFilters.length === 0 || statusFilters.includes("closed_without_resolution")} selected={statusFilters.includes("closed_without_resolution")} onClick={() => selectMetric("closed_without_resolution")}/>
               </Stack>
             </Stack>
-            <Stack direction="row" alignItems="center" gap={.5} sx={{ display: { xs: "none", sm: "flex" }, mt: .75, minWidth: 0, position: "relative", height: ui.control.visibleHeight }}>
+            {!embedded && <Stack direction="row" alignItems="center" gap={.5} sx={{ display: { xs: "none", sm: "flex" }, mt: .75, minWidth: 0, position: "relative", height: ui.control.visibleHeight }}>
               <Stack direction="row" alignItems="center" gap={.5} aria-hidden={desktopSearchExpanded} sx={{ minWidth: 0, flex: 1, pr: "172px", opacity: desktopSearchExpanded ? 0 : 1, visibility: desktopSearchExpanded ? "hidden" : "visible", pointerEvents: desktopSearchExpanded ? "none" : "auto", transition: "opacity 120ms linear, visibility 0ms linear 120ms" }}>
                 <Stack direction="row" gap={.4} role="tablist" aria-label="Agrupar gráfico por" sx={{ minWidth: 0, overflowX: "auto" }}>{dimensions.map((label, index) => <Chip key={label} label={label} size="small" clickable role="tab" aria-selected={dimension === index} variant={dimension === index ? "filled" : "outlined"} color={dimension === index ? "primary" : "default"} onClick={() => { setDimension(index); setSelectedDate(null); setSelectedGroup(null); }} sx={{ height: ui.control.visibleHeight, borderRadius: ui.control.radius, fontSize: ui.typography.routine, flex: "0 0 auto" }}/>)}</Stack>
                 <Box ref={rangeTriggerRef} sx={{ height: ui.control.visibleHeight, width: 112, flex: "0 0 112px", display: "flex", border: "1px solid", borderColor: "divider", borderRadius: ui.control.radius, overflow: "hidden" }}>
@@ -463,8 +486,8 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
                 </TextField>
               </Stack>
               <TextField size="small" placeholder="Buscar alertas" value={search} onChange={(event) => setSearch(event.target.value)} onFocus={() => setDesktopSearchExpanded(true)} onBlur={() => setDesktopSearchExpanded(false)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === "Escape") { event.preventDefault(); setDesktopSearchExpanded(false); event.currentTarget.querySelector("input")?.blur(); } }} aria-label="Buscar por persona, OT, máquina o error" sx={{ position: "absolute", right: 0, top: 0, width: desktopSearchExpanded ? "100%" : 168, zIndex: 2, bgcolor: "background.paper", transition: "width 180ms cubic-bezier(.23,1,.32,1)", "& .MuiInputBase-root": { height: ui.control.visibleHeight, minHeight: ui.control.visibleHeight, fontSize: ui.typography.routine, bgcolor: "background.paper", pr: desktopSearchExpanded ? .25 : 1 }, "& .MuiInputBase-input": { height: "100%", py: 0, boxSizing: "border-box", fontSize: ui.typography.routine } }} slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRounded sx={{ fontSize: 16 }}/></InputAdornment>, endAdornment: desktopSearchExpanded ? <InputAdornment position="end"><ButtonBase aria-label="Filtros avanzados" onMouseDown={(event) => event.preventDefault()} onClick={() => setMobileFiltersOpen(true)} sx={{ height: 22, px: .75, borderRadius: ui.control.radius, gap: .4, color: "primary.main", fontSize: ui.typography.routine, fontWeight: 700 }}><TuneRounded sx={{ fontSize: 14 }}/>Filtros avanzados</ButtonBase></InputAdornment> : undefined } }}/>
-            </Stack>
-            <Box role="group" aria-label={`Alertas por ${dimensions[dimension]?.toLowerCase()} y estado`} sx={{ display: "grid", gridTemplateColumns: "28px minmax(0,1fr)", height: { xs: 176, sm: 190 }, mt: .75 }}>
+            </Stack>}
+            <Box role="group" aria-label={`Alertas por ${dimensions[dimension]?.toLowerCase()} y estado`} sx={{ display: "grid", gridTemplateColumns: "28px minmax(0,1fr)", height: embedded ? 270 : { xs: 176, sm: 190 }, mt: .75 }}>
               <Box sx={{ position: "relative", height: "calc(100% - 26px)", color: "text.secondary" }}>{chartTicks.map((tick, index) => <Typography key={`${tick}-${index}`} variant="caption" sx={{ position: "absolute", right: 5, top: index === 5 ? "calc(100% - 12px)" : `calc(${index * 20}% - 6px)`, fontSize: ui.typography.routine, fontVariantNumeric: "tabular-nums" }}>{tick}</Typography>)}</Box>
               <Box sx={{ position: "relative", minWidth: 0 }}>
                 <Box sx={{ position: "absolute", inset: "0 0 26px", borderBottom: "1px solid", borderColor: "divider" }}>{chartTicks.slice(0, 5).map((_, index) => <Box key={index} sx={{ position: "absolute", top: `${index * 20}%`, left: 0, right: 0, borderTop: "1px solid", borderColor: "divider", opacity: .72 }}/>)}</Box>
@@ -489,6 +512,7 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
             </Box>
           </Box>
 
+          {!embedded && <>
           <Divider/>
           <Box ref={detailsRef} sx={{ scrollMarginTop: 56 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1} sx={{ px: { xs: 1, sm: 1.25 }, py: .75 }}>
@@ -502,9 +526,9 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
               <TableBody>
                 {loading && [...Array(4)].map((_, index) => <TableRow key={index}>{[...Array(4)].map((__, cell) => <TableCell key={cell}><Skeleton width={cell === 1 ? "90%" : 56}/></TableCell>)}</TableRow>)}
                 {!loading && visibleRows.map((row) => <TableRow hover key={row.id}>
-                  <TableCell title={dateTime(row.openedAt)} sx={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontSize: ui.typography.primaryData }}>{relativeDateTime(row.openedAt)}</TableCell>
+                  <TableCell title={dateTime(effectiveTime(row))} sx={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums", fontSize: ui.typography.primaryData }}>{relativeDateTime(effectiveTime(row))}</TableCell>
                   <TableCell sx={{ p: "0 !important" }}>
-                    <ButtonBase aria-label={`Ver causa e historial técnico de ${row.title}`} onClick={() => void openDetail(row.id)} sx={{ display: "block", width: "100%", minHeight: 48, px: 1, py: .55, textAlign: "left", borderRadius: .5, "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 } }}><Typography variant="body2" fontWeight={700} noWrap title={row.title}>{row.title}</Typography><Typography variant="caption" color="text.secondary" display="block" noWrap title={[row.ruleCode, duration(minutesBetween(row.openedAt, row.resolvedAt ?? undefined)), row.responsibleName, row.machineCode, row.operationName, row.shiftName].filter(Boolean).join(" · ")}>{[row.ruleCode, duration(minutesBetween(row.openedAt, row.resolvedAt ?? undefined)), row.responsibleName, row.machineCode, row.operationName, row.shiftName].filter(Boolean).join(" · ")}</Typography></ButtonBase>
+                    <ButtonBase aria-label={`Ver causa e historial técnico de ${row.title}`} onClick={() => void openDetail(row.id)} sx={{ display: "block", width: "100%", minHeight: 48, px: 1, py: .55, textAlign: "left", borderRadius: .5, "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 } }}><Typography variant="body2" fontWeight={700} noWrap title={row.title}>{row.title}</Typography><Typography variant="caption" color="text.secondary" display="block" noWrap title={[row.ruleCode, duration(minutesBetween(effectiveTime(row), row.resolvedAt ?? undefined)), row.responsibleName, row.machineCode, row.operationName, row.shiftName].filter(Boolean).join(" · ")}>{[row.ruleCode, duration(minutesBetween(effectiveTime(row), row.resolvedAt ?? undefined)), row.responsibleName, row.machineCode, row.operationName, row.shiftName].filter(Boolean).join(" · ")}</Typography></ButtonBase>
                   </TableCell>
                   <TableCell><Typography variant="body2" color="primary.main" fontWeight={600} sx={{ userSelect: "text", fontVariantNumeric: "tabular-nums" }}>{row.workOrderCode ?? "—"}</Typography></TableCell>
                   <TableCell align="center" sx={{ pr: 2 }}><StatusDot lifecycle={row.lifecycle}/></TableCell>
@@ -515,7 +539,7 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
               {loading && [...Array(3)].map((_, index) => <Box key={index} sx={{ p: 1.25 }}><Skeleton width="55%"/><Skeleton width="90%"/><Skeleton width="72%"/></Box>)}
               {!loading && visibleRows.map((row) => <Box component="article" key={row.id}>
                 <ButtonBase aria-label={`Ver causa e historial técnico de ${row.title}`} onClick={() => void openDetail(row.id)} sx={{ display: "block", width: "100%", p: 1.25, textAlign: "left", borderRadius: .5, "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: -2 } }}>
-                  <Stack direction="row" justifyContent="space-between" gap={1} alignItems="flex-start"><Box minWidth={0}><Typography variant="body2" fontWeight={700}>{row.title}</Typography><Typography variant="caption" color="text.secondary">{row.ruleCode} · {relativeDateTime(row.openedAt)} · {duration(minutesBetween(row.openedAt, row.resolvedAt ?? undefined))}</Typography></Box><StatusDot lifecycle={row.lifecycle}/></Stack>
+                  <Stack direction="row" justifyContent="space-between" gap={1} alignItems="flex-start"><Box minWidth={0}><Typography variant="body2" fontWeight={700}>{row.title}</Typography><Typography variant="caption" color="text.secondary">{row.ruleCode} · {relativeDateTime(effectiveTime(row))} · {duration(minutesBetween(effectiveTime(row), row.resolvedAt ?? undefined))}</Typography></Box><StatusDot lifecycle={row.lifecycle}/></Stack>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: .5 }}>{[row.responsibleName, row.machineCode, row.operationName, row.shiftName].filter(Boolean).join(" · ") || "Sin contexto operativo"}</Typography>
                   <Typography variant="caption" color="primary.main" fontWeight={600} sx={{ mt: .5, display: "block" }}>OT {row.workOrderCode ?? "—"}</Typography>
                 </ButtonBase>
@@ -524,21 +548,22 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
             {!loading && visibleRows.length === 0 && <Box sx={{ p: 4, textAlign: "center" }}><Typography fontWeight={700}>No hay alertas con estos filtros</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>Prueba otra fecha, operación, estado o término.</Typography><Button variant="outlined" sx={{ mt: 1.5 }} onClick={resetFilters}>Restablecer filtros</Button></Box>}
             </>}
           </Box>
+          </>}
         </Paper>
 
-        <Stack gap={1} sx={{ minWidth: 0 }}>
+        {!embedded && <Stack gap={1} sx={{ minWidth: 0 }}>
           <Paper component="section" variant="outlined" aria-labelledby="age-title" sx={{ p: 1.25, borderRadius: 1.5, minWidth: 0 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="baseline" gap={1}><Typography id="age-title" variant="h2">Antigüedad abierta</Typography><Typography variant="caption" color="text.secondary">{totals.open} abiertas</Typography></Stack>
             <Stack sx={{ mt: .75 }} gap={.25}>{["Menos de 30 min", "30 min – 1 h", "1 – 4 h", "Más de 4 h"].map((label, index) => <ButtonBase key={label} aria-pressed={ageBucket === index} onClick={() => preserveViewport(() => setAgeBucket((currentBucket) => currentBucket === index ? null : index))} sx={{ width: "100%", borderRadius: ui.control.radius, px: .25, py: .5, bgcolor: ageBucket === index ? "action.selected" : "transparent", "&:hover": { bgcolor: "action.hover" }, "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main" } }}><Stack direction="row" alignItems="center" gap={.75} sx={{ width: "100%" }}><Typography variant="caption" sx={{ width: 90, fontSize: ui.typography.routine, textAlign: "left" }}>{label}</Typography><Box sx={{ flex: 1, height: 6, bgcolor: "background.default", borderRadius: 1 }}><Box sx={{ width: `${openAges[index]! / Math.max(1, ...openAges) * 100}%`, height: "100%", bgcolor: ageBucket === index ? "secondary.main" : "primary.main", borderRadius: 1 }}/></Box><Typography variant="caption" fontWeight={700} sx={{ width: 18, textAlign: "right" }}>{openAges[index]}</Typography></Stack></ButtonBase>)}</Stack>
           </Paper>
-        </Stack>
+        </Stack>}
       </Box>
     </Container>
 
-    <Paper component="nav" square elevation={0} aria-label="Navegación principal" sx={{ position: "fixed", bottom: 0, left: 0, right: 0, height: 60, zIndex: 20, display: "flex", justifyContent: "center", gap: { xs: .5, sm: 3 }, borderTop: "1px solid", borderColor: "divider" }}>
+    {!embedded && <Paper component="nav" square elevation={0} aria-label="Navegación principal" sx={{ position: "fixed", bottom: 0, left: 0, right: 0, height: 60, zIndex: 20, display: "flex", justifyContent: "center", gap: { xs: .5, sm: 3 }, borderTop: "1px solid", borderColor: "divider" }}>
       <Button startIcon={<DashboardRounded/>} sx={{ minWidth: { xs: 136, sm: 168 }, height: 60, fontWeight: 700, position: "relative", "&::before": { content: "''", position: "absolute", top: 0, left: 20, right: 20, height: 3, bgcolor: "primary.main", borderRadius: "0 0 4px 4px" } }} aria-current="page">Dashboard</Button>
       <Button startIcon={<ChatBubbleOutlineRounded/>} onClick={() => { window.location.href = "/chats"; }} sx={{ minWidth: { xs: 136, sm: 168 }, height: 60 }}>Chats</Button>
-    </Paper>
+    </Paper>}
 
     <Drawer anchor="bottom" open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} PaperProps={{ sx: { maxHeight: "88vh", borderRadius: "16px 16px 0 0", p: 2 } }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}><Typography variant="h2">Filtros avanzados</Typography><IconButton size="small" aria-label="Cerrar filtros" onClick={() => setMobileFiltersOpen(false)} sx={{ width: 32, height: 32 }}><CloseRounded fontSize="small"/></IconButton></Stack>
@@ -570,12 +595,15 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
       {detail && <Box sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2}>
           <Chip color={lifecycleColor[detail.lifecycle]} label={lifecycleLabel[detail.lifecycle]}/>
-          <Typography variant="caption" color="text.secondary">Detectada {dateTime(detail.openedAt)}</Typography>
+          <Stack alignItems="flex-end"><Typography variant="caption" color="text.secondary">Condición desde {dateTime(effectiveTime(detail))}</Typography><Typography variant="caption" color="text.secondary">Detectada {dateTime(detail.openedAt)}</Typography></Stack>
         </Stack>
         <Typography sx={{ mt: 2, maxWidth: "65ch" }}>{detail.summary}</Typography>
         <Button variant="contained" startIcon={<ChatBubbleOutlineRounded/>} disabled={!detailConversationId} onClick={() => { window.location.href = `/chats/${detailConversationId}`; }} sx={{ mt: 2 }}>
           {detailConversationId ? "Abrir conversación" : "Conversación no disponible"}
         </Button>
+        {canCloseWithoutResolution && detail.lifecycle === "open" && <Button variant="outlined" color="warning" onClick={() => setClosureOpen(true)} sx={{ mt: 2, ml: 1 }}>
+          Cerrar sin resolución
+        </Button>}
 
         <Section title="Datos operativos">
           <Stack divider={<Divider flexItem/>}><Fact label="OT" value={detail.workOrderCode}/><Fact label="Máquina" value={detail.machineCode}/><Fact label="Operación" value={detail.operationName}/><Fact label="Turno" value={detail.shiftName}/><Fact label="Responsable" value={detail.responsibleName}/></Stack>
@@ -588,8 +616,25 @@ function Dashboard({ session, onLogout }: { session: SessionResponse; onLogout: 
         <Section title="¿Por qué se generó?">
           <IncidentExplanation detail={detail}/>
         </Section>
+        {detail.administrativeClosure && <Section title="Cierre administrativo"><Stack gap={.5}><Typography variant="body2" fontWeight={600}>{detail.administrativeClosure.reason}</Typography><Typography variant="body2">{detail.administrativeClosure.comment}</Typography><Typography variant="caption" color="text.secondary">{dateTime(detail.administrativeClosure.closedAt)}</Typography></Stack></Section>}
       </Box>}
     </Drawer>
+
+    <Dialog open={closureOpen} onClose={() => { if (!closureSubmitting) setClosureOpen(false); }} fullWidth maxWidth="xs">
+      <DialogTitle>Cerrar sin resolución</DialogTitle>
+      <DialogContent><Stack gap={2} sx={{ pt: 1 }}>
+        <Typography variant="body2">El cierre conserva la verdad de EmusaSoft y evita reabrir solo esta condición ininterrumpida.</Typography>
+        <TextField label="Motivo" value={closureReason} onChange={(event) => setClosureReason(event.target.value)} required/>
+        <TextField label="Comentario" value={closureComment} onChange={(event) => setClosureComment(event.target.value)} required multiline minRows={3} sx={{ "& .MuiOutlinedInput-root": { height: "auto", minHeight: 84 } }}/>
+      </Stack></DialogContent>
+      <DialogActions><Button onClick={() => setClosureOpen(false)} disabled={closureSubmitting}>Cancelar</Button><Button variant="contained" color="warning" disabled={!closureReason.trim() || !closureComment.trim() || closureSubmitting} onClick={() => {
+        if (!detail) return;
+        setClosureSubmitting(true);
+        void closeIncidentWithoutResolution(detail.id, closureReason, closureComment).then(async () => {
+          const next = await incidentDetail(detail.id); setDetail(next); setClosureOpen(false); setClosureReason(""); setClosureComment(""); refresh();
+        }).finally(() => setClosureSubmitting(false));
+      }}>Cerrar sin resolución</Button></DialogActions>
+    </Dialog>
   </Box>;
 }
 
@@ -606,7 +651,7 @@ function StatusDot({ lifecycle }: { lifecycle: IncidentLifecycle }) {
 }
 function IncidentExplanation({ detail }: { detail: IncidentDetail }) {
   const evidence = detail.evidence[0]?.evidence ?? {};
-  const elapsed = Number(evidence.elapsedMinutes ?? evidence.declaredAgeMinutes ?? minutesBetween(detail.openedAt));
+  const elapsed = Number(evidence.elapsedMinutes ?? evidence.declaredAgeMinutes ?? minutesBetween(effectiveTime(detail)));
   if (detail.ruleCode === "A02") return <Typography variant="body2">El material reservado para la OT {detail.workOrderCode ?? "sin código"} fue enviado hacia {detail.machineCode ?? "la máquina de destino"} y lleva {elapsed} min en tránsito sin que el responsable de recepción haya registrado su llegada.</Typography>;
   if (detail.ruleCode === "A03") return <Typography variant="body2">La OT {detail.workOrderCode ?? "sin código"} lleva {elapsed} min activa en {detail.machineCode ?? "la máquina"} sin que el responsable de la operación haya declarado el primer consumo de material.</Typography>;
   return <Typography variant="body2">La bobina declarada para la OT {detail.workOrderCode ?? "sin código"} lleva {elapsed} min sin que el responsable del equipo complete el pesaje o el movimiento requerido desde {detail.machineCode ?? "la máquina"}.</Typography>;
@@ -632,5 +677,8 @@ export default function App() {
   if (window.location.pathname === "/chats") return <ChatList session={session}/>;
   if (window.location.pathname.startsWith("/chats/")) return <ChatDetail session={session} conversationId={window.location.pathname.slice("/chats/".length)}/>;
   if (window.location.pathname === "/roster") return <OperationalResponsibilityRoster session={session} onLogout={onLogout}/>;
-  return window.location.pathname === "/dev/scenarios" ? <ScenarioLab session={session} onLogout={onLogout}/> : <Dashboard session={session} onLogout={onLogout}/>;
+  if (window.location.pathname === "/dev/scenarios/alert-preview") return <ScenarioAlertPreview/>;
+  return window.location.pathname === "/dev/scenarios"
+    ? <ScenarioLab session={session} onLogout={onLogout}/>
+    : <Dashboard session={session} onLogout={onLogout} embedded={window.location.pathname === "/dashboard" && new URLSearchParams(window.location.search).get("embed") === "scenario"}/>;
 }

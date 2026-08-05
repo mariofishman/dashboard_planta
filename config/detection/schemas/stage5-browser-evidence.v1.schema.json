@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://monitor.local/schemas/stage5-browser-evidence.v1.schema.json",
+  "title": "Phase 6 Stage 5 browser evidence manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "kind", "gate", "claim", "identity", "runtime", "artifacts", "cleanup"],
+  "properties": {
+    "schemaVersion": { "const": "1.0.0" },
+    "kind": { "const": "browser_evidence_manifest" },
+    "gate": { "const": "phase6-stage5-step8" },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "accepted"],
+      "properties": {
+        "level": { "enum": ["diagnostic", "surface", "aggregate"] },
+        "accepted": { "type": "boolean" }
+      }
+    },
+    "identity": { "$ref": "#/$defs/manifestIdentity" },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "sourceKind", "sourceAccount", "apiOrigin", "webOrigin", "identityEndpoint", "identityArtifactId", "monitorDatabaseInstanceId", "schedulerOwnerId", "startedAt", "services", "surfaces"],
+      "properties": {
+        "mode": { "const": "connected" },
+        "sourceKind": { "const": "test_database" },
+        "sourceAccount": { "const": "monitor_source_ro" },
+        "apiOrigin": { "$ref": "#/$defs/httpOrigin" },
+        "webOrigin": { "$ref": "#/$defs/httpOrigin" },
+        "identityEndpoint": { "type": "string", "pattern": "^/api/dev/stage5/runtime-identity$" },
+        "identityArtifactId": { "$ref": "#/$defs/identifier" },
+        "monitorDatabaseInstanceId": { "$ref": "#/$defs/identifier" },
+        "schedulerOwnerId": { "$ref": "#/$defs/identifier" },
+        "startedAt": { "$ref": "#/$defs/timestamp" },
+        "services": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": { "$ref": "#/$defs/serviceIdentity" }
+        },
+        "surfaces": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/surfaceIdentity" }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executedInFinally", "completed", "sourceRestored", "monitorStateDisposed", "artifactPath", "artifactSha256"],
+      "properties": {
+        "executedInFinally": { "type": "boolean" },
+        "completed": { "type": "boolean" },
+        "sourceRestored": { "type": "boolean" },
+        "monitorStateDisposed": { "type": "boolean" },
+        "artifactPath": { "$ref": "#/$defs/artifactPath" },
+        "artifactSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  },
+  "$defs": {
+    "nonEmptyString": { "type": "string", "minLength": 1 },
+    "identifier": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "httpOrigin": { "type": "string", "pattern": "^https?://[^/?#]+$" },
+    "artifactPath": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
+    "manifestIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "experimentId", "runtimeId", "captureNonce", "manifestVersion", "sourceActionContractVersion", "startedAt", "completedAt"],
+      "properties": {
+        "runId": { "$ref": "#/$defs/identifier" },
+        "experimentId": { "$ref": "#/$defs/identifier" },
+        "runtimeId": { "$ref": "#/$defs/identifier" },
+        "captureNonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{16,128}$" },
+        "manifestVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "sourceActionContractVersion": { "$ref": "#/$defs/nonEmptyString" },
+        "startedAt": { "$ref": "#/$defs/timestamp" },
+        "completedAt": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "artifactIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runId", "experimentId", "runtimeId", "captureNonce"],
+      "properties": {
+        "runId": { "$ref": "#/$defs/identifier" },
+        "experimentId": { "$ref": "#/$defs/identifier" },
+        "runtimeId": { "$ref": "#/$defs/identifier" },
+        "captureNonce": { "type": "string", "pattern": "^[A-Za-z0-9_-]{16,128}$" }
+      }
+    },
+    "serviceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "instanceId", "location", "identityDigest"],
+      "properties": {
+        "name": { "enum": ["laboratory", "api", "scheduler", "monitor_database", "dashboard", "chat"] },
+        "instanceId": { "$ref": "#/$defs/identifier" },
+        "location": { "$ref": "#/$defs/nonEmptyString" },
+        "identityDigest": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "surfaceIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "url", "identityUrl"],
+      "properties": {
+        "name": { "enum": ["laboratory", "dashboard", "chat_list", "chat_detail"] },
+        "url": { "type": "string", "format": "uri" },
+        "identityUrl": { "type": "string", "format": "uri" }
+      }
+    },
+    "objectReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": { "enum": ["experiment", "poll_cycle", "incident", "routing_decision", "delivery", "conversation", "message", "receipt", "cursor"] },
+        "id": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "chainReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["testId", "attachmentId"],
+      "properties": {
+        "testId": { "type": "string", "pattern": "^(SH-(?:0[1-9]|1[01])|A02-(?:0[0-7]|09)|A03-0[0-5]|A05-(?:0[0-6]|08))$" },
+        "attachmentId": { "$ref": "#/$defs/identifier" }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactId", "surface", "artifactKind", "contentPath", "contentSha256", "provenancePath", "provenanceSha256", "capturedAt", "identity", "apiOrigin", "webOrigin", "monitorDatabaseInstanceId", "schedulerOwnerId", "objectReferences", "chainReference"],
+      "properties": {
+        "artifactId": { "$ref": "#/$defs/identifier" },
+        "surface": { "enum": ["runtime", "laboratory", "dashboard", "chat_list", "chat_detail"] },
+        "artifactKind": { "enum": ["identity_snapshot", "screenshot", "accessibility", "interaction", "console", "reconnect"] },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "contentPath": { "$ref": "#/$defs/artifactPath" },
+        "contentSha256": { "$ref": "#/$defs/sha256" },
+        "provenancePath": { "$ref": "#/$defs/artifactPath" },
+        "provenanceSha256": { "$ref": "#/$defs/sha256" },
+        "capturedAt": { "$ref": "#/$defs/timestamp" },
+        "identity": { "$ref": "#/$defs/artifactIdentity" },
+        "apiOrigin": { "$ref": "#/$defs/httpOrigin" },
+        "webOrigin": { "$ref": "#/$defs/httpOrigin" },
+        "monitorDatabaseInstanceId": { "$ref": "#/$defs/identifier" },
+        "schedulerOwnerId": { "$ref": "#/$defs/identifier" },
+        "objectReferences": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/objectReference" } },
+        "chainReference": { "$ref": "#/$defs/chainReference" }
+      }
+    }
+  }
+}

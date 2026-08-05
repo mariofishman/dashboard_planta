@@ -3,7 +3,7 @@
   "contractVersion": "1.1.0",
   "alertTypeCode": "A02",
   "queryId": "a02-reserved-material-in-transit",
-  "queryVersion": "1.0.0-candidate",
+  "queryVersion": "1.0.1-candidate",
   "keySchemaVersion": 1,
   "naturalKey": ["materialFlowDetailId"],
   "output": {
@@ -19,7 +19,12 @@
     "warehouseOriginId": "nullable-integer",
     "warehouseDestinationId": "nullable-integer",
     "locationOriginId": "nullable-integer",
-    "locationDestinationId": "nullable-integer"
+    "locationDestinationId": "nullable-integer",
+    "machineCode": "string",
+    "operationName": "string",
+    "shiftName": "string",
+    "responsibleName": "string",
+    "warehouseType": "string"
   },
   "sqlFile": "../queries/a02-reserved-material-in-transit.v1.sql",
   "timeoutMs": 3000,

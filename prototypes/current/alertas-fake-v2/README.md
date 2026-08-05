@@ -7,7 +7,7 @@ This folder contains the standalone HTML prototype for testing the A02, A03, and
 Open Terminal and run:
 
 ```bash
-cd /Users/mariofishman/.codex/worktrees/4407/dashboard_planta/prototypes/current/alertas-fake-v2
+cd /Users/mariofishman/projects/dashboard_planta/prototypes/current/alertas-fake-v2
 python3 -m http.server 5190 --bind 127.0.0.1
 ```
 
@@ -32,7 +32,7 @@ Then open `http://127.0.0.1:5191/`.
 The same prototype can be opened without a server:
 
 ```text
-file:///Users/mariofishman/.codex/worktrees/4407/dashboard_planta/prototypes/current/alertas-fake-v2/index.html
+file:///Users/mariofishman/projects/dashboard_planta/prototypes/current/alertas-fake-v2/index.html
 ```
 
 Both addresses display the same `index.html` design. The difference is how the browser loads it:
@@ -47,4 +47,5 @@ Use the local-server method for testing because it behaves more like a normal we
 - The prototype stores its experiment only in browser memory.
 - Reloading or closing the page resets the experiment.
 - It is not connected to `test_database`.
+- It is the approved V2 interface reference; the application's current `/dev/scenarios` route still uses the older screen composition until Recovery 3.
 - It does not modify EmusaSoft or Monitor production data.
