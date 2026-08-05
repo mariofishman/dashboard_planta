@@ -21,7 +21,7 @@
 | A06 | Deadline + deterministic + statistical | OT | Waste declaration/age/weight and balance signal | Waste declaration or OT closure; minutes and kilograms | Fixture proven; undeclared-waste signal pending; D03 remains independent |
 | A07 | Physical + statistical | OT | Good output, waste, declared input, tolerance | Latest contributing evidence; kilograms | Fixture proven; tolerance/evidence policy pending |
 | B01 | Deterministic | OT | Actual start, latest-plan next OT, prior sequence update | Actual OT start | Fixture proven; approved-plan source pending |
-| B02 | Deadline + deterministic | OT + plan version | Planned deadline, actual start, approved reschedule | Planned start | Fixture proven; plan-version semantics pending |
+| B02 | Deadline + deterministic | OT + plan version | Planned deadline, actual start, approved full-plan update | Planned start | Fixture proven; approved plan-version source mapping pending |
 | B03 | Deadline + deterministic | Machine + schedule window | Expected operation, active OT, exclusions, idle age | Start of unexplained interval; minutes | Fixture proven; schedule/exclusion source pending |
 | C01 | Physical + statistical | Article serial | Weight, bounds, sample size | Scale record; kilograms | Fixture proven; model segmentation pending |
 | C02 | Statistical | OT | Waste weight, bounds, sample size | OT closure/latest waste weight; kilograms | Fixture proven; baseline version pending |

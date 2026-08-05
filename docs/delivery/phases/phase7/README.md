@@ -37,10 +37,11 @@ D04 is retired into consolidated D01. Historical D04 incidents and current compa
 - **D03:** closed-OT mass-balance invariant integrated with its all-weighed gate, theoretical ink and adhesive inputs, strict 5% boundary, E05 blocker, and explicit independence from every other alert. D03 is never suppressed or cascade-resolved through another alert.
 - **A01:** material-readiness invariant integrated with full-quantity allocation, reservation, and dispatch checks; reservation-first competing-stock allocation; inclusive 60- and 30-minute checkpoints; cancellation and rescheduling lifecycle; and explicit independence from D03.
 - **B01:** approved-plan sequence invariant integrated with EmusaSoft-owned update validity, preservation of the originally expected and actually started OTs, audited late explanations, independent explanatory links, and no Monitor-defined plan authorization rule.
+- **B02:** planned-start invariant integrated with inclusive deadline evaluation, one condition per OT and approved plan version, late-start resolution, approved superseding full-plan updates, and complete independence from equipment pauses and other alerts.
 
 ## Immediate next action
 
-Inspect B02 against the A01/B01/D01/D02/D03-integrated result and present the B02 functional-conflict and validation checkpoint for approval.
+Inspect B03 against the A01/B01/B02/D01/D02/D03-integrated result and present the B03 functional-conflict and validation checkpoint for approval.
 
 ## Phase 7 exit gate
 

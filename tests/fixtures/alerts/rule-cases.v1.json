@@ -33,8 +33,8 @@
     {"id":"B01-clear","ruleCode":"B01","input":{"workOrderId":201,"actualStarted":true,"nextApprovedWorkOrderId":201,"sequenceUpdatedBeforeStart":false},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"B01-insufficient","ruleCode":"B01","input":{"workOrderId":201,"actualStarted":true,"sequenceUpdatedBeforeStart":false},"expectedStatus":"insufficient","expectedReasons":[]},
 
-    {"id":"B02-trigger","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false,"approvedReschedule":false},"expectedStatus":"triggered","expectedReasons":["planned_start_missed"]},
-    {"id":"B02-clear","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false,"approvedReschedule":true},"expectedStatus":"clear","expectedReasons":[]},
+    {"id":"B02-trigger","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false,"approvedPlanUpdate":false},"expectedStatus":"triggered","expectedReasons":["planned_start_missed"]},
+    {"id":"B02-clear","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false,"approvedPlanUpdate":true},"expectedStatus":"clear","expectedReasons":[]},
     {"id":"B02-insufficient","ruleCode":"B02","input":{"workOrderId":202,"planVersionId":7,"plannedStartPassed":true,"actualStarted":false},"expectedStatus":"insufficient","expectedReasons":[]},
 
     {"id":"B03-trigger","ruleCode":"B03","input":{"equipmentId":3,"scheduleWindowId":"shift-1","expectedToOperate":true,"activeWorkOrder":false,"excludedState":false,"idleMinutes":31},"expectedStatus":"triggered","expectedReasons":["unexplained_machine_idle"]},

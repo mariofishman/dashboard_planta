@@ -154,18 +154,21 @@
       "productionDependencies": ["Latest approved plan source and EmusaSoft validity mapping"]
     },
     {
-      "code": "B02", "title": "Planned OT has not started on time", "ruleVersion": "1.0.0",
+      "code": "B02", "title": "Planned OT has not started on time", "ruleVersion": "1.0.1",
       "queryId": "b02-planned-start-missed", "queryVersion": "1.0.0-candidate", "keySchemaVersion": 1,
       "naturalKey": ["workOrderId", "planVersionId"], "classification": ["deadline", "deterministic"],
       "labels": ["Error"], "productionReadiness": "fixture-proven-production-pending",
-      "sourceMappings": [{"source":"ordenes_trabajo","fields":["id","id_equipo","fecha_inicio_planificada","fecha_inicio_ejecucion"],"evidence":"backup-confirmed"}],
-      "requiredEvidence": ["workOrderId","planVersionId","plannedStartPassed","actualStarted","approvedReschedule"],
+      "sourceMappings": [
+        {"source":"ordenes_trabajo","fields":["id","id_equipo","fecha_inicio_planificada","fecha_inicio_ejecucion"],"evidence":"backup-confirmed"},
+        {"source":"approved_plan_contract","fields":["planVersionId","plannedStartAt","status","approvedAt"],"evidence":"phase10-pending"}
+      ],
+      "requiredEvidence": ["workOrderId","planVersionId","plannedStartPassed","actualStarted","approvedPlanUpdate"],
       "parameters": {},
-      "predicate": {"all":[{"var":"plannedStartPassed"},{"not":{"var":"actualStarted"}},{"not":{"var":"approvedReschedule"}}]},
+      "predicate": {"all":[{"var":"plannedStartPassed"},{"not":{"var":"actualStarted"}},{"not":{"var":"approvedPlanUpdate"}}]},
       "reasonRules": [{"code":"planned_start_missed","when":{"all":[{"var":"plannedStartPassed"},{"not":{"var":"actualStarted"}}]}}],
-      "resolution": "The OT starts or an approved reschedule supersedes the plan version.",
-      "correlations": ["Link a specific delay cause instead of duplicating the operational problem."],
-      "productionDependencies": ["Plan-version and approved-reschedule semantics"]
+      "resolution": "The OT starts, even late, or an approved full-plan update reschedules, removes, or cancels the OT and supersedes the missed plan version; unrelated actions and alerts do not resolve B02.",
+      "correlations": [],
+      "productionDependencies": ["Approved plan-version source and approved full-plan-update validity mapping"]
     },
     {
       "code": "B03", "title": "Machine has no active OT for more than 30 minutes", "ruleVersion": "1.0.0",

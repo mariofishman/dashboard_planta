@@ -55,7 +55,7 @@ For the A01 exception described during review, material may have been physically
 | A06 | Declare or weigh waste and correct its category. If the missing quantity cannot be recovered, close without resolution and link the resulting D03 gap. |
 | A07 | Declare missing consumption while OT input remains editable, or correct the output/waste evidence. If input is locked and cannot be reconstructed, close without resolution and link D03. |
 | B01 | Update the current plan and record the reason for the sequence change. An already-started historical deviation is closed as explained or closed without resolution when it cannot be reconstructed. |
-| B02 | Start, record the real pause, or reschedule and update the full plan. Close a historical unreconstructable delay without resolution with its affected plan version. |
+| B02 | Start the OT or update the full plan to supersede the missed commitment. A pause alone does not resolve B02. Close a historical unreconstructable delay without resolution with its affected plan version. |
 | B03 | Start the next OT, record the pause, or update the expected production interval. Preserve unexplained historical downtime when closing without resolution. |
 | C01 | Reweigh and correct unit, barcode, or scale association. Close a verified exceptional reel without resolution while preserving both measurements. |
 | C02 | Reweigh or correct the waste category/unit. Close verified exceptional waste without resolution rather than changing a correct value to fit the model. |
@@ -238,11 +238,13 @@ Iteration history is preserved in `archive/docs/product/alert_catalog_iteration_
 | Possible causes | Setup delay, missing materials, unavailable operator, machine problem, or an unrecorded plan change. |
 | Example | OT 151230.1 should start on P15 at 16:00, but at 16:01 it has not started and no revised plan exists. |
 
-**Detection indicators and algorithm:** For each machine plan, find the first pending OT whose planned start is in the past. Alert when it has no actual start and no approved rescheduling event. If another specific incident explains the delay, link it as the reason rather than duplicating the operational problem.
+**Detection indicators and algorithm:** For each machine plan, find the first pending OT whose planned start has arrived or is in the past. Alert when it has no actual start and no approved plan update that supersedes that planned commitment. Maintain one independent condition per `OT + approved plan version`. If the same OT is reprogrammed under a new approved plan version and misses the new start, create a separate B02 occurrence for that new missed commitment. Other alerts remain independent: Monitor does not infer that another alert caused B02, create a cross-alert link, suppress either alert, or couple their lifecycles.
 
 **Primary action owner:** Previous OT still running or schedule simply delayed → **Planner**. Nothing running and no recorded pause → **machine operator** until the real machine state is recorded; after that, the **Planner** owns the plan update.
 
-**Resolution:** If the preceding OT is still running, the planner supplies the expected delay and selects `Actualizar todo el plan`; the system shifts every subsequent OT on that machine. If nothing is running, record a categorized equipment pause and then update the plan. If the historical delay can no longer be reconstructed, an administrator closes without resolution and preserves the observed delay and affected plan version.
+**Resolution:** B02 resolves only after a healthy evaluation observes either that the OT started or that an approved full-plan update superseded the missed commitment. A late start resolves B02 while its missed-start occurrence remains in history. An approved update may assign a later planned start, remove the OT, or cancel it; each outcome resolves the occurrence for the superseded plan version. If a later approved plan version also misses its start, it creates a separate occurrence. Recording an equipment pause, correcting another alert, or recording any other unrelated action does not resolve B02. If the historical delay can no longer be reconstructed, an administrator closes without resolution and preserves the observed delay and affected plan version.
+
+**EmusaSoft ownership boundary:** EmusaSoft determines whether a production-plan update is approved and which plan version is current. Monitor consumes that evidence and does not infer approval, causality, or plan-edit authorization. The approved-plan version and update mapping remain pending source-contract validation.
 
 
 ### B03 — Machine has no active OT for more than 30 minutes
