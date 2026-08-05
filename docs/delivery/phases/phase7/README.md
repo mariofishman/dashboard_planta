@@ -2,7 +2,7 @@
 
 **Role:** Phase 7 status, sequencing, and exit authority
 
-**Status:** Active; standalone laboratory consolidation in progress
+**Status:** Active; standalone laboratory consolidation complete; connected implementation pending
 
 **Project sequencing authority:** [`../../../roadmap.md`](../../../roadmap.md)
 
@@ -18,7 +18,7 @@ D04 is retired into consolidated D01. Historical D04 incidents and current compa
 
 | Stage | Status | Work | Exit condition |
 | --- | --- | --- | --- |
-| 1 — Consolidate reviewed standalone laboratories | **In progress** | Merge one alert branch at a time in dependency order: D01, D02, D03, A01, B01, B02, B03. Preserve reviewed business rules while adapting stale implementation assumptions to the completed Phase 6 baseline. | All seven alert preparations coexist; focused specifications, contracts, tests, typecheck, build, and aggregate review pass with exclusions reported accurately. |
+| 1 — Consolidate reviewed standalone laboratories | **Completed** | Merge one alert branch at a time in dependency order: D01, D02, D03, A01, B01, B02, B03. Preserve reviewed business rules while adapting stale implementation assumptions to the completed Phase 6 baseline. | All seven alert preparations coexist; focused specifications, contracts, tests, typecheck, build, and aggregate review pass with exclusions reported accurately. |
 | 2 — Connect Phase 7 source and lifecycle behavior | Pending | Implement Laboratory actions, `test_database` mappings, bounded read-only queries, polling, occurrence lifecycle, routing, Dashboard, and conversations for each rule. | Every rule passes its connected automated lifecycle and source-boundary gate. |
 | 3 — Complete Phase 7 acceptance | Pending | Run aggregate browser, recurrence, correlation, recovery, routing, Dashboard, and Chat evidence. | The roadmap Phase 7 exit gate passes and the product manager accepts the result. |
 
@@ -42,7 +42,7 @@ D04 is retired into consolidated D01. Historical D04 incidents and current compa
 
 ## Immediate next action
 
-Run the aggregate Stage 1 review across all seven integrated laboratories, cumulative documentation, executable contracts, focused suites, repository tests, typecheck, and build; then present the integration-to-`main` checkpoint separately.
+Present the reviewed integration branch for the separate integration-to-`main` checkpoint. Do not push or begin connected Stage 2 implementation without its own authorization.
 
 ## Phase 7 exit gate
 

@@ -126,6 +126,10 @@ export interface D01CorrelatedCondition {
   sameEvidenceChain: boolean;
 }
 
+export interface D01IndependentCondition {
+  active: boolean;
+}
+
 export interface D01CorrelationClassification {
   A04: "not_active" | "independent_capacity_condition" | "replaced_or_enriched_by_d01";
   A05: "not_active" | "independent_reel_handling_condition";
@@ -455,7 +459,11 @@ export class D01StandaloneLaboratory {
 
 export function classifyD01Correlations(
   evaluation: D01Evaluation,
-  conditions: { A04?: D01CorrelatedCondition; A05?: D01CorrelatedCondition; D03?: D01CorrelatedCondition },
+  conditions: {
+    A04?: D01CorrelatedCondition;
+    A05?: D01CorrelatedCondition;
+    D03?: D01IndependentCondition;
+  },
 ): D01CorrelationClassification {
   const explains = (condition: D01CorrelatedCondition | undefined) => {
     if (!condition) return false;
