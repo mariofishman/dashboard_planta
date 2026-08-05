@@ -6,9 +6,9 @@
 
 **Branch:** `codex/phase6-stage5`
 
-**Latest pushed pre-Step-8B implementation checkpoint:** `27bd646`. The separate future instant-reset plan was added at `1b608b2`. The preserved pre-recovery implementation base is `2319c80`. `main` has not been changed. A pushed checkpoint means the work can be recovered; it does not mean Stage 5 or Step 8 is accepted.
+**Historical pre-Step-8B implementation checkpoint:** `27bd646`. The separate future instant-reset plan was added at `1b608b2`. The preserved pre-recovery implementation base is `2319c80`. The completed Stage 5 branch tip is `f142ae6`, merged into local `main` at `6aa83da`.
 
-**Current Stage 5 status:** Complete on the Stage 5 branch by explicit product decision on 2026-08-05. Step 8B is complete and user-approved; all 34 Step 8C case bodies executed successfully; the product manager accepted the unresolved final-ledger limitation, waived Step 9's duplicate runs, and completed the Step 10 evidence review. Step 11 publication is authorized; Step 12 merge remains separate and has not started.
+**Current Stage 5 status:** Complete and merged into local `main` at merge commit `6aa83da` on 2026-08-05. The reviewed merge passed focused post-merge validators, typecheck, and build. The unresolved final-ledger limitation and Step 9 waiver remain explicitly accepted. `origin/main` has not been pushed because that requires separate authorization.
 
 ## Start here
 
@@ -23,7 +23,7 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 | 3 | Complete Recovery 3–4. | The approved V2 laboratory is connected and the obsolete executable workflow cannot be mistaken for current Stage 5 behavior. |
 | 4 | Complete Recovery 5. | Complete — every affected focused check passes and the development baseline is independently restored and verified. |
 | 5 | Complete Recovery 6. | Complete — new Step 8.2–8.7 evidence passes in one runtime using the approved laboratory. |
-| 6 | Resume the original path at Step 8B. | Step 8B is complete and approved. Step 8C executed all 34 cases; the product manager accepted its unresolved ledger limitation, waived Step 9, and completed Step 10. Step 11 is authorized; Step 12 has not started. |
+| 6 | Resume the original path at Step 8B. | Complete — Steps 8B–12 are complete through the reviewed local merge `6aa83da`; pushing `main` remains separately gated. |
 
 ### Exact next action
 
@@ -42,6 +42,7 @@ The project is not starting Stage 5 again. It is correcting one wrong interface,
 13. Evidence limitation identified — the final ledger validator rejected result assembly for absence-case identifiers, scheduling evidence, source/read revision representation, and fixture-population mutation evidence. The user directed that the expensive 34-case execution not be rerun and declined further ledger work at its current time and token cost. This initially left Step 8C formally incomplete; item 15 records the later explicit product acceptance of that limitation.
 14. Waived by product decision — on 2026-08-05 the product manager removed Step 9's requirement for two additional complete runs because it is disproportionate and redundant for the project's practical objective after Step 8B review and Step 8C execution. This waiver removes the repeatability gate; it does not convert the invalid Step 8C ledger into accepted evidence.
 15. Complete by product decision — on 2026-08-05 the product manager reviewed the recorded final evidence and limitations, accepted Stage 5 as complete for the project's practical purpose despite the invalid ledger and waived repeatability evidence, and authorized Step 11 commit and push. This decision does not claim that the missing evidence passed and does not authorize Step 12 merge.
+16. Complete locally — Step 11 commit `f142ae6` was pushed to `origin/codex/phase6-stage5`; the user then authorized Step 12. The reviewed branch was merged without conflicts into local `main` at `6aa83da`, and focused fixture, declaration, ledger, browser-harness, browser-evidence, typecheck, build, and diff checks passed. Pushing `main` remains separately gated.
 
 Recovery 3–4 is committed and pushed at `30ed384`; Recovery 5 is committed and pushed at `d2ef6af`; Recovery 6 is committed and pushed at `5a9b28b`.
 
@@ -99,8 +100,8 @@ The audit did not find evidence of a second active A02, A03, or A05 rule path. T
 | Step 8C final 34-case execution | Accepted with an explicit evidence limitation. Run `step8c-full-20260805-sequential-r2` completed all 34 approved cases across 37 lanes and restored the source, but its final ledger failed validation. The product manager accepted that limitation without authorizing a rerun. |
 | Step 9 repeatability runs | Waived by the product manager on 2026-08-05. No additional complete runs are required. |
 | Step 10 final evidence review | Complete by product decision on 2026-08-05. |
-| Step 11 commit and push | Authorized and in progress. |
-| Step 12 merge | Not started; separate approval is required. |
+| Step 11 commit and push | Complete at `f142ae6`; local and remote Stage 5 branches match. |
+| Step 12 merge | Complete locally at merge commit `6aa83da`; post-merge checks pass. `origin/main` is unchanged pending separate push authorization. |
 
 ### What we are not starting over
 
@@ -737,8 +738,8 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 | 8C | Execute the exact 34 connected acceptance cases and produce final result records. | Accepted by product decision with the invalid final-ledger limitation explicitly retained. |
 | 9 | Run the complete finished version twice from clean starting states. | Waived by product decision on 2026-08-05. |
 | 10 | Review all final evidence and decide whether Stage 5 is genuinely complete. | Complete by product decision on 2026-08-05. |
-| 11 | Commit and push the completed Stage 5 branch. | Authorized on 2026-08-05; no merge. |
-| 12 | Review and merge Stage 5 into `main`. | Separate explicit merge approval and separate approval before pushing `main`. |
+| 11 | Commit and push the completed Stage 5 branch. | Complete at `f142ae6`. |
+| 12 | Review and merge Stage 5 into `main`. | Complete locally at `6aa83da`; pushing `main` remains separately gated. |
 
 ### Step 8B — Add passive Dashboard and Chat previews
 
@@ -846,6 +847,8 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 
 ### Step 12 — Review and merge Stage 5 into `main`
 
+**Execution record — 2026-08-05:** The user explicitly authorized review and merge. The Stage 5 branch was clean, synchronized with `origin/codex/phase6-stage5`, directly based on current `origin/main`, and contained no tracked protected or runtime data. It merged without conflicts into local `main` as `6aa83da`. Focused fixture, declaration, ledger, browser-harness, browser-evidence, typecheck, build, and diff checks passed on the merged tree. The connected 8C suite was not rerun and the database was not reset. `origin/main` remains unchanged pending separate push authorization.
+
 **Purpose:** Make Stage 5 part of the canonical project only after final review.
 
 **Work:**
@@ -859,7 +862,7 @@ Recovery does not replace the rest of Stage 5. It returns the project to the poi
 - Push `main` only with separate explicit authorization.
 - Keep the Stage 5 branch until the merged result is verified.
 
-**Done when:** Stage 5 is merged, verified, and accurately documented on `main`.
+**Done when:** Complete locally — Stage 5 is merged, verified, and accurately documented on local `main`. Remote publication still requires separate authorization.
 
 **Approval:** Merge approval and permission to push `main` are separate decisions.
 
