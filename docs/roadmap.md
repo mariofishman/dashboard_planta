@@ -6,7 +6,7 @@
 
 **Version:** 3.0
 
-**Status:** Active; Phases 0–6 complete locally; Phase 7 is ready after the accepted Phase 6 branch is delivered to `main`
+**Status:** Active; Phases 0–6 complete and published; Phase 7 is ready to begin
 
 **Roadmap date:** 2026-08-02
 
@@ -85,7 +85,7 @@ Phase 5 remains complete. Its dynamic routing behavior will receive additional e
 
 ## 5. Phase 6 — Source-compatible testing, conversations, and messages
 
-**Status:** Complete locally and accepted on 2026-08-05. Stage 5 is published on `origin/main` at `e05684b`: Step 8B was approved, all 34 Step 8C case bodies executed, the unresolved final-ledger limitation was accepted, Step 9 was waived, and Steps 10–12 completed. Stage 6 retired the superseded source boundary, passed proportional validation, and completed the Phase 6 exit review. Branch delivery to `main` remains.
+**Status:** Complete and published on 2026-08-05. Stage 5 was published at `e05684b`: Step 8B was approved, all 34 Step 8C case bodies executed, the unresolved final-ledger limitation was accepted, Step 9 was waived, and Steps 10–12 completed. Stage 6 retirement commit `af8ce41` merged into `main` at `504ee50`, passed proportional post-merge validation, and completed the Phase 6 exit review.
 
 **Purpose:** Establish the correct separate-database testing architecture and deliver accepted conversations and messages driven by realistically detected A02, A03, and A05 incidents.
 
@@ -116,7 +116,7 @@ The EmusaSoft MCP is useful for discovering entities, fields, types, relationshi
 
 The redesign covers only A02, A03, and A05.
 
-The standalone V2 laboratory and its documented browser matrix are implemented. The [Stage 5 recovery and completion plan](delivery/phases/phase6/stage5_corrective_execution_plan.md) is the sole current Stage 5 execution and evidence authority; [`alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) remains the supporting laboratory specification. Stage 2 user review was completed and approved on 2026-07-31. Recovery ported V2 onto `/dev/scenarios` using the connected database and Monitor services, replacement Steps 8.2–8.7 passed, and Step 8B was approved. On 2026-08-05 all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final ledger failed evidence-format validation. The product manager accepted that unresolved limitation, waived Step 9's two additional complete runs and the resulting absence of independent repeatability evidence, and completed the Step 10 evidence review. Step 11 completed at `f142ae6`; the reviewed branch merged without conflicts into `main` at `6aa83da`; focused post-merge checks passed; and the final record was published on `origin/main` at `e05684b`. The completed Stage 5 branch was then deleted locally and remotely. Stage 5 is complete. Stage 6 retirement implementation, proportional validation, and final exit review are complete locally on `codex/phase6-stage6`. Phase 7 may begin after this accepted branch is delivered to `main`.
+The standalone V2 laboratory and its documented browser matrix are implemented. The [Stage 5 recovery and completion plan](delivery/phases/phase6/stage5_corrective_execution_plan.md) remains the Stage 5 execution and evidence authority; [`alertas_fake_audit_and_redesign_v2.md`](delivery/phases/phase6/alertas_fake_audit_and_redesign_v2.md) remains the supporting laboratory specification. Stage 2 user review was completed and approved on 2026-07-31. Recovery ported V2 onto `/dev/scenarios` using the connected database and Monitor services, replacement Steps 8.2–8.7 passed, and Step 8B was approved. On 2026-08-05 all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final ledger failed evidence-format validation. The product manager accepted that unresolved limitation, waived Step 9's two additional complete runs and the resulting absence of independent repeatability evidence, and completed the Step 10 evidence review. Stage 5 was published at `e05684b`. Stage 6 retirement commit `af8ce41` then removed the superseded operational source boundary, merged into `main` at `504ee50`, and passed proportional post-merge validation. Phase 6 is complete and Phase 7 is ready to begin.
 
 For each scenario, define in simple business language:
 
@@ -134,7 +134,7 @@ For each scenario, define in simple business language:
 
 ### 5.4 Workstream D — Remove the incorrect synthetic source boundary
 
-**Status:** Complete and accepted in Stage 6; branch delivery remains.
+**Status:** Complete, accepted, and published in Stage 6.
 
 - Run every A02, A03, and A05 lifecycle through `test_database` and the normal polling adapter.
 - Compare the observed business outcomes with the approved rule contracts: trigger, persistence, deduplication, correction, resolution, failed-cycle preservation, and recurrence.

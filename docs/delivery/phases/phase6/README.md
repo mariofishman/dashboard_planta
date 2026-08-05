@@ -2,7 +2,7 @@
 
 **Role:** Phase 6 status index; the linked Stage 5 recovery and completion plan is the sole Stage 5 execution and evidence authority
 
-**Status:** Complete locally and accepted — 2026-08-05; branch delivery to `main` remains
+**Status:** Complete, accepted, merged, verified, and published — 2026-08-05
 
 **Project sequencing authority:** [`../../../roadmap.md`](../../../roadmap.md)
 
@@ -16,9 +16,9 @@ The three prerequisite workstreams are complete within their separate scopes:
 - the guarded, resettable local `test_database`; and
 - the approved standalone `alertas_fake` Stage 2 laboratory and its 34 valid tests.
 
-Commit `165abc1` remains a preserved pre-recovery checkpoint; its useful implementation was corrected and revalidated through Recovery 1–6. Step 8B is complete and approved. On 2026-08-05, all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final evidence ledger failed validation. The product manager explicitly accepted that limitation, waived Step 9's two additional complete runs, and completed the Step 10 evidence review. Step 11 completed at `f142ae6`. The reviewed branch then merged without conflicts into `main` at `6aa83da`, focused post-merge checks passed, and the completion record was committed at `e05684b`. Local and remote `main` match at `e05684b`; the completed Stage 5 branch was deleted locally and remotely after containment was verified. Stage 5 is complete without claiming that the missing evidence passed. Stage 6 retirement implementation, validation, and final exit review are complete locally and accepted; branch delivery remains.
+Commit `165abc1` remains a preserved pre-recovery checkpoint; its useful implementation was corrected and revalidated through Recovery 1–6. Step 8B is complete and approved. On 2026-08-05, all 34 Step 8C case bodies executed successfully across 37 lanes and the source was restored, but the final evidence ledger failed validation. The product manager explicitly accepted that limitation, waived Step 9's two additional complete runs, and completed the Step 10 evidence review. Step 11 completed at `f142ae6`. The reviewed Stage 5 branch then merged without conflicts into `main` at `6aa83da`, focused post-merge checks passed, and the completion record was published at `e05684b`. Stage 6 retirement commit `af8ce41` was pushed, merged without conflicts into `main` at `504ee50`, and passed proportional post-merge database, API, typecheck, build, and diff validation. Phase 6 is complete without changing the accepted Stage 5 evidence limitations.
 
-The three workstreams now coexist on published `main` through the Stage 5 merge. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It originally connected that correct boundary behind the older scenario-screen composition. Recovery 3 later connected the approved tabbed V2 laboratory on `/dev/scenarios`, and Recovery 6 produced the passing replacement Step 8.2–8.7 evidence. The earlier browser run remains diagnostic history and is invalid for acceptance.
+The three workstreams coexist on published `main` through the completed Phase 6 delivery. Stage 4 remains complete only within its documented separate-source write, read-only polling, and A02/A03/A05 incident-lifecycle scope. It originally connected that correct boundary behind the older scenario-screen composition. Recovery 3 later connected the approved tabbed V2 laboratory on `/dev/scenarios`, and Recovery 6 produced the passing replacement Step 8.2–8.7 evidence. The earlier browser run remains diagnostic history and is invalid for acceptance.
 
 ## Stage plan
 
@@ -29,11 +29,11 @@ The three workstreams now coexist on published `main` through the Stage 5 merge.
 | 3 — Inspect the `test_database` handoff | Complete — 2026-07-31 | Verified the merged runtime, reset safeguards, readiness contract, credentials, Node driver access, and A02/A03/A05 source mappings. | **Ready with exact gaps.** The evidence, approved mappings, corrections, and Stage 4 gaps are recorded in the Stage 3 handoff. |
 | 4 — Connect the testing boundary | Complete — 2026-07-31 | Reconciled contracts and fixtures; connected `alertas_fake` writes and Monitor read-only adapters through the normal scheduler; connected the older `/dev/scenarios` composition to `test_database`. | Source actions changed only `test_database`; complete polling opened, deduplicated, and resolved the correct Monitor incidents. This did not connect or accept the approved V2 interface. |
 | 5 — Run connected acceptance | **Complete and published — 2026-08-05** | Step 8B is approved; all 34 Step 8C cases executed; the final ledger limitation and Step 9 waiver are explicitly accepted; Steps 10–12 are complete. | Complete — merge `6aa83da` passed focused post-merge checks and `origin/main` contains the final record at `e05684b`. |
-| 6 — Finalize Phase 6 | **Complete and accepted locally — 2026-08-05** | Audited the accepted Stage 5 result. Retired the Monitor-owned source simulator, runtime fixture and backup sources, fake source tables and registrations, hardcoded Phase 4 incidents, and tests that manufactured EmusaSoft facts inside Monitor. | Complete — the product manager accepted the final Phase 6 result without changing the previously accepted Stage 5 limitations. |
+| 6 — Finalize Phase 6 | **Complete and published — 2026-08-05** | Audited the accepted Stage 5 result. Retired the Monitor-owned source simulator, runtime fixture and backup sources, fake source tables and registrations, hardcoded Phase 4 incidents, and tests that manufactured EmusaSoft facts inside Monitor. | Complete — merge `504ee50` passed proportional post-merge validation and the product manager's final acceptance preserves the recorded Stage 5 limitations. |
 
-## Immediate next action — Phase 6 delivery
+## Immediate next action — Phase 7
 
-Review, commit, push, and merge `codex/phase6-stage6` through the normal separate approval gates. After publication on `main`, Phase 7 may begin from the delivered Phase 6 result.
+Begin Phase 7 from the published Phase 6 result. Phase 7 must continue using the Laboratory → `test_database` → Monitor polling boundary and must not restore a Monitor-owned operational source simulator.
 
 Local retirement evidence: the migrated Monitor database contains zero `monitor_sim_*` tables, zero fixture/simulator/backup query registrations, three `test_database` query registrations, and no hardcoded incidents or conversations. Database tests pass 3/3, focused API server tests pass 12/12, detection tests pass 15/15 including six connected source-action cases, workspace typecheck and build pass, and `git diff --check` passes. The complete 34-case Stage 5 suite was not rerun.
 
